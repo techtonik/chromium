@@ -47,11 +47,9 @@ WebStateImpl::~WebStateImpl() {
 
   FOR_EACH_OBSERVER(WebStateObserver, observers_, WebStateDestroyed());
   FOR_EACH_OBSERVER(WebStateObserver, observers_, ResetWebState());
-  for (WebStatePolicyDecider* policy_decider : policy_deciders_) {
-    policy_decider->WebStateDestroyed();
-    policy_decider->ResetWebState();
-  }
-  policy_deciders_.clear();
+  FOR_EACH_OBSERVER(WebStatePolicyDecider, policy_deciders_,
+                    WebStateDestroyed());
+  FOR_EACH_OBSERVER(WebStatePolicyDecider, policy_deciders_, ResetWebState());
   DCHECK(script_command_callbacks_.empty());
   if (request_tracker_.get())
     CloseRequestTracker();
@@ -68,13 +66,19 @@ void WebStateImpl::RemoveObserver(WebStateObserver* observer) {
 }
 
 void WebStateImpl::AddPolicyDecider(WebStatePolicyDecider* decider) {
-  DCHECK_EQ(0u, policy_deciders_.count(decider));
-  policy_deciders_.insert(decider);
+  // Despite the name, ObserverList is actually generic, so it is used for
+  // deciders. This makes the call here odd looking, but it's really just
+  // managing the list, not setting observers on deciders.
+  DCHECK(!policy_deciders_.HasObserver(decider));
+  policy_deciders_.AddObserver(decider);
 }
 
 void WebStateImpl::RemovePolicyDecider(WebStatePolicyDecider* decider) {
-  DCHECK_LT(0u, policy_deciders_.count(decider));
-  policy_deciders_.erase(decider);
+  // Despite the name, ObserverList is actually generic, so it is used for
+  // deciders. This makes the call here odd looking, but it's really just
+  // managing the list, not setting observers on deciders.
+  DCHECK(policy_deciders_.HasObserver(decider));
+  policy_deciders_.RemoveObserver(decider);
 }
 
 bool WebStateImpl::Configured() const {
@@ -352,10 +356,11 @@ void WebStateImpl::ClearTransientContentView() {
     web::NavigationItem* currentItem =
         [sessionController.currentEntry navigationItem];
     if (currentItem->IsUnsafe()) {
-      // The unsafe page should be removed from history, and, in fact,
-      // SafeBrowsingBlockingPage will do just that *provided* that it
-      // isn't the current page. So to make this happen, before removing the
-      // interstitial, have the session controller go back one page.
+      // The unsafe page or page with bad SSL cert should be removed from the
+      // history, and, in fact, Safe Browsing and SSL interstitials will do
+      // just that *provided* that it isn't the current page.
+      // So to make this happen, before removing the interstitial, have the
+      // session controller go back one page.
       [sessionController goBack];
     }
     [sessionController discardNonCommittedEntries];
@@ -396,7 +401,9 @@ void WebStateImpl::ExecuteJavaScriptAsync(const base::string16& javascript) {
 }
 
 bool WebStateImpl::ShouldAllowRequest(NSURLRequest* request) {
-  for (WebStatePolicyDecider* policy_decider : policy_deciders_) {
+  base::ObserverListBase<WebStatePolicyDecider>::Iterator it(&policy_deciders_);
+  WebStatePolicyDecider* policy_decider = nullptr;
+  while ((policy_decider = it.GetNext()) != nullptr) {
     if (!policy_decider->ShouldAllowRequest(request))
       return false;
   }
@@ -404,7 +411,9 @@ bool WebStateImpl::ShouldAllowRequest(NSURLRequest* request) {
 }
 
 bool WebStateImpl::ShouldAllowResponse(NSURLResponse* response) {
-  for (WebStatePolicyDecider* policy_decider : policy_deciders_) {
+  base::ObserverListBase<WebStatePolicyDecider>::Iterator it(&policy_deciders_);
+  WebStatePolicyDecider* policy_decider = nullptr;
+  while ((policy_decider = it.GetNext()) != nullptr) {
     if (!policy_decider->ShouldAllowResponse(response))
       return false;
   }

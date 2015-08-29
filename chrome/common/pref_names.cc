@@ -298,7 +298,6 @@ const char kWebKitUsesUniversalDetector[] =
     "webkit.webprefs.uses_universal_detector";
 const char kWebKitTextAreasAreResizable[] =
     "webkit.webprefs.text_areas_are_resizable";
-const char kWebKitJavaEnabled[] = "webkit.webprefs.java_enabled";
 const char kWebkitTabsToLinks[] = "webkit.webprefs.tabs_to_links";
 const char kWebKitAllowDisplayingInsecureContent[] =
     "webkit.webprefs.allow_displaying_insecure_content";
@@ -912,7 +911,7 @@ const char kPluginsEnabledPlugins[] = "plugins.plugins_enabled";
 const char kNpapiFlashMigratedToPepperFlash[] =
     "plugins.npapi_flash_migrated_to_pepper_flash";
 
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_PLUGINS)
 // Whether about:plugins is shown in the details mode or not.
 const char kPluginsShowDetails[] = "plugins.show_details";
 #endif
@@ -953,27 +952,18 @@ const char kShowUpdatePromotionInfoBar[] =
 // true, we draw a custom chrome frame (thicker title bar and blue border).
 const char kUseCustomChromeFrame[] = "browser.custom_chrome_frame";
 
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_PLUGINS)
 // Which plugins have been whitelisted manually by the user.
 const char kContentSettingsPluginWhitelist[] =
     "profile.content_settings.plugin_whitelist";
 #endif
 
-// Boolean that is true when all locally stored site data (e.g. cookies, local
-// storage, etc..) should be deleted on exit.
-const char kClearSiteDataOnExit[] = "profile.clear_site_data_on_exit";
-
 // Double that indicates the default zoom level.
 const char kPartitionDefaultZoomLevel[] = "partition.default_zoom_level";
-// TODO(wjmaclean): Remove this once sufficient users have migrated to the
-// per-StoragePartition zoom levels. http://crbug.com/420643.
-const char kDefaultZoomLevelDeprecated[] = "profile.default_zoom_level";
 
 // Dictionary that maps hostnames to zoom levels.  Hosts not in this pref will
 // be displayed at the default zoom level.
 const char kPartitionPerHostZoomLevels[] = "partition.per_host_zoom_levels";
-// TODO(wjmaclean): Remove this.
-const char kPerHostZoomLevelsDeprecated[] = "profile.per_host_zoom_levels";
 
 // A dictionary that tracks the default data model to use for each section of
 // the dialog.
@@ -1198,10 +1188,16 @@ const char kToolbarIconSurfacingBubbleLastShowTime[] =
     "toolbar_icon_surfacing_bubble_show_time";
 #endif
 
+#if defined(ENABLE_WEBRTC)
 // Whether WebRTC should bind to individual NICs to explore all possible routing
 // options. Default is true.
-#if defined(ENABLE_WEBRTC)
 const char kWebRTCMultipleRoutesEnabled[] = "webrtc.multiple_routes_enabled";
+// Whether WebRTC should use non-proxied UDP. If false, WebRTC will not send UDP
+// unless it goes through a proxy (i.e RETURN when it's available).  If no UDP
+// proxy is configured, it will not send UDP.  If true, WebRTC will send UDP
+// regardless of whether or not a proxy is configured.
+const char kWebRTCNonProxiedUdpTransportEnabled[] =
+    "webrtc.nonproxied_udp_transport_enabled";
 #endif
 
 // *************** LOCAL STATE ***************
@@ -1263,35 +1259,6 @@ const char kMetricsReportingEnabled[] =
 const char kCrashReportingEnabled[] =
     "user_experience_metrics_crash.reporting_enabled";
 #endif
-
-// Base64-encoded compressed serialized form of the variations seed protobuf.
-const char kVariationsCompressedSeed[] = "variations_compressed_seed";
-
-// 64-bit integer serialization of the base::Time from the last successful seed
-// fetch (i.e. when the Variations server responds with 200 or 304).
-const char kVariationsLastFetchTime[] = "variations_last_fetch_time";
-
-// The latest country code received by the VariationsService for evaluating
-// studies.
-const char kVariationsCountry[] = "variations_country";
-
-// Pair of <Chrome version string, country code string> representing the country
-// used for filtering permanent consistency studies until the next time Chrome
-// is updated.
-const char kVariationsPermanentConsistencyCountry[] =
-    "variations_permanent_consistency_country";
-
-// String for the restrict parameter to be appended to the variations URL.
-const char kVariationsRestrictParameter[] = "variations_restrict_parameter";
-
-// Base64-encoded serialized form of the variations seed protobuf.
-const char kVariationsSeed[] = "variations_seed";
-
-// 64-bit integer serialization of the base::Time from the last seed received.
-const char kVariationsSeedDate[] = "variations_seed_date";
-
-// Digital signature of the binary variations seed data, base64-encoded.
-const char kVariationsSeedSignature[] = "variations_seed_signature";
 
 // Number of times a page load event occurred since the last report.
 const char kStabilityPageLoadCount[] =
@@ -1709,9 +1676,7 @@ const char kBuiltInDnsClientEnabled[] = "async_dns.enabled";
 // See also kAudioCaptureAllowedUrls.
 const char kAudioCaptureAllowed[] = "hardware.audio_capture_enabled";
 // Holds URL patterns that specify URLs that will be granted access to audio
-// capture devices without prompt.  NOTE: This whitelist is currently only
-// supported when running in kiosk mode.
-// TODO(tommi): Update comment when this is supported for all modes.
+// capture devices without prompt.
 const char kAudioCaptureAllowedUrls[] = "hardware.audio_capture_allowed_urls";
 
 // A pref holding the value of the policy used to explicitly allow or deny
@@ -1720,9 +1685,7 @@ const char kAudioCaptureAllowedUrls[] = "hardware.audio_capture_allowed_urls";
 // is not allowed and no prompt will be shown.
 const char kVideoCaptureAllowed[] = "hardware.video_capture_enabled";
 // Holds URL patterns that specify URLs that will be granted access to video
-// capture devices without prompt.  NOTE: This whitelist is currently only
-// supported when running in kiosk mode.
-// TODO(tommi): Update comment when this is supported for all modes.
+// capture devices without prompt.
 const char kVideoCaptureAllowedUrls[] = "hardware.video_capture_allowed_urls";
 
 // A boolean pref that controls the enabled-state of hotword search voice

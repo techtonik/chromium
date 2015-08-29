@@ -405,10 +405,6 @@
       # Set to select the Title Case versions of strings in GRD files.
       'use_titlecase_in_grd%': 0,
 
-      # Use translations provided by volunteers at launchpad.net.  This
-      # currently only works on Linux.
-      'use_third_party_translations%': 0,
-
       # Remoting compilation is enabled by default. Set to 0 to disable.
       'remoting%': 1,
 
@@ -684,10 +680,10 @@
       'host_clang%': 1,
 
       # Variables to control Link-Time Optimization (LTO).
-      # On Android, the variable use_lto enables LTO on code compiled with -Os,
-      # and use_lto_o2 enables LTO on code compiled with -O2. On other
-      # platforms, use_lto enables LTO in all translation units, and use_lto_o2
-      # has no effect.
+      # On Android, when using GCC LTO, the variable use_lto enables LTO on code
+      # compiled with -Os, and use_lto_o2 enables LTO on code compiled with -O2.
+      # On other platforms (including Android with Clang), use_lto enables LTO
+      # in all translation units, and use_lto_o2 has no effect.
       #
       # On Linux and Android, when using LLVM LTO, the script
       # build/download_gold_plugin.py must be run to download a linker plugin.
@@ -695,8 +691,10 @@
       # tools/clang/scripts/update.py and the absolute path to
       # third_party/llvm-build/Release+Asserts/lib must be added to
       # $DYLD_LIBRARY_PATH to pick up the right version of the linker plugin.
+      # TODO(pcc): Teach build system to use -lto_library flag to specify path
+      # to linker plugin on Mac.
       #
-      # On Android, the variables must *not* be enabled at the same time.
+      # On Android/GCC, the variables must *not* be enabled at the same time.
       # In this case LTO would 'merge' the optimization flags at link-time
       # which would lead to all code be optimized with -O2. See crbug.com/407544
       'use_lto%': 0,
@@ -902,6 +900,13 @@
           'chromium_win_pch%': 1
         }],
 
+        # Whether PDF plugin is enabled.
+        ['OS=="android" or OS=="ios" or (embedded==1 and chromecast==0)', {
+          'enable_pdf%': 0,
+        }, {
+          'enable_pdf%': 1,
+        }],
+
         ['chromeos==1 or OS=="android" or OS=="ios" or desktop_linux==1', {
           'enable_plugin_installation%': 0,
         }, {
@@ -1034,10 +1039,15 @@
         }, {
           'pkg-config': 'pkg-config'
         }],
-      ],
 
-      # WebVR support disabled until platform implementations have been added
-      'enable_webvr%': 0,
+        # Enable WebVR support by default on Android
+        # Still requires command line flag to access API
+        ['OS=="android"', {
+          'enable_webvr%': 1,
+        }, {
+          'enable_webvr%': 0,
+        }],
+      ],
 
       # Setting this to '0' will cause V8's startup snapshot to be
       # embedded in the binary instead of being a external files.
@@ -1161,7 +1171,6 @@
     'win_fastlink%': '<(win_fastlink)',
     'enable_resource_whitelist_generation%': '<(enable_resource_whitelist_generation)',
     'use_titlecase_in_grd%': '<(use_titlecase_in_grd)',
-    'use_third_party_translations%': '<(use_third_party_translations)',
     'remoting%': '<(remoting)',
     'enable_one_click_signin%': '<(enable_one_click_signin)',
     'enable_pre_sync_backup%': '<(enable_pre_sync_backup)',
@@ -1202,6 +1211,7 @@
     'order_profiling%': '<(order_profiling)',
     'order_text_section%': '<(order_text_section)',
     'enable_extensions%': '<(enable_extensions)',
+    'enable_pdf%': '<(enable_pdf)',
     'enable_plugin_installation%': '<(enable_plugin_installation)',
     'enable_plugins%': '<(enable_plugins)',
     'enable_session_service%': '<(enable_session_service)',
@@ -1431,9 +1441,6 @@
 
     # TODO(thakis): Make this a blacklist instead, http://crbug.com/101600
     'enable_wexit_time_destructors%': 0,
-
-    # Build libpeerconnection as a static library by default.
-    'libpeer_target_type%': 'static_library',
 
     # Set to 1 to compile with the OpenGL ES 2.0 conformance tests.
     'internal_gles2_conform_tests%': 0,
@@ -1715,8 +1722,8 @@
             'android_ndk_absolute_root%': '<!(cd <(DEPTH) && pwd -P)/third_party/android_tools/ndk/',
             'android_host_arch%': '<!(uname -m)',
             # Android API-level of the SDK used for compilation.
-            'android_sdk_version%': '22',
-            'android_sdk_build_tools_version%': '22.0.0',
+            'android_sdk_version%': '23',
+            'android_sdk_build_tools_version%': '23.0.0',
             'host_os%': "<!(uname -s | sed -e 's/Linux/linux/;s/Darwin/mac/')",
 
             'conditions': [
@@ -1844,7 +1851,7 @@
         'use_openssl_certs%': 1,
 
         'proprietary_codecs%': '<(proprietary_codecs)',
-        'safe_browsing%': 2,
+        'safe_browsing%': 3,
         'enable_web_speech%': 0,
         'java_bridge%': 1,
         'use_allocator%': 'none',
@@ -2105,13 +2112,6 @@
       ['use_titlecase_in_grd==1', {
         'grit_defines': ['-D', 'use_titlecase'],
       }],
-      ['use_third_party_translations==1', {
-        'grit_defines': ['-D', 'use_third_party_translations'],
-        'locales': [
-          'ast', 'bs', 'ca@valencia', 'en-AU', 'eo', 'eu', 'gl', 'hy', 'ia',
-          'ka', 'ku', 'kw', 'ms', 'ug'
-        ],
-      }],
       ['OS=="android"', {
         'grit_defines': [
           '-t', 'android',
@@ -2197,6 +2197,9 @@
       }],
       ['mac_views_browser==1', {
         'grit_defines': ['-D', 'mac_views_browser'],
+      }],
+      ['enable_topchrome_md==1', {
+        'grit_defines': ['-D', 'enable_topchrome_md'],
       }],
       ['enable_resource_whitelist_generation==1 and OS!="win"', {
         'grit_rc_header_format': ['-h', '#define {textual_id} _Pragma("whitelisted_resource_{numeric_id}") {numeric_id}'],
@@ -2991,6 +2994,9 @@
       ['enable_dart==1', {
         'defines': ['WEBKIT_USING_DART=1'],
       }],
+      ['enable_pdf==1', {
+        'defines': ['ENABLE_PDF=1'],
+      }],
       ['enable_plugin_installation==1', {
         'defines': ['ENABLE_PLUGIN_INSTALLATION=1'],
       }],
@@ -3140,9 +3146,6 @@
       ['chromium_code==0', {
         'variables': {
           'clang_warning_flags': [
-            # TODO(mgiuca): Move this suppression into individual third-party
-            # libraries as required. http://crbug.com/505301.
-            '-Wno-overloaded-virtual',
             # TODO(thakis): Move this suppression into individual third-party
             # libraries as required. http://crbug.com/505316.
             '-Wno-unused-function',
@@ -3324,6 +3327,22 @@
             ],
           },
         },
+        'conditions': [
+          ['OS=="win" and win_fastlink==1', {
+            'msvs_settings': {
+              'VCLinkerTool': {
+                # /PROFILE is incompatible with /debug:fastlink
+                'Profile': 'false',
+                'AdditionalOptions': [
+                  # Tell VS 2015+ to create a PDB that references debug
+                  # information in .obj and .lib files instead of copying
+                  # it all.
+                  '/DEBUG:FASTLINK',
+                ],
+              },
+            },
+          }],
+        ],
       },
       'x86_Base': {
         'abstract': 1,
@@ -3568,22 +3587,6 @@
           }],
           ['OS=="win"', {
             'defines': ['NO_TCMALLOC'],
-            'conditions': [
-              ['win_fastlink==1', {
-                'msvs_settings': {
-                  'VCLinkerTool': {
-                    # /PROFILE is incompatible with /debug:fastlink
-                    'Profile': 'false',
-                    'AdditionalOptions': [
-                      # Tell VS 2015+ to create a PDB that references debug
-                      # information in .obj and .lib files instead of copying
-                      # it all.
-                      '/DEBUG:FASTLINK',
-                    ],
-                  },
-                },
-              }],
-            ],
           }],
           # _FORTIFY_SOURCE isn't really supported by Clang now, see
           # http://llvm.org/bugs/show_bug.cgi?id=16821.
@@ -3955,8 +3958,14 @@
                 'conditions': [
                   # Use gold linker for Android ia32 target.
                   ['OS=="android"', {
+                     # Use gold linker for Android ia32 target.
                     'ldflags': [
                       '-fuse-ld=gold',
+                    ],
+                    # Use -mstackrealign due to a bug on ia32 Jelly Bean.
+                    # See crbug.com/521527
+                    'cflags': [
+                      '-mstackrealign',
                     ],
                   }],
                 ],
@@ -5799,8 +5808,7 @@
 
                   # TODO(hans): Make this list shorter eventually, http://crbug.com/504657
                   '-Qunused-arguments',  # http://crbug.com/504658
-                  '-Wno-microsoft',  # http://crbug.com/505296
-                  '-Wno-switch',  # http://crbug.com/505308
+                  '-Wno-microsoft-enum-value',  # http://crbug.com/505296
                   '-Wno-unknown-pragmas',  # http://crbug.com/505314
                   '-Wno-unused-value',  # http://crbug.com/505318
                 ],

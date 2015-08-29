@@ -7684,76 +7684,91 @@ should be able to be added at any place in this file.
 <action name="MobileContextMenuCopyImageLinkAddress">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuCopyLinkAddress">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuCopyLinkText">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuDownloadImage">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuDownloadLink">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuDownloadVideo">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuImage">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuLink">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuOpenImageInNewTab">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuOpenLink">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuOpenLinkInIncognito">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuOpenLinkInNewTab">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuOpenOriginalImageInNewTab">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of the metric.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuSaveImage">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuSearchByImage">
   <owner>bdibello@chromium.org</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuShareLink">
@@ -7765,16 +7780,19 @@ should be able to be added at any place in this file.
 <action name="MobileContextMenuText">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuVideo">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileContextMenuViewImage">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+  <obsolete>Deprecated as of 8/2015</obsolete>
 </action>
 
 <action name="MobileFirstEditInOmnibox">
@@ -8558,23 +8576,41 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="Notifications.Mute">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <description>Please enter the description of this user action.</description>
+  <owner>dewittj@chromium.org</owner>
+  <description>
+    Recorded when a user enables the message center's Do Not Disturb mode.
+  </description>
 </action>
 
 <action name="Notifications.ShowMessageCenter">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <description>Please enter the description of this user action.</description>
+  <owner>dewittj@chromium.org</owner>
+  <description>
+    Recorded when the message center screen is being presented to the user.
+  </description>
 </action>
 
 <action name="Notifications.ShowSettings">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <description>Please enter the description of this user action.</description>
+  <owner>dewittj@chromium.org</owner>
+  <description>
+    Recorded when the message center settings screen is being presented to the
+    user.
+  </description>
+</action>
+
+<action name="Notifications.ShowSiteSettings">
+  <owner>peter@chromium.org</owner>
+  <description>
+    Recorded when a user clicks on the Site Settings button included with Web
+    Notifications.
+  </description>
 </action>
 
 <action name="Notifications.Unmute">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <description>Please enter the description of this user action.</description>
+  <owner>dewittj@chromium.org</owner>
+  <description>
+    Recorded when the message center's Do Not Disturb mode is disabled, either
+    due to manual user action, or because a timed Do Not Disturb expires.
+  </description>
 </action>
 
 <action name="Omnibox.ServerSuggestDelete.Failure">
@@ -9101,8 +9137,11 @@ should be able to be added at any place in this file.
 </action>
 
 <action name="Options_DefaultNotificationsSettingChanged">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <description>Please enter the description of this user action.</description>
+  <owner>peter@chromium.org</owner>
+  <description>
+    Recorded when the default value for the Notifications content setting is
+    changed by the user.
+  </description>
 </action>
 
 <action name="Options_DefaultPluginsSettingChanged">
@@ -11200,6 +11239,7 @@ should be able to be added at any place in this file.
   <description>
     Counts the number of page loads controlled by a Service Worker.
   </description>
+  <obsolete>Replaced by ServiceWorker.PageLoad histogram.</obsolete>
 </action>
 
 <action name="SettingsResetBubble.LearnMore">

@@ -88,7 +88,7 @@ public class TranslateLanguagePanel
             mOptions.setSourceLanguage(mSessionOptions.sourceLanguageIndex());
             mOptions.setTargetLanguage(mSessionOptions.targetLanguageIndex());
         }
-        mListener.onPanelClosed(InfoBar.ACTION_TYPE_NONE);
+        mListener.onPanelClosed(ActionType.NONE);
     }
 
     private void createSpinners(Context context) {
@@ -221,16 +221,12 @@ public class TranslateLanguagePanel
 
         @Override
         public View getDropDownView(int position, View convertView, ViewGroup parent) {
-            TextView result;
-            if (!(convertView instanceof TextView)) {
-                result = (TextView) LayoutInflater.from(getContext()).inflate(
-                        R.layout.infobar_spinner_item, null);
-            } else {
-                result = (TextView) convertView;
+            View result = super.getDropDownView(position, convertView, parent);
+            result.setBackgroundColor(
+                    getContext().getResources().getColor(R.color.infobar_background));
+            if (result instanceof TextView) {
+                ((TextView) result).setText(getItem(position).toString());
             }
-
-            String language = getItem(position).toString();
-            result.setText(language);
             return result;
         }
 

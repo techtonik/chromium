@@ -269,6 +269,9 @@ const char kDisableExtensionsHttpThrottling[] =
 // Disable field trial tests configured in fieldtrial_testing_config.json.
 const char kDisableFieldTrialTestingConfig[] = "disable-field-trial-config";
 
+// Disables the Material Design version of chrome://downloads.
+const char kDisableMaterialDesignDownloads[] = "disable-md-downloads";
+
 // Disable the behavior that the second click on a launcher item (the click when
 // the item is already active) minimizes the item.
 const char kDisableMinimizeOnSecondLauncherItemClick[] =
@@ -440,16 +443,14 @@ const char kEnableFastUnload[]         = "enable-fast-unload";
 // This is a temporary testing flag.
 const char kEnableInsecureQuic[] = "enable-insecure-quic";
 
-// Enables an experimental Material Design version of chrome://downloads.
+// Enables the Material Design version of chrome://downloads.
 const char kEnableMaterialDesignDownloads[] = "enable-md-downloads";
 
 // Enables the material design Settings feature.
 const char kEnableMaterialDesignSettings[]  = "enable-md-settings";
 
-#if defined(ENABLE_MEDIA_ROUTER)
 // Enables Media Router.
 const char kEnableMediaRouter[]             = "enable-media-router";
-#endif
 
 // Runs the Native Client inside the renderer process and enables GPU plugin
 // (internally adds lEnableGpuPlugin to the command line).
@@ -481,10 +482,6 @@ const char kEnablePanels[]                  = "enable-panels";
 
 // Enable the new material UI - requires out of process PDF plugin.
 const char kEnablePdfMaterialUI[]           = "enable-pdf-material-ui";
-
-// Enables presenting plugin placeholder content as shadow DOM.
-const char kEnablePluginPlaceholderShadowDom[] =
-    "enable-plugin-placeholder-shadow-dom";
 
 // Enables a number of potentially annoying security features (strict mixed
 // content mode, powerful feature restrictions, etc.)
@@ -556,7 +553,7 @@ const char kEnableUserAlternateProtocolPorts[] =
 
 // Enables a new "web app" style frame for hosted apps (including bookmark
 // apps).
-extern const char kEnableWebAppFrame[] = "enable-web-app-frame";
+const char kEnableWebAppFrame[] = "enable-web-app-frame";
 
 // Enables synchronizing WiFi credentials across devices, using Chrome Sync.
 const char kEnableWifiCredentialSync[]      = "enable-wifi-credential-sync";
@@ -581,12 +578,6 @@ const char kExtensionsNotWebstore[] = "extensions-not-webstore";
 
 // Frequency in seconds for Extensions auto-update.
 const char kExtensionsUpdateFrequency[]     = "extensions-update-frequency";
-
-// Fakes the channel of the browser for purposes of Variations filtering. This
-// is to be used for testing only. Possible values are "stable", "beta", "dev"
-// and "canary". Note that this only applies if the browser's reported channel
-// is UNKNOWN.
-const char kFakeVariationsChannel[]         = "fake-variations-channel";
 
 // If this flag is present then this command line is being delegated to an
 // already running chrome process via the fast path, ie: before chrome.dll is
@@ -667,12 +658,6 @@ const char kIncognito[]                     = "incognito";
 // Causes Chrome to initiate an installation flow for the given app.
 const char kInstallChromeApp[]              = "install-chrome-app";
 
-// Causes Chrome to attempt to get metadata from the webstore for the
-// app/extension ID given, and then prompt the user to download and install it.
-// This is allowed *only* for ephemeral apps. All other ids will be ignored.
-const char kInstallEphemeralAppFromWebstore[] =
-    "install-ephemeral-app-from-webstore";
-
 // A list of whitelists to install for a supervised user, for testing.
 // The list is of the following form: <id>[:<name>],[<id>[:<name>],...]
 const char kInstallSupervisedUserWhitelists[] =
@@ -724,7 +709,6 @@ const char kMakeDefaultBrowser[]            = "make-default-browser";
 // Use to opt-in to marking HTTP as non-secure.
 const char kMarkNonSecureAs[]               = "mark-non-secure-as";
 const char kMarkNonSecureAsNeutral[]        = "neutral";
-const char kMarkNonSecureAsDubious[]        = "dubious";
 const char kMarkNonSecureAsNonSecure[]      = "non-secure";
 
 // Forces the maximum disk space to be used by the media cache, in bytes.
@@ -1152,11 +1136,6 @@ const char kV8PacMojoInProcess[] = "v8-pac-mojo-in-process";
 // Enables using an out-of-process Mojo service for the v8 proxy resolver.
 const char kV8PacMojoOutOfProcess[] = "v8-pac-mojo-out-of-process";
 
-// Specifies a custom URL for the server which reports variation data to the
-// client. Specifying this switch enables the Variations service on
-// unofficial builds. See variations_service.cc.
-const char kVariationsServerURL[]           = "variations-server-url";
-
 // Prints version information and quits.
 const char kVersion[]                       = "version";
 
@@ -1178,14 +1157,8 @@ const char kWinJumplistAction[]             = "win-jumplist-action";
 // Android authentication account type for SPNEGO authentication
 const char kAuthAndroidNegotiateAccountType[] = "auth-spnego-account-type";
 
-// Disables support for playing videos on Chromecast devices.
-const char kDisableCast[]                    = "disable-cast";
-
 // Disables Contextual Search.
 const char kDisableContextualSearch[]        = "disable-contextual-search";
-
-// Disables zero suggest experiment on Dev channel.
-const char kDisableZeroSuggest[] = "disable-zero-suggest";
 
 // Enable the accessibility tab switcher.
 const char kEnableAccessibilityTabSwitcher[] =
@@ -1204,16 +1177,6 @@ const char kEnableHostedMode[] = "enable-hosted-mode";
 // Enables context-sensitive reader mode button in the toolbar.
 const char kEnableReaderModeToolbarIcon[] =
     "enable-reader-mode-toolbar-icon";
-
-// Enables zero suggest functionality on Dev channel, showing most visited
-// sites as default suggestions.
-const char kEnableZeroSuggestMostVisited[] =
-    "enable-zero-suggest-most-visited";
-
-// Enable zero suggest functionality on Dev channel, showing most visited
-// sites on non-search-result pages as default suggestions.
-const char kEnableZeroSuggestMostVisitedWithoutSerp[] =
-    "enable-zero-suggest-most-visited-without-serp";
 
 // Specifies Android phone page loading progress bar animation.
 const char kProgressBarAnimation[]          = "progress-bar-animation";
@@ -1258,9 +1221,15 @@ const char kDisableAppWindowCycling[] = "disable-app-window-cycling";
 // Disables app shim creation for hosted apps on Mac.
 const char kDisableHostedAppShimCreation[] = "disable-hosted-app-shim-creation";
 
+// Prevents hosted apps from being opened in windows on Mac.
+const char kDisableHostedAppsInWindows[] = "disable-hosted-apps-in-windows";
+
 // Disables use of toolkit-views based native app windows.
 const char kDisableMacViewsNativeAppWindows[] =
     "disable-mac-views-native-app-windows";
+
+// Disables Translate experimental new UX which replaces the infobar.
+const char kDisableTranslateNewUX[] = "disable-translate-new-ux";
 
 // Enable the toolkit-views App Info dialog for Mac. This is accessible from
 // chrome://apps and chrome://extensions and is already enabled on non-mac.
@@ -1268,6 +1237,9 @@ const char kEnableAppInfoDialogMac[] = "enable-app-info-dialog-mac";
 
 // Enables custom Cmd+` window cycling for platform apps and hosted apps.
 const char kEnableAppWindowCycling[] = "enable-app-window-cycling";
+
+// Allows hosted apps to be opened in windows on Mac.
+const char kEnableHostedAppsInWindows[] = "enable-hosted-apps-in-windows";
 
 // Enables use of toolkit-views based native app windows.
 const char kEnableMacViewsNativeAppWindows[] =
@@ -1278,7 +1250,7 @@ const char kEnableMacViewsNativeAppWindows[] =
 const char kEnableMacViewsDialogs[] = "enable-mac-views-dialogs";
 
 // Enables Translate experimental new UX which replaces the infobar.
-const char kEnableTranslateNewUX[]         = "enable-translate-new-ux";
+const char kEnableTranslateNewUX[] = "enable-translate-new-ux";
 
 // This is how the metrics client ID is passed from the browser process to its
 // children. With Crashpad, the metrics client ID is distinct from the crash
@@ -1357,19 +1329,14 @@ const char kDebugPrint[] = "debug-print";
 #endif
 
 #if defined(ENABLE_TASK_MANAGER)
-// Enables the new implementation of the task manager.
-const char kEnableNewTaskManager[]   = "enable-new-task-manager";
+// Disables the new implementation of the task manager.
+const char kDisableNewTaskManager[]   = "disable-new-task-manager";
 #endif  // defined(ENABLE_TASK_MANAGER)
 
 bool AboutInSettingsEnabled() {
   return SettingsWindowEnabled() &&
          !base::CommandLine::ForCurrentProcess()->HasSwitch(
              ::switches::kDisableAboutInSettings);
-}
-
-bool MdDownloadsEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      ::switches::kEnableMaterialDesignDownloads);
 }
 
 bool MdSettingsEnabled() {
@@ -1390,7 +1357,7 @@ bool PdfMaterialUIEnabled() {
     return false;
 
   // Default.
-  return false;
+  return true;
 }
 
 bool SettingsWindowEnabled() {
@@ -1412,8 +1379,8 @@ bool PowerOverlayEnabled() {
 
 #if defined(ENABLE_TASK_MANAGER)
 bool NewTaskManagerEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      kEnableNewTaskManager);
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+      kDisableNewTaskManager);
 }
 #endif  // defined(ENABLE_TASK_MANAGER)
 

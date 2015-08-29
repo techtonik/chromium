@@ -34,7 +34,7 @@ import org.chromium.chrome.browser.sync.ProfileSyncService;
 import org.chromium.chrome.browser.sync.SyncController;
 import org.chromium.sync.AndroidSyncSettings;
 import org.chromium.sync.ModelType;
-import org.chromium.sync.internal_api.pub.PassphraseType;
+import org.chromium.sync.PassphraseType;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -114,7 +114,7 @@ public class SyncCustomizationFragment extends PreferenceFragment
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        mProfileSyncService = ProfileSyncService.get(getActivity());
+        mProfileSyncService = ProfileSyncService.get();
         mIsSyncInitialized = mProfileSyncService.isSyncInitialized();
         mIsPassphraseRequired =
                 mIsSyncInitialized && mProfileSyncService.isPassphraseRequiredForDecryption();

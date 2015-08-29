@@ -20,16 +20,13 @@ from telemetry.page import page_test
 from telemetry import story as story_module
 from telemetry.testing import options_for_unittests
 from telemetry.testing import system_stub
+import mock
 from telemetry.value import list_of_scalar_values
 from telemetry.value import scalar
 from telemetry.value import summary as summary_module
 from telemetry.web_perf import story_test
 from telemetry.web_perf import timeline_based_measurement
 from telemetry.wpr import archive_info
-
-# Import Python mock module (https://pypi.python.org/pypi/mock)
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
-import mock  # pylint: disable=import-error
 
 # This linter complains if we define classes nested inside functions.
 # pylint: disable=bad-super-call
@@ -104,6 +101,9 @@ class DummyLocalStory(story_module.Story):
   def __init__(self, shared_state_class, name=''):
     super(DummyLocalStory, self).__init__(
         shared_state_class, name=name)
+
+  def Run(self, shared_state):
+    pass
 
   @property
   def is_local(self):
@@ -591,7 +591,7 @@ class StoryRunnerTest(unittest.TestCase):
         self._current_story = story
 
       def RunStory(self, results):
-        self._current_story.Run()
+        self._current_story.Run(self)
 
       def DidRunStory(self, results):
         pass
@@ -609,7 +609,7 @@ class StoryRunnerTest(unittest.TestCase):
             is_local=True)
         self.was_run = False
 
-      def Run(self):
+      def Run(self, shared_state):
         self.was_run = True
         raise page_test.Failure
 

@@ -10,26 +10,40 @@
 #include "cc/output/overlay_processor.h"
 
 namespace cc {
+class IOSurfaceDrawQuad;
+class OverlayCandidate;
 class OverlayCandidateValidator;
 class StreamVideoDrawQuad;
 class TextureDrawQuad;
-class OverlayCandidate;
+
+class CC_EXPORT OverlayStrategyCommonDelegate {
+ public:
+  virtual ~OverlayStrategyCommonDelegate() {}
+  virtual bool TryOverlay(OverlayCandidateValidator* capability_checker,
+                          RenderPassList* render_passes_in_draw_order,
+                          OverlayCandidateList* candidate_list,
+                          const OverlayCandidate& candidate,
+                          QuadList::Iterator iter,
+                          float device_scale_factor) = 0;
+};
 
 class CC_EXPORT OverlayStrategyCommon : public OverlayProcessor::Strategy {
  public:
-  explicit OverlayStrategyCommon(OverlayCandidateValidator* capability_checker);
+  explicit OverlayStrategyCommon(OverlayCandidateValidator* capability_checker,
+                                 OverlayStrategyCommonDelegate* delegate);
   ~OverlayStrategyCommon() override;
 
   bool Attempt(RenderPassList* render_passes_in_draw_order,
-               OverlayCandidateList* candidate_list) override;
+               OverlayCandidateList* candidate_list,
+               float device_scale_factor) override;
+
+  // Returns true if |draw_quad| will not block quads underneath from becoming
+  // an overlay.
+  static bool IsInvisibleQuad(const DrawQuad* draw_quad);
 
  protected:
   bool GetCandidateQuadInfo(const DrawQuad& draw_quad,
                             OverlayCandidate* quad_info);
-
-  // Returns true if |draw_quad| will not block quads underneath from becoming
-  // an overlay.
-  bool IsInvisibleQuad(const DrawQuad* draw_quad);
 
   // Returns true if |draw_quad| is of a known quad type and contains an
   // overlayable resource.
@@ -39,15 +53,12 @@ class CC_EXPORT OverlayStrategyCommon : public OverlayProcessor::Strategy {
                           OverlayCandidate* quad_info);
   bool GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
                         OverlayCandidate* quad_info);
-
-  virtual bool TryOverlay(OverlayCandidateValidator* capability_checker,
-                          RenderPassList* render_passes_in_draw_order,
-                          OverlayCandidateList* candidate_list,
-                          const OverlayCandidate& candidate,
-                          QuadList::Iterator iter) = 0;
+  bool GetIOSurfaceQuadInfo(const IOSurfaceDrawQuad& quad,
+                            OverlayCandidate* quad_info);
 
  private:
   OverlayCandidateValidator* capability_checker_;
+  scoped_ptr<OverlayStrategyCommonDelegate> delegate_;
 
   DISALLOW_COPY_AND_ASSIGN(OverlayStrategyCommon);
 };

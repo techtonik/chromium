@@ -4,10 +4,7 @@
 
 import unittest
 
-from telemetry.core import util
 from telemetry.timeline import memory_dump_event
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
 import mock
 
 

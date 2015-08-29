@@ -5,7 +5,7 @@
 #ifndef CHROME_BROWSER_CHROMEOS_DRIVE_DUMMY_FILE_SYSTEM_H_
 #define CHROME_BROWSER_CHROMEOS_DRIVE_DUMMY_FILE_SYSTEM_H_
 
-#include "chrome/browser/chromeos/drive/file_system_interface.h"
+#include "components/drive/file_system_interface.h"
 
 namespace drive {
 
@@ -102,6 +102,8 @@ class DummyFileSystem : public FileSystemInterface {
   void FreeDiskSpaceIfNeededFor(
       int64 num_bytes,
       const FreeDiskSpaceCallback& callback) override {}
+  void CalculateEvictableCacheSize(
+      const EvictableCacheSizeCallback& callback) override {}
 };
 
 }  // namespace drive

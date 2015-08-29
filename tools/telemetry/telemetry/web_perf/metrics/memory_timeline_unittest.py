@@ -5,15 +5,12 @@
 import collections
 import unittest
 
-from telemetry.core import util
 from telemetry.internal.results import page_test_results
 from telemetry.page import page
+import mock
 from telemetry.timeline import memory_dump_event
 from telemetry.web_perf.metrics import memory_timeline
 from telemetry.web_perf import timeline_interaction_record
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
-import mock
 
 
 def MockProcessDumpEvent(dump_id, name, start, memory_usage):
@@ -129,12 +126,12 @@ class MemoryTimelineMetricUnitTest(unittest.TestCase):
     expected = {}
     expected.update(('%s_browser' % metric, [value])
                     for metric, value in stats1.iteritems())
-    expected.update(('%s_renderer' % metric, [value])
+    expected.update(('%s_gpu_process' % metric, [value])
                     for metric, value in stats2.iteritems())
     expected.update(('%s_total' % metric, [total]) for metric in metrics)
 
     model = MockTimelineModel([
         MockProcessDumpEvent('dump1', 'browser', 2, stats1),
-        MockProcessDumpEvent('dump1', 'renderer', 5, stats2)])
+        MockProcessDumpEvent('dump1', 'GPU Process', 5, stats2)])
     interactions = [TestInteraction(1, 10)]
     self.assertEquals(expected, self.getResultsDict(model, interactions))

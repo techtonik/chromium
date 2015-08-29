@@ -8,6 +8,7 @@
 #include "base/macros.h"
 #include "base/memory/shared_memory.h"
 #include "components/view_manager/gles2/command_buffer_type_conversions.h"
+#include "components/view_manager/gles2/gpu_memory_tracker.h"
 #include "components/view_manager/gles2/gpu_state.h"
 #include "components/view_manager/gles2/mojo_buffer_backing.h"
 #include "gpu/command_buffer/common/constants.h"
@@ -21,6 +22,7 @@
 #include "gpu/command_buffer/service/mailbox_manager.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
 #include "gpu/command_buffer/service/sync_point_manager.h"
+#include "gpu/command_buffer/service/transfer_buffer_manager.h"
 #include "gpu/command_buffer/service/valuebuffer_manager.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
 #include "mojo/platform_handle/platform_handle_functions.h"
@@ -32,52 +34,17 @@
 
 namespace gles2 {
 
-namespace {
-
-class MemoryTrackerStub : public gpu::gles2::MemoryTracker {
- public:
-  MemoryTrackerStub() {}
-
-  void TrackMemoryAllocatedChange(
-      size_t old_size,
-      size_t new_size,
-      gpu::gles2::MemoryTracker::Pool pool) override {}
-
-  bool EnsureGPUMemoryAvailable(size_t size_needed) override { return true; };
-  uint64_t ClientTracingId() const override { return 0; }
-  int ClientId() const override { return 0; }
-
- private:
-  ~MemoryTrackerStub() override {}
-
-  DISALLOW_COPY_AND_ASSIGN(MemoryTrackerStub);
-};
-
-}  // anonymous namespace
-
 CommandBufferDriver::Client::~Client() {
 }
 
 CommandBufferDriver::CommandBufferDriver(scoped_refptr<GpuState> gpu_state)
-    : CommandBufferDriver(gfx::kNullAcceleratedWidget,
-                          gpu_state,
-                          base::Callback<void(CommandBufferDriver*)>()) {}
-
-CommandBufferDriver::CommandBufferDriver(
-    gfx::AcceleratedWidget widget,
-    scoped_refptr<GpuState> gpu_state,
-    const base::Callback<void(CommandBufferDriver*)>& destruct_callback)
     : client_(nullptr),
-      widget_(widget),
       gpu_state_(gpu_state),
-      destruct_callback_(destruct_callback),
       weak_factory_(this) {
 }
 
 CommandBufferDriver::~CommandBufferDriver() {
   DestroyDecoder();
-  if (!destruct_callback_.is_null())
-    destruct_callback_.Run(this);
 }
 
 void CommandBufferDriver::Initialize(
@@ -89,7 +56,7 @@ void CommandBufferDriver::Initialize(
   bool success = DoInitialize(shared_state.Pass());
   mojo::GpuCapabilitiesPtr capabilities =
       success ? mojo::GpuCapabilities::From(decoder_->GetCapabilities())
-              : mojo::GpuCapabilities::New();
+              : nullptr;
   sync_client_->DidInitialize(success, capabilities.Pass());
 }
 
@@ -110,16 +77,7 @@ bool CommandBufferDriver::MakeCurrent() {
 
 bool CommandBufferDriver::DoInitialize(
     mojo::ScopedSharedBufferHandle shared_state) {
-  if (widget_ == gfx::kNullAcceleratedWidget)
-    surface_ = gfx::GLSurface::CreateOffscreenGLSurface(gfx::Size(1, 1));
-  else {
-    surface_ = gfx::GLSurface::CreateViewGLSurface(widget_);
-    if (auto vsync_provider = surface_->GetVSyncProvider()) {
-      vsync_provider->GetVSyncParameters(
-          base::Bind(&CommandBufferDriver::OnUpdateVSyncParameters,
-                     weak_factory_.GetWeakPtr()));
-    }
-  }
+  surface_ = gfx::GLSurface::CreateOffscreenGLSurface(gfx::Size(1, 1));
 
   if (!surface_.get())
     return false;
@@ -138,9 +96,10 @@ bool CommandBufferDriver::DoInitialize(
   bool bind_generates_resource = false;
   scoped_refptr<gpu::gles2::ContextGroup> context_group =
       new gpu::gles2::ContextGroup(
-          gpu_state_->mailbox_manager(), new MemoryTrackerStub,
-          new gpu::gles2::ShaderTranslatorCache, nullptr, nullptr, nullptr,
-          bind_generates_resource);
+          gpu_state_->mailbox_manager(), new GpuMemoryTracker,
+          new gpu::gles2::ShaderTranslatorCache,
+          new gpu::gles2::FramebufferCompletenessCache, nullptr, nullptr,
+          nullptr, bind_generates_resource);
 
   command_buffer_.reset(
       new gpu::CommandBufferService(context_group->transfer_buffer_manager()));
@@ -197,13 +156,6 @@ void CommandBufferDriver::Flush(int32_t put_offset) {
     return;
   }
   command_buffer_->Flush(put_offset);
-}
-
-void CommandBufferDriver::DestroyWindow() {
-  DestroyDecoder();
-  surface_ = nullptr;
-  context_ = nullptr;
-  destruct_callback_.Reset();
 }
 
 void CommandBufferDriver::MakeProgress(int32_t last_get_offset) {
@@ -278,7 +230,7 @@ void CommandBufferDriver::CreateImage(int32_t id,
   gfx::GpuMemoryBufferHandle gfx_handle;
   // TODO(jam): create mojo enum for this and converter
   gfx_handle.type = static_cast<gfx::GpuMemoryBufferType>(type);
-  gfx_handle.id = id;
+  gfx_handle.id = gfx::GpuMemoryBufferId(id);
 
   MojoPlatformHandle platform_handle;
   MojoResult extract_result = MojoExtractPlatformHandle(
@@ -345,12 +297,6 @@ void CommandBufferDriver::OnSyncPointRetired() {
 void CommandBufferDriver::OnContextLost(uint32_t reason) {
   loss_observer_->DidLoseContext(reason);
   client_->DidLoseContext();
-}
-
-void CommandBufferDriver::OnUpdateVSyncParameters(
-    const base::TimeTicks timebase,
-    const base::TimeDelta interval) {
-  client_->UpdateVSyncParameters(timebase, interval);
 }
 
 void CommandBufferDriver::DestroyDecoder() {

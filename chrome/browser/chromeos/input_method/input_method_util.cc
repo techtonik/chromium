@@ -120,70 +120,71 @@ const struct EnglishToResouceId {
   const char* english_string_from_ibus;
   int resource_id;
 } kEnglishToResourceIdArray[] = {
-  // For xkb-layouts.
-  { "xkb:am:phonetic:arm", IDS_STATUSBAR_LAYOUT_ARMENIAN_PHONETIC },
-  { "xkb:be::fra", IDS_STATUSBAR_LAYOUT_BELGIUM },
-  { "xkb:be::ger", IDS_STATUSBAR_LAYOUT_BELGIUM },
-  { "xkb:be::nld", IDS_STATUSBAR_LAYOUT_BELGIUM },
-  { "xkb:bg::bul", IDS_STATUSBAR_LAYOUT_BULGARIA },
-  { "xkb:bg:phonetic:bul", IDS_STATUSBAR_LAYOUT_BULGARIA_PHONETIC },
-  { "xkb:br::por", IDS_STATUSBAR_LAYOUT_BRAZIL },
-  { "xkb:by::bel", IDS_STATUSBAR_LAYOUT_BELARUSIAN },
-  { "xkb:ca::fra", IDS_STATUSBAR_LAYOUT_CANADA },
-  { "xkb:ca:eng:eng", IDS_STATUSBAR_LAYOUT_CANADA_ENGLISH },
-  { "xkb:ca:multix:fra", IDS_STATUSBAR_LAYOUT_CANADIAN_MULTILINGUAL },
-  { "xkb:ch::ger", IDS_STATUSBAR_LAYOUT_SWITZERLAND },
-  { "xkb:ch:fr:fra", IDS_STATUSBAR_LAYOUT_SWITZERLAND_FRENCH },
-  { "xkb:cz::cze", IDS_STATUSBAR_LAYOUT_CZECHIA },
-  { "xkb:cz:qwerty:cze", IDS_STATUSBAR_LAYOUT_CZECHIA_QWERTY },
-  { "xkb:de::ger", IDS_STATUSBAR_LAYOUT_GERMANY },
-  { "xkb:de:neo:ger", IDS_STATUSBAR_LAYOUT_GERMANY_NEO2 },
-  { "xkb:dk::dan", IDS_STATUSBAR_LAYOUT_DENMARK },
-  { "xkb:ee::est", IDS_STATUSBAR_LAYOUT_ESTONIA },
-  { "xkb:es::spa", IDS_STATUSBAR_LAYOUT_SPAIN },
-  { "xkb:es:cat:cat", IDS_STATUSBAR_LAYOUT_SPAIN_CATALAN },
-  { "xkb:fi::fin", IDS_STATUSBAR_LAYOUT_FINLAND },
-  { "xkb:fr::fra", IDS_STATUSBAR_LAYOUT_FRANCE },
-  { "xkb:gb:dvorak:eng", IDS_STATUSBAR_LAYOUT_UNITED_KINGDOM_DVORAK },
-  { "xkb:gb:extd:eng", IDS_STATUSBAR_LAYOUT_UNITED_KINGDOM },
-  { "xkb:ge::geo", IDS_STATUSBAR_LAYOUT_GEORGIAN },
-  { "xkb:gr::gre", IDS_STATUSBAR_LAYOUT_GREECE },
-  { "xkb:hr::scr", IDS_STATUSBAR_LAYOUT_CROATIA },
-  { "xkb:hu::hun", IDS_STATUSBAR_LAYOUT_HUNGARY },
-  { "xkb:ie::ga", IDS_STATUSBAR_LAYOUT_IRISH },
-  { "xkb:il::heb", IDS_STATUSBAR_LAYOUT_ISRAEL },
-  { "xkb:is::ice", IDS_STATUSBAR_LAYOUT_ICELANDIC },
-  { "xkb:it::ita", IDS_STATUSBAR_LAYOUT_ITALY },
-  { "xkb:jp::jpn", IDS_STATUSBAR_LAYOUT_JAPAN },
-  { "xkb:latam::spa", IDS_STATUSBAR_LAYOUT_LATIN_AMERICAN },
-  { "xkb:lt::lit", IDS_STATUSBAR_LAYOUT_LITHUANIA },
-  { "xkb:lv:apostrophe:lav", IDS_STATUSBAR_LAYOUT_LATVIA },
-  { "xkb:mk::mkd", IDS_STATUSBAR_LAYOUT_MACEDONIAN },
-  { "xkb:mn::mon", IDS_STATUSBAR_LAYOUT_MONGOLIAN },
-  { "xkb:nl::nld", IDS_STATUSBAR_LAYOUT_NETHERLANDS },
-  { "xkb:no::nob", IDS_STATUSBAR_LAYOUT_NORWAY },
-  { "xkb:pl::pol", IDS_STATUSBAR_LAYOUT_POLAND },
-  { "xkb:pt::por", IDS_STATUSBAR_LAYOUT_PORTUGAL },
-  { "xkb:ro::rum", IDS_STATUSBAR_LAYOUT_ROMANIA },
-  { "xkb:rs::srp", IDS_STATUSBAR_LAYOUT_SERBIA },
-  { "xkb:ru::rus", IDS_STATUSBAR_LAYOUT_RUSSIA },
-  { "xkb:ru:phonetic:rus", IDS_STATUSBAR_LAYOUT_RUSSIA_PHONETIC },
-  { "xkb:se::swe", IDS_STATUSBAR_LAYOUT_SWEDEN },
-  { "xkb:si::slv", IDS_STATUSBAR_LAYOUT_SLOVENIA },
-  { "xkb:sk::slo", IDS_STATUSBAR_LAYOUT_SLOVAKIA },
-  { "xkb:tr::tur", IDS_STATUSBAR_LAYOUT_TURKEY },
-  { "xkb:ua::ukr", IDS_STATUSBAR_LAYOUT_UKRAINE },
-  { "xkb:us::eng", IDS_STATUSBAR_LAYOUT_USA },
-  { "xkb:us::fil", IDS_STATUSBAR_LAYOUT_USA },
-  { "xkb:us::ind", IDS_STATUSBAR_LAYOUT_USA },
-  { "xkb:us::msa", IDS_STATUSBAR_LAYOUT_USA },
-  { "xkb:us:altgr-intl:eng", IDS_STATUSBAR_LAYOUT_USA_EXTENDED },
-  { "xkb:us:colemak:eng", IDS_STATUSBAR_LAYOUT_USA_COLEMAK },
-  { "xkb:us:dvorak:eng", IDS_STATUSBAR_LAYOUT_USA_DVORAK },
-  { "xkb:us:dvp:eng", IDS_STATUSBAR_LAYOUT_USA_DVP },
-  { "xkb:us:intl:eng", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL },
-  { "xkb:us:intl:nld", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL },
-  { "xkb:us:intl:por", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL },
+    // For xkb-layouts.
+    {"xkb:am:phonetic:arm", IDS_STATUSBAR_LAYOUT_ARMENIAN_PHONETIC},
+    {"xkb:be::fra", IDS_STATUSBAR_LAYOUT_BELGIUM},
+    {"xkb:be::ger", IDS_STATUSBAR_LAYOUT_BELGIUM},
+    {"xkb:be::nld", IDS_STATUSBAR_LAYOUT_BELGIUM},
+    {"xkb:bg::bul", IDS_STATUSBAR_LAYOUT_BULGARIA},
+    {"xkb:bg:phonetic:bul", IDS_STATUSBAR_LAYOUT_BULGARIA_PHONETIC},
+    {"xkb:br::por", IDS_STATUSBAR_LAYOUT_BRAZIL},
+    {"xkb:by::bel", IDS_STATUSBAR_LAYOUT_BELARUSIAN},
+    {"xkb:ca::fra", IDS_STATUSBAR_LAYOUT_CANADA},
+    {"xkb:ca:eng:eng", IDS_STATUSBAR_LAYOUT_CANADA_ENGLISH},
+    {"xkb:ca:multix:fra", IDS_STATUSBAR_LAYOUT_CANADIAN_MULTILINGUAL},
+    {"xkb:ch::ger", IDS_STATUSBAR_LAYOUT_SWITZERLAND},
+    {"xkb:ch:fr:fra", IDS_STATUSBAR_LAYOUT_SWITZERLAND_FRENCH},
+    {"xkb:cz::cze", IDS_STATUSBAR_LAYOUT_CZECHIA},
+    {"xkb:cz:qwerty:cze", IDS_STATUSBAR_LAYOUT_CZECHIA_QWERTY},
+    {"xkb:de::ger", IDS_STATUSBAR_LAYOUT_GERMANY},
+    {"xkb:de:neo:ger", IDS_STATUSBAR_LAYOUT_GERMANY_NEO2},
+    {"xkb:dk::dan", IDS_STATUSBAR_LAYOUT_DENMARK},
+    {"xkb:ee::est", IDS_STATUSBAR_LAYOUT_ESTONIA},
+    {"xkb:es::spa", IDS_STATUSBAR_LAYOUT_SPAIN},
+    {"xkb:es:cat:cat", IDS_STATUSBAR_LAYOUT_SPAIN_CATALAN},
+    {"xkb:fi::fin", IDS_STATUSBAR_LAYOUT_FINLAND},
+    {"xkb:fr::fra", IDS_STATUSBAR_LAYOUT_FRANCE},
+    {"xkb:gb:dvorak:eng", IDS_STATUSBAR_LAYOUT_UNITED_KINGDOM_DVORAK},
+    {"xkb:gb:extd:eng", IDS_STATUSBAR_LAYOUT_UNITED_KINGDOM},
+    {"xkb:ge::geo", IDS_STATUSBAR_LAYOUT_GEORGIAN},
+    {"xkb:gr::gre", IDS_STATUSBAR_LAYOUT_GREECE},
+    {"xkb:hr::scr", IDS_STATUSBAR_LAYOUT_CROATIA},
+    {"xkb:hu::hun", IDS_STATUSBAR_LAYOUT_HUNGARY},
+    {"xkb:ie::ga", IDS_STATUSBAR_LAYOUT_IRISH},
+    {"xkb:il::heb", IDS_STATUSBAR_LAYOUT_ISRAEL},
+    {"xkb:is::ice", IDS_STATUSBAR_LAYOUT_ICELANDIC},
+    {"xkb:it::ita", IDS_STATUSBAR_LAYOUT_ITALY},
+    {"xkb:jp::jpn", IDS_STATUSBAR_LAYOUT_JAPAN},
+    {"xkb:latam::spa", IDS_STATUSBAR_LAYOUT_LATIN_AMERICAN},
+    {"xkb:lt::lit", IDS_STATUSBAR_LAYOUT_LITHUANIA},
+    {"xkb:lv:apostrophe:lav", IDS_STATUSBAR_LAYOUT_LATVIA},
+    {"xkb:mk::mkd", IDS_STATUSBAR_LAYOUT_MACEDONIAN},
+    {"xkb:mn::mon", IDS_STATUSBAR_LAYOUT_MONGOLIAN},
+    {"xkb:nl::nld", IDS_STATUSBAR_LAYOUT_NETHERLANDS},
+    {"xkb:no::nob", IDS_STATUSBAR_LAYOUT_NORWAY},
+    {"xkb:pl::pol", IDS_STATUSBAR_LAYOUT_POLAND},
+    {"xkb:pt::por", IDS_STATUSBAR_LAYOUT_PORTUGAL},
+    {"xkb:ro::rum", IDS_STATUSBAR_LAYOUT_ROMANIA},
+    {"xkb:rs::srp", IDS_STATUSBAR_LAYOUT_SERBIA},
+    {"xkb:ru::rus", IDS_STATUSBAR_LAYOUT_RUSSIA},
+    {"xkb:ru:phonetic:rus", IDS_STATUSBAR_LAYOUT_RUSSIA_PHONETIC},
+    {"xkb:se::swe", IDS_STATUSBAR_LAYOUT_SWEDEN},
+    {"xkb:si::slv", IDS_STATUSBAR_LAYOUT_SLOVENIA},
+    {"xkb:sk::slo", IDS_STATUSBAR_LAYOUT_SLOVAKIA},
+    {"xkb:tr::tur", IDS_STATUSBAR_LAYOUT_TURKEY},
+    {"xkb:tr:f:tur", IDS_STATUSBAR_LAYOUT_TURKEY_F},
+    {"xkb:ua::ukr", IDS_STATUSBAR_LAYOUT_UKRAINE},
+    {"xkb:us::eng", IDS_STATUSBAR_LAYOUT_USA},
+    {"xkb:us::fil", IDS_STATUSBAR_LAYOUT_USA},
+    {"xkb:us::ind", IDS_STATUSBAR_LAYOUT_USA},
+    {"xkb:us::msa", IDS_STATUSBAR_LAYOUT_USA},
+    {"xkb:us:altgr-intl:eng", IDS_STATUSBAR_LAYOUT_USA_EXTENDED},
+    {"xkb:us:colemak:eng", IDS_STATUSBAR_LAYOUT_USA_COLEMAK},
+    {"xkb:us:dvorak:eng", IDS_STATUSBAR_LAYOUT_USA_DVORAK},
+    {"xkb:us:dvp:eng", IDS_STATUSBAR_LAYOUT_USA_DVP},
+    {"xkb:us:intl:eng", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL},
+    {"xkb:us:intl:nld", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL},
+    {"xkb:us:intl:por", IDS_STATUSBAR_LAYOUT_USA_INTERNATIONAL},
 };
 const size_t kEnglishToResourceIdArraySize =
     arraysize(kEnglishToResourceIdArray);
@@ -310,6 +311,7 @@ const struct InputMethodNameMap {
     {"__MSG_KEYBOARD_THAI_KEDMANEE__", IDS_IME_NAME_KEYBOARD_THAI_KEDMANEE},
     {"__MSG_KEYBOARD_THAI_PATTACHOTE__", IDS_IME_NAME_KEYBOARD_THAI_PATTACHOTE},
     {"__MSG_KEYBOARD_THAI_TIS__", IDS_IME_NAME_KEYBOARD_THAI_TIS},
+    {"__MSG_KEYBOARD_TURKISH_F__", IDS_IME_NAME_KEYBOARD_TURKISH_F},
     {"__MSG_KEYBOARD_TURKISH__", IDS_IME_NAME_KEYBOARD_TURKISH},
     {"__MSG_KEYBOARD_UKRAINIAN__", IDS_IME_NAME_KEYBOARD_UKRAINIAN},
     {"__MSG_KEYBOARD_UK_DVORAK__", IDS_IME_NAME_KEYBOARD_UK_DVORAK},
@@ -568,15 +570,16 @@ bool InputMethodUtil::GetInputMethodIdsFromLanguageCodeInternal(
 
 void InputMethodUtil::GetFirstLoginInputMethodIds(
     const std::string& language_code,
-    const InputMethodDescriptor& current_input_method,
+    const InputMethodDescriptor& preferred_input_method,
     std::vector<std::string>* out_input_method_ids) const {
   out_input_method_ids->clear();
 
-  // First, add the current keyboard layout (one used on the login screen).
-  out_input_method_ids->push_back(current_input_method.id());
+  // First, add the preferred keyboard layout (e.g. one used on the login
+  // screen or set in UserContext when starting a public session).
+  out_input_method_ids->push_back(preferred_input_method.id());
 
   const std::string current_layout
-      = current_input_method.GetPreferredKeyboardLayout();
+      = preferred_input_method.GetPreferredKeyboardLayout();
   for (size_t i = 0; i < arraysize(kDefaultInputMethodRecommendation);
        ++i) {
     if (kDefaultInputMethodRecommendation[i].locale == language_code && (
@@ -594,7 +597,7 @@ void InputMethodUtil::GetFirstLoginInputMethodIds(
       language_code, kAllInputMethods, &input_method_ids);
   // Uses the first input method as the most popular one.
   if (input_method_ids.size() > 0 &&
-      current_input_method.id() != input_method_ids[0]) {
+      preferred_input_method.id() != input_method_ids[0]) {
     out_input_method_ids->push_back(input_method_ids[0]);
   }
 }

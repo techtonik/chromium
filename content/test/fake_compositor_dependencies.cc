@@ -42,7 +42,7 @@ bool FakeCompositorDependencies::IsZeroCopyEnabled() {
   return true;
 }
 
-bool FakeCompositorDependencies::IsOneCopyEnabled() {
+bool FakeCompositorDependencies::IsPersistentGpuMemoryBufferEnabled() {
   return false;
 }
 

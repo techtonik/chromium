@@ -10,12 +10,13 @@
 var windowCreateOptions = {
   id: 'gallery',
   outerBounds: {
-    minWidth: 820,
+    minWidth: 860,
     minHeight: 554
   },
   frame: {
     color: '#1E2023'
-  }
+  },
+  hidden: true
 };
 
 /**
@@ -62,7 +63,7 @@ function openGalleryWindow(urls) {
       });
     });
   }).then(function(gallery) {
-    gallery.rawAppWindow.focus();
+    gallery.rawAppWindow.show();
     return gallery.rawAppWindow.contentWindow.appID;
   }).catch(function(error) {
     console.error('Launch failed' + error.stack || error);

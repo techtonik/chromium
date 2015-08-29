@@ -183,10 +183,8 @@ content::WebUIDataSource* CreateHistoryUIHTMLSource(Profile* profile) {
   source->AddLocalizedString("inContentPack", IDS_HISTORY_IN_CONTENT_PACK);
   source->AddLocalizedString("allowItems", IDS_HISTORY_FILTER_ALLOW_ITEMS);
   source->AddLocalizedString("blockItems", IDS_HISTORY_FILTER_BLOCK_ITEMS);
-  source->AddLocalizedString("lockButton", IDS_HISTORY_LOCK_BUTTON);
   source->AddLocalizedString("blockedVisitText",
                              IDS_HISTORY_BLOCKED_VISIT_TEXT);
-  source->AddLocalizedString("unlockButton", IDS_HISTORY_UNLOCK_BUTTON);
   source->AddLocalizedString("hasSyncedResults",
                              IDS_HISTORY_HAS_SYNCED_RESULTS);
   source->AddLocalizedString("noSyncedResults", IDS_HISTORY_NO_SYNCED_RESULTS);
@@ -487,7 +485,8 @@ void BrowsingHistoryHandler::WebHistoryTimeout() {
 }
 
 void BrowsingHistoryHandler::QueryHistory(
-    base::string16 search_text, const history::QueryOptions& options) {
+    const base::string16& search_text,
+    const history::QueryOptions& options) {
   Profile* profile = Profile::FromWebUI(web_ui());
 
   // Anything in-flight is invalid.

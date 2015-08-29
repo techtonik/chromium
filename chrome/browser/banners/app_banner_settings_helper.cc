@@ -8,6 +8,9 @@
 #include <string>
 
 #include "base/command_line.h"
+#include "base/metrics/field_trial.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "chrome/browser/banners/app_banner_data_fetcher.h"
 #include "chrome/browser/banners/app_banner_metrics.h"
 #include "chrome/browser/browser_process.h"
@@ -36,6 +39,12 @@ const double kTotalEngagementToTrigger = 2;
 // Number of days that showing the banner will prevent it being seen again for.
 const unsigned int kMinimumDaysBetweenBannerShows = 60;
 
+const unsigned int kNumberOfMinutesInADay = 1440;
+
+// Number of minutes between visits that will trigger a could show banner event.
+// Defaults to the number of minutes in a day.
+unsigned int gMinimumMinutesBetweenVisits = kNumberOfMinutesInADay;
+
 // Number of days that the banner being blocked will prevent it being seen again
 // for.
 const unsigned int kMinimumBannerBlockedToBannerShown = 90;
@@ -54,10 +63,9 @@ const char kBannerEngagementKey[] = "engagement";
 
 // Engagement weight assigned to direct and indirect navigations.
 // By default, a direct navigation is a page visit via ui::PAGE_TRANSITION_TYPED
-// or ui::PAGE_TRANSITION_GENERATED. These are weighted twice the engagement of
-// all other navigations.
+// or ui::PAGE_TRANSITION_GENERATED.
 double kDirectNavigationEngagement = 1;
-double kIndirectNavigationEnagagement = 0.5;
+double kIndirectNavigationEnagagement = 1;
 
 scoped_ptr<base::DictionaryValue> GetOriginDict(
     HostContentSettingsMap* settings,
@@ -100,6 +108,49 @@ double GetEventEngagement(ui::PageTransition transition_type) {
   } else {
     return kIndirectNavigationEnagagement;
   }
+}
+
+// Queries a field trial for updates to the default engagement values assigned
+// to direct and indirect navigations.
+void UpdateEngagementWeights() {
+  // Expect a field trial value of "X:Y", where X is the direct engagement
+  // value and Y is the indirect engagement value.
+  std::string weights =
+      base::FieldTrialList::FindFullName("AppBannersEngagementWeights");
+  if (weights.empty())
+    return;
+
+  std::vector<std::string> tokens = base::SplitString(
+      weights, ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+  if (tokens.size() == 2) {
+    double direct_engagement = -1;
+    double indirect_engagement = -1;
+
+    // Ensure that we get valid doubles from the field trial, and that both
+    // values are greater than or equal to zero and less than or equal to the
+    // total engagement required to trigger the banner.
+    if (base::StringToDouble(tokens[0], &direct_engagement) &&
+        base::StringToDouble(tokens[1], &indirect_engagement) &&
+        direct_engagement >= 0 && indirect_engagement >= 0 &&
+        direct_engagement <= kTotalEngagementToTrigger &&
+        indirect_engagement <= kTotalEngagementToTrigger) {
+      AppBannerSettingsHelper::SetEngagementWeights(direct_engagement,
+                                                    indirect_engagement);
+    }
+  }
+}
+
+// Queries a field trial for updates to the default number of minutes between
+// site visits counted for the purposes of displaying a banner.
+void UpdateMinutesBetweenVisits() {
+  std::string minutes_between_visits =
+      base::FieldTrialList::FindFullName("AppBannersMinutesBetweenVisits");
+  if (minutes_between_visits.empty())
+    return;
+
+  int minimum_minutes = 0;
+  if (base::StringToInt(minutes_between_visits, &minimum_minutes))
+    AppBannerSettingsHelper::SetMinimumMinutesBetweenVisits(minimum_minutes);
 }
 
 }  // namespace
@@ -241,7 +292,7 @@ void AppBannerSettingsHelper::RecordBannerCouldShowEvent(
 
   // Trim any items that are older than we should care about. For comparisons
   // the times are converted to local dates.
-  base::Time date = time.LocalMidnight();
+  base::Time date = BucketTimeToResolution(time, gMinimumMinutesBetweenVisits);
   base::ValueVector::iterator it = could_show_list->begin();
   while (it != could_show_list->end()) {
     if ((*it)->IsType(base::Value::TYPE_DICTIONARY)) {
@@ -251,7 +302,8 @@ void AppBannerSettingsHelper::RecordBannerCouldShowEvent(
 
       if (internal_value->GetDouble(kBannerTimeKey, &internal_date)) {
         base::Time other_date =
-            base::Time::FromInternalValue(internal_date).LocalMidnight();
+            BucketTimeToResolution(base::Time::FromInternalValue(internal_date),
+                                   gMinimumMinutesBetweenVisits);
         if (other_date == date) {
           double other_engagement = 0;
           if (internal_value->GetDouble(kBannerEngagementKey,
@@ -432,4 +484,40 @@ void AppBannerSettingsHelper::SetEngagementWeights(double direct_engagement,
                                                    double indirect_engagement) {
   kDirectNavigationEngagement = direct_engagement;
   kIndirectNavigationEnagagement = indirect_engagement;
+}
+
+void AppBannerSettingsHelper::SetMinimumMinutesBetweenVisits(
+    unsigned int minutes) {
+  gMinimumMinutesBetweenVisits = minutes;
+}
+
+// Given a time, returns that time scoped to the nearest minute resolution
+// locally. For example, if the resolution is one hour, this function will
+// return the time to the closest (previous) hour in the local time zone.
+base::Time AppBannerSettingsHelper::BucketTimeToResolution(
+    base::Time time,
+    unsigned int minutes) {
+  // Only support resolutions smaller than or equal to one day. Enforce
+  // that resolutions divide evenly into one day. Otherwise, default to a
+  // day resolution (each time converted to midnight local time).
+  if (minutes == 0 || minutes >= kNumberOfMinutesInADay ||
+      kNumberOfMinutesInADay % minutes != 0) {
+    return time.LocalMidnight();
+  }
+
+  // Extract the number of minutes past midnight in local time. Divide that
+  // number by the resolution size, and return the time converted to local
+  // midnight with the resulting truncated number added.
+  base::Time::Exploded exploded;
+  time.LocalExplode(&exploded);
+  int total_minutes = exploded.hour * 60 + exploded.minute;
+
+  // Use truncating integer division here.
+  return time.LocalMidnight() +
+         base::TimeDelta::FromMinutes((total_minutes / minutes) * minutes);
+}
+
+void AppBannerSettingsHelper::UpdateFromFieldTrial() {
+  UpdateEngagementWeights();
+  UpdateMinutesBetweenVisits();
 }

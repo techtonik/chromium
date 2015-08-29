@@ -9,7 +9,6 @@
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/memory/scoped_vector.h"
 #include "base/prefs/pref_registry.h"
 #include "base/strings/string_split.h"
 #include "base/values.h"
@@ -194,18 +193,6 @@ void GetRendererContentSettingRules(const HostContentSettingsMap* map,
       CONTENT_SETTINGS_TYPE_JAVASCRIPT,
       ResourceIdentifier(),
       &(rules->script_rules));
-}
-
-uint32 PrefRegistrationFlagsForType(ContentSettingsType content_type) {
-  uint32 flags = PrefRegistry::NO_REGISTRATION_FLAGS;
-
-  if (IsContentSettingsTypeSyncable(content_type))
-    flags |= user_prefs::PrefRegistrySyncable::SYNCABLE_PREF;
-
-  if (IsContentSettingsTypeLossy(content_type))
-    flags |= PrefRegistry::LOSSY_PREF;
-
-  return flags;
 }
 
 }  // namespace content_settings

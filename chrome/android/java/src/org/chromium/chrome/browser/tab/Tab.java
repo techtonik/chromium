@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.provider.Browser;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -32,6 +33,7 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.AccessibilityUtil;
 import org.chromium.chrome.browser.ChromeWebContentsDelegateAndroid;
 import org.chromium.chrome.browser.FrozenNativePage;
+import org.chromium.chrome.browser.IntentHandler.TabOpenType;
 import org.chromium.chrome.browser.NativePage;
 import org.chromium.chrome.browser.RepostFormWarningDialog;
 import org.chromium.chrome.browser.SwipeRefreshHandler;
@@ -54,6 +56,7 @@ import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.metrics.UmaUtils;
 import org.chromium.chrome.browser.printing.TabPrinter;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.ssl.ConnectionSecurity;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.TabUma.TabCreationState;
@@ -61,6 +64,7 @@ import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
 import org.chromium.chrome.browser.tabmodel.TabModelBase;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.components.navigation_interception.InterceptNavigationDelegate;
 import org.chromium.content.browser.ContentView;
 import org.chromium.content.browser.ContentViewClient;
@@ -696,6 +700,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
                 color = mDefaultThemeColor;
             }
             if (isShowingInterstitialPage()) color = mDefaultThemeColor;
+            if (!FeatureUtilities.isDocumentMode(mApplicationContext)) color = mDefaultThemeColor;
             if (color == Color.TRANSPARENT) color = mDefaultThemeColor;
             color |= 0xFF000000;
             if (mThemeColor == color) return;
@@ -925,19 +930,15 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
             // We load the URL from the tab rather than directly from the ContentView so the tab has
             // a chance of using a prerenderer page is any.
-            int loadType = nativeLoadUrl(
-                    mNativeTabAndroid,
-                    params.getUrl(),
-                    params.getVerbatimHeaders(),
-                    params.getPostData(),
-                    params.getTransitionType(),
+            int loadType = nativeLoadUrl(mNativeTabAndroid, params.getUrl(),
+                    params.getVerbatimHeaders(), params.getPostData(), params.getTransitionType(),
                     params.getReferrer() != null ? params.getReferrer().getUrl() : null,
                     // Policy will be ignored for null referrer url, 0 is just a placeholder.
                     // TODO(ppi): Should we pass Referrer jobject and add JNI methods to read it
                     //            from the native?
                     params.getReferrer() != null ? params.getReferrer().getPolicy() : 0,
-                    params.getIsRendererInitiated(), params.getIntentReceivedTimestamp(),
-                    params.getHasUserGesture());
+                    params.getIsRendererInitiated(), params.getShouldReplaceCurrentEntry(),
+                    params.getIntentReceivedTimestamp(), params.getHasUserGesture());
 
             for (TabObserver observer : mObservers) {
                 observer.onLoadUrl(this, params, loadType);
@@ -1390,7 +1391,15 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         NativePage previousNativePage = mNativePage;
         mNativePage = nativePage;
         pushNativePageStateToNavigationEntry();
-        for (TabObserver observer : mObservers) observer.onContentChanged(this);
+        // Notifying of theme color change before content change because some of
+        // the observers depend on the theme information being correct in
+        // onContentChanged().
+        for (TabObserver observer : mObservers) {
+            observer.onDidChangeThemeColor(this, mDefaultThemeColor);
+        }
+        for (TabObserver observer : mObservers) {
+            observer.onContentChanged(this);
+        }
         destroyNativePageInternal(previousNativePage);
     }
 
@@ -1738,6 +1747,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             getContentViewCore().getContainerView().addView(
                     mSadTabView, new FrameLayout.LayoutParams(
                             LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            for (TabObserver observer : mObservers) observer.onContentChanged(this);
         }
         FullscreenManager fullscreenManager = getFullscreenManager();
         if (fullscreenManager != null) {
@@ -1749,7 +1759,10 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * Removes the sad tab view if present.
      */
     protected void removeSadTabIfPresent() {
-        if (isShowingSadTab()) getContentViewCore().getContainerView().removeView(mSadTabView);
+        if (isShowingSadTab()) {
+            getContentViewCore().getContainerView().removeView(mSadTabView);
+            for (TabObserver observer : mObservers) observer.onContentChanged(this);
+        }
         mSadTabView = null;
     }
 
@@ -2243,6 +2256,14 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
+     * Returns the SnackbarManager for the activity that owns this Tab, if any. May
+     * return null.
+     */
+    public SnackbarManager getSnackbarManager() {
+        return null;
+    }
+
+    /**
      * @return The native pointer representing the native side of this {@link Tab} object.
      */
     @CalledByNative
@@ -2649,6 +2670,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
+     * @return True if the offline page is opened.
+     */
+    public boolean isOfflinePage() {
+        return isFrozen() ? false : nativeIsOfflinePage(mNativeTabAndroid);
+    }
+
+    /**
      * Request that this tab receive focus. Currently, this function requests focus for the main
      * View (usually a ContentView).
      */
@@ -2742,23 +2770,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
-     * Check if the tab is covered by its child activity.
-     * @return Whether the tab is covered by its child activity.
-     */
-    public boolean isCoveredByChildActivity() {
-        // Default return value, this is only used by subclasses.
-        return false;
-    }
-
-    /**
-     * Update whether the tab is covered by its child activity.
-     * @param isCoveredByChildActivity Whether the tab is covered by its child activity.
-     */
-    public void setCoveredByChildActivity(boolean isCoveredByChildActivity) {
-        // Empty implementation, only used by subclasses.
-    }
-
-    /**
      * @return the UMA object for the tab. Note that this may be null in some
      * cases.
      */
@@ -2818,6 +2829,18 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         return tab;
     }
 
+    /**
+     * Returns an Intent that tells Chrome to open a Tab with a particular ID.
+     */
+    public static Intent createBringTabToFrontIntent(int tabId) {
+        String packageName = ApplicationStatus.getApplicationContext().getPackageName();
+        Intent intent = new Intent(Intent.ACTION_MAIN);
+        intent.putExtra(Browser.EXTRA_APPLICATION_ID, packageName);
+        intent.putExtra(TabOpenType.BRING_TAB_TO_FRONT.name(), tabId);
+        intent.setPackage(packageName);
+        return intent;
+    }
+
     private native void nativeInit();
     private native void nativeDestroy(long nativeTabAndroid);
     private native void nativeInitWebContents(long nativeTabAndroid, boolean incognito,
@@ -2827,7 +2850,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native Profile nativeGetProfileAndroid(long nativeTabAndroid);
     private native int nativeLoadUrl(long nativeTabAndroid, String url, String extraHeaders,
             byte[] postData, int transition, String referrerUrl, int referrerPolicy,
-            boolean isRendererInitiated, long intentReceivedTimestamp, boolean hasUserGesture);
+            boolean isRendererInitiated, boolean shoulReplaceCurrentEntry,
+            long intentReceivedTimestamp, boolean hasUserGesture);
     private native void nativeSetActiveNavigationEntryTitleForUrl(long nativeTabAndroid, String url,
             String title);
     private native boolean nativePrint(long nativeTabAndroid);
@@ -2838,6 +2862,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native void nativeLoadOriginalImage(long nativeTabAndroid);
     private native void nativeSearchByImageInNewTabAsync(long nativeTabAndroid);
     private native long nativeGetBookmarkId(long nativeTabAndroid, boolean onlyEditable);
+    private native boolean nativeIsOfflinePage(long nativeTabAndroid);
     private native void nativeSetInterceptNavigationDelegate(long nativeTabAndroid,
             InterceptNavigationDelegate delegate);
     private native void nativeAttachToTabContentManager(long nativeTabAndroid,

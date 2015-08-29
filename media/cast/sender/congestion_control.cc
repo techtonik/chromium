@@ -18,6 +18,7 @@
 #include <deque>
 
 #include "base/logging.h"
+#include "base/trace_event/trace_event.h"
 #include "media/cast/cast_config.h"
 #include "media/cast/cast_defines.h"
 
@@ -27,27 +28,22 @@ namespace cast {
 class AdaptiveCongestionControl : public CongestionControl {
  public:
   AdaptiveCongestionControl(base::TickClock* clock,
-                            uint32 max_bitrate_configured,
-                            uint32 min_bitrate_configured,
+                            int max_bitrate_configured,
+                            int min_bitrate_configured,
                             double max_frame_rate);
 
   ~AdaptiveCongestionControl() final;
 
+  // CongestionControl implementation.
   void UpdateRtt(base::TimeDelta rtt) final;
-
   void UpdateTargetPlayoutDelay(base::TimeDelta delay) final;
-
-  // Called when an encoded frame is sent to the transport.
   void SendFrameToTransport(uint32 frame_id,
                             size_t frame_size_in_bits,
                             base::TimeTicks when) final;
-
-  // Called when we receive an ACK for a frame.
   void AckFrame(uint32 frame_id, base::TimeTicks when) final;
-
-  // Returns the bitrate we should use for the next frame.
-  uint32 GetBitrate(base::TimeTicks playout_time,
-                    base::TimeDelta playout_delay) final;
+  int GetBitrate(base::TimeTicks playout_time,
+                 base::TimeDelta playout_delay,
+                 int soft_max_bitrate) final;
 
  private:
   struct FrameStats {
@@ -78,8 +74,8 @@ class AdaptiveCongestionControl : public CongestionControl {
                                        double estimated_bitrate);
 
   base::TickClock* const clock_;  // Not owned by this class.
-  const uint32 max_bitrate_configured_;
-  const uint32 min_bitrate_configured_;
+  const int max_bitrate_configured_;
+  const int min_bitrate_configured_;
   const double max_frame_rate_;
   std::deque<FrameStats> frame_stats_;
   uint32 last_frame_stats_;
@@ -95,37 +91,33 @@ class AdaptiveCongestionControl : public CongestionControl {
 
 class FixedCongestionControl : public CongestionControl {
  public:
-  FixedCongestionControl(uint32 bitrate) : bitrate_(bitrate) {}
+  explicit FixedCongestionControl(int bitrate) : bitrate_(bitrate) {}
   ~FixedCongestionControl() final {}
 
+  // CongestionControl implementation.
   void UpdateRtt(base::TimeDelta rtt) final {}
-
   void UpdateTargetPlayoutDelay(base::TimeDelta delay) final {}
-
-  // Called when an encoded frame is sent to the transport.
   void SendFrameToTransport(uint32 frame_id,
                             size_t frame_size_in_bits,
                             base::TimeTicks when) final {}
-
-  // Called when we receive an ACK for a frame.
   void AckFrame(uint32 frame_id, base::TimeTicks when) final {}
-
-  // Returns the bitrate we should use for the next frame.
-  uint32 GetBitrate(base::TimeTicks playout_time,
-                    base::TimeDelta playout_delay) final {
+  int GetBitrate(base::TimeTicks playout_time,
+                 base::TimeDelta playout_delay,
+                 int soft_max_bitrate) final {
     return bitrate_;
   }
 
  private:
-  uint32 bitrate_;
+  const int bitrate_;
+
   DISALLOW_COPY_AND_ASSIGN(FixedCongestionControl);
 };
 
 
 CongestionControl* NewAdaptiveCongestionControl(
     base::TickClock* clock,
-    uint32 max_bitrate_configured,
-    uint32 min_bitrate_configured,
+    int max_bitrate_configured,
+    int min_bitrate_configured,
     double max_frame_rate) {
   return new AdaptiveCongestionControl(clock,
                                        max_bitrate_configured,
@@ -133,7 +125,7 @@ CongestionControl* NewAdaptiveCongestionControl(
                                        max_frame_rate);
 }
 
-CongestionControl* NewFixedCongestionControl(uint32 bitrate) {
+CongestionControl* NewFixedCongestionControl(int bitrate) {
   return new FixedCongestionControl(bitrate);
 }
 
@@ -152,8 +144,8 @@ AdaptiveCongestionControl::FrameStats::FrameStats() : frame_size_in_bits(0) {
 
 AdaptiveCongestionControl::AdaptiveCongestionControl(
     base::TickClock* clock,
-    uint32 max_bitrate_configured,
-    uint32 min_bitrate_configured,
+    int max_bitrate_configured,
+    int min_bitrate_configured,
     double max_frame_rate)
     : clock_(clock),
       max_bitrate_configured_(max_bitrate_configured),
@@ -165,6 +157,7 @@ AdaptiveCongestionControl::AdaptiveCongestionControl(
       history_size_(kHistorySize),
       acked_bits_in_history_(0) {
   DCHECK_GE(max_bitrate_configured, min_bitrate_configured) << "Invalid config";
+  DCHECK_GT(min_bitrate_configured, 0);
   frame_stats_.resize(2);
   base::TimeTicks now = clock->NowTicks();
   frame_stats_[0].ack_time = now;
@@ -349,8 +342,9 @@ base::TimeTicks AdaptiveCongestionControl::EstimatedSendingTime(
   return estimated_sending_time;
 }
 
-uint32 AdaptiveCongestionControl::GetBitrate(base::TimeTicks playout_time,
-                                             base::TimeDelta playout_delay) {
+int AdaptiveCongestionControl::GetBitrate(base::TimeTicks playout_time,
+                                          base::TimeDelta playout_delay,
+                                          int soft_max_bitrate) {
   double safe_bitrate = CalculateSafeBitrate();
   // Estimate when we might start sending the next frame.
   base::TimeDelta time_to_catch_up =
@@ -362,13 +356,17 @@ uint32 AdaptiveCongestionControl::GetBitrate(base::TimeTicks playout_time,
   empty_buffer_fraction = std::min(empty_buffer_fraction, 1.0);
   empty_buffer_fraction = std::max(empty_buffer_fraction, 0.0);
 
-  uint32 bits_per_second = static_cast<uint32>(
+  int bits_per_second = static_cast<int>(
       safe_bitrate * empty_buffer_fraction / kTargetEmptyBufferFraction);
   VLOG(3) << " FBR:" << (bits_per_second / 1E6)
           << " EBF:" << empty_buffer_fraction
           << " SBR:" << (safe_bitrate / 1E6);
+  TRACE_COUNTER_ID1("cast.stream", "Empty Buffer Fraction", this,
+                    empty_buffer_fraction);
+  bits_per_second = std::min(bits_per_second, soft_max_bitrate);
   bits_per_second = std::max(bits_per_second, min_bitrate_configured_);
   bits_per_second = std::min(bits_per_second, max_bitrate_configured_);
+
   return bits_per_second;
 }
 

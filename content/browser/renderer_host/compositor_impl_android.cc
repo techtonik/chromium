@@ -447,8 +447,6 @@ void CompositorImpl::CreateLayerTreeHost() {
   settings.renderer_settings.allow_antialiasing = false;
   settings.renderer_settings.highp_threshold_min = 2048;
   settings.use_zero_copy = true;
-  settings.use_one_copy = false;
-  settings.use_display_lists = true;
 
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   settings.initial_debug_state.SetRecordRenderingStats(
@@ -674,7 +672,7 @@ void CompositorImpl::CreateOutputSurface() {
         base::ThreadTaskRunnerHandle::Get()));
     scoped_ptr<cc::SurfaceDisplayOutputSurface> surface_output_surface(
         new cc::SurfaceDisplayOutputSurface(
-            manager, surface_id_allocator_.get(), context_provider));
+            manager, surface_id_allocator_.get(), context_provider, nullptr));
 
     display_client_->set_surface_output_surface(surface_output_surface.get());
     surface_output_surface->set_display_client(display_client_.get());

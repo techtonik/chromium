@@ -26,6 +26,7 @@
 #include "net/base/net_export.h"
 #include "net/base/network_delegate.h"
 #include "net/dns/host_resolver.h"
+#include "net/http/http_network_session.h"
 #include "net/proxy/proxy_config_service.h"
 #include "net/proxy/proxy_service.h"
 #include "net/quic/quic_protocol.h"
@@ -80,7 +81,7 @@ class NET_EXPORT URLRequestContextBuilder {
     uint16 testing_fixed_https_port;
     NextProtoVector next_protos;
     std::string trusted_spdy_proxy;
-    bool use_alternate_protocols;
+    bool use_alternative_services;
     bool enable_quic;
     bool enable_insecure_quic;
     QuicTagVector quic_connection_options;
@@ -88,6 +89,14 @@ class NET_EXPORT URLRequestContextBuilder {
 
   URLRequestContextBuilder();
   ~URLRequestContextBuilder();
+
+  // Extracts the component pointers required to construct an HttpNetworkSession
+  // and copies them into the Params used to create the session. This function
+  // should be used to ensure that a context and its associated
+  // HttpNetworkSession are consistent.
+  static void SetHttpNetworkSessionComponents(
+      const URLRequestContext* context,
+      HttpNetworkSession::Params* params);
 
   // These functions are mutually exclusive.  The ProxyConfigService, if
   // set, will be used to construct a ProxyService.

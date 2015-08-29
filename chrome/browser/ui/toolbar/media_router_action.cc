@@ -13,6 +13,7 @@
 #include "chrome/browser/media/router/media_router_mojo_impl.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
+#include "chrome/browser/ui/toolbar/component_toolbar_actions_factory.h"
 #include "chrome/browser/ui/toolbar/media_router_action_platform_delegate.h"
 #include "chrome/browser/ui/toolbar/toolbar_action_view_delegate.h"
 #include "chrome/grit/generated_resources.h"
@@ -26,28 +27,27 @@ using media_router::MediaRouterDialogController;
 MediaRouterAction::MediaRouterAction(Browser* browser)
     : media_router::IssuesObserver(GetMediaRouter(browser)),
       media_router::MediaRoutesObserver(GetMediaRouter(browser)),
-      id_("media_router_action"),
-      name_(l10n_util::GetStringUTF16(IDS_MEDIA_ROUTER_TITLE)),
-      media_router_active_icon_(ui::ResourceBundle::GetSharedInstance().
-          GetImageNamed(IDR_MEDIA_ROUTER_ACTIVE_ICON)),
-      media_router_error_icon_(ui::ResourceBundle::GetSharedInstance().
-          GetImageNamed(IDR_MEDIA_ROUTER_ERROR_ICON)),
-      media_router_idle_icon_(ui::ResourceBundle::GetSharedInstance().
-          GetImageNamed(IDR_MEDIA_ROUTER_IDLE_ICON)),
-      media_router_warning_icon_(ui::ResourceBundle::GetSharedInstance().
-          GetImageNamed(IDR_MEDIA_ROUTER_WARNING_ICON)),
+      media_router_active_icon_(
+          ui::ResourceBundle::GetSharedInstance()
+              .GetImageNamed(IDR_MEDIA_ROUTER_ACTIVE_ICON)),
+      media_router_error_icon_(ui::ResourceBundle::GetSharedInstance()
+                                   .GetImageNamed(IDR_MEDIA_ROUTER_ERROR_ICON)),
+      media_router_idle_icon_(ui::ResourceBundle::GetSharedInstance()
+                                  .GetImageNamed(IDR_MEDIA_ROUTER_IDLE_ICON)),
+      media_router_warning_icon_(
+          ui::ResourceBundle::GetSharedInstance()
+              .GetImageNamed(IDR_MEDIA_ROUTER_WARNING_ICON)),
       current_icon_(&media_router_idle_icon_),
       has_local_route_(false),
       delegate_(nullptr),
       platform_delegate_(MediaRouterActionPlatformDelegate::Create(browser)),
-      contextual_menu_(browser) {
-}
+      contextual_menu_(browser) {}
 
 MediaRouterAction::~MediaRouterAction() {
 }
 
-const std::string& MediaRouterAction::GetId() const {
-  return id_;
+std::string MediaRouterAction::GetId() const {
+  return ComponentToolbarActionsFactory::kMediaRouterActionId;
 }
 
 void MediaRouterAction::SetDelegate(ToolbarActionViewDelegate* delegate) {
@@ -60,7 +60,7 @@ gfx::Image MediaRouterAction::GetIcon(content::WebContents* web_contents,
 }
 
 base::string16 MediaRouterAction::GetActionName() const {
-  return name_;
+  return l10n_util::GetStringUTF16(IDS_MEDIA_ROUTER_TITLE);
 }
 
 base::string16 MediaRouterAction::GetAccessibleName(
@@ -70,7 +70,7 @@ base::string16 MediaRouterAction::GetAccessibleName(
 
 base::string16 MediaRouterAction::GetTooltip(
     content::WebContents* web_contents) const {
-  return name_;
+  return l10n_util::GetStringUTF16(IDS_MEDIA_ROUTER_SHARE_YOUR_SCREEN_TEXT);
 }
 
 bool MediaRouterAction::IsEnabled(
@@ -100,10 +100,6 @@ ui::MenuModel* MediaRouterAction::GetContextMenu() {
   return contextual_menu_.menu_model();
 }
 
-bool MediaRouterAction::CanDrag() const {
-  return false;
-}
-
 bool MediaRouterAction::ExecuteAction(bool by_user) {
   GetMediaRouterDialogController()->ShowMediaRouterDialog();
   if (platform_delegate_)
@@ -112,6 +108,8 @@ bool MediaRouterAction::ExecuteAction(bool by_user) {
 }
 
 void MediaRouterAction::UpdateState() {
+  if (delegate_)
+    delegate_->UpdateState();
 }
 
 bool MediaRouterAction::DisabledClickOpensMenu() const {

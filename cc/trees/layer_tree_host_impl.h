@@ -227,7 +227,7 @@ class CC_EXPORT LayerTreeHostImpl
   virtual void BeginMainFrameAborted(CommitEarlyOutReason reason);
   virtual void BeginCommit();
   virtual void CommitComplete();
-  virtual void Animate(base::TimeTicks monotonic_time);
+  virtual void Animate();
   virtual void UpdateAnimationState(bool start_ready_animations);
   void ActivateAnimations();
   void MainThreadHasStoppedFlinging();
@@ -365,6 +365,7 @@ class CC_EXPORT LayerTreeHostImpl
   std::string LayerTreeAsJson() const;
 
   void FinishAllRendering();
+  int RequestedMSAASampleCount() const;
 
   virtual bool InitializeRenderer(scoped_ptr<OutputSurface> output_surface);
   TileManager* tile_manager() { return tile_manager_.get(); }
@@ -432,8 +433,6 @@ class CC_EXPORT LayerTreeHostImpl
 
   virtual void SetVisible(bool visible);
   bool visible() const { return visible_; }
-
-  bool AnimationsAreVisible() { return visible() && CanDraw(); }
 
   void SetNeedsCommit() { client_->SetNeedsCommitOnImplThread(); }
   void SetNeedsAnimate();
@@ -559,8 +558,7 @@ class CC_EXPORT LayerTreeHostImpl
 
   virtual void CreateResourceAndTileTaskWorkerPool(
       scoped_ptr<TileTaskWorkerPool>* tile_task_worker_pool,
-      scoped_ptr<ResourcePool>* resource_pool,
-      scoped_ptr<ResourcePool>* staging_resource_pool);
+      scoped_ptr<ResourcePool>* resource_pool);
 
   bool prepare_tiles_needed() const { return tile_priorities_dirty_; }
 
@@ -713,7 +711,6 @@ class CC_EXPORT LayerTreeHostImpl
   bool tree_resources_for_gpu_rasterization_dirty_;
   scoped_ptr<TileTaskWorkerPool> tile_task_worker_pool_;
   scoped_ptr<ResourcePool> resource_pool_;
-  scoped_ptr<ResourcePool> staging_resource_pool_;
   scoped_ptr<Renderer> renderer_;
 
   GlobalStateThatImpactsTilePriority global_tile_state_;

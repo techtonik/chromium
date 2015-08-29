@@ -280,15 +280,6 @@ scoped_ptr<OverscrollControllerAndroid> CreateOverscrollController(
   return make_scoped_ptr(new OverscrollControllerAndroid(content_view_core));
 }
 
-ui::GestureProvider::Config CreateGestureProviderConfig() {
-  ui::GestureProvider::Config config = ui::GetGestureProviderConfig(
-      ui::GestureProviderConfigType::CURRENT_PLATFORM);
-  config.disable_click_delay =
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableClickDelay);
-  return config;
-}
-
 gfx::RectF GetSelectionRect(const ui::TouchSelectionController& controller) {
   gfx::RectF rect = controller.GetRectBetweenBounds();
   if (rect.IsEmpty())
@@ -330,7 +321,9 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
       ime_adapter_android_(this),
       cached_background_color_(SK_ColorWHITE),
       last_output_surface_id_(kUndefinedOutputSurfaceId),
-      gesture_provider_(CreateGestureProviderConfig(), this),
+      gesture_provider_(ui::GetGestureProviderConfig(
+                            ui::GestureProviderConfigType::CURRENT_PLATFORM),
+                        this),
       stylus_text_selector_(this),
       accelerated_surface_route_id_(0),
       using_browser_compositor_(CompositorImpl::IsInitialized()),
@@ -454,7 +447,7 @@ scoped_refptr<cc::Layer> RenderWidgetHostViewAndroid::CreateDelegatedLayer()
     delegated_layer = cc::DelegatedRendererLayer::Create(
         Compositor::LayerSettings(), frame_provider_);
   }
-  delegated_layer->SetBounds(content_size_in_layer_);
+  delegated_layer->SetBounds(texture_size_in_layer_);
   delegated_layer->SetIsDrawable(true);
   delegated_layer->SetContentsOpaque(true);
 
@@ -1024,7 +1017,7 @@ void RenderWidgetHostViewAndroid::CheckOutputSurfaceChanged(
   last_output_surface_id_ = output_surface_id;
 }
 
-void RenderWidgetHostViewAndroid::SubmitFrame(
+void RenderWidgetHostViewAndroid::SubmitCompositorFrame(
     scoped_ptr<cc::CompositorFrame> frame) {
   cc::SurfaceManager* manager = CompositorImpl::GetSurfaceManager();
   if (manager) {
@@ -1032,7 +1025,10 @@ void RenderWidgetHostViewAndroid::SubmitFrame(
       surface_factory_ = make_scoped_ptr(new cc::SurfaceFactory(manager, this));
     }
     if (surface_id_.is_null() ||
-        texture_size_in_layer_ != current_surface_size_) {
+        texture_size_in_layer_ != current_surface_size_ ||
+        location_bar_content_translation_ !=
+            frame->metadata.location_bar_content_translation ||
+        current_viewport_selection_ != frame->metadata.selection) {
       RemoveLayers();
       if (!surface_id_.is_null())
         surface_factory_->Destroy(surface_id_);
@@ -1043,13 +1039,17 @@ void RenderWidgetHostViewAndroid::SubmitFrame(
       DCHECK(layer_);
 
       current_surface_size_ = texture_size_in_layer_;
+      location_bar_content_translation_ =
+          frame->metadata.location_bar_content_translation;
+      current_viewport_selection_ = frame->metadata.selection;
       AttachLayers();
     }
 
     cc::SurfaceFactory::DrawCallback ack_callback =
         base::Bind(&RenderWidgetHostViewAndroid::RunAckCallbacks,
                    weak_ptr_factory_.GetWeakPtr());
-    surface_factory_->SubmitFrame(surface_id_, frame.Pass(), ack_callback);
+    surface_factory_->SubmitCompositorFrame(surface_id_, frame.Pass(),
+                                            ack_callback);
   } else {
     if (!resource_collection_.get()) {
       resource_collection_ = new cc::DelegatedFrameResourceCollection;
@@ -1093,29 +1093,17 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
   if (!has_content) {
     DestroyDelegatedContent();
   } else {
-    SubmitFrame(frame.Pass());
+    SubmitCompositorFrame(frame.Pass());
   }
 
   if (layer_.get()) {
     layer_->SetIsDrawable(true);
     layer_->SetContentsOpaque(true);
-    layer_->SetBounds(content_size_in_layer_);
+    layer_->SetBounds(texture_size_in_layer_);
   }
 
   if (host_->is_hidden())
     RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
-}
-
-void RenderWidgetHostViewAndroid::ComputeContentsSize(
-    const cc::CompositorFrameMetadata& frame_metadata) {
-  // Calculate the content size.  This should be 0 if the texture_size is 0.
-  gfx::Vector2dF offset;
-  if (texture_size_in_layer_.IsEmpty())
-    content_size_in_layer_ = gfx::Size();
-  content_size_in_layer_ = gfx::ToCeiledSize(gfx::ScaleSize(
-      frame_metadata.scrollable_viewport_size,
-      frame_metadata.device_scale_factor * frame_metadata.page_scale_factor));
-
 }
 
 void RenderWidgetHostViewAndroid::InternalSwapCompositorFrame(
@@ -1147,7 +1135,6 @@ void RenderWidgetHostViewAndroid::InternalSwapCompositorFrame(
   cc::RenderPass* root_pass =
       frame->delegated_frame_data->render_pass_list.back();
   texture_size_in_layer_ = root_pass->output_rect.size();
-  ComputeContentsSize(frame->metadata);
 
   cc::CompositorFrameMetadata metadata = frame->metadata;
 
@@ -1194,7 +1181,6 @@ void RenderWidgetHostViewAndroid::SynchronousFrameMetadata(
   // This is a subset of OnSwapCompositorFrame() used in the synchronous
   // compositor flow.
   OnFrameMetadataUpdated(frame_metadata);
-  ComputeContentsSize(frame_metadata);
 
   // DevTools ScreenCast support for Android WebView.
   WebContents* web_contents = content_view_core_->GetWebContents();
@@ -1280,7 +1266,7 @@ void RenderWidgetHostViewAndroid::SynchronousCopyContents(
     const SkColorType color_type) {
   gfx::Size input_size_in_pixel;
   if (src_subrect_in_pixel.IsEmpty())
-    input_size_in_pixel = content_size_in_layer_;
+    input_size_in_pixel = texture_size_in_layer_;
   else
     input_size_in_pixel = src_subrect_in_pixel.size();
 
@@ -1537,6 +1523,13 @@ void RenderWidgetHostViewAndroid::GetScreenInfo(blink::WebScreenInfo* result) {
   RenderWidgetHostViewBase::GetDefaultScreenInfo(result);
 }
 
+bool RenderWidgetHostViewAndroid::GetScreenColorProfile(
+    std::vector<char>* color_profile) {
+  DCHECK(color_profile->empty());
+  NOTREACHED();
+  return false;
+}
+
 // TODO(jrg): Find out the implications and answer correctly here,
 // as we are returning the WebView and not root window bounds.
 gfx::Rect RenderWidgetHostViewAndroid::GetBoundsInRootWindow() {
@@ -1546,7 +1539,8 @@ gfx::Rect RenderWidgetHostViewAndroid::GetBoundsInRootWindow() {
 gfx::GLSurfaceHandle RenderWidgetHostViewAndroid::GetCompositingSurface() {
   gfx::GLSurfaceHandle handle =
       gfx::GLSurfaceHandle(gfx::kNullPluginWindow, gfx::NULL_TRANSPORT);
-  if (using_browser_compositor_) {
+  // Null check for when we're running inside content_unittests.
+  if (using_browser_compositor_ && BrowserGpuChannelHostFactory::instance()) {
     handle.parent_client_id =
         BrowserGpuChannelHostFactory::instance()->GetGpuChannelId();
   }

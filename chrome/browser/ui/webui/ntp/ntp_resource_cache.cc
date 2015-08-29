@@ -35,6 +35,7 @@
 #include "chrome/browser/ui/webui/ntp/new_tab_page_handler.h"
 #include "chrome/browser/ui/webui/ntp/new_tab_ui.h"
 #include "chrome/browser/web_resource/notification_promo.h"
+#include "chrome/browser/web_resource/notification_promo_helper.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
@@ -477,16 +478,14 @@ void NTPResourceCache::CreateNewTabHTML() {
   load_time_data.SetBoolean("showWebStoreIcon",
                             !prefs->GetBoolean(prefs::kHideWebStoreIcon));
 
-  bool bookmark_apps_enabled = extensions::util::IsNewBookmarkAppsEnabled();
-  load_time_data.SetBoolean("enableNewBookmarkApps", bookmark_apps_enabled);
+  load_time_data.SetBoolean("enableNewBookmarkApps",
+                            extensions::util::IsNewBookmarkAppsEnabled());
+
+  load_time_data.SetBoolean("canHostedAppsOpenInWindows",
+                            extensions::util::CanHostedAppsOpenInWindows());
 
   load_time_data.SetBoolean("canShowAppInfoDialog",
                             CanShowAppInfoDialog());
-
-#if defined(OS_CHROMEOS)
-  load_time_data.SetString("expandMenu",
-      l10n_util::GetStringUTF16(IDS_NEW_TAB_CLOSE_MENU_EXPAND));
-#endif
 
   NewTabPageHandler::GetLocalizedValues(profile_, &load_time_data);
   AppLauncherLoginHandler::GetLocalizedValues(profile_, &load_time_data);
@@ -506,9 +505,10 @@ void NTPResourceCache::CreateNewTabHTML() {
   // Disable the promo if this is the first run, otherwise set the promo string
   // for display if there is a valid outstanding promo.
   if (first_run::IsChromeFirstRun()) {
-    NotificationPromo::HandleClosed(NotificationPromo::NTP_NOTIFICATION_PROMO);
+    web_resource::HandleNotificationPromoClosed(
+        NotificationPromo::NTP_NOTIFICATION_PROMO);
   } else {
-    NotificationPromo notification_promo;
+    NotificationPromo notification_promo(g_browser_process->local_state());
     notification_promo.InitFromPrefs(NotificationPromo::NTP_NOTIFICATION_PROMO);
     if (notification_promo.CanShow()) {
       load_time_data.SetString("notificationPromoText",
@@ -516,7 +516,7 @@ void NTPResourceCache::CreateNewTabHTML() {
       DVLOG(1) << "Notification promo:" << notification_promo.promo_text();
     }
 
-    NotificationPromo bubble_promo;
+    NotificationPromo bubble_promo(g_browser_process->local_state());
     bubble_promo.InitFromPrefs(NotificationPromo::NTP_BUBBLE_PROMO);
     if (bubble_promo.CanShow()) {
       load_time_data.SetString("bubblePromoText",

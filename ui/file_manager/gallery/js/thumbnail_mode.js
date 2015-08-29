@@ -67,18 +67,9 @@ ThumbnailMode.prototype.hasActiveTool = function() { return true; };
  * Handles key down event.
  * @param {!Event} event An event.
  * @return {boolean} True when an event is handled.
- *
- * TODO(yawano): Support up and down key.
- * TODO(yawano): Move not-mode-specific logics to ThumbnailView.
  */
 ThumbnailMode.prototype.onKeyDown = function(event) {
   switch (event.keyIdentifier) {
-    case 'Right':
-      this.thumbnailView_.moveSelection(isRTL() ? -1 : 1);
-      return true;
-    case 'Left':
-      this.thumbnailView_.moveSelection(isRTL() ? 1 : -1);
-      return true;
     case 'Enter':
       this.changeToSlideModeCallback_();
       return true;
@@ -130,6 +121,13 @@ ThumbnailMode.prototype.performEnterAnimation = function(index, rect) {
 };
 
 /**
+ * Focus to thumbnail mode.
+ */
+ThumbnailMode.prototype.focus = function() {
+  this.thumbnailView_.focus();
+};
+
+/**
  * Returns thumbnail rect of the index.
  * @param {number} index An index of thumbnail.
  * @return {!ClientRect} A rect of thumbnail.
@@ -147,7 +145,6 @@ ThumbnailMode.prototype.getThumbnailRect = function(index) {
  * @extends {cr.EventTarget}
  * @struct
  *
- * TODO(yawano): Implement multi selection.
  * TODO(yawano): Optimization. Remove DOMs outside of viewport, reuse them.
  * TODO(yawano): Extract ThumbnailView as a polymer element.
  */
@@ -228,6 +225,10 @@ function ThumbnailView(container, dataModel, selectionModel) {
   this.container_.addEventListener('click', this.onClick_.bind(this));
   this.container_.addEventListener('dblclick', this.onDblClick_.bind(this));
 
+  // Set tabIndex to -1 as the container can capture keydown events.
+  this.container_.tabIndex = -1;
+  this.container_.addEventListener('keydown', this.onKeydown_.bind(this));
+
   this.scrollbarThumb_.addEventListener(
       'mousedown', this.onScrollbarThumbMouseDown_.bind(this));
   window.addEventListener('mousemove', this.onWindowMouseMove_.bind(this));
@@ -261,6 +262,16 @@ ThumbnailView.MARGIN = 4; // px
  * @const {number}
  */
 ThumbnailView.SCROLLBAR_TIMEOUT = 1500; // ms
+
+/**
+ * Selection mode.
+ * @enum {string}
+ */
+ThumbnailView.SelectionMode = {
+  SINGLE: 'single',
+  MULTIPLE: 'multiple',
+  RANGE: 'range'
+};
 
 /**
  * Shows thumbnail view.
@@ -324,24 +335,70 @@ ThumbnailView.prototype.onScroll_ = function(event) {
 
 /**
  * Moves selection to specified direction.
- * @param {number} direction Direction.
- * @param {number=} opt_index Base index.
+ * @param {string} direction Direction. Should be 'Left', 'Right', 'Up', or
+ *     'Down'.
  */
-ThumbnailView.prototype.moveSelection = function(direction, opt_index) {
-  var index = opt_index || this.selectionModel_.selectedIndex;
-  if (index + direction < 0 || index + direction >= this.dataModel_.length)
-    return;
-
-  // Skip error thumbnail.
-  var thumbnail = this.getThumbnailAt_(index + direction);
-  if (thumbnail.isError()) {
-    this.moveSelection(direction, index + direction);
-    return;
+ThumbnailView.prototype.moveSelection = function(direction) {
+  var step;
+  if ((direction === 'Left' && !isRTL()) ||
+      (direction === 'Right' && isRTL()) ||
+      (direction === 'Up')) {
+    step = -1;
+  } else if ((direction === 'Right' && !isRTL()) ||
+             (direction === 'Left' && isRTL()) ||
+             (direction === 'Down')) {
+    step = 1;
+  } else {
+    assertNotReached();
   }
 
-  // Move selection.
-  this.selectionModel_.selectedIndex = index + direction;
-  this.scrollTo_(index + direction);
+  var vertical = direction === 'Up' || direction === 'Down';
+  var baseIndex = this.selectionModel_.selectedIndex;
+  var baseRect = this.getThumbnailRect(baseIndex);
+  var baseCenter = baseRect.left + baseRect.width / 2;
+  var minHorizontalGap = Number.MAX_VALUE;
+  var index = null;
+
+  for (var i = baseIndex + step;
+       0 <= i && i < this.dataModel_.length;
+       i += step) {
+    // Skip error thumbnail.
+    var thumbnail = this.getThumbnailAt_(i);
+    if (thumbnail.isError())
+      continue;
+
+    // Look for the horizontally nearest item if it is vertical move. Otherwise
+    // it just use the current i.
+    if (vertical) {
+      var rect = this.getThumbnailRect(i);
+      var verticalGap = Math.abs(baseRect.top - rect.top);
+      if (verticalGap === 0)
+        continue;
+      else if (verticalGap >= ThumbnailView.ROW_HEIGHT * 2)
+        break;
+      // If centerGap - rect.width / 2 < 0, the image is located just
+      // above the center point of base image since baseCenter is in the range
+      // (rect.left, rect.right). In this case we use 0 as distance. Otherwise
+      // centerGap - rect.width / 2 equals to the distance between baseCenter
+      // and either of rect.left or rect.right that is closer to centerGap.
+      var centerGap = Math.abs(baseCenter - (rect.left + rect.width / 2));
+      var horizontalGap = Math.max(centerGap - rect.width / 2, 0);
+      if (horizontalGap < minHorizontalGap) {
+        minHorizontalGap = horizontalGap;
+        index = i;
+      }
+    } else {
+      index = i;
+      break;
+    }
+  }
+
+  if (index !== null) {
+    // Move selection.
+    this.selectionModel_.selectedIndex = index;
+    this.selectionModel_.leadIndex = index;
+    this.scrollTo_(index);
+  }
 };
 
 /**
@@ -466,6 +523,7 @@ ThumbnailView.prototype.onContent_ = function(event) {
  */
 ThumbnailView.prototype.onSelectionChange_ = function(event) {
   var changes = event.changes;
+  var lastSelectedThumbnail = null;
 
   for (var i = 0; i < changes.length; i++) {
     var change = changes[i];
@@ -479,7 +537,16 @@ ThumbnailView.prototype.onSelectionChange_ = function(event) {
       continue;
 
     thumbnail.setSelected(change.selected);
+
+    // We should not focus to error thumbnail.
+    if (change.selected && !thumbnail.isError())
+      lastSelectedThumbnail = thumbnail;
   }
+
+  // If new item is selected, focus to it. If multiple thumbnails are selected,
+  // focus to the last one.
+  if (lastSelectedThumbnail)
+    lastSelectedThumbnail.getContainer().focus();
 };
 
 /**
@@ -489,8 +556,19 @@ ThumbnailView.prototype.onSelectionChange_ = function(event) {
  */
 ThumbnailView.prototype.onClick_ = function(event) {
   var target = event.target;
-  if (target.matches('.selection.frame'))
-    this.selectBySelectionFrame_(/** @type {!HTMLElement} */ (target));
+  if (target.matches('.selection.frame')) {
+    var selectionMode = ThumbnailView.SelectionMode.SINGLE;
+    if (event.ctrlKey)
+      selectionMode = ThumbnailView.SelectionMode.MULTIPLE;
+    if (event.shiftKey)
+      selectionMode = ThumbnailView.SelectionMode.RANGE;
+
+    this.selectByThumbnail_(target.parentNode.getThumbnail(), selectionMode);
+    return;
+  }
+
+  // If empty space is clicked, unselect current selection.
+  this.selectionModel_.unselectAll();
 };
 
 /**
@@ -501,26 +579,60 @@ ThumbnailView.prototype.onClick_ = function(event) {
 ThumbnailView.prototype.onDblClick_ = function(event) {
   var target = event.target;
   if (target.matches('.selection.frame')) {
-    this.selectBySelectionFrame_(/** @type{!HTMLElement} */ (target));
+    this.selectByThumbnail_(target.parentNode.getThumbnail(),
+        ThumbnailView.SelectionMode.SINGLE);
     var thumbnailDoubleClickEvent = new Event('thumbnail-double-click');
     this.dispatchEvent(thumbnailDoubleClickEvent);
   }
 };
 
 /**
- * Selects a thumbnail by selection frame.
- * @param {!HTMLElement} selectionFrame Selection frame.
+ * Handles keydown event.
+ * @param {!Event} event
+ */
+ThumbnailView.prototype.onKeydown_ = function(event) {
+  var keyString = util.getKeyModifiers(event) + event.keyIdentifier;
+
+  switch (keyString) {
+    case 'Right':
+    case 'Left':
+    case 'Up':
+    case 'Down':
+      this.moveSelection(event.keyIdentifier);
+      event.stopPropagation();
+      break;
+    case 'Ctrl-U+0041': // Crtl+A
+      this.selectionModel_.selectAll();
+      event.stopPropagation();
+      break;
+  }
+};
+
+/**
+ * Selects a thumbnail.
+ * @param {!ThumbnailView.Thumbnail} thumbnail Thumbnail to be selected.
+ * @param {ThumbnailView.SelectionMode} selectionMode
  * @private
  */
-ThumbnailView.prototype.selectBySelectionFrame_ = function(selectionFrame) {
-  var thumbnailContainer = selectionFrame.parentNode;
-
-  // Unselect all other items.
-  this.selectionModel_.unselectAll();
-
-  var thumbnail = thumbnailContainer.getThumbnail();
+ThumbnailView.prototype.selectByThumbnail_ = function(
+    thumbnail, selectionMode) {
   var index = this.dataModel_.indexOf(thumbnail.getGalleryItem());
-  this.selectionModel_.setIndexSelected(index, true);
+
+  if (selectionMode === ThumbnailView.SelectionMode.SINGLE) {
+    this.selectionModel_.unselectAll();
+    this.selectionModel_.setIndexSelected(index, true);
+  } else if (selectionMode === ThumbnailView.SelectionMode.MULTIPLE) {
+    this.selectionModel_.setIndexSelected(index,
+        this.selectionModel_.selectedIndexes.indexOf(index) === -1);
+  } else if (selectionMode === ThumbnailView.SelectionMode.RANGE) {
+    var leadIndex = this.selectionModel_.leadIndex;
+    this.selectionModel_.unselectAll();
+    this.selectionModel_.selectRange(leadIndex, index);
+  } else {
+    assertNotReached();
+  }
+
+  this.selectionModel_.leadIndex = index;
 };
 
 /**
@@ -628,6 +740,21 @@ ThumbnailView.prototype.performEnterAnimation = function(index, rect) {
 };
 
 /**
+ * Focus to thumbnail view. If an item is selected, focus to it.
+ */
+ThumbnailView.prototype.focus = function() {
+  if (this.selectionModel_.selectedIndexes.length === 0) {
+    this.container_.focus();
+    return;
+  }
+
+  var index = this.selectionModel_.leadIndex !== -1 ?
+      this.selectionModel_.leadIndex : this.selectionModel_.selectedIndex;
+  var thumbnail = this.getThumbnailAt_(index);
+  thumbnail.getContainer().focus();
+};
+
+/**
  * Thumbnail.
  * @param {!Gallery.Item} galleryItem A gallery item.
  * @constructor
@@ -668,6 +795,7 @@ ThumbnailView.Thumbnail = function(galleryItem) {
    * @private {!HTMLElement}
    */
   this.container_ = assertInstanceof(document.createElement('li'), HTMLElement);
+  this.container_.tabIndex = 1;
   this.container_.classList.add('thumbnail');
 
   /**
@@ -777,8 +905,8 @@ ThumbnailView.Thumbnail.prototype.getBackgroundImage = function() {
  * Updates thumbnail.
  */
 ThumbnailView.Thumbnail.prototype.update = function() {
-  // Update aria-label.
-  this.container_.setAttribute('aria-label', this.galleryItem_.getFileName());
+  // Update title.
+  this.container_.setAttribute('title', this.galleryItem_.getFileName());
 
   // Calculate and set width.
   var metadata = this.galleryItem_.getMetadataItem();

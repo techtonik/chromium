@@ -83,47 +83,13 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['win', 'opengl'], bug=1007) # angle bug ID
     self.Fail('deqp/data/gles2/shaders/conditionals.html',
         ['win', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('deqp/data/gles2/shaders/conversions.html',
-        ['win', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('deqp/data/gles2/shaders/linkage.html',
-        ['win', 'opengl'], bug=1007) # angle bug ID
 
     # Win / OpenGL / NVIDIA failures
     self.Fail('conformance/attribs/gl-disabled-vertex-attrib.html',
         ['win', 'nvidia', 'opengl'], bug=1007) # angle bug ID
 
     # Win / OpenGL / AMD failures
-    self.Fail('conformance/context/premultiplyalpha-test.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/extensions/oes-texture-float.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/extensions/oes-texture-half-float.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
     self.Skip('conformance/glsl/misc/shader-struct-scope.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/textures/misc/tex-sub-image-2d.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/textures/misc/texture-formats-test.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/textures/misc/texture-npot.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/more/functions/copyTexImage2D.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/more/functions/copyTexSubImage2D.html',
-        ['win', 'amd', 'opengl'], bug=1113) # angle bug ID
-    self.Fail('conformance/more/functions/uniformf.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformfBadArgs.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformfArrayLen1.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformi.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformiBadArgs.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformMatrix.html',
-        ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/more/functions/uniformMatrixBadArgs.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
     self.Fail('conformance/glsl/misc/shaders-with-invariance.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
@@ -530,10 +496,15 @@ class WebGLConformanceExpectations(GpuTestExpectations):
 
     self.Skip('deqp/functional/gles3/attriblocation.html', bug=483282)
     self.Skip('deqp/functional/gles3/buffercopy.html', bug=483282)
+    self.Fail('deqp/functional/gles3/builtinprecision.html', bug=483282)
     self.Skip('deqp/functional/gles3/draw.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fbocolorbuffer.html', bug=483282)
     self.Fail('deqp/functional/gles3/fbocompleteness.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fbodepthbuffer.html', bug=483282)
     self.Skip('deqp/functional/gles3/fbomultisample.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fborender.html', bug=483282)
     self.Fail('deqp/functional/gles3/fbostencilbuffer.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fragdepth.html', bug=483282)
     self.Skip('deqp/functional/gles3/fragmentoutput.html', bug=483282)
     self.Skip('deqp/functional/gles3/framebufferblit.html', bug=483282)
     self.Skip('deqp/functional/gles3/instancedrendering.html', bug=483282)
@@ -547,9 +518,21 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Skip('deqp/functional/gles3/negativevertexarrayapi.html', bug=483282)
     self.Skip('deqp/functional/gles3/pixelbufferobject.html', bug=483282)
     self.Fail('deqp/functional/gles3/primitiverestart.html', bug=483282)
+    self.Fail('deqp/functional/gles3/rasterizerdiscard.html', bug=483282)
     self.Skip('deqp/functional/gles3/samplerobject.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderbuiltinvar.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shadercommonfunction.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderderivate.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderindexing.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderloop.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shadermatrix.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderpackingfunction.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderprecision.html', bug=483282)
+    self.Fail('deqp/functional/gles3/shaderstruct.html', bug=483282)
+    self.Fail('deqp/functional/gles3/texturefiltering.html', bug=483282)
     self.Fail('deqp/functional/gles3/textureformat.html', bug=483282)
     self.Skip('deqp/functional/gles3/textureshadow.html', bug=483282)
+    self.Fail('deqp/functional/gles3/texturespecification.html', bug=483282)
     self.Fail('deqp/functional/gles3/texturewrap.html', bug=483282)
     self.Skip('deqp/functional/gles3/transformfeedback.html', bug=483282)
     self.Fail('deqp/functional/gles3/uniformapi.html', bug=483282)
@@ -566,10 +549,13 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         bug=483282)
     self.Fail('conformance2/buffers/buffer-type-restrictions.html', bug=483282)
     self.Fail('conformance2/buffers/getBufferSubData.html', bug=483282)
+    self.Fail('conformance2/buffers/uniform-buffers.html', bug=483282)
     self.Fail('conformance2/context/constants-and-properties-2.html',
         bug=483282)
 
     self.Fail('conformance2/glsl3/array-complex-indexing.html', bug=483282)
+    self.Fail('conformance2/glsl3/attrib-location-length-limits.html',
+        bug=483282)
     self.Fail('conformance2/glsl3/frag-depth.html', bug=483282)
     self.Fail('conformance2/glsl3/invalid-default-precision.html', bug=483282)
     self.Fail('conformance2/glsl3/sequence-operator-returns-non-constant.html',
@@ -583,8 +569,12 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         bug=483282)
     self.Fail('conformance2/glsl3/ternary-operator-on-arrays-glsl3.html',
         bug=483282)
+    self.Fail('conformance2/glsl3/uniform-location-length-limits.html',
+        bug=483282)
+    self.Fail('conformance2/glsl3/vector-dynamic-indexing.html', bug=483282)
     self.Fail('conformance2/misc/instanceof-test.html', bug=483282)
     self.Fail('conformance2/query/query.html', bug=483282)
+    self.Fail('conformance2/reading/read-pixels-from-fbo-test.html', bug=483282)
     self.Fail('conformance2/renderbuffers/framebuffer-test.html', bug=483282)
     self.Fail('conformance2/renderbuffers/invalidate-framebuffer.html',
         bug=483282)
@@ -633,3 +623,13 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['mac'], bug=483282)
     self.Fail('conformance2/rendering/instanced-arrays.html',
         ['mac'], bug=483282)
+    self.Fail('conformance2/vertex_arrays/vertex-array-object.html',
+        ['mac'], bug=483282)
+
+    # Mac/AMD only.
+    self.Fail('deqp/functional/gles3/shaderswitch.html',
+        ['mac', 'amd'], bug=483282)
+
+    # Linux only.
+    self.Fail('deqp/functional/gles3/shaderswitch.html',
+        ['linux'], bug=483282)

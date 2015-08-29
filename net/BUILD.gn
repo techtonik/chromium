@@ -259,6 +259,9 @@ component("net") {
     if (is_mac) {
       sources -= [ "ssl/ssl_platform_key_mac.cc" ]
     }
+    if (is_android) {
+      sources -= [ "ssl/ssl_platform_key_android.cc" ]
+    }
     if (is_win) {
       sources -= [
         "cert/sha256_legacy_support_openssl_win.cc",
@@ -266,7 +269,11 @@ component("net") {
       ]
     }
     if (use_nss_certs) {
-      sources -= [ "ssl/ssl_platform_key_nss.cc" ]
+      sources -= [
+        "ssl/client_key_store.cc",
+        "ssl/client_key_store.h",
+        "ssl/ssl_platform_key_nss.cc",
+      ]
     }
   }
 
@@ -297,18 +304,11 @@ component("net") {
         "cert/test_root_certs_openssl.cc",
       ]
     }
-
-    # TODO(davidben): Remove these exclusions when use_openssl_certs builds also
-    # use the SSLPrivateKey machinery.
-    sources -= [
-      "ssl/threaded_ssl_private_key.cc",
-      "ssl/threaded_ssl_private_key.h",
-    ]
   }
 
   if (use_glib && !is_chromeos) {
     configs += [ "//build/config/linux:gconf" ]
-    deps += [ "//build/config/linux:gio" ]
+    deps += [ "//build/linux:gio" ]
   }
 
   if (is_linux) {
@@ -351,11 +351,13 @@ component("net") {
         "cert/nss_cert_database_chromeos.h",
         "cert/nss_profile_filter_chromeos.cc",
         "cert/nss_profile_filter_chromeos.h",
-        "ssl/client_cert_store_chromeos.cc",
-        "ssl/client_cert_store_chromeos.h",
       ]
     }
-    sources -= [ "ssl/ssl_platform_key_nss.cc" ]
+    sources -= [
+      "ssl/client_key_store.cc",
+      "ssl/client_key_store.h",
+      "ssl/ssl_platform_key_nss.cc",
+    ]
   } else if (use_openssl) {
     # client_cert_store_nss.c requires NSS_CmpCertChainWCANames from NSS's
     # libssl, but our bundled copy is not built in OpenSSL ports. Pull that file
@@ -477,6 +479,12 @@ component("net") {
       "SystemConfiguration.framework",
       "resolv",
     ]
+
+    deps += [
+      "//third_party/nss:nspr",
+      "//third_party/nss",
+      "//net/third_party/nss/ssl:libssl",
+    ]
   }
 
   if (is_ios || is_mac) {
@@ -578,17 +586,9 @@ static_library("http_server") {
 executable("dump_cache") {
   testonly = true
   sources = [
-    "tools/dump_cache/cache_dumper.cc",
-    "tools/dump_cache/cache_dumper.h",
     "tools/dump_cache/dump_cache.cc",
     "tools/dump_cache/dump_files.cc",
     "tools/dump_cache/dump_files.h",
-    "tools/dump_cache/simple_cache_dumper.cc",
-    "tools/dump_cache/simple_cache_dumper.h",
-    "tools/dump_cache/url_to_filename_encoder.cc",
-    "tools/dump_cache/url_to_filename_encoder.h",
-    "tools/dump_cache/url_utilities.cc",
-    "tools/dump_cache/url_utilities.h",
   ]
 
   # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
@@ -1011,11 +1011,15 @@ if (!is_ios && !is_android) {
       ]
 
       if (is_desktop_linux) {
-        configs += [
-          "//build/config/linux:gconf",
-          "//build/config/linux:glib",
-        ]
-        deps += [ "//build/config/linux:gio" ]
+        deps += [ "//build/linux:gio" ]
+      }
+
+      if (use_gconf) {
+        configs += [ "//build/config/linux:gconf" ]
+      }
+
+      if (use_glib) {
+        configs += [ "//build/config/linux:glib" ]
       }
     }
   }
@@ -1078,10 +1082,6 @@ if (is_linux) {
   static_library("flip_in_mem_edsm_server_base") {
     testonly = true
     sources = [
-      "tools/dump_cache/url_to_filename_encoder.cc",
-      "tools/dump_cache/url_to_filename_encoder.h",
-      "tools/dump_cache/url_utilities.cc",
-      "tools/dump_cache/url_utilities.h",
       "tools/flip_server/acceptor_thread.cc",
       "tools/flip_server/acceptor_thread.h",
       "tools/flip_server/constants.h",
@@ -1109,6 +1109,10 @@ if (is_linux) {
       "tools/flip_server/spdy_util.h",
       "tools/flip_server/streamer_interface.cc",
       "tools/flip_server/streamer_interface.h",
+      "tools/flip_server/url_to_filename_encoder.cc",
+      "tools/flip_server/url_to_filename_encoder.h",
+      "tools/flip_server/url_utilities.cc",
+      "tools/flip_server/url_utilities.h",
     ]
     deps = [
       ":balsa",
@@ -1128,6 +1132,8 @@ if (is_linux) {
       "tools/flip_server/mem_cache_test.cc",
       "tools/flip_server/run_all_tests.cc",
       "tools/flip_server/spdy_interface_test.cc",
+      "tools/flip_server/url_to_filename_encoder_unittest.cc",
+      "tools/flip_server/url_utilities_unittest.cc",
     ]
     deps = [
       ":balsa",
@@ -1254,6 +1260,8 @@ if (is_android || is_linux) {
 
 source_set("simple_quic_tools") {
   sources = [
+    "tools/quic/quic_client_base.cc",
+    "tools/quic/quic_client_base.h",
     "tools/quic/quic_client_session.cc",
     "tools/quic/quic_client_session.h",
     "tools/quic/quic_dispatcher.cc",
@@ -1358,7 +1366,6 @@ test("net_unittests") {
     "//crypto",
     "//crypto:platform",
     "//crypto:test_support",
-    "//gin",
     "//net/base/registry_controlled_domains",
     "//sql",
     "//testing/gmock",
@@ -1367,6 +1374,9 @@ test("net_unittests") {
     "//url",
   ]
 
+  if (!is_ios) {
+    deps += [ "//gin" ]
+  }
   data = [
     "data/",
   ]
@@ -1424,7 +1434,6 @@ test("net_unittests") {
       sources -= [
         "cert/nss_cert_database_chromeos_unittest.cc",
         "cert/nss_profile_filter_chromeos_unittest.cc",
-        "ssl/client_cert_store_chromeos_unittest.cc",
       ]
     }
   }
@@ -1580,6 +1589,7 @@ test("net_unittests") {
     #          'data/test.html',
     #          'data/url_request_unittest/',
     #          'data/verify_name_match_unittest/names/',
+    #          'data/parse_certificate_unittest/',
     #        ],
     #        'test_data_prefix': 'net',
     #      },

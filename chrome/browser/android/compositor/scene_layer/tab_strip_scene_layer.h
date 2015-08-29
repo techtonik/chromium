@@ -43,7 +43,8 @@ class TabStripSceneLayer : public SceneLayer {
                            jfloat width,
                            jfloat height,
                            jfloat y_offset,
-                           jfloat strip_brightness,
+                           jfloat background_tab_brightness,
+                           jfloat brightness,
                            jboolean should_readd_background);
   void UpdateNewTabButton(JNIEnv* env,
                           jobject jobj,
@@ -79,6 +80,7 @@ class TabStripSceneLayer : public SceneLayer {
                         jfloat content_offset_x,
                         jfloat close_button_alpha,
                         jboolean is_loading,
+                        jfloat spinner_rotation,
                         jfloat border_opacity,
                         jobject jlayer_title_cache,
                         jobject jresource_manager);
@@ -93,7 +95,8 @@ class TabStripSceneLayer : public SceneLayer {
   scoped_refptr<cc::UIResourceLayer> new_tab_button_;
   scoped_refptr<cc::UIResourceLayer> model_selector_button_;
 
-  float strip_brightness_;
+  float background_tab_brightness_;
+  float brightness_;
   unsigned write_index_;
   TabHandleLayerList tab_handle_layers_;
   SceneLayer* content_tree_;

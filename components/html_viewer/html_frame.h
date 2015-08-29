@@ -13,18 +13,25 @@
 #include "components/html_viewer/replicated_frame_state.h"
 #include "components/view_manager/public/cpp/view_observer.h"
 #include "mandoline/tab/public/interfaces/frame_tree.mojom.h"
+#include "mojo/services/tracing/public/interfaces/tracing.mojom.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
 #include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebRemoteFrameClient.h"
 #include "third_party/WebKit/public/web/WebSandboxFlags.h"
 #include "third_party/WebKit/public/web/WebTextInputInfo.h"
-#include "third_party/WebKit/public/web/WebViewClient.h"
+#include "third_party/mojo/src/mojo/public/cpp/bindings/binding.h"
+
+namespace cc_blink {
+class WebLayerImpl;
+}
 
 namespace blink {
 class WebFrame;
+class WebWidget;
 }
 
 namespace mojo {
+class ApplicationImpl;
 class Rect;
 class ScopedViewPtr;
 class View;
@@ -32,11 +39,12 @@ class View;
 
 namespace html_viewer {
 
+class DevToolsAgentImpl;
 class GeolocationClientImpl;
 class HTMLFrameDelegate;
 class HTMLFrameTreeManager;
+class HTMLWidget;
 class TouchHandler;
-class WebLayerImpl;
 class WebLayerTreeViewImpl;
 
 // Frame is used to represent a single frame in the frame tree of a page. The
@@ -55,29 +63,42 @@ class WebLayerTreeViewImpl;
 // Remote frames may become local again if the embed happens in the same
 // process. See HTMLFrameTreeManager for details.
 class HTMLFrame : public blink::WebFrameClient,
-                  public blink::WebViewClient,
                   public blink::WebRemoteFrameClient,
                   public mandoline::FrameTreeClient,
                   public mojo::ViewObserver {
  public:
   struct CreateParams {
-    CreateParams(HTMLFrameTreeManager* manager, HTMLFrame* parent, uint32_t id)
-        : manager(manager), parent(parent), id(id) {}
+    CreateParams(
+        HTMLFrameTreeManager* manager,
+        HTMLFrame* parent,
+        uint32_t id,
+        mojo::View* view,
+        const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties,
+        HTMLFrameDelegate* delegate)
+        : manager(manager),
+          parent(parent),
+          id(id),
+          view(view),
+          properties(properties),
+          delegate(delegate),
+          allow_local_shared_frame(false) {}
     ~CreateParams() {}
 
     HTMLFrameTreeManager* manager;
     HTMLFrame* parent;
     uint32_t id;
+    mojo::View* view;
+    const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties;
+    HTMLFrameDelegate* delegate;
+
+   private:
+    friend class HTMLFrame;
+
+    // TODO(sky): nuke.
+    bool allow_local_shared_frame;
   };
 
-  explicit HTMLFrame(const CreateParams& params);
-
-  void Init(mojo::View* local_view,
-            const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties);
-
-  // Called when another app is embedded in the View this Frame is associated
-  // with.
-  void OnViewUnembed();
+  explicit HTMLFrame(CreateParams* params);
 
   // Closes and deletes this Frame.
   void Close();
@@ -102,6 +123,7 @@ class HTMLFrame : public blink::WebFrameClient,
   // Returns the WebView for this frame, or null if there isn't one. The root
   // has a WebView, the children WebFrameWidgets.
   blink::WebView* web_view();
+  blink::WebWidget* GetWebWidget();
 
   // The mojo::View this frame renders to. This is non-null for the local frame
   // the frame tree was created with as well as non-null for any frames created
@@ -110,15 +132,59 @@ class HTMLFrame : public blink::WebFrameClient,
 
   HTMLFrameTreeManager* frame_tree_manager() { return frame_tree_manager_; }
 
+  // Returns null if the browser side didn't request to setup an agent in this
+  // frame.
+  DevToolsAgentImpl* devtools_agent() { return devtools_agent_.get(); }
+
   // Returns true if this or one of the frames descendants is local.
   bool HasLocalDescendant() const;
 
- private:
-  friend class HTMLFrameTreeManager;
-
+ protected:
   virtual ~HTMLFrame();
 
-  void set_delegate(HTMLFrameDelegate* delegate) { delegate_ = delegate; }
+  // TODO(sky): move implementations to match new position.
+
+  // WebFrameClient methods:
+  virtual blink::WebMediaPlayer* createMediaPlayer(
+      blink::WebLocalFrame* frame,
+      const blink::WebURL& url,
+      blink::WebMediaPlayerClient* client,
+      blink::WebMediaPlayerEncryptedMediaClient* encrypted_client,
+      blink::WebContentDecryptionModule* initial_cdm);
+  virtual blink::WebFrame* createChildFrame(
+      blink::WebLocalFrame* parent,
+      blink::WebTreeScopeType scope,
+      const blink::WebString& frame_ame,
+      blink::WebSandboxFlags sandbox_flags);
+  virtual void frameDetached(blink::WebFrame* frame,
+                             blink::WebFrameClient::DetachType type);
+  virtual blink::WebCookieJar* cookieJar(blink::WebLocalFrame* frame);
+  virtual blink::WebNavigationPolicy decidePolicyForNavigation(
+      const NavigationPolicyInfo& info);
+  virtual void didHandleOnloadEvents(blink::WebLocalFrame* frame);
+  virtual void didAddMessageToConsole(const blink::WebConsoleMessage& message,
+                                      const blink::WebString& source_name,
+                                      unsigned source_line,
+                                      const blink::WebString& stack_trace);
+  virtual void didFinishLoad(blink::WebLocalFrame* frame);
+  virtual void didNavigateWithinPage(blink::WebLocalFrame* frame,
+                                     const blink::WebHistoryItem& history_item,
+                                     blink::WebHistoryCommitType commit_type);
+  virtual void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame* frame);
+  virtual blink::WebGeolocationClient* geolocationClient();
+  virtual blink::WebEncryptedMediaClient* encryptedMediaClient();
+  virtual void didStartLoading(bool to_different_document);
+  virtual void didStopLoading();
+  virtual void didChangeLoadProgress(double load_progress);
+  virtual void didChangeName(blink::WebLocalFrame* frame,
+                             const blink::WebString& name);
+  virtual void didCommitProvisionalLoad(
+      blink::WebLocalFrame* frame,
+      const blink::WebHistoryItem& item,
+      blink::WebHistoryCommitType commit_type);
+
+ private:
+  friend class HTMLFrameTreeManager;
 
   // Binds this frame to the specified server. |this| serves as the
   // FrameTreeClient for the server.
@@ -150,13 +216,7 @@ class HTMLFrame : public blink::WebFrameClient,
   void CreateRootWebWidget();
   void CreateLocalRootWebWidget(blink::WebLocalFrame* local_frame);
 
-  void InitializeWebWidget();
-
   void UpdateFocus();
-
-  // Updates the size and scale factor of the webview and related classes from
-  // |root_|.
-  void UpdateWebViewSizeFromViewSize();
 
   // Swaps this frame from a local frame to remote frame. |request| is the url
   // to load in the frame.
@@ -164,6 +224,7 @@ class HTMLFrame : public blink::WebFrameClient,
 
   // Swaps this frame from a remote frame to a local frame.
   void SwapToLocal(
+      HTMLFrameDelegate* delegate,
       mojo::View* view,
       const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties);
 
@@ -174,10 +235,6 @@ class HTMLFrame : public blink::WebFrameClient,
 
   // The various frameDetached() implementations call into this.
   void FrameDetachedImpl(blink::WebFrame* web_frame);
-
-  // Update text input state from WebView to mojo::View. If the focused element
-  // is editable and |show_ime| is True, the software keyboard will be shown.
-  void UpdateTextInputState(bool show_ime);
 
   // mojo::ViewObserver methods:
   void OnViewBoundsChanged(mojo::View* view,
@@ -198,60 +255,12 @@ class HTMLFrame : public blink::WebFrameClient,
   void OnFrameClientPropertyChanged(uint32_t frame_id,
                                     const mojo::String& name,
                                     mojo::Array<uint8_t> new_value) override;
-  void PostMessage(uint32_t source_frame_id,
-                   uint32_t target_frame_id,
-                   mandoline::HTMLMessageEventPtr serialized_event) override;
-
-  // WebViewClient methods:
-  virtual blink::WebStorageNamespace* createSessionStorageNamespace();
-  virtual void didCancelCompositionOnSelectionChange();
-  virtual void didChangeContents();
-
-  // WebWidgetClient methods:
-  virtual void initializeLayerTreeView();
-  virtual blink::WebLayerTreeView* layerTreeView();
-  virtual void resetInputMethod();
-  virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
-                                     bool eventCancelled);
-  virtual void didUpdateTextOfFocusedElementByNonUserInput();
-  virtual void showImeIfNeeded();
-
-  // WebFrameClient methods:
-  virtual blink::WebMediaPlayer* createMediaPlayer(
-      blink::WebLocalFrame* frame,
-      const blink::WebURL& url,
-      blink::WebMediaPlayerClient* client,
-      blink::WebMediaPlayerEncryptedMediaClient* encrypted_client,
-      blink::WebContentDecryptionModule* initial_cdm);
-  virtual blink::WebFrame* createChildFrame(
-      blink::WebLocalFrame* parent,
-      blink::WebTreeScopeType scope,
-      const blink::WebString& frame_ame,
-      blink::WebSandboxFlags sandbox_flags);
-  virtual void frameDetached(blink::WebFrame* frame,
-                             blink::WebFrameClient::DetachType type);
-  virtual blink::WebCookieJar* cookieJar(blink::WebLocalFrame* frame);
-  virtual blink::WebNavigationPolicy decidePolicyForNavigation(
-      const NavigationPolicyInfo& info);
-  virtual void didAddMessageToConsole(const blink::WebConsoleMessage& message,
-                                      const blink::WebString& source_name,
-                                      unsigned source_line,
-                                      const blink::WebString& stack_trace);
-  virtual void didFinishLoad(blink::WebLocalFrame* frame);
-  virtual void didNavigateWithinPage(blink::WebLocalFrame* frame,
-                                     const blink::WebHistoryItem& history_item,
-                                     blink::WebHistoryCommitType commit_type);
-  virtual blink::WebGeolocationClient* geolocationClient();
-  virtual blink::WebEncryptedMediaClient* encryptedMediaClient();
-  virtual void didStartLoading(bool to_different_document);
-  virtual void didStopLoading();
-  virtual void didChangeLoadProgress(double load_progress);
-  virtual void didChangeName(blink::WebLocalFrame* frame,
-                             const blink::WebString& name);
-  virtual void didCommitProvisionalLoad(
-      blink::WebLocalFrame* frame,
-      const blink::WebHistoryItem& item,
-      blink::WebHistoryCommitType commit_type);
+  void OnPostMessageEvent(
+      uint32_t source_frame_id,
+      uint32_t target_frame_id,
+      mandoline::HTMLMessageEventPtr serialized_event) override;
+  void OnWillNavigate(uint32_t target_frame_id,
+                      const OnWillNavigateCallback& callback) override;
 
   // blink::WebRemoteFrameClient:
   virtual void frameDetached(blink::WebRemoteFrameClient::DetachType type);
@@ -276,12 +285,11 @@ class HTMLFrame : public blink::WebFrameClient,
   const uint32_t id_;
   std::vector<HTMLFrame*> children_;
   blink::WebFrame* web_frame_;
-  blink::WebWidget* web_widget_;
+  scoped_ptr<HTMLWidget> html_widget_;
   scoped_ptr<GeolocationClientImpl> geolocation_client_impl_;
-  scoped_ptr<WebLayerTreeViewImpl> web_layer_tree_view_impl_;
   scoped_ptr<TouchHandler> touch_handler_;
 
-  scoped_ptr<WebLayerImpl> web_layer_;
+  scoped_ptr<cc_blink::WebLayerImpl> web_layer_;
 
   HTMLFrameDelegate* delegate_;
   scoped_ptr<mojo::Binding<mandoline::FrameTreeClient>>
@@ -302,7 +310,11 @@ class HTMLFrame : public blink::WebFrameClient,
   // be severed.
   scoped_ptr<mojo::ScopedViewPtr> owned_view_;
 
-  blink::WebTextInputInfo text_input_info_;
+  // This object is only valid in the context of performance tests.
+  tracing::StartupPerformanceDataCollectorPtr
+      startup_performance_data_collector_;
+
+  scoped_ptr<DevToolsAgentImpl> devtools_agent_;
 
   base::WeakPtrFactory<HTMLFrame> weak_factory_;
 

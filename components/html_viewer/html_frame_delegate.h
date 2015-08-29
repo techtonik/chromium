@@ -11,14 +11,10 @@ class ApplicationImpl;
 
 namespace html_viewer {
 
-class HTMLFrame;
+class HTMLFactory;
 
 class HTMLFrameDelegate {
  public:
-  // TODO(yzshen): Remove this check once the browser is able to navigate an
-  // existing html_viewer instance and about:blank page support is ready.
-  virtual bool ShouldNavigateLocallyInMainFrame() = 0;
-
   // Invoked when the Frame the delegate is attached to finishes loading. This
   // is not invoked for any child frames, only the frame returned from
   // HTMLFrameTreeManager::CreateFrameAndAttachToTree().
@@ -26,6 +22,13 @@ class HTMLFrameDelegate {
 
   // Returns the ApplicationImpl for the frame.
   virtual mojo::ApplicationImpl* GetApp() = 0;
+
+  // Invoked when the HTMLFrame the delegate is associated with is swapped
+  // to a remote frame.
+  virtual void OnFrameSwappedToRemote() = 0;
+
+  // Returns the factory for creating various classes.
+  virtual HTMLFactory* GetHTMLFactory() = 0;
 
  protected:
   virtual ~HTMLFrameDelegate() {}

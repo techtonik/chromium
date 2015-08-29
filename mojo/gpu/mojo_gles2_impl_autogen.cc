@@ -825,7 +825,8 @@ void MojoGLES2Impl::ShallowFlushCHROMIUM() {
   glShallowFlushCHROMIUM();
 }
 void MojoGLES2Impl::OrderingBarrierCHROMIUM() {
-  NOTREACHED() << "Unimplemented OrderingBarrierCHROMIUM.";
+  MojoGLES2MakeCurrent(context_);
+  glOrderingBarrierCHROMIUM();
 }
 void MojoGLES2Impl::StencilFunc(GLenum func, GLint ref, GLuint mask) {
   MojoGLES2MakeCurrent(context_);
@@ -1285,16 +1286,29 @@ void MojoGLES2Impl::GetQueryivEXT(GLenum target, GLenum pname, GLint* params) {
   MojoGLES2MakeCurrent(context_);
   glGetQueryivEXT(target, pname, params);
 }
+void MojoGLES2Impl::GetQueryObjectivEXT(GLuint id,
+                                        GLenum pname,
+                                        GLint* params) {
+  NOTREACHED() << "Unimplemented GetQueryObjectivEXT.";
+}
 void MojoGLES2Impl::GetQueryObjectuivEXT(GLuint id,
                                          GLenum pname,
                                          GLuint* params) {
   MojoGLES2MakeCurrent(context_);
   glGetQueryObjectuivEXT(id, pname, params);
 }
+void MojoGLES2Impl::GetQueryObjecti64vEXT(GLuint id,
+                                          GLenum pname,
+                                          GLint64* params) {
+  NOTREACHED() << "Unimplemented GetQueryObjecti64vEXT.";
+}
 void MojoGLES2Impl::GetQueryObjectui64vEXT(GLuint id,
                                            GLenum pname,
                                            GLuint64* params) {
   NOTREACHED() << "Unimplemented GetQueryObjectui64vEXT.";
+}
+void MojoGLES2Impl::SetDisjointValueSyncCHROMIUM() {
+  NOTREACHED() << "Unimplemented SetDisjointValueSyncCHROMIUM.";
 }
 void MojoGLES2Impl::InsertEventMarkerEXT(GLsizei length, const GLchar* marker) {
   NOTREACHED() << "Unimplemented InsertEventMarkerEXT.";
@@ -1494,6 +1508,17 @@ void MojoGLES2Impl::CompressedCopyTextureCHROMIUM(GLenum target,
                                                   GLenum dest_id) {
   NOTREACHED() << "Unimplemented CompressedCopyTextureCHROMIUM.";
 }
+void MojoGLES2Impl::CompressedCopySubTextureCHROMIUM(GLenum target,
+                                                     GLenum source_id,
+                                                     GLenum dest_id,
+                                                     GLint xoffset,
+                                                     GLint yoffset,
+                                                     GLint x,
+                                                     GLint y,
+                                                     GLsizei width,
+                                                     GLsizei height) {
+  NOTREACHED() << "Unimplemented CompressedCopySubTextureCHROMIUM.";
+}
 void MojoGLES2Impl::DrawArraysInstancedANGLE(GLenum mode,
                                              GLint first,
                                              GLsizei count,
@@ -1579,34 +1604,6 @@ void MojoGLES2Impl::TraceBeginCHROMIUM(const char* category_name,
 }
 void MojoGLES2Impl::TraceEndCHROMIUM() {
   NOTREACHED() << "Unimplemented TraceEndCHROMIUM.";
-}
-void MojoGLES2Impl::AsyncTexSubImage2DCHROMIUM(GLenum target,
-                                               GLint level,
-                                               GLint xoffset,
-                                               GLint yoffset,
-                                               GLsizei width,
-                                               GLsizei height,
-                                               GLenum format,
-                                               GLenum type,
-                                               const void* data) {
-  NOTREACHED() << "Unimplemented AsyncTexSubImage2DCHROMIUM.";
-}
-void MojoGLES2Impl::AsyncTexImage2DCHROMIUM(GLenum target,
-                                            GLint level,
-                                            GLenum internalformat,
-                                            GLsizei width,
-                                            GLsizei height,
-                                            GLint border,
-                                            GLenum format,
-                                            GLenum type,
-                                            const void* pixels) {
-  NOTREACHED() << "Unimplemented AsyncTexImage2DCHROMIUM.";
-}
-void MojoGLES2Impl::WaitAsyncTexImage2DCHROMIUM(GLenum target) {
-  NOTREACHED() << "Unimplemented WaitAsyncTexImage2DCHROMIUM.";
-}
-void MojoGLES2Impl::WaitAllAsyncTexImage2DCHROMIUM() {
-  NOTREACHED() << "Unimplemented WaitAllAsyncTexImage2DCHROMIUM.";
 }
 void MojoGLES2Impl::DiscardFramebufferEXT(GLenum target,
                                           GLsizei count,

@@ -128,7 +128,11 @@ class MediaCodecDecoder {
   // playback the subsequent intervals overlap.
   // For video both values are PTS of the corresponding frame, i.e. the interval
   // has zero width.
-  typedef base::Callback<void(base::TimeDelta, base::TimeDelta)>
+  // The third parameter means "postpone", it is set to true if the actual
+  // rendering will start in a later point in time. This only happens with
+  // audio after preroll. The MediaCodecPlayer might decide to update the
+  // current time but not pass it to the upper layer.
+  typedef base::Callback<void(base::TimeDelta, base::TimeDelta, bool)>
       SetTimeCallback;
 
   // MediaCodecDecoder constructor.
@@ -145,6 +149,8 @@ class MediaCodecDecoder {
   //     The player is supposed to stop and then prefetch the decoder.
   //   stop_done_cb:
   //     Called when async stop request is completed.
+  //   decoder_drained_cb:
+  //     Called when decoder is drained for reconfiguration.
   //   error_cb:
   //     Called when a MediaCodec error occurred. If this happens, a player has
   //     to either call ReleaseDecoderResources() or destroy the decoder object.
@@ -154,6 +160,7 @@ class MediaCodecDecoder {
       const scoped_refptr<base::SingleThreadTaskRunner>& media_task_runner,
       const base::Closure& external_request_data_cb,
       const base::Closure& starvation_cb,
+      const base::Closure& decoder_drained_cb,
       const base::Closure& stop_done_cb,
       const base::Closure& error_cb,
       const char* decoder_thread_name);
@@ -171,19 +178,24 @@ class MediaCodecDecoder {
   virtual void SetDemuxerConfigs(const DemuxerConfigs& configs) = 0;
 
   // Stops decoder thread, releases the MediaCodecBridge and other resources.
-  virtual void ReleaseDecoderResources();
+  virtual void ReleaseDecoderResources() = 0;
 
   // Flushes the MediaCodec, after that resets the AccessUnitQueue and blocks
   // the input. Decoder thread should not be running.
   virtual void Flush();
 
-  // Releases MediaCodecBridge.
-  void ReleaseMediaCodec();
+  // Releases MediaCodecBridge and any related buffers or references.
+  virtual void ReleaseMediaCodec();
 
   // Returns corresponding conditions.
   bool IsPrefetchingOrPlaying() const;
   bool IsStopped() const;
   bool IsCompleted() const;
+  bool NotCompletedAndNeedsPreroll() const;
+
+  // Requests an A/V sync mechanism that is similar to preroll, but stops at the
+  // first available output frame rather than passing certain PTS.
+  void SetDecodingUntilOutputIsPresent();
 
   base::android::ScopedJavaLocalRef<jobject> GetMediaCrypto();
 
@@ -194,8 +206,13 @@ class MediaCodecDecoder {
   // Configures MediaCodec.
   ConfigStatus Configure();
 
-  // Starts the decoder thread and resumes the playback.
-  bool Start(base::TimeDelta current_time);
+  // Starts the decoder for prerolling. This method starts the decoder thread.
+  bool Preroll(base::TimeDelta preroll_timestamp,
+               const base::Closure& preroll_done_cb);
+
+  // Starts the decoder after preroll is not needed, starting decoder thread
+  // if it has not started yet.
+  bool Start(base::TimeDelta start_timestamp);
 
   // Stops the playback process synchronously. This method stops the decoder
   // thread synchronously, and then releases all MediaCodec buffers.
@@ -207,16 +224,35 @@ class MediaCodecDecoder {
   void RequestToStop();
 
   // Notification posted when asynchronous stop is done or playback completed.
-  void OnLastFrameRendered(bool completed);
+  void OnLastFrameRendered(bool eos_encountered);
+
+  // Notification posted when last prerolled frame has been returned to codec.
+  void OnPrerollDone();
 
   // Puts the incoming data into AccessUnitQueue.
   void OnDemuxerDataAvailable(const DemuxerData& data);
 
+  // For testing only.
+
+  // Returns true if the decoder is in kPrerolling state.
+  bool IsPrerollingForTests() const;
+
+  // Drains decoder and reconfigures for each |kConfigChanged|.
+  void SetAlwaysReconfigureForTests();
+
+  // Sets the notification to be called when MediaCodec is created.
+  void SetCodecCreatedCallbackForTests(base::Closure cb);
+
  protected:
+  enum RenderMode {
+    kRenderSkip = 0,
+    kRenderAfterPreroll,
+    kRenderNow,
+  };
+
   // Returns true if the new DemuxerConfigs requires MediaCodec
   // reconfiguration.
-  virtual bool IsCodecReconfigureNeeded(const DemuxerConfigs& curr,
-                                        const DemuxerConfigs& next) const = 0;
+  virtual bool IsCodecReconfigureNeeded(const DemuxerConfigs& next) const = 0;
 
   // Does the part of MediaCodecBridge configuration that is specific
   // to audio or video.
@@ -224,7 +260,10 @@ class MediaCodecDecoder {
 
   // Associates PTS with device time so we can calculate delays.
   // We use delays for video decoder only.
-  virtual void SynchronizePTSWithTime(base::TimeDelta current_time) {}
+  virtual void AssociateCurrentTimeWithPTS(base::TimeDelta current_time) {}
+
+  // Invalidate delay calculation. We use delays for video decoder only.
+  virtual void DissociatePTSFromTime() {}
 
   // Processes the change of the output format, varies by stream.
   virtual void OnOutputFormatChanged() = 0;
@@ -232,17 +271,17 @@ class MediaCodecDecoder {
   // Renders the decoded frame and releases output buffer, or posts
   // a delayed task to do it at a later time,
   virtual void Render(int buffer_index,
+                      size_t offset,
                       size_t size,
-                      bool render_output,
+                      RenderMode render_mode,
                       base::TimeDelta pts,
                       bool eos_encountered) = 0;
 
   // Returns the number of delayed task (we might have them for video).
   virtual int NumDelayedRenderTasks() const;
 
-  // Releases output buffers that are dequeued and not released yet (video)
-  // if the |release| parameter is set and then remove the references to them.
-  virtual void ClearDelayedBuffers(bool release) {}
+  // Releases output buffers that are dequeued and not released yet (video).
+  virtual void ReleaseDelayedBuffers() {}
 
 #ifndef NDEBUG
   // For video, checks that access unit is the key frame or stand-alone EOS.
@@ -251,8 +290,16 @@ class MediaCodecDecoder {
 
   // Helper methods.
 
+  // Synchroniously stop decoder thread.
+  void DoEmergencyStop();
+
+  // Returns true if we are in the process of sync stop.
+  bool InEmergencyStop() const { return GetState() == kInEmergencyStop; }
+
   // Notifies the decoder if the frame is the last one.
   void CheckLastFrame(bool eos_encountered, bool has_delayed_tasks);
+
+  const char* AsString(RenderMode render_mode);
 
   // Protected data.
 
@@ -273,15 +320,32 @@ class MediaCodecDecoder {
   // is set by video decoder when the video surface changes.
   bool needs_reconfigure_;
 
+  // Flag forces to drain decoder in the process of dynamic reconfiguration.
+  bool drain_decoder_;
+
+  // For tests only. Forces to always reconfigure for |kConfigChanged| unit.
+  bool always_reconfigure_for_tests_;
+
+  // For tests only. Callback to be callned when MediaCodec is created.
+  base::Closure codec_created_for_tests_cb_;
+
  private:
   enum DecoderState {
     kStopped = 0,
     kPrefetching,
     kPrefetched,
+    kPrerolling,
+    kPrerolled,
     kRunning,
     kStopping,
     kInEmergencyStop,
     kError,
+  };
+
+  enum PrerollMode {
+    kNoPreroll = 0,
+    kPrerollTillOutputIsPresent,
+    kPrerollTillPTS,
   };
 
   // Helper method that processes an error from MediaCodec.
@@ -303,6 +367,14 @@ class MediaCodecDecoder {
   // Returns false if there was MediaCodec error.
   bool EnqueueInputBuffer();
 
+  // Helper method for EnqueueInputBuffer.
+  // Gets the next data frame from the queue, requesting more data and saving
+  // configuration changes on the way. Sets |drain_decoder| to true of any of
+  // the configuration changes requires draining the decoder. Returns the Info
+  // pointing to the current data unit ot empty Info if it got past the end of
+  // the queue.
+  AccessUnitQueue::Info AdvanceAccessUnitQueue(bool* drain_decoder);
+
   // Helper method for ProcessNextFrame.
   // Pulls all currently available output frames and renders them.
   // Returns true if we need to continue decoding process, i.e post next
@@ -321,6 +393,8 @@ class MediaCodecDecoder {
   // These notifications are called on corresponding conditions.
   base::Closure prefetch_done_cb_;
   base::Closure starvation_cb_;
+  base::Closure preroll_done_cb_;
+  base::Closure decoder_drained_cb_;
   base::Closure stop_done_cb_;
   base::Closure error_cb_;
 
@@ -330,9 +404,19 @@ class MediaCodecDecoder {
   // Callback used to post OnCodecError method.
   base::Closure internal_error_cb_;
 
+  // Callback for posting OnPrerollDone method.
+  base::Closure internal_preroll_done_cb_;
+
   // Internal state.
   DecoderState state_;
   mutable base::Lock state_lock_;
+
+  // Preroll timestamp is set if we need preroll and cleared after we done it.
+  base::TimeDelta preroll_timestamp_;
+
+  // The preroll mode. If not |kNoPreroll|, the playback should start with
+  // preroll.
+  PrerollMode preroll_mode_;
 
   // Flag is set when the EOS is enqueued into MediaCodec. Reset by Flush.
   bool eos_enqueued_;

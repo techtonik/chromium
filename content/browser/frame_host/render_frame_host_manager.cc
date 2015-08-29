@@ -690,22 +690,45 @@ void RenderFrameHostManager::CommitPendingIfNecessary(
   }
 }
 
-void RenderFrameHostManager::DidDisownOpener(
-    RenderFrameHost* render_frame_host) {
-  // Notify all RenderFrameHosts but the one that notified us. This is necessary
-  // in case a process swap has occurred while the message was in flight.
-  for (const auto& pair : *proxy_hosts_) {
-    DCHECK_NE(pair.second->GetSiteInstance(),
-              current_frame_host()->GetSiteInstance());
-    pair.second->DisownOpener();
+void RenderFrameHostManager::DidChangeOpener(
+    int opener_routing_id,
+    SiteInstance* source_site_instance) {
+  FrameTreeNode* opener = nullptr;
+  if (opener_routing_id != MSG_ROUTING_NONE) {
+    RenderFrameHostImpl* opener_rfhi = RenderFrameHostImpl::FromID(
+        source_site_instance->GetProcess()->GetID(), opener_routing_id);
+    // If |opener_rfhi| is null, the opener RFH has already disappeared.  In
+    // this case, clear the opener rather than keeping the old opener around.
+    if (opener_rfhi)
+      opener = opener_rfhi->frame_tree_node();
   }
 
-  if (render_frame_host_.get() != render_frame_host)
-    render_frame_host_->DisownOpener();
+  if (frame_tree_node_->opener() == opener)
+    return;
 
+  frame_tree_node_->SetOpener(opener);
+
+  for (const auto& pair : *proxy_hosts_) {
+    if (pair.second->GetSiteInstance() == source_site_instance)
+      continue;
+    pair.second->UpdateOpener();
+  }
+
+  if (render_frame_host_->GetSiteInstance() != source_site_instance)
+    render_frame_host_->UpdateOpener();
+
+  // Notify the pending and speculative RenderFrameHosts as well.  This is
+  // necessary in case a process swap has started while the message was in
+  // flight.
   if (pending_render_frame_host_ &&
-      pending_render_frame_host_.get() != render_frame_host) {
-    pending_render_frame_host_->DisownOpener();
+      pending_render_frame_host_->GetSiteInstance() != source_site_instance) {
+    pending_render_frame_host_->UpdateOpener();
+  }
+
+  if (speculative_render_frame_host_ &&
+      speculative_render_frame_host_->GetSiteInstance() !=
+          source_site_instance) {
+    speculative_render_frame_host_->UpdateOpener();
   }
 }
 
@@ -2475,12 +2498,27 @@ void RenderFrameHostManager::CreateOpenerProxies(SiteInstance* instance) {
         ->CreateOpenerProxiesForFrameTree(instance);
   }
 
-  // TODO(alexmos): Set openers for nodes in |nodes_with_back_links| in a
-  // second pass. The proxies created at these FrameTreeNodes in
+  // Set openers for nodes in |nodes_with_back_links| in a second pass.
+  // The proxies created at these FrameTreeNodes in
   // CreateOpenerProxiesForFrameTree won't have their opener routing ID
   // available when created due to cycles or back links in the opener chain.
   // They must have their openers updated as a separate step after proxy
   // creation.
+  for (const auto& node : nodes_with_back_links) {
+    RenderFrameProxyHost* proxy =
+        node->render_manager()->GetRenderFrameProxyHost(instance);
+    // If there is no proxy, the cycle may involve nodes in the same process,
+    // or, if this is a subframe, --site-per-process may be off.  Either way,
+    // there's nothing more to do.
+    if (!proxy)
+      continue;
+
+    int opener_routing_id =
+        node->render_manager()->GetOpenerRoutingID(instance);
+    DCHECK_NE(opener_routing_id, MSG_ROUTING_NONE);
+    proxy->Send(new FrameMsg_UpdateOpener(proxy->GetRoutingID(),
+                                          opener_routing_id));
+  }
 }
 
 void RenderFrameHostManager::CreateOpenerProxiesForFrameTree(

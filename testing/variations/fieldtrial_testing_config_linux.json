@@ -1,4 +1,14 @@
 {
+    "CaptivePortalInterstitial": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "EnableSessionCrashedBubbleUI": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "InstanceID": [
         {
             "group_name": "Enabled"
@@ -64,9 +74,22 @@
             "group_name": "Enabled"
         }
     ],
+    "TabSyncByRecency": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "UseDelayAgnosticAEC": [
         {
             "group_name": "DefaultEnabled"
+        }
+    ],
+    "VarationsServiceControl": [
+        {
+            "group_name": "Interval_30min",
+            "params": {
+                "fetch_period_min": "30"
+            }
         }
     ]
 }

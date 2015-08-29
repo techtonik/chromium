@@ -6,10 +6,11 @@
  * @fileoverview Polymer element for displaying the network state for a specific
  * type and a list of networks for that type.
  */
-(function() {
 
 /** @typedef {chrome.networkingPrivate.DeviceStateProperties} */
 var DeviceStateProperties;
+
+(function() {
 
 Polymer({
   is: 'network-summary-item',
@@ -108,11 +109,12 @@ Polymer({
 
   /**
    * @param {?DeviceStateProperties} deviceState The state of a device.
+   * @param {boolean} expanded The expanded state.
    * @return {boolean} Whether or not the scanning spinner should be shown.
    * @private
    */
-  showScanning_: function(deviceState) {
-    return this.expanded && deviceState.Scanning;
+  showScanning_: function(deviceState, expanded) {
+    return !!expanded && !!deviceState.Scanning;
   },
 
   /**
@@ -121,7 +123,7 @@ Polymer({
    * @private
    */
   deviceIsEnabled_: function(deviceState) {
-    return deviceState && deviceState.State == 'Enabled';
+    return !!deviceState && deviceState.State == 'Enabled';
   },
 
   /**
@@ -156,13 +158,23 @@ Polymer({
   expandIsVisible_: function(deviceState, networkList) {
     if (!this.deviceIsEnabled_(deviceState))
       return false;
-    var minLength = (this.type == CrOnc.Type.WIFI) ? 1 : 2;
+    var minLength = (this.deviceState.Type == CrOnc.Type.WI_FI) ? 1 : 2;
     return networkList.length >= minLength;
   },
 
   /**
-   * Event triggered when the details div is clicked on.
-   * @param {!Object} event The enable button event.
+   * @param {?CrOnc.NetworkStateProperties} state The network state properties.
+   * @param {boolean} expanded The expanded state.
+   * @return {boolean} True if the 'Known networks' button should be shown.
+   * @private
+   */
+  showKnownNetworks_: function(state, expanded) {
+    return !!expanded && !!state && state.Type == CrOnc.Type.WI_FI;
+  },
+
+  /**
+   * Event triggered when the details div is clicked.
+   * @param {Event} event The enable button event.
    * @private
    */
   onDetailsClicked_: function(event) {
@@ -181,8 +193,16 @@ Polymer({
   },
 
   /**
+   * Event triggered when the known networks button is clicked.
+   * @private
+   */
+  onKnownNetworksClicked_: function() {
+    MoreRouting.navigateTo('internet-known-networks', {type: CrOnc.Type.WI_FI});
+  },
+
+  /**
    * Event triggered when a network-list-item is the network list is selected.
-   * @param {!{detail: NetworkListItem}} event
+   * @param {!{detail: !CrOnc.NetworkStateProperties}} event
    * @private
    */
   onListItemSelected_: function(event) {

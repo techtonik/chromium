@@ -6,7 +6,6 @@
 
 #include <vector>
 
-#include "base/memory/scoped_vector.h"
 #include "base/metrics/field_trial.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
@@ -14,7 +13,6 @@
 #include "chrome/common/extensions/permissions/chrome_permission_message_rules.h"
 #include "chrome/grit/generated_resources.h"
 #include "extensions/common/extensions_client.h"
-#include "extensions/common/permissions/permission_message.h"
 #include "extensions/common/permissions/permission_message_util.h"
 #include "extensions/common/permissions/permission_set.h"
 #include "extensions/common/url_pattern.h"
@@ -27,11 +25,10 @@ namespace extensions {
 
 namespace {
 
-// Copyable wrapper to make CoalescedPermissionMessages comparable.
+// Copyable wrapper to make PermissionMessages comparable.
 class ComparablePermission {
  public:
-  explicit ComparablePermission(const CoalescedPermissionMessage& msg)
-      : msg_(&msg) {}
+  explicit ComparablePermission(const PermissionMessage& msg) : msg_(&msg) {}
 
   bool operator<(const ComparablePermission& rhs) const {
     if (msg_->message() < rhs.msg_->message())
@@ -42,7 +39,7 @@ class ComparablePermission {
   }
 
  private:
-  const CoalescedPermissionMessage* msg_;
+  const PermissionMessage* msg_;
 };
 using ComparablePermissions = std::vector<ComparablePermission>;
 
@@ -56,8 +53,7 @@ ChromePermissionMessageProvider::ChromePermissionMessageProvider() {
 ChromePermissionMessageProvider::~ChromePermissionMessageProvider() {
 }
 
-CoalescedPermissionMessages
-ChromePermissionMessageProvider::GetPermissionMessages(
+PermissionMessages ChromePermissionMessageProvider::GetPermissionMessages(
     const PermissionIDSet& permissions) const {
   std::vector<ChromePermissionMessageRule> rules =
       ChromePermissionMessageRule::GetAllRules();
@@ -66,10 +62,17 @@ ChromePermissionMessageProvider::GetPermissionMessages(
   // permissions. Once a permission is used in a rule, remove it from the set
   // of available permissions so it cannot be applied to subsequent rules.
   PermissionIDSet remaining_permissions = permissions;
-  CoalescedPermissionMessages messages;
+  PermissionMessages messages;
   for (const auto& rule : rules) {
-    // Only apply the rule if we have all the required permission IDs.
-    if (remaining_permissions.ContainsAllIDs(rule.required_permissions())) {
+    // Only apply the rule if we have all the required permission IDs. If the
+    // rule has no required IDs, then apply it only if any of the optional ones
+    // are there.
+    bool has_required_permissions = !rule.required_permissions().empty();
+    bool use_rule =
+        has_required_permissions
+            ? remaining_permissions.ContainsAllIDs(rule.required_permissions())
+            : remaining_permissions.ContainsAnyID(rule.optional_permissions());
+    if (use_rule) {
       // We can apply the rule. Add all the required permissions, and as many
       // optional permissions as we can, to the new message.
       PermissionIDSet used_permissions =
@@ -100,10 +103,7 @@ bool ChromePermissionMessageProvider::IsPrivilegeIncrease(
   if (IsHostPrivilegeIncrease(old_permissions, new_permissions, extension_type))
     return true;
 
-  if (IsAPIPrivilegeIncrease(old_permissions, new_permissions))
-    return true;
-
-  if (IsManifestPermissionPrivilegeIncrease(old_permissions, new_permissions))
+  if (IsAPIOrManifestPrivilegeIncrease(old_permissions, new_permissions))
     return true;
 
   return false;
@@ -172,44 +172,24 @@ void ChromePermissionMessageProvider::AddHostPermissions(
   }
 }
 
-bool ChromePermissionMessageProvider::IsAPIPrivilegeIncrease(
+bool ChromePermissionMessageProvider::IsAPIOrManifestPrivilegeIncrease(
     const PermissionSet* old_permissions,
     const PermissionSet* new_permissions) const {
   PermissionIDSet old_ids;
   AddAPIPermissions(old_permissions, &old_ids);
-  PermissionIDSet new_ids;
-  AddAPIPermissions(new_permissions, &new_ids);
-
-  // A special hack: kFileSystemWriteDirectory implies kFileSystemDirectory.
-  // TODO(sammc): Remove this. See http://crbug.com/284849.
-  if (old_ids.ContainsID(APIPermission::kFileSystemWriteDirectory))
-    old_ids.insert(APIPermission::kFileSystemDirectory);
-
-  return IsAPIOrManifestPrivilegeIncrease(old_ids, new_ids);
-}
-
-bool ChromePermissionMessageProvider::IsManifestPermissionPrivilegeIncrease(
-    const PermissionSet* old_permissions,
-    const PermissionSet* new_permissions) const {
-  PermissionIDSet old_ids;
   AddManifestPermissions(old_permissions, &old_ids);
   PermissionIDSet new_ids;
+  AddAPIPermissions(new_permissions, &new_ids);
   AddManifestPermissions(new_permissions, &new_ids);
 
-  return IsAPIOrManifestPrivilegeIncrease(old_ids, new_ids);
-}
-
-bool ChromePermissionMessageProvider::IsAPIOrManifestPrivilegeIncrease(
-    const PermissionIDSet& old_ids,
-    const PermissionIDSet& new_ids) const {
   // If all the IDs were already there, it's not a privilege increase.
   if (old_ids.Includes(new_ids))
     return false;
 
   // Otherwise, check the actual messages - not all IDs result in a message,
   // and some messages can suppress others.
-  CoalescedPermissionMessages old_messages = GetPermissionMessages(old_ids);
-  CoalescedPermissionMessages new_messages = GetPermissionMessages(new_ids);
+  PermissionMessages old_messages = GetPermissionMessages(old_ids);
+  PermissionMessages new_messages = GetPermissionMessages(new_ids);
 
   ComparablePermissions old_strings(old_messages.begin(), old_messages.end());
   ComparablePermissions new_strings(new_messages.begin(), new_messages.end());

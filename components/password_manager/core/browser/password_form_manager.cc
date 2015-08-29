@@ -12,17 +12,19 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/histogram_tester.h"
 #include "components/autofill/core/browser/autofill_manager.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/validation.h"
 #include "components/autofill/core/common/password_form.h"
 #include "components/password_manager/core/browser/affiliation_utils.h"
 #include "components/password_manager/core/browser/browser_save_password_progress_logger.h"
+#include "components/password_manager/core/browser/credentials_filter.h"
 #include "components/password_manager/core/browser/password_manager.h"
 #include "components/password_manager/core/browser/password_manager_client.h"
 #include "components/password_manager/core/browser/password_manager_driver.h"
+#include "components/password_manager/core/browser/password_manager_metrics_util.h"
 #include "components/password_manager/core/browser/password_store.h"
-#include "components/password_manager/core/browser/store_result_filter.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 
 using autofill::FormStructure;
@@ -37,35 +39,6 @@ typedef autofill::SavePasswordProgressLogger Logger;
 namespace password_manager {
 
 namespace {
-
-enum PasswordGenerationSubmissionEvent {
-  // Generated password was submitted and saved.
-  PASSWORD_SUBMITTED,
-
-  // Generated password submission failed. These passwords aren't saved.
-  PASSWORD_SUBMISSION_FAILED,
-
-  // Generated password was not submitted before navigation. Currently these
-  // passwords are not saved.
-  PASSWORD_NOT_SUBMITTED,
-
-  // Generated password was overridden by a non-generated one. This generally
-  // signals that the user was unhappy with the generated password for some
-  // reason.
-  PASSWORD_OVERRIDDEN,
-
-  // A generated password was used.
-  PASSWORD_USED,
-
-  // Number of enum entries, used for UMA histogram reporting macros.
-  SUBMISSION_EVENT_ENUM_COUNT
-};
-
-void LogPasswordGenerationSubmissionEvent(
-    PasswordGenerationSubmissionEvent event) {
-  UMA_HISTOGRAM_ENUMERATION("PasswordGeneration.SubmissionEvent", event,
-                            SUBMISSION_EVENT_ENUM_COUNT);
-}
 
 PasswordForm CopyAndModifySSLValidity(const PasswordForm& orig,
                                       bool ssl_valid) {
@@ -88,6 +61,11 @@ bool DoesUsenameAndPasswordMatchCredentials(
   return false;
 }
 
+std::vector<std::string> SplitPathToSegments(const std::string& path) {
+  return base::SplitString(path, "/", base::TRIM_WHITESPACE,
+                           base::SPLIT_WANT_ALL);
+}
+
 }  // namespace
 
 PasswordFormManager::PasswordFormManager(
@@ -100,8 +78,14 @@ PasswordFormManager::PasswordFormManager(
       provisionally_saved_form_(nullptr),
       other_possible_username_action_(
           PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES),
+      form_path_segments_(
+          observed_form_.origin.is_valid()
+              ? SplitPathToSegments(observed_form_.origin.path())
+              : std::vector<std::string>()),
       is_new_login_(true),
       has_generated_password_(false),
+      password_overridden_(false),
+      generation_available_(false),
       password_manager_(password_manager),
       preferred_match_(nullptr),
       is_ignorable_change_password_form_(false),
@@ -112,18 +96,19 @@ PasswordFormManager::PasswordFormManager(
       submit_result_(kSubmitResultNotSubmitted),
       form_type_(kFormTypeUnspecified) {
   drivers_.push_back(driver);
-  if (observed_form_.origin.is_valid()) {
-    form_path_tokens_ =
-        base::SplitString(observed_form_.origin.path(), "/",
-                          base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
-  }
 }
 
 PasswordFormManager::~PasswordFormManager() {
   UMA_HISTOGRAM_ENUMERATION(
       "PasswordManager.ActionsTakenV3", GetActionsTaken(), kMaxNumActionsTaken);
-  if (has_generated_password_ && submit_result_ == kSubmitResultNotSubmitted)
-    LogPasswordGenerationSubmissionEvent(PASSWORD_NOT_SUBMITTED);
+  if (submit_result_ == kSubmitResultNotSubmitted) {
+    if (has_generated_password_)
+      metrics_util::LogPasswordGenerationSubmissionEvent(
+          metrics_util::PASSWORD_NOT_SUBMITTED);
+    else if (generation_available_)
+      metrics_util::LogPasswordGenerationAvailableSubmissionEvent(
+          metrics_util::PASSWORD_NOT_SUBMITTED);
+  }
   if (form_type_ != kFormTypeUnspecified) {
     UMA_HISTOGRAM_ENUMERATION("PasswordManager.SubmittedFormType", form_type_,
                               kFormTypeMax);
@@ -203,49 +188,26 @@ PasswordFormManager::MatchResultMask PasswordFormManager::DoesManage(
 
 bool PasswordFormManager::IsBlacklisted() const {
   DCHECK_EQ(state_, POST_MATCHING_PHASE);
-  if (preferred_match_ && preferred_match_->blacklisted_by_user)
-    return true;
-  return false;
+  return !blacklisted_matches_.empty();
 }
 
 void PasswordFormManager::PermanentlyBlacklist() {
   DCHECK_EQ(state_, POST_MATCHING_PHASE);
+  DCHECK(!client_->IsOffTheRecord());
 
   // Configure the form about to be saved for blacklist status.
-  pending_credentials_.preferred = true;
-  pending_credentials_.blacklisted_by_user = true;
-  pending_credentials_.username_value.clear();
-  pending_credentials_.password_value.clear();
+  blacklisted_matches_.push_back(
+      new autofill::PasswordForm(pending_credentials_));
+  blacklisted_matches_.back()->preferred = false;
+  blacklisted_matches_.back()->blacklisted_by_user = true;
+  blacklisted_matches_.back()->username_value.clear();
+  blacklisted_matches_.back()->password_value.clear();
+  blacklisted_matches_.back()->other_possible_usernames.clear();
+  blacklisted_matches_.back()->date_created = Time::Now();
 
-  // Retroactively forget existing matches for this form, so we NEVER prompt or
-  // autofill it again.
-  int num_passwords_deleted = 0;
-  if (!best_matches_.empty()) {
-    PasswordFormMap::const_iterator iter;
-    PasswordStore* password_store = client_->GetPasswordStore();
-    if (!password_store) {
-      NOTREACHED();
-      return;
-    }
-    for (iter = best_matches_.begin(); iter != best_matches_.end(); ++iter) {
-      // We want to remove existing matches for this form so that the exact
-      // origin match with |blackisted_by_user == true| is the only result that
-      // shows up in the future for this origin URL. However, we don't want to
-      // delete logins that were actually saved on a different page (hence with
-      // different origin URL) and just happened to match this form because of
-      // the scoring algorithm. See bug 1204493.
-      if (iter->second->origin == observed_form_.origin) {
-        password_store->RemoveLogin(*iter->second);
-        ++num_passwords_deleted;
-      }
-    }
-  }
-
-  UMA_HISTOGRAM_COUNTS("PasswordManager.NumPasswordsDeletedWhenBlacklisting",
-                       num_passwords_deleted);
-
-  // Save the pending_credentials_ entry marked as blacklisted.
-  SaveAsNewLogin(false);
+  PasswordStore* password_store = client_->GetPasswordStore();
+  DCHECK(password_store);
+  password_store->AddLogin(*blacklisted_matches_.back());
 }
 
 bool PasswordFormManager::IsNewLogin() const {
@@ -283,17 +245,19 @@ void PasswordFormManager::Save() {
   DCHECK_EQ(state_, POST_MATCHING_PHASE);
   DCHECK(!client_->IsOffTheRecord());
 
+  if (IsNewLogin()) {
+    SaveAsNewLogin();
+    DeleteEmptyUsernameCredentials();
+  } else {
+    UpdateLogin();
+  }
+
   // This is not in UpdateLogin() to catch PSL matched credentials.
   if (pending_credentials_.times_used != 0 &&
       pending_credentials_.type == PasswordForm::TYPE_GENERATED) {
-    LogPasswordGenerationSubmissionEvent(PASSWORD_USED);
+    metrics_util::LogPasswordGenerationSubmissionEvent(
+        metrics_util::PASSWORD_USED);
   }
-
-  if (IsNewLogin()) {
-    SaveAsNewLogin(true);
-    DeleteEmptyUsernameCredentials();
-  } else
-    UpdateLogin();
 }
 
 void PasswordFormManager::Update(
@@ -368,6 +332,7 @@ void PasswordFormManager::OnRequestDone(
     ScopedVector<PasswordForm> logins_result) {
   preferred_match_ = nullptr;
   best_matches_.clear();
+  blacklisted_matches_.clear();
   const size_t logins_result_size = logins_result.size();
 
   scoped_ptr<BrowserSavePasswordProgressLogger> logger;
@@ -376,27 +341,32 @@ void PasswordFormManager::OnRequestDone(
     logger->LogMessage(Logger::STRING_ON_REQUEST_DONE_METHOD);
   }
 
-  // First, compute scores for credentials in |login_result|.
-  std::vector<int> credential_scores;
-  credential_scores.reserve(logins_result.size());
-  int best_score = 0;
-  scoped_ptr<StoreResultFilter> result_filter =
-      client_->CreateStoreResultFilter();
-  for (const PasswordForm* login : logins_result) {
-    if (ShouldIgnoreResult(*login, result_filter.get())) {
-      credential_scores.push_back(-1);
-      continue;
-    }
+  // Remove credentials which need to be ignored from |logins_result|.
+  if (!observed_form_.ssl_valid) {
+    logins_result.erase(
+        std::partition(logins_result.begin(), logins_result.end(),
+                       [](PasswordForm* form) { return !form->ssl_valid; }),
+        logins_result.end());
+  }
+  logins_result =
+      client_->CreateStoreResultFilter()->FilterResults(logins_result.Pass());
 
-    int current_score = ScoreResult(*login);
+  // Now compute scores for the remaining credentials in |login_result|.
+  std::vector<uint32_t> credential_scores;
+  credential_scores.reserve(logins_result.size());
+  uint32_t best_score = 0;
+  for (const PasswordForm* login : logins_result) {
+    uint32_t current_score = ScoreResult(*login);
     if (current_score > best_score)
       best_score = current_score;
     credential_scores.push_back(current_score);
   }
 
-  if (best_score <= 0) {
-    if (logger)
-      logger->LogNumber(Logger::STRING_BEST_SCORE, best_score);
+  if (best_score == 0) {
+    if (logger) {
+      logger->LogNumber(Logger::STRING_BEST_SCORE,
+                        static_cast<size_t>(best_score));
+    }
     return;
   }
 
@@ -408,8 +378,6 @@ void PasswordFormManager::OnRequestDone(
     scoped_ptr<PasswordForm> login(logins_result[i]);
     logins_result[i] = nullptr;
 
-    if (credential_scores[i] < 0)
-      continue;
     if (credential_scores[i] < best_score) {
       // Empty path matches are most commonly imports from Firefox, and
       // generally useful to autofill. Blacklisted entries are only meaningful
@@ -432,6 +400,11 @@ void PasswordFormManager::OnRequestDone(
 
       if (is_credential_protected)
         protected_credentials.push_back(login.Pass());
+      continue;
+    }
+
+    if (login->blacklisted_by_user) {
+      blacklisted_matches_.push_back(login.Pass());
       continue;
     }
 
@@ -469,18 +442,18 @@ void PasswordFormManager::OnRequestDone(
   UMA_HISTOGRAM_COUNTS("PasswordManager.NumPasswordsNotShown",
                        logins_result_size - best_matches_.size());
 
-  // It is possible we have at least one match but have no preferred_match_,
-  // because a user may have chosen to 'Forget' the preferred match. So we
-  // just pick the first one and whichever the user selects for submit will
-  // be saved as preferred.
-  DCHECK(!best_matches_.empty());
-  if (!preferred_match_)
-    preferred_match_ = best_matches_.begin()->second;
-
   // Check to see if the user told us to ignore this site in the past.
-  if (preferred_match_->blacklisted_by_user) {
+  if (best_matches_.empty()) {
+    DCHECK(!preferred_match_);
     client_->PasswordAutofillWasBlocked(best_matches_);
     manager_action_ = kManagerActionBlacklisted;
+  } else {
+    // It is possible we have at least one match but have no preferred_match_,
+    // because a user may have chosen to 'Forget' the preferred match. So we
+    // just pick the first one and whichever the user selects for submit will
+    // be saved as preferred.
+    if (!preferred_match_)
+      preferred_match_ = best_matches_.begin()->second;
   }
 }
 
@@ -550,23 +523,12 @@ void PasswordFormManager::OnGetPasswordStoreResults(
   drivers_.clear();
 }
 
-bool PasswordFormManager::ShouldIgnoreResult(const PasswordForm& form,
-                                             StoreResultFilter* filter) const {
-  // Don't match an invalid SSL form with one saved under secure circumstances.
-  if (form.ssl_valid && !observed_form_.ssl_valid)
-    return true;
-
-  if (filter->ShouldIgnore(form))
-    return true;
-
-  return false;
-}
-
-void PasswordFormManager::SaveAsNewLogin(bool reset_preferred_login) {
+void PasswordFormManager::SaveAsNewLogin() {
   DCHECK_EQ(state_, POST_MATCHING_PHASE);
   DCHECK(IsNewLogin());
   // The new_form is being used to sign in, so it is preferred.
   DCHECK(pending_credentials_.preferred);
+  DCHECK(!pending_credentials_.blacklisted_by_user);
   // new_form contains the same basic data as observed_form_ (because its the
   // same form), but with the newly added credentials.
 
@@ -580,25 +542,20 @@ void PasswordFormManager::SaveAsNewLogin(bool reset_preferred_login) {
 
   // Upload credentials the first time they are saved. This data is used
   // by password generation to help determine account creation sites.
-  // Blacklisted credentials will never be used, so don't upload a vote for
-  // them. Credentials that have been previously used (e.g. PSL matches) are
-  // checked to see if they are valid account creation forms.
-  if (!pending_credentials_.blacklisted_by_user) {
+  // Credentials that have been previously used (e.g. PSL matches) are checked
+  // to see if they are valid account creation forms.
     if (pending_credentials_.times_used == 0) {
       UploadPasswordForm(pending_credentials_.form_data, base::string16(),
                          autofill::PASSWORD, std::string());
     } else {
       SendAutofillVotes(observed_form_, &pending_credentials_);
     }
-  }
 
   pending_credentials_.date_created = Time::Now();
   SanitizePossibleUsernames(&pending_credentials_);
   password_store->AddLogin(pending_credentials_);
 
-  if (reset_preferred_login) {
-    UpdatePreferredLoginState(password_store);
-  }
+  UpdatePreferredLoginState(password_store);
 }
 
 void PasswordFormManager::SanitizePossibleUsernames(PasswordForm* form) {
@@ -814,15 +771,15 @@ void PasswordFormManager::CreatePendingCredentials() {
   if (it != best_matches_.end()) {
     // The user signed in with a login we autofilled.
     pending_credentials_ = *it->second;
-    bool password_changed =
+    password_overridden_ =
         pending_credentials_.password_value != password_to_save;
     if (IsPendingCredentialsPublicSuffixMatch()) {
       // If the autofilled credentials were only a PSL match, store a copy with
       // the current origin and signon realm. This ensures that on the next
       // visit, a precise match is found.
       is_new_login_ = true;
-      user_action_ = password_changed ? kUserActionChoosePslMatch
-                                      : kUserActionOverridePassword;
+      user_action_ = password_overridden_ ? kUserActionChoosePslMatch
+                                          : kUserActionOverridePassword;
 
       // Since this credential will not overwrite a previously saved credential,
       // username_value can be updated now.
@@ -861,13 +818,13 @@ void PasswordFormManager::CreatePendingCredentials() {
       // This will likely happen infrequently, and the inconvenience put on the
       // user by asking them is not significant, so we are fine with asking
       // here again.
-      if (password_changed) {
+      if (password_overridden_) {
         pending_credentials_.original_signon_realm.clear();
         DCHECK(!IsPendingCredentialsPublicSuffixMatch());
       }
     } else {  // Not a PSL match.
       is_new_login_ = false;
-      if (password_changed)
+      if (password_overridden_)
         user_action_ = kUserActionOverridePassword;
     }
   } else if (other_possible_username_action_ ==
@@ -931,7 +888,8 @@ void PasswordFormManager::CreatePendingCredentials() {
   if (user_action_ == kUserActionOverridePassword &&
       pending_credentials_.type == PasswordForm::TYPE_GENERATED &&
       !has_generated_password_) {
-    LogPasswordGenerationSubmissionEvent(PASSWORD_OVERRIDDEN);
+    metrics_util::LogPasswordGenerationSubmissionEvent(
+        metrics_util::PASSWORD_OVERRIDDEN);
     pending_credentials_.type = PasswordForm::TYPE_MANUAL;
   }
 
@@ -941,7 +899,7 @@ void PasswordFormManager::CreatePendingCredentials() {
   provisionally_saved_form_.reset();
 }
 
-int PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
+uint32_t PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
   DCHECK_EQ(state_, MATCHING_PHASE);
   // For scoring of candidate login data:
   // The most important element that should match is the signon_realm followed
@@ -955,42 +913,49 @@ int PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
   // That way, a partial match cannot trump an exact match even if
   // the partial one matches all other attributes (action, elements) (and
   // regardless of the matching depth in the URL path).
-  int score = 0;
+
+  // When comparing path segments, only consider at most 63 of them, so that the
+  // potential gain from shared path prefix is not more than from an exact
+  // origin match.
+  const size_t kSegmentCountCap = 63;
+  const size_t capped_form_path_segment_count =
+      std::min(form_path_segments_.size(), kSegmentCountCap);
+
+  uint32_t score = 0u;
   if (!candidate.IsPublicSuffixMatch()) {
-    score += 1 << 7;
+    score += 1u << 7;
   }
   if (candidate.origin == observed_form_.origin) {
     // This check is here for the most common case which
     // is we have a single match in the db for the given host,
     // so we don't generally need to walk the entire URL path (the else
     // clause).
-    score += (1 << 6) + static_cast<int>(form_path_tokens_.size());
+    score += (1u << 6) + static_cast<uint32_t>(capped_form_path_segment_count);
   } else {
     // Walk the origin URL paths one directory at a time to see how
     // deep the two match.
-    std::vector<std::string> candidate_path_tokens =
-        base::SplitString(candidate.origin.path(), "/", base::TRIM_WHITESPACE,
-                          base::SPLIT_WANT_ALL);
-    size_t depth = 0;
-    size_t max_dirs =
-        std::min(form_path_tokens_.size(), candidate_path_tokens.size());
+    std::vector<std::string> candidate_path_segments =
+        SplitPathToSegments(candidate.origin.path());
+    size_t depth = 0u;
+    const size_t max_dirs = std::min(capped_form_path_segment_count,
+                                     candidate_path_segments.size());
     while ((depth < max_dirs) &&
-           (form_path_tokens_[depth] == candidate_path_tokens[depth])) {
+           (form_path_segments_[depth] == candidate_path_segments[depth])) {
       depth++;
       score++;
     }
     // do we have a partial match?
-    score += (depth > 0) ? 1 << 5 : 0;
+    score += (depth > 0u) ? 1u << 5 : 0u;
   }
   if (observed_form_.scheme == PasswordForm::SCHEME_HTML) {
     if (candidate.action == observed_form_.action)
-      score += 1 << 3;
+      score += 1u << 3;
     if (candidate.password_element == observed_form_.password_element)
-      score += 1 << 2;
+      score += 1u << 2;
     if (candidate.submit_element == observed_form_.submit_element)
-      score += 1 << 1;
+      score += 1u << 1;
     if (candidate.username_element == observed_form_.username_element)
-      score += 1 << 0;
+      score += 1u << 0;
   }
 
   return score;
@@ -1037,16 +1002,28 @@ PasswordForm* PasswordFormManager::FindBestMatchForUpdatePassword(
              : best_password_match_it->second;
 }
 
-void PasswordFormManager::SubmitPassed() {
+void PasswordFormManager::LogSubmitPassed() {
+  if (submit_result_ != kSubmitResultFailed) {
+    if (has_generated_password_) {
+      metrics_util::LogPasswordGenerationSubmissionEvent(
+          metrics_util::PASSWORD_SUBMITTED);
+    } else if (generation_available_) {
+      metrics_util::LogPasswordGenerationAvailableSubmissionEvent(
+          metrics_util::PASSWORD_SUBMITTED);
+    }
+  }
   submit_result_ = kSubmitResultPassed;
-  if (has_generated_password_)
-    LogPasswordGenerationSubmissionEvent(PASSWORD_SUBMITTED);
 }
 
-void PasswordFormManager::SubmitFailed() {
+void PasswordFormManager::LogSubmitFailed() {
+  if (has_generated_password_) {
+    metrics_util::LogPasswordGenerationSubmissionEvent(
+        metrics_util::GENERATED_PASSWORD_FORCE_SAVED);
+  } else if (generation_available_) {
+    metrics_util::LogPasswordGenerationAvailableSubmissionEvent(
+        metrics_util::PASSWORD_SUBMISSION_FAILED);
+  }
   submit_result_ = kSubmitResultFailed;
-  if (has_generated_password_)
-    LogPasswordGenerationSubmissionEvent(PASSWORD_SUBMISSION_FAILED);
 }
 
 void PasswordFormManager::WipeStoreCopyIfOutdated() {

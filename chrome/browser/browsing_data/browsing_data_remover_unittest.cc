@@ -137,15 +137,14 @@ void FakeDBusCall(const chromeos::BoolDBusMethodCallback& callback) {
 #endif
 
 struct StoragePartitionRemovalData {
-  uint32 remove_mask;
-  uint32 quota_storage_remove_mask;
+  uint32 remove_mask = 0;
+  uint32 quota_storage_remove_mask = 0;
   GURL remove_origin;
   base::Time remove_begin;
   base::Time remove_end;
   StoragePartition::OriginMatcherFunction origin_matcher;
 
-  StoragePartitionRemovalData() : remove_mask(0),
-                                  quota_storage_remove_mask(0) {}
+  StoragePartitionRemovalData() {}
 };
 
 class TestStoragePartition : public StoragePartition {
@@ -155,38 +154,48 @@ class TestStoragePartition : public StoragePartition {
 
   // content::StoragePartition implementation.
   base::FilePath GetPath() override { return base::FilePath(); }
-  net::URLRequestContextGetter* GetURLRequestContext() override { return NULL; }
+  net::URLRequestContextGetter* GetURLRequestContext() override {
+    return nullptr;
+  }
   net::URLRequestContextGetter* GetMediaURLRequestContext() override {
-    return NULL;
+    return nullptr;
   }
-  storage::QuotaManager* GetQuotaManager() override { return NULL; }
-  content::AppCacheService* GetAppCacheService() override { return NULL; }
-  storage::FileSystemContext* GetFileSystemContext() override { return NULL; }
-  storage::DatabaseTracker* GetDatabaseTracker() override { return NULL; }
-  content::DOMStorageContext* GetDOMStorageContext() override { return NULL; }
-  content::IndexedDBContext* GetIndexedDBContext() override { return NULL; }
+  storage::QuotaManager* GetQuotaManager() override { return nullptr; }
+  content::AppCacheService* GetAppCacheService() override { return nullptr; }
+  storage::FileSystemContext* GetFileSystemContext() override {
+    return nullptr;
+  }
+  storage::DatabaseTracker* GetDatabaseTracker() override { return nullptr; }
+  content::DOMStorageContext* GetDOMStorageContext() override {
+    return nullptr;
+  }
+  content::IndexedDBContext* GetIndexedDBContext() override { return nullptr; }
   content::ServiceWorkerContext* GetServiceWorkerContext() override {
-    return NULL;
+    return nullptr;
   }
-  content::GeofencingManager* GetGeofencingManager() override { return NULL; }
+  content::CacheStorageContext* GetCacheStorageContext() override {
+    return nullptr;
+  }
+  content::GeofencingManager* GetGeofencingManager() override {
+    return nullptr;
+  }
   content::NavigatorConnectContext* GetNavigatorConnectContext() override {
     return nullptr;
   }
-
   content::PlatformNotificationContext* GetPlatformNotificationContext()
       override {
     return nullptr;
   }
-
   content::BackgroundSyncContext* GetBackgroundSyncContext() override {
     return nullptr;
   }
-
-  content::HostZoomMap* GetHostZoomMap() override { return NULL; }
+  content::HostZoomMap* GetHostZoomMap() override { return nullptr; }
   content::HostZoomLevelContext* GetHostZoomLevelContext() override {
-    return NULL;
+    return nullptr;
   }
-  content::ZoomLevelDelegate* GetZoomLevelDelegate() override { return NULL; }
+  content::ZoomLevelDelegate* GetZoomLevelDelegate() override {
+    return nullptr;
+  }
 
   void ClearDataForOrigin(uint32 remove_mask,
                           uint32 quota_storage_remove_mask,
@@ -275,8 +284,7 @@ inline Matcher<const url::Origin&> SameOrigin(const url::Origin& reference) {
 
 class RemoveCookieTester {
  public:
-  RemoveCookieTester() : get_cookie_success_(false), cookie_store_(NULL) {
-  }
+  RemoveCookieTester() {}
 
   // Returns true, if the given cookie exists in the cookie store.
   bool ContainsCookie() {
@@ -324,9 +332,9 @@ class RemoveCookieTester {
     quit_closure_.Run();
   }
 
-  bool get_cookie_success_;
+  bool get_cookie_success_ = false;
   base::Closure quit_closure_;
-  net::CookieStore* cookie_store_;
+  net::CookieStore* cookie_store_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(RemoveCookieTester);
 };
@@ -354,7 +362,7 @@ class RemoveSafeBrowsingCookieTester : public RemoveCookieTester {
   virtual ~RemoveSafeBrowsingCookieTester() {
     browser_process_->safe_browsing_service()->ShutDown();
     base::MessageLoop::current()->RunUntilIdle();
-    browser_process_->SetSafeBrowsingService(NULL);
+    browser_process_->SetSafeBrowsingService(nullptr);
   }
 
  private:
@@ -366,8 +374,7 @@ class RemoveSafeBrowsingCookieTester : public RemoveCookieTester {
 
 class RemoveChannelIDTester : public net::SSLConfigService::Observer {
  public:
-  explicit RemoveChannelIDTester(TestingProfile* profile)
-      : ssl_config_changed_count_(0) {
+  explicit RemoveChannelIDTester(TestingProfile* profile) {
     channel_id_service_ = profile->GetRequestContext()->
         GetURLRequestContext()->channel_id_service();
     ssl_config_service_ = profile->GetSSLConfigService();
@@ -423,14 +430,14 @@ class RemoveChannelIDTester : public net::SSLConfigService::Observer {
 
   net::ChannelIDService* channel_id_service_;
   scoped_refptr<net::SSLConfigService> ssl_config_service_;
-  int ssl_config_changed_count_;
+  int ssl_config_changed_count_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(RemoveChannelIDTester);
 };
 
 class RemoveHistoryTester {
  public:
-  RemoveHistoryTester() : query_url_success_(false), history_service_(NULL) {}
+  RemoveHistoryTester() {}
 
   bool Init(TestingProfile* profile) WARN_UNUSED_RESULT {
     if (!profile->CreateHistoryService(true, false))
@@ -456,9 +463,9 @@ class RemoveHistoryTester {
   }
 
   void AddHistory(const GURL& url, base::Time time) {
-    history_service_->AddPage(url, time, NULL, 0, GURL(),
-        history::RedirectList(), ui::PAGE_TRANSITION_LINK,
-        history::SOURCE_BROWSED, false);
+    history_service_->AddPage(url, time, nullptr, 0, GURL(),
+                              history::RedirectList(), ui::PAGE_TRANSITION_LINK,
+                              history::SOURCE_BROWSED, false);
   }
 
  private:
@@ -472,22 +479,18 @@ class RemoveHistoryTester {
 
   // For History requests.
   base::CancelableTaskTracker tracker_;
-  bool query_url_success_;
+  bool query_url_success_ = false;
   base::Closure quit_closure_;
 
   // TestingProfile owns the history service; we shouldn't delete it.
-  history::HistoryService* history_service_;
+  history::HistoryService* history_service_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(RemoveHistoryTester);
 };
 
 class RemoveFaviconTester {
  public:
-  RemoveFaviconTester()
-      : got_favicon_(false),
-        got_expired_favicon_(false),
-        history_service_(nullptr),
-        favicon_service_(nullptr) {}
+  RemoveFaviconTester() {}
 
   bool Init(TestingProfile* profile) WARN_UNUSED_RESULT {
     // Create the history service if it has not been created yet.
@@ -560,13 +563,13 @@ class RemoveFaviconTester {
 
   // For favicon requests.
   base::CancelableTaskTracker tracker_;
-  bool got_favicon_;
-  bool got_expired_favicon_;
+  bool got_favicon_ = false;
+  bool got_expired_favicon_ = false;
   base::Closure quit_closure_;
 
   // Owned by TestingProfile.
-  history::HistoryService* history_service_;
-  favicon::FaviconService* favicon_service_;
+  history::HistoryService* history_service_ = nullptr;
+  favicon::FaviconService* favicon_service_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(RemoveFaviconTester);
 };
@@ -593,19 +596,15 @@ class RemoveAutofillTester : public autofill::PersonalDataManagerObserver {
   bool HasOrigin(const std::string& origin) {
     const std::vector<autofill::AutofillProfile*>& profiles =
         personal_data_manager_->GetProfiles();
-    for (std::vector<autofill::AutofillProfile*>::const_iterator it =
-             profiles.begin();
-         it != profiles.end(); ++it) {
-      if ((*it)->origin() == origin)
+    for (const autofill::AutofillProfile* profile : profiles) {
+      if (profile->origin() == origin)
         return true;
     }
 
     const std::vector<autofill::CreditCard*>& credit_cards =
         personal_data_manager_->GetCreditCards();
-    for (std::vector<autofill::CreditCard*>::const_iterator it =
-             credit_cards.begin();
-         it != credit_cards.end(); ++it) {
-      if ((*it)->origin() == origin)
+    for (const autofill::CreditCard* credit_card : credit_cards) {
+      if (credit_card->origin() == origin)
         return true;
     }
 
@@ -662,7 +661,7 @@ class RemoveAutofillTester : public autofill::PersonalDataManagerObserver {
 class RemoveLocalStorageTester {
  public:
   explicit RemoveLocalStorageTester(TestingProfile* profile)
-      : profile_(profile), dom_storage_context_(NULL) {
+      : profile_(profile) {
     dom_storage_context_ =
         content::BrowserContext::GetDefaultStoragePartition(profile)->
             GetDOMStorageContext();
@@ -690,10 +689,10 @@ class RemoveLocalStorageTester {
     base::CreateDirectory(storage_path);
 
     // Write some files.
-    base::WriteFile(storage_path.Append(kDomStorageOrigin1), NULL, 0);
-    base::WriteFile(storage_path.Append(kDomStorageOrigin2), NULL, 0);
-    base::WriteFile(storage_path.Append(kDomStorageOrigin3), NULL, 0);
-    base::WriteFile(storage_path.Append(kDomStorageExt), NULL, 0);
+    base::WriteFile(storage_path.Append(kDomStorageOrigin1), nullptr, 0);
+    base::WriteFile(storage_path.Append(kDomStorageOrigin2), nullptr, 0);
+    base::WriteFile(storage_path.Append(kDomStorageOrigin3), nullptr, 0);
+    base::WriteFile(storage_path.Append(kDomStorageExt), nullptr, 0);
 
     // Tweak their dates.
     base::Time now = base::Time::Now();
@@ -724,7 +723,7 @@ class RemoveLocalStorageTester {
 
   // We don't own these pointers.
   TestingProfile* profile_;
-  content::DOMStorageContext* dom_storage_context_;
+  content::DOMStorageContext* dom_storage_context_ = nullptr;
 
   std::vector<content::LocalStorageUsageInfo> infos_;
   base::Closure quit_closure_;
@@ -734,7 +733,7 @@ class RemoveLocalStorageTester {
 
 class MockDomainReliabilityService : public DomainReliabilityService {
  public:
-  MockDomainReliabilityService() : clear_count_(0) {}
+  MockDomainReliabilityService() {}
 
   ~MockDomainReliabilityService() override {}
 
@@ -764,7 +763,7 @@ class MockDomainReliabilityService : public DomainReliabilityService {
   }
 
  private:
-  unsigned clear_count_;
+  unsigned clear_count_ = 0;
   DomainReliabilityClearMode last_clear_mode_;
 };
 
@@ -887,7 +886,7 @@ class BrowsingDataRemoverTest : public testing::Test {
 
   void TearDown() override {
 #if defined(ENABLE_EXTENSIONS)
-    mock_policy_ = NULL;
+    mock_policy_ = nullptr;
 #endif
 
     // TestingProfile contains a DOMStorageContext.  BrowserContext's destructor
@@ -898,7 +897,7 @@ class BrowsingDataRemoverTest : public testing::Test {
     profile_.reset();
     base::MessageLoop::current()->RunUntilIdle();
 
-    TestingBrowserProcess::GetGlobal()->SetLocalState(NULL);
+    TestingBrowserProcess::GetGlobal()->SetLocalState(nullptr);
   }
 
   void BlockUntilBrowsingDataRemoved(BrowsingDataRemover::TimePeriod period,
@@ -984,7 +983,7 @@ class BrowsingDataRemoverTest : public testing::Test {
     return mock_policy_.get();
 #else
     NOTREACHED();
-    return NULL;
+    return nullptr;
 #endif
   }
 
@@ -992,7 +991,7 @@ class BrowsingDataRemoverTest : public testing::Test {
 #if defined(ENABLE_EXTENSIONS)
     return mock_policy_.get();
 #else
-    return NULL;
+    return nullptr;
 #endif
   }
 
@@ -1400,19 +1399,23 @@ TEST_F(BrowsingDataRemoverTest, ExpireBookmarkFavicons) {
 }
 
 TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverBoth) {
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1422,6 +1425,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverBoth) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1433,19 +1437,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverOnlyTemporary) {
   CreateMockPolicy();
 #endif
 
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1456,6 +1464,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverOnlyTemporary) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1473,19 +1482,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverOnlyPersistent) {
   CreateMockPolicy();
 #endif
 
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1496,6 +1509,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverOnlyPersistent) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1513,20 +1527,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverNeither) {
   CreateMockPolicy();
 #endif
 
-
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1537,6 +1554,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverNeither) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1553,17 +1571,20 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverSpecificOrigin) {
   // Remove Origin 1.
   BlockUntilOriginDataRemoved(BrowsingDataRemover::EVERYTHING,
                               BrowsingDataRemover::REMOVE_APPCACHE |
-                              BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                              BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                              BrowsingDataRemover::REMOVE_INDEXEDDB |
-                              BrowsingDataRemover::REMOVE_WEBSQL,
+                                  BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                                  BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                                  BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                                  BrowsingDataRemover::REMOVE_INDEXEDDB |
+                                  BrowsingDataRemover::REMOVE_WEBSQL,
                               kOrigin1);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB |
-      BrowsingDataRemover::REMOVE_WEBSQL, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                BrowsingDataRemover::REMOVE_INDEXEDDB |
+                BrowsingDataRemover::REMOVE_WEBSQL,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1574,6 +1595,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverSpecificOrigin) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1581,19 +1603,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForeverSpecificOrigin) {
 }
 
 TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForLastHour) {
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::LAST_HOUR,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::LAST_HOUR,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1604,6 +1630,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForLastHour) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
 
   // Persistent data would be left out since we are not removing from
@@ -1617,19 +1644,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForLastHour) {
 }
 
 TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForLastWeek) {
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::LAST_WEEK,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::LAST_WEEK,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1640,6 +1671,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedDataForLastWeek) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
 
   // Persistent data would be left out since we are not removing from
@@ -1659,19 +1691,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedUnprotectedOrigins) {
   policy->AddProtected(kOrigin1.GetOrigin());
 #endif
 
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_WEBSQL |
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_WEBSQL |
+          BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_INDEXEDDB,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_WEBSQL |
-      BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_WEBSQL |
+                BrowsingDataRemover::REMOVE_APPCACHE |
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_INDEXEDDB,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1682,6 +1718,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedUnprotectedOrigins) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1704,17 +1741,20 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedProtectedSpecificOrigin) {
   // Try to remove kOrigin1. Expect failure.
   BlockUntilOriginDataRemoved(BrowsingDataRemover::EVERYTHING,
                               BrowsingDataRemover::REMOVE_APPCACHE |
-                              BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                              BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                              BrowsingDataRemover::REMOVE_INDEXEDDB |
-                              BrowsingDataRemover::REMOVE_WEBSQL,
+                                  BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                                  BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                                  BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                                  BrowsingDataRemover::REMOVE_INDEXEDDB |
+                                  BrowsingDataRemover::REMOVE_WEBSQL,
                               kOrigin1);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB |
-      BrowsingDataRemover::REMOVE_WEBSQL, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                BrowsingDataRemover::REMOVE_INDEXEDDB |
+                BrowsingDataRemover::REMOVE_WEBSQL,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1725,6 +1765,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedProtectedSpecificOrigin) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1745,19 +1786,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedProtectedOrigins) {
 #endif
 
   // Try to remove kOrigin1. Expect success.
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB |
-                                BrowsingDataRemover::REMOVE_WEBSQL,
-                                true);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_INDEXEDDB |
+          BrowsingDataRemover::REMOVE_WEBSQL,
+      true);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB |
-      BrowsingDataRemover::REMOVE_WEBSQL, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                BrowsingDataRemover::REMOVE_INDEXEDDB |
+                BrowsingDataRemover::REMOVE_WEBSQL,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::PROTECTED_WEB |
       BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
@@ -1769,6 +1814,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedProtectedOrigins) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);
@@ -1786,19 +1832,23 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedIgnoreExtensionsAndDevTools) {
   CreateMockPolicy();
 #endif
 
-  BlockUntilBrowsingDataRemoved(BrowsingDataRemover::EVERYTHING,
-                                BrowsingDataRemover::REMOVE_APPCACHE |
-                                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-                                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-                                BrowsingDataRemover::REMOVE_INDEXEDDB |
-                                BrowsingDataRemover::REMOVE_WEBSQL,
-                                false);
+  BlockUntilBrowsingDataRemoved(
+      BrowsingDataRemover::EVERYTHING,
+      BrowsingDataRemover::REMOVE_APPCACHE |
+          BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+          BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+          BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+          BrowsingDataRemover::REMOVE_INDEXEDDB |
+          BrowsingDataRemover::REMOVE_WEBSQL,
+      false);
 
   EXPECT_EQ(BrowsingDataRemover::REMOVE_APPCACHE |
-      BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
-      BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
-      BrowsingDataRemover::REMOVE_INDEXEDDB |
-      BrowsingDataRemover::REMOVE_WEBSQL, GetRemovalMask());
+                BrowsingDataRemover::REMOVE_SERVICE_WORKERS |
+                BrowsingDataRemover::REMOVE_CACHE_STORAGE |
+                BrowsingDataRemover::REMOVE_FILE_SYSTEMS |
+                BrowsingDataRemover::REMOVE_INDEXEDDB |
+                BrowsingDataRemover::REMOVE_WEBSQL,
+            GetRemovalMask());
   EXPECT_EQ(BrowsingDataHelper::UNPROTECTED_WEB, GetOriginTypeMask());
 
   // Verify storage partition related stuffs.
@@ -1809,6 +1859,7 @@ TEST_F(BrowsingDataRemoverTest, RemoveQuotaManagedIgnoreExtensionsAndDevTools) {
                 StoragePartition::REMOVE_DATA_MASK_WEBSQL |
                 StoragePartition::REMOVE_DATA_MASK_APPCACHE |
                 StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS |
+                StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE |
                 StoragePartition::REMOVE_DATA_MASK_INDEXEDDB);
   EXPECT_EQ(removal_data.quota_storage_remove_mask,
             StoragePartition::QUOTA_MANAGED_STORAGE_MASK_ALL);

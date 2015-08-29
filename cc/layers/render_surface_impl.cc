@@ -71,8 +71,30 @@ int RenderSurfaceImpl::OwningLayerId() const {
   return owning_layer_ ? owning_layer_->id() : 0;
 }
 
+bool RenderSurfaceImpl::HasReplica() const {
+  return owning_layer_->has_replica();
+}
+
+const LayerImpl* RenderSurfaceImpl::ReplicaLayer() const {
+  return owning_layer_->replica_layer();
+}
+
 int RenderSurfaceImpl::TransformTreeIndex() const {
   return owning_layer_->transform_tree_index();
+}
+
+int RenderSurfaceImpl::ClipTreeIndex() const {
+  return owning_layer_->clip_tree_index();
+}
+
+int RenderSurfaceImpl::EffectTreeIndex() const {
+  return owning_layer_->effect_tree_index();
+}
+
+int RenderSurfaceImpl::TargetEffectTreeIndex() const {
+  if (!owning_layer_->parent() || !owning_layer_->parent()->render_target())
+    return -1;
+  return owning_layer_->parent()->render_target()->effect_tree_index();
 }
 
 void RenderSurfaceImpl::SetClipRect(const gfx::Rect& clip_rect) {
@@ -89,6 +111,20 @@ void RenderSurfaceImpl::SetContentRect(const gfx::Rect& content_rect) {
 
   surface_property_changed_ = true;
   content_rect_ = content_rect;
+}
+
+void RenderSurfaceImpl::SetContentRectFromPropertyTrees(
+    const gfx::Rect& content_rect) {
+  if (content_rect_from_property_trees_ == content_rect)
+    return;
+
+  surface_property_changed_ = true;
+  content_rect_from_property_trees_ = content_rect;
+}
+
+void RenderSurfaceImpl::SetAccumulatedContentRect(
+    const gfx::Rect& content_rect) {
+  accumulated_content_rect_ = content_rect;
 }
 
 bool RenderSurfaceImpl::SurfacePropertyChanged() const {

@@ -277,6 +277,7 @@ static const GLenum valid_g_l_state_table_es3[] = {
     GL_DRAW_BUFFER15,
     GL_DRAW_FRAMEBUFFER_BINDING,
     GL_FRAGMENT_SHADER_DERIVATIVE_HINT,
+    GL_GPU_DISJOINT_EXT,
     GL_MAJOR_VERSION,
     GL_MAX_3D_TEXTURE_SIZE,
     GL_MAX_ARRAY_TEXTURE_LAYERS,
@@ -317,6 +318,7 @@ static const GLenum valid_g_l_state_table_es3[] = {
     GL_READ_BUFFER,
     GL_READ_FRAMEBUFFER_BINDING,
     GL_SAMPLER_BINDING,
+    GL_TIMESTAMP_EXT,
     GL_TEXTURE_BINDING_2D_ARRAY,
     GL_TEXTURE_BINDING_3D,
     GL_TRANSFORM_FEEDBACK_BINDING,
@@ -361,7 +363,7 @@ static const GLenum valid_hint_target_table_es3[] = {
 };
 
 static const GLenum valid_image_internal_format_table[] = {
-    GL_RGB, GL_RGB_YUV_420_CHROMIUM, GL_RGBA,
+    GL_RGB, GL_RGB_YUV_420_CHROMIUM, GL_RGB_YCBCR_422_CHROMIUM, GL_RGBA,
 };
 
 static const GLenum valid_image_usage_table[] = {
@@ -503,7 +505,6 @@ static const GLenum valid_query_target_table[] = {
     GL_ANY_SAMPLES_PASSED_CONSERVATIVE_EXT,
     GL_COMMANDS_ISSUED_CHROMIUM,
     GL_LATENCY_QUERY_CHROMIUM,
-    GL_ASYNC_PIXEL_UNPACK_COMPLETED_CHROMIUM,
     GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM,
     GL_COMMANDS_COMPLETED_CHROMIUM,
 };
@@ -534,11 +535,8 @@ static const GLenum valid_read_pixel_format_table[] = {
 };
 
 static const GLenum valid_read_pixel_format_table_es3[] = {
-    GL_RGBA_INTEGER,
-};
-
-static const GLenum deprecated_read_pixel_format_table_es3[] = {
-    GL_ALPHA, GL_RGB,
+    GL_RED,        GL_RED_INTEGER, GL_RG,
+    GL_RG_INTEGER, GL_RGB_INTEGER, GL_RGBA_INTEGER,
 };
 
 static const GLenum valid_read_pixel_type_table[] = {
@@ -547,12 +545,8 @@ static const GLenum valid_read_pixel_type_table[] = {
 };
 
 static const GLenum valid_read_pixel_type_table_es3[] = {
-    GL_UNSIGNED_INT, GL_INT, GL_FLOAT, GL_UNSIGNED_INT_2_10_10_10_REV,
-};
-
-static const GLenum deprecated_read_pixel_type_table_es3[] = {
-    GL_UNSIGNED_SHORT_5_6_5, GL_UNSIGNED_SHORT_4_4_4_4,
-    GL_UNSIGNED_SHORT_5_5_5_1,
+    GL_BYTE, GL_UNSIGNED_SHORT, GL_SHORT, GL_UNSIGNED_INT,
+    GL_INT,  GL_HALF_FLOAT,     GL_FLOAT, GL_UNSIGNED_INT_2_10_10_10_REV,
 };
 
 static const GLenum valid_render_buffer_format_table[] = {
@@ -1159,13 +1153,8 @@ void Validators::UpdateValuesES3() {
                        arraysize(valid_pixel_type_table_es3));
   program_parameter.AddValues(valid_program_parameter_table_es3,
                               arraysize(valid_program_parameter_table_es3));
-  read_pixel_format.RemoveValues(
-      deprecated_read_pixel_format_table_es3,
-      arraysize(deprecated_read_pixel_format_table_es3));
   read_pixel_format.AddValues(valid_read_pixel_format_table_es3,
                               arraysize(valid_read_pixel_format_table_es3));
-  read_pixel_type.RemoveValues(deprecated_read_pixel_type_table_es3,
-                               arraysize(deprecated_read_pixel_type_table_es3));
   read_pixel_type.AddValues(valid_read_pixel_type_table_es3,
                             arraysize(valid_read_pixel_type_table_es3));
   render_buffer_format.AddValues(

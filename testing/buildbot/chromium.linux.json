@@ -3,8 +3,6 @@
     "additional_compile_targets": [
       "chrome_public_apk",
       "chrome_public_test_apk",
-      "chrome_shell_apk",
-      "chrome_shell_test_apk",
       "content_shell_apk",
       "mandoline:all"
     ],
@@ -75,8 +73,6 @@
     "additional_compile_targets": [
       "chrome_public_apk",
       "chrome_public_test_apk",
-      "chrome_shell_apk",
-      "chrome_shell_test_apk",
       "content_shell_apk",
       "content_shell_test_apk",
       "mandoline:all"
@@ -388,6 +384,9 @@
         "test": "gn_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "google_apis_unittests"
       },
       {
@@ -436,9 +435,15 @@
         "test": "mojo_public_application_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "mojo_public_bindings_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "mojo_public_environment_unittests"
       },
       {

@@ -10,14 +10,24 @@ import android.text.TextUtils;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.UrlUtils;
+import org.chromium.base.test.util.parameter.BaseParameter;
+import org.chromium.base.test.util.parameter.Parameter;
+import org.chromium.base.test.util.parameter.Parameterizable;
+import org.chromium.base.test.util.parameter.parameters.MethodParameter;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
 import org.chromium.chrome.test.util.ApplicationTestUtils;
 import org.chromium.chrome.test.util.browser.tabmodel.document.MockStorageDelegate;
+import org.chromium.chrome.test.util.parameters.AddFakeAccountToAppParameter;
+import org.chromium.chrome.test.util.parameters.AddFakeAccountToOsParameter;
+import org.chromium.chrome.test.util.parameters.AddGoogleAccountToOsParameter;
 import org.chromium.content.browser.test.util.Criteria;
 import org.chromium.content.browser.test.util.CriteriaHelper;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Base for testing and interacting with multiple Activities (e.g. Document or Webapp Activities).
@@ -25,11 +35,15 @@ import org.chromium.content.browser.test.util.CriteriaHelper;
 @CommandLineFlags.Add({
         ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE
         })
-public abstract class MultiActivityTestBase extends InstrumentationTestCase {
+public abstract class MultiActivityTestBase extends InstrumentationTestCase
+        implements Parameterizable {
     protected static final String URL_1 = createTestUrl(1);
     protected static final String URL_2 = createTestUrl(2);
     protected static final String URL_3 = createTestUrl(3);
     protected static final String URL_4 = createTestUrl(4);
+
+    private Parameter.Reader mParameterReader;
+    private Map<String, BaseParameter> mAvailableParameters;
 
     /** Defines one gigantic link spanning the whole page that creates a new window with URL_4. */
     protected static final String HREF_LINK = UrlUtils.encodeHtmlDataUri(
@@ -156,6 +170,65 @@ public abstract class MultiActivityTestBase extends InstrumentationTestCase {
                 return true;
             }
         }));
+    }
+
+    /**
+     * Creates the {@link Map} of available parameters for the test to use.
+     *
+     * @return a {@link Map} of {@link BaseParameter} objects.
+     */
+    protected Map<String, BaseParameter> createAvailableParameters() {
+        Map<String, BaseParameter> availableParameters = new HashMap<>();
+        availableParameters
+                .put(MethodParameter.PARAMETER_TAG, new MethodParameter(getParameterReader()));
+        availableParameters.put(AddFakeAccountToAppParameter.PARAMETER_TAG,
+                new AddFakeAccountToAppParameter(getParameterReader(), getInstrumentation()));
+        availableParameters.put(AddFakeAccountToOsParameter.PARAMETER_TAG,
+                new AddFakeAccountToOsParameter(getParameterReader(), getInstrumentation()));
+        availableParameters.put(AddGoogleAccountToOsParameter.PARAMETER_TAG,
+                new AddGoogleAccountToOsParameter(getParameterReader(), getInstrumentation()));
+        return availableParameters;
+    }
+
+    /**
+     * Gets the {@link Map} of available parameters that inherited classes can use.
+     *
+     * @return a {@link Map} of {@link BaseParameter} objects to set as the available parameters.
+     */
+    public Map<String, BaseParameter> getAvailableParameters() {
+        return mAvailableParameters;
+    }
+
+    /**
+     * Gets a specific parameter from the current test.
+     *
+     * @param parameterTag a string with the name of the {@link BaseParameter} we want.
+     * @return a parameter that extends {@link BaseParameter} that has the matching parameterTag.
+     */
+    @SuppressWarnings("unchecked")
+    public <T extends BaseParameter> T getAvailableParameter(String parameterTag) {
+        return (T) mAvailableParameters.get(parameterTag);
+    }
+
+    /**
+     * Setter method for {@link Parameter.Reader}.
+     *
+     * @param parameterReader the {@link Parameter.Reader} to set.
+     */
+    public void setParameterReader(Parameter.Reader parameterReader) {
+        mParameterReader = parameterReader;
+        mAvailableParameters = createAvailableParameters();
+    }
+
+    /**
+     * Getter method for {@link Parameter.Reader} object to be used by test cases reading the
+     * parameter.
+     *
+     * @return the {@link Parameter.Reader} for the current {@link
+     * org.chromium.base.test.util.parameter.ParameterizedTest} being run.
+     */
+    protected Parameter.Reader getParameterReader() {
+        return mParameterReader;
     }
 
     private static final String createTestUrl(int index) {

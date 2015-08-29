@@ -10,7 +10,6 @@
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/time/time.h"
-#include "chrome/browser/bitmap_fetcher/bitmap_fetcher_delegate.h"
 #include "chrome/common/web_application_info.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -32,7 +31,6 @@ class AppBannerDataFetcher;
 // the WebContents.
 class AppBannerDataFetcher
     : public base::RefCounted<AppBannerDataFetcher>,
-      public chrome::BitmapFetcherDelegate,
       public content::WebContentsObserver {
  public:
   class Observer {
@@ -113,12 +111,17 @@ class AppBannerDataFetcher
   // opportunity to cancel.
   void OnBannerPromptReply(content::RenderFrameHost* render_frame_host,
                            int request_id,
-                           blink::WebAppBannerPromptReply reply);
+                           blink::WebAppBannerPromptReply reply,
+                           std::string referrer);
 
   // Called when the client has prevented a banner from being shown, and is
   // now requesting that it be shown later.
   void OnRequestShowAppBanner(content::RenderFrameHost* render_frame_host,
                               int request_id);
+
+  // Called when it is determined that the webapp has fulfilled the initial
+  // criteria of having a manifest and a service worker.
+  void OnHasServiceWorker(content::WebContents* web_contents);
 
   content::WebContents* GetWebContents();
   virtual std::string GetAppIdentifier();
@@ -128,7 +131,7 @@ class AppBannerDataFetcher
 
   // Fetches the icon at the given URL asynchronously, returning |false| if a
   // load could not be started.
-  bool FetchIcon(const GURL& image_url);
+  bool FetchAppIcon(content::WebContents* web_contents, const GURL& url);
 
   // Records that a banner was shown. The |event_name| corresponds to the RAPPOR
   // metric being recorded.
@@ -138,15 +141,12 @@ class AppBannerDataFetcher
   // Callbacks for data retrieval.
   void OnDidGetManifest(const content::Manifest& manifest);
   void OnDidCheckHasServiceWorker(bool has_service_worker);
-  void OnFetchComplete(const GURL& url, const SkBitmap* icon) override;
+  void OnAppIconFetched(const SkBitmap& bitmap);
 
   // Returns whether the given web app has already been installed.
   // Implemented on desktop platforms only.
   virtual bool IsWebAppInstalled(content::BrowserContext* browser_context,
                                  const GURL& start_url);
-
-  // Shows a banner for the app, if the given |icon| is valid.
-  virtual void RequestShowBanner(const SkBitmap* icon);
 
   // Record that the banner could be shown at this point, if the triggering
   // heuristic allowed.
@@ -154,7 +154,8 @@ class AppBannerDataFetcher
 
   // Creates a banner for the app using the given |icon|.
   virtual void ShowBanner(const SkBitmap* icon,
-                          const base::string16& title) = 0;
+                          const base::string16& title,
+                          const std::string& referrer) = 0;
 
   // Returns whether the banner should be shown.
   bool CheckIfShouldShowBanner();
@@ -176,8 +177,8 @@ class AppBannerDataFetcher
   bool page_requested_prompt_;
   ui::PageTransition transition_type_;
   int event_request_id_;
-  scoped_ptr<chrome::BitmapFetcher> bitmap_fetcher_;
   scoped_ptr<SkBitmap> app_icon_;
+  std::string referrer_;
 
   GURL validated_url_;
   base::string16 app_title_;

@@ -166,12 +166,20 @@ struct PasswordForm {
   // When parsing an HTML form, this is typically empty.
   base::string16 password_value;
 
+  // Whether the password value is the same as specified in the "value"
+  // attribute of the input element. Only used in the renderer.
+  bool password_value_is_default;
+
   // If the form was a sign-up or a change password form, the name of the input
   // element corresponding to the new password. Optional, and not persisted.
   base::string16 new_password_element;
 
   // The new password. Optional, and not persisted.
   base::string16 new_password_value;
+
+  // Whether the password value is the same as specified in the "value"
+  // attribute of the input element. Only used in the renderer.
+  bool new_password_value_is_default;
 
   // Whether the |new_password_element| has an autocomplete=new-password
   // attribute. This is only used in parsed HTML forms.
@@ -293,8 +301,13 @@ struct PasswordForm {
 
 // True if the unique keys for the forms are the same. The unique key is
 // (origin, username_element, username_value, password_element, signon_realm).
-bool ArePasswordFormUniqueKeyEqual(const autofill::PasswordForm& left,
-                                   const autofill::PasswordForm& right);
+bool ArePasswordFormUniqueKeyEqual(const PasswordForm& left,
+                                   const PasswordForm& right);
+
+// A comparator for the unique key.
+struct LessThanUniqueKey {
+  bool operator()(const PasswordForm* left, const PasswordForm* right) const;
+};
 
 // Map username to PasswordForm* for convenience. See password_form_manager.h.
 typedef base::ScopedPtrMap<base::string16, scoped_ptr<PasswordForm>>
@@ -305,8 +318,8 @@ typedef std::map<base::string16, const PasswordForm*> ConstPasswordFormMap;
 
 // For testing.
 std::ostream& operator<<(std::ostream& os, PasswordForm::Layout layout);
-std::ostream& operator<<(std::ostream& os, const autofill::PasswordForm& form);
-std::ostream& operator<<(std::ostream& os, autofill::PasswordForm* form);
+std::ostream& operator<<(std::ostream& os, const PasswordForm& form);
+std::ostream& operator<<(std::ostream& os, PasswordForm* form);
 
 }  // namespace autofill
 

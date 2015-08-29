@@ -64,13 +64,9 @@ import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeSwitches;
-import org.chromium.chrome.browser.ContextualMenuBar;
-import org.chromium.chrome.browser.ContextualMenuBar.ActionBarDelegate;
-import org.chromium.chrome.browser.CustomSelectionActionModeCallback;
 import org.chromium.chrome.browser.WebsiteSettingsPopup;
 import org.chromium.chrome.browser.WindowDelegate;
 import org.chromium.chrome.browser.appmenu.AppMenuButtonHelper;
-import org.chromium.chrome.browser.document.BrandColorUtils;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerServiceFactory;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerTabUtils;
 import org.chromium.chrome.browser.ntp.NativePageFactory;
@@ -90,8 +86,12 @@ import org.chromium.chrome.browser.search_engines.TemplateUrlService;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.toolbar.ActionModeController;
+import org.chromium.chrome.browser.toolbar.ActionModeController.ActionBarDelegate;
+import org.chromium.chrome.browser.toolbar.ToolbarActionModeCallback;
 import org.chromium.chrome.browser.toolbar.ToolbarDataProvider;
 import org.chromium.chrome.browser.toolbar.ToolbarPhone;
+import org.chromium.chrome.browser.util.ColorUtils;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.KeyNavigationUtil;
 import org.chromium.chrome.browser.util.ViewUtils;
@@ -157,7 +157,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     protected TintedImageButton mMicButton;
     protected UrlBar mUrlBar;
     protected UrlContainer mUrlContainer;
-    private ContextualMenuBar mContextualMenuBar = null;
+    private ActionModeController mActionModeController = null;
 
     private AutocompleteController mAutocomplete;
 
@@ -244,7 +244,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     // code paths in a not necessarily obvious or even deterministic order.
     private boolean mSuggestionSelectionInProgress;
 
-    private CustomSelectionActionModeCallback mDefaultActionModeCallbackForTextEdit;
+    private ToolbarActionModeCallback mDefaultActionModeCallbackForTextEdit;
 
     private Runnable mShowSuggestions;
 
@@ -791,9 +791,9 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
             ActionBarDelegate actionBarDelegate, WindowAndroid windowAndroid) {
         mWindowDelegate = windowDelegate;
 
-        mContextualMenuBar = new ContextualMenuBar(getContext(), actionBarDelegate);
-        mContextualMenuBar.setCustomSelectionActionModeCallback(
-                new CustomSelectionActionModeCallback() {
+        mActionModeController = new ActionModeController(getContext(), actionBarDelegate);
+        mActionModeController.setCustomSelectionActionModeCallback(
+                new ToolbarActionModeCallback() {
                     @Override
                     public boolean onCreateActionMode(ActionMode mode, Menu menu) {
                         boolean retVal = super.onCreateActionMode(mode, menu);
@@ -949,6 +949,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
      */
     public void onUrlFocusChange(boolean hasFocus) {
         mUrlHasFocus = hasFocus;
+        mUrlContainer.onUrlFocusChanged(hasFocus);
         updateFocusSource(hasFocus);
         updateDeleteButtonVisibility();
         Tab currentTab = getCurrentTab();
@@ -1050,7 +1051,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     @Override
-    public void setDefaultTextEditActionModeCallback(CustomSelectionActionModeCallback callback) {
+    public void setDefaultTextEditActionModeCallback(ToolbarActionModeCallback callback) {
         mDefaultActionModeCallbackForTextEdit = callback;
     }
 
@@ -1061,7 +1062,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     private void updateCustomSelectionActionModeCallback() {
         if (mQueryInTheOmnibox) {
             mUrlBar.setCustomSelectionActionModeCallback(
-                    mContextualMenuBar.getCustomSelectionActionModeCallback());
+                    mActionModeController.getActionModeCallback());
         } else {
             mUrlBar.setCustomSelectionActionModeCallback(mDefaultActionModeCallbackForTextEdit);
         }
@@ -1096,11 +1097,6 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
 
     @Override
     public void setMenuButtonHelper(AppMenuButtonHelper helper) { }
-
-    @Override
-    public View getMenuAnchor() {
-        return null;
-    }
 
     /**
      * Sets the URL focus change listner that will be notified when the URL gains or loses focus.
@@ -1433,6 +1429,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
 
         mSuggestionList = new OmniboxSuggestionsList(getContext());
         mOmniboxResultsContainer.addView(mSuggestionList);
+        // Start with visibility GONE to ensure that show() is called. http://crbug.com/517438
+        mSuggestionList.setVisibility(GONE);
         mSuggestionList.setAdapter(mSuggestionListAdapter);
         mSuggestionList.setClipToPadding(false);
         mSuggestionListAdapter.setSuggestionDelegate(new OmniboxSuggestionDelegate() {
@@ -1752,8 +1750,11 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         } else if (!mUrlHasFocus && isLocationIcon(v)) {
             Tab currentTab = getCurrentTab();
             if (currentTab != null && currentTab.getWebContents() != null) {
-                WebsiteSettingsPopup.show(getContext(), currentTab.getProfile(),
-                        currentTab.getWebContents());
+                Activity activity = currentTab.getWindowAndroid().getActivity().get();
+                if (activity != null) {
+                    WebsiteSettingsPopup.show(activity, currentTab.getProfile(),
+                            currentTab.getWebContents());
+                }
             }
         } else if (v == mMicButton) {
             RecordUserAction.record("MobileOmniboxVoiceSearch");
@@ -2323,7 +2324,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         if (getToolbarDataProvider().isUsingBrandColor() && !mUrlHasFocus) {
             int currentPrimaryColor = getToolbarDataProvider().getPrimaryColor();
             brandColorNeedsLightText =
-                    BrandColorUtils.shouldUseLightDrawablesForToolbar(currentPrimaryColor);
+                    ColorUtils.shoudUseLightForegroundOnBackground(currentPrimaryColor);
         }
 
         boolean useDarkColors = tab == null || !(tab.isIncognito() || brandColorNeedsLightText);

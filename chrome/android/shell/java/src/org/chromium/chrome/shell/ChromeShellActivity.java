@@ -18,7 +18,6 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.BaseSwitches;
@@ -62,6 +61,7 @@ import org.chromium.sync.signin.AccountManagerHelper;
 import org.chromium.sync.signin.ChromeSigninController;
 import org.chromium.ui.base.ActivityWindowAndroid;
 import org.chromium.ui.base.WindowAndroid;
+import org.chromium.ui.widget.Toast;
 
 /**
  * The {@link android.app.Activity} component of a basic test shell to test Chrome features.
@@ -341,7 +341,7 @@ public class ChromeShellActivity extends AppCompatActivity implements AppMenuPro
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_MENU && event.getRepeatCount() == 0) {
             if (mToolbar != null) mToolbar.hideSuggestions();
-            mAppMenuHandler.showAppMenu(findViewById(R.id.menu_button), true, false);
+            mAppMenuHandler.showAppMenu(findViewById(R.id.menu_button), false);
             return true;
         }
         return super.onKeyDown(keyCode, event);

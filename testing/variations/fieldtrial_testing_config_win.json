@@ -4,6 +4,11 @@
             "group_name": "Enabled"
         }
     ],
+    "CaptivePortalInterstitial": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "ChildAccountDetection": [
         {
             "group_name": "Disabled"
@@ -124,9 +129,22 @@
             "group_name": "Enabled"
         }
     ],
+    "TabSyncByRecency": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "UseDelayAgnosticAEC": [
         {
             "group_name": "DefaultEnabled"
+        }
+    ],
+    "VarationsServiceControl": [
+        {
+            "group_name": "Interval_30min",
+            "params": {
+                "fetch_period_min": "30"
+            }
         }
     ]
 }

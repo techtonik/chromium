@@ -149,13 +149,18 @@ class MediaCodecDecoderTest : public testing::Test {
   // Decoder callbacks.
   void OnDataRequested();
   void OnStarvation() { is_starved_ = true; }
+  void OnDecoderDrained() {}
   void OnStopDone() { is_stopped_ = true; }
   void OnError() { DVLOG(0) << "MediaCodecDecoderTest::" << __FUNCTION__; }
   void OnUpdateCurrentTime(base::TimeDelta now_playing,
-                           base::TimeDelta last_buffered) {
+                           base::TimeDelta last_buffered,
+                           bool postpone) {
     // Add the |last_buffered| value for PTS. For video it is the same as
     // |now_playing| and is equal to PTS, for audio |last_buffered| should
     // exceed PTS.
+    if (postpone)
+      return;
+
     pts_stat_.AddValue(last_buffered);
 
     if (stop_request_time_ != kNoTimestamp() &&
@@ -165,12 +170,16 @@ class MediaCodecDecoderTest : public testing::Test {
     }
   }
 
-  void OnVideoSizeChanged(const gfx::Size& video_size) {}
+  void OnVideoSizeChanged(const gfx::Size& video_size) {
+    video_size_ = video_size;
+  }
+
   void OnVideoCodecCreated() {}
 
   scoped_ptr<MediaCodecDecoder> decoder_;
   scoped_ptr<TestDataFactory> data_factory_;
   Minimax<base::TimeDelta> pts_stat_;
+  gfx::Size video_size_;
 
  private:
   bool is_timeout_expired() const { return is_timeout_expired_; }
@@ -231,6 +240,8 @@ void MediaCodecDecoderTest::CreateAudioDecoder() {
       task_runner_, base::Bind(&MediaCodecDecoderTest::OnDataRequested,
                                base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnStarvation, base::Unretained(this)),
+      base::Bind(&MediaCodecDecoderTest::OnDecoderDrained,
+                 base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnStopDone, base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnError, base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnUpdateCurrentTime,
@@ -245,6 +256,8 @@ void MediaCodecDecoderTest::CreateVideoDecoder() {
       task_runner_, base::Bind(&MediaCodecDecoderTest::OnDataRequested,
                                base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnStarvation, base::Unretained(this)),
+      base::Bind(&MediaCodecDecoderTest::OnDecoderDrained,
+                 base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnStopDone, base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnError, base::Unretained(this)),
       base::Bind(&MediaCodecDecoderTest::OnUpdateCurrentTime,
@@ -493,7 +506,10 @@ TEST_F(MediaCodecDecoderTest, AudioPlayTillCompletion) {
   EXPECT_TRUE(decoder_->IsCompleted());
 
   // Last buffered timestamp should be no less than PTS.
-  EXPECT_EQ(22, pts_stat_.num_values());
+  // The number of hits in pts_stat_ depends on the preroll implementation.
+  // We might not report the time for the first buffer after preroll that
+  // is written to the audio track. pts_stat_.num_values() is either 21 or 22.
+  EXPECT_LE(21, pts_stat_.num_values());
   EXPECT_LE(data_factory_->last_pts(), pts_stat_.max());
 
   DVLOG(0) << "AudioPlayTillCompletion stopping";
@@ -651,6 +667,61 @@ TEST_F(MediaCodecDecoderTest, DISABLED_AudioStarvationAndStop) {
 
   EXPECT_TRUE(decoder_->IsStopped());
   EXPECT_FALSE(decoder_->IsCompleted());
+}
+
+TEST_F(MediaCodecDecoderTest, VideoFirstUnitIsReconfig) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that the kConfigChanged unit that comes before the first data unit
+  // gets processed, i.e. is not lost.
+
+  CreateVideoDecoder();
+
+  base::TimeDelta duration = base::TimeDelta::FromMilliseconds(200);
+  base::TimeDelta timeout = base::TimeDelta::FromMilliseconds(1000);
+  SetDataFactory(scoped_ptr<VideoFactory>(new VideoFactory(duration)));
+
+  // Ask factory to produce initial configuration unit. The configuraton will
+  // be factory.GetConfigs().
+  data_factory_->RequestInitialConfigs();
+
+  // Create am alternative configuration (we just alter video size).
+  DemuxerConfigs alt_configs = data_factory_->GetConfigs();
+  alt_configs.video_size = gfx::Size(100, 100);
+
+  // Pass the alternative configuration to decoder.
+  decoder_->SetDemuxerConfigs(alt_configs);
+
+  // Prefetch.
+  decoder_->Prefetch(base::Bind(&MediaCodecDecoderTest::SetPrefetched,
+                                base::Unretained(this), true));
+
+  EXPECT_TRUE(WaitForCondition(base::Bind(&MediaCodecDecoderTest::is_prefetched,
+                                          base::Unretained(this))));
+
+  // Current implementation reports the new video size after
+  // SetDemuxerConfigs(), verify that it is alt size.
+  EXPECT_EQ(alt_configs.video_size, video_size_);
+
+  SetVideoSurface();
+
+  // Configure.
+  EXPECT_EQ(MediaCodecDecoder::kConfigOk, decoder_->Configure());
+
+  // Start.
+  EXPECT_TRUE(decoder_->Start(base::TimeDelta::FromMilliseconds(0)));
+
+  // Wait for completion.
+  EXPECT_TRUE(WaitForCondition(
+      base::Bind(&MediaCodecDecoderTest::is_stopped, base::Unretained(this)),
+      timeout));
+
+  EXPECT_TRUE(decoder_->IsStopped());
+  EXPECT_TRUE(decoder_->IsCompleted());
+  EXPECT_EQ(data_factory_->last_pts(), pts_stat_.max());
+
+  // Check that the reported video size is the one from the in-stream configs.
+  EXPECT_EQ(data_factory_->GetConfigs().video_size, video_size_);
 }
 
 }  // namespace media

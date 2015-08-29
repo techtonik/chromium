@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include "base/atomic_sequence_num.h"
 #include "base/bind.h"
 #include "base/location.h"
 #include "base/posix/eintr_wrapper.h"
@@ -26,6 +27,12 @@
 using base::AutoLock;
 
 namespace content {
+namespace {
+
+// Global atomic to generate unique transfer buffer IDs.
+base::StaticAtomicSequenceNumber g_next_transfer_buffer_id;
+
+}  // namespace
 
 GpuChannelHost::StreamFlushInfo::StreamFlushInfo()
     : flush_pending(false),
@@ -56,7 +63,6 @@ GpuChannelHost::GpuChannelHost(
     : factory_(factory),
       gpu_info_(gpu_info),
       gpu_memory_buffer_manager_(gpu_memory_buffer_manager) {
-  next_transfer_buffer_id_.GetNext();
   next_image_id_.GetNext();
   next_route_id_.GetNext();
   next_stream_id_.GetNext();
@@ -161,6 +167,7 @@ scoped_ptr<CommandBufferProxyImpl> GpuChannelHost::CreateViewCommandBuffer(
     const std::vector<int32>& attribs,
     const GURL& active_url,
     gfx::GpuPreference gpu_preference) {
+  DCHECK(!share_group || (stream_id == share_group->stream_id()));
   TRACE_EVENT1("gpu",
                "GpuChannelHost::CreateViewCommandBuffer",
                "surface_id",
@@ -169,10 +176,13 @@ scoped_ptr<CommandBufferProxyImpl> GpuChannelHost::CreateViewCommandBuffer(
   GPUCreateCommandBufferConfig init_params;
   init_params.share_group_id =
       share_group ? share_group->route_id() : MSG_ROUTING_NONE;
+  init_params.stream_id = stream_id;
   init_params.attribs = attribs;
   init_params.active_url = active_url;
   init_params.gpu_preference = gpu_preference;
+
   int32 route_id = GenerateRouteID();
+
   CreateCommandBufferResult result = factory_->CreateViewCommandBuffer(
       surface_id, init_params, route_id);
   if (result != CREATE_COMMAND_BUFFER_SUCCEEDED) {
@@ -207,15 +217,19 @@ scoped_ptr<CommandBufferProxyImpl> GpuChannelHost::CreateOffscreenCommandBuffer(
     const std::vector<int32>& attribs,
     const GURL& active_url,
     gfx::GpuPreference gpu_preference) {
+  DCHECK(!share_group || (stream_id == share_group->stream_id()));
   TRACE_EVENT0("gpu", "GpuChannelHost::CreateOffscreenCommandBuffer");
 
   GPUCreateCommandBufferConfig init_params;
   init_params.share_group_id =
       share_group ? share_group->route_id() : MSG_ROUTING_NONE;
+  init_params.stream_id = stream_id;
   init_params.attribs = attribs;
   init_params.active_url = active_url;
   init_params.gpu_preference = gpu_preference;
+
   int32 route_id = GenerateRouteID();
+
   bool succeeded = false;
   if (!Send(new GpuChannelMsg_CreateOffscreenCommandBuffer(
           size, init_params, route_id, &succeeded))) {
@@ -267,6 +281,7 @@ void GpuChannelHost::DestroyCommandBuffer(
   Send(new GpuChannelMsg_DestroyCommandBuffer(route_id));
   RemoveRoute(route_id);
 
+  AutoLock lock(context_lock_);
   if (stream_flush_info_[stream_id].route_id == route_id)
     stream_flush_info_.erase(stream_id);
 }
@@ -329,7 +344,8 @@ base::SharedMemoryHandle GpuChannelHost::ShareToGpuProcess(
 }
 
 int32 GpuChannelHost::ReserveTransferBufferId() {
-  return next_transfer_buffer_id_.GetNext();
+  // 0 is a reserved value.
+  return g_next_transfer_buffer_id.GetNext() + 1;
 }
 
 gfx::GpuMemoryBufferHandle GpuChannelHost::ShareGpuMemoryBufferToGpuProcess(

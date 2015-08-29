@@ -157,6 +157,14 @@ class MEDIA_EXPORT MediaCodecPlayer : public MediaPlayerAndroid,
 
   typedef base::Callback<void(int)> ErrorCallback;
 
+  // For testing only.
+  typedef base::Callback<void(DemuxerStream::Type,
+                              base::TimeDelta,
+                              base::TimeDelta)> DecodersTimeCallback;
+
+  // For testing only.
+  typedef base::Callback<void(DemuxerStream::Type)> CodecCreatedCallback;
+
   // Constructs a player with the given ID and demuxer. |manager| must outlive
   // the lifetime of this object.
   MediaCodecPlayer(int player_id,
@@ -193,6 +201,12 @@ class MEDIA_EXPORT MediaCodecPlayer : public MediaPlayerAndroid,
   void OnDemuxerDataAvailable(const DemuxerData& params) override;
   void OnDemuxerSeekDone(base::TimeDelta actual_browser_seek_time) override;
   void OnDemuxerDurationChanged(base::TimeDelta duration) override;
+
+  // For testing only.
+  void SetDecodersTimeCallbackForTests(DecodersTimeCallback cb);
+  void SetCodecCreatedCallbackForTests(CodecCreatedCallback cb);
+  void SetAlwaysReconfigureForTests(DemuxerStream::Type type);
+  bool IsPrerollingForTests(DemuxerStream::Type type) const;
 
  private:
   // The state machine states.
@@ -239,12 +253,15 @@ class MEDIA_EXPORT MediaCodecPlayer : public MediaPlayerAndroid,
   // Callbacks from decoders
   void RequestDemuxerData(DemuxerStream::Type stream_type);
   void OnPrefetchDone();
-  void OnStopDone();
+  void OnPrerollDone();
+  void OnDecoderDrained(DemuxerStream::Type type);
+  void OnStopDone(DemuxerStream::Type type);
   void OnError();
   void OnStarvation(DemuxerStream::Type stream_type);
   void OnTimeIntervalUpdate(DemuxerStream::Type stream_type,
                             base::TimeDelta now_playing,
-                            base::TimeDelta last_buffered);
+                            base::TimeDelta last_buffered,
+                            bool postpone);
 
   // Callbacks from video decoder
   void OnVideoCodecCreated();
@@ -262,6 +279,9 @@ class MEDIA_EXPORT MediaCodecPlayer : public MediaPlayerAndroid,
   void StartPrefetchDecoders();
   void StartPlaybackOrBrowserSeek();
   StartStatus StartPlaybackDecoders();
+  StartStatus ConfigureDecoders();
+  StartStatus MaybePrerollDecoders(bool* preroll_required);
+  StartStatus StartDecoders();
   void StopDecoders();
   void RequestToStopDecoders();
   void RequestDemuxerSeek(base::TimeDelta seek_time,
@@ -331,6 +351,9 @@ class MEDIA_EXPORT MediaCodecPlayer : public MediaPlayerAndroid,
 
   // Cached current time, accessed on UI thread.
   base::TimeDelta current_time_cache_;
+
+  // For testing only.
+  DecodersTimeCallback decoders_time_cb_;
 
   base::WeakPtr<MediaCodecPlayer> media_weak_this_;
   // NOTE: Weak pointers must be invalidated before all other member variables.

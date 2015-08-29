@@ -25,7 +25,7 @@ class FakeCompositorDependencies : public CompositorDependencies {
   bool IsLcdTextEnabled() override;
   bool IsDistanceFieldTextEnabled() override;
   bool IsZeroCopyEnabled() override;
-  bool IsOneCopyEnabled() override;
+  bool IsPersistentGpuMemoryBufferEnabled() override;
   bool IsElasticOverscrollEnabled() override;
   std::vector<unsigned> GetImageTextureTargets() override;
   scoped_refptr<base::SingleThreadTaskRunner>

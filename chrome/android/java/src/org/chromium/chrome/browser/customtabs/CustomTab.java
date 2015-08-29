@@ -7,6 +7,7 @@ package org.chromium.chrome.browser.customtabs;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ResolveInfo;
+import android.graphics.Rect;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.os.TransactionTooLargeException;
@@ -28,6 +29,7 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuParams;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationDelegateImpl;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
@@ -78,9 +80,19 @@ public class CustomTab extends ChromeTab {
             if (mCurrentState == STATE_WAITING_LOAD_START) {
                 mPageLoadStartedTimestamp = SystemClock.elapsedRealtime();
                 mCurrentState = STATE_WAITING_LOAD_FINISH;
+            } else if (mCurrentState == STATE_WAITING_LOAD_FINISH) {
+                mCustomTabsConnection.notifyNavigationEvent(
+                        mSession, CustomTabsCallback.NAVIGATION_ABORTED);
+                mPageLoadStartedTimestamp = SystemClock.elapsedRealtime();
             }
             mCustomTabsConnection.notifyNavigationEvent(
                     mSession, CustomTabsCallback.NAVIGATION_STARTED);
+        }
+
+        @Override
+        public void onShown(Tab tab) {
+            mCustomTabsConnection.notifyNavigationEvent(
+                    mSession, CustomTabsCallback.TAB_SHOWN);
         }
 
         @Override
@@ -108,8 +120,18 @@ public class CustomTab extends ChromeTab {
         }
 
         @Override
+        public void onDidAttachInterstitialPage(Tab tab) {
+            if (tab.getSecurityLevel() != ConnectionSecurityLevel.SECURITY_ERROR) return;
+            resetPageLoadTracking();
+            mCustomTabsConnection.notifyNavigationEvent(
+                    mSession, CustomTabsCallback.NAVIGATION_FAILED);
+        }
+
+        @Override
         public void onPageLoadFailed(Tab tab, int errorCode) {
             resetPageLoadTracking();
+            mCustomTabsConnection.notifyNavigationEvent(
+                    mSession, CustomTabsCallback.NAVIGATION_FAILED);
         }
 
         private void resetPageLoadTracking() {
@@ -130,18 +152,27 @@ public class CustomTab extends ChromeTab {
             };
 
     private CustomTabObserver mTabObserver;
+    private final boolean mEnableUrlBarHiding;
+    private boolean mShouldReplaceCurrentEntry;
 
     /**
-     * Construct an CustomTab. It might load a prerendered {@link WebContents} for the URL, if
-     * {@link CustomTabsConnectionService} has successfully warmed up for the url.
+     * Construct an CustomTab. Note that url and referrer given here is only used to retrieve a
+     * prerendered web contents if it exists. It might load a prerendered {@link WebContents} for
+     * the URL, if {@link CustomTabsConnectionService} has successfully warmed up for the url.
      */
     public CustomTab(ChromeActivity activity, WindowAndroid windowAndroid, IBinder session,
-            String url, String referrer, int parentTabId) {
+            String url, String referrer, int parentTabId, boolean enableUrlBarHiding) {
         super(TabIdManager.getInstance().generateValidId(Tab.INVALID_TAB_ID), activity, false,
                 windowAndroid, TabLaunchType.FROM_EXTERNAL_APP, parentTabId, null, null);
+        mEnableUrlBarHiding = enableUrlBarHiding;
         CustomTabsConnection customTabsConnection =
                 CustomTabsConnection.getInstance(activity.getApplication());
         WebContents webContents = customTabsConnection.takePrerenderedUrl(session, url, referrer);
+        if (webContents == null) {
+            webContents = customTabsConnection.takeSpareWebContents();
+            // TODO(lizeb): Remove this once crbug.com/521729 is fixed.
+            if (webContents != null) mShouldReplaceCurrentEntry = true;
+        }
         if (webContents == null) {
             webContents = WebContentsFactory.createWebContents(isIncognito(), false);
         }
@@ -160,6 +191,8 @@ public class CustomTab extends ChromeTab {
      */
     void loadUrlAndTrackFromTimestamp(LoadUrlParams params, long timestamp) {
         mTabObserver.trackNextPageLoadFromTimestamp(timestamp);
+        if (mShouldReplaceCurrentEntry) params.setShouldReplaceCurrentEntry(true);
+        mShouldReplaceCurrentEntry = false;
         loadUrl(params);
     }
 
@@ -176,6 +209,11 @@ public class CustomTab extends ChromeTab {
     @VisibleForTesting
     ExternalNavigationHandler getExternalNavigationHandler() {
         return mNavigationHandler;
+    }
+
+    @Override
+    protected boolean isHidingTopControlsEnabled() {
+        return mEnableUrlBarHiding && super.isHidingTopControlsEnabled();
     }
 
     /**
@@ -200,7 +238,7 @@ public class CustomTab extends ChromeTab {
                 String linkUrl = params.getLinkUrl();
                 if (linkUrl != null) linkUrl = linkUrl.trim();
                 if (!TextUtils.isEmpty(linkUrl)) {
-                    menu.add(Menu.NONE, org.chromium.chrome.R.id.contextmenu_copy_link_address_text,
+                    menu.add(Menu.NONE, org.chromium.chrome.R.id.contextmenu_copy_link_address,
                             Menu.NONE, org.chromium.chrome.R.string.contextmenu_copy_link_address);
                 }
 
@@ -297,7 +335,7 @@ public class CustomTab extends ChromeTab {
 
         private static void logTransactionTooLargeOrRethrow(RuntimeException e, Intent intent) {
             // See http://crbug.com/369574.
-            if (e.getCause() != null && e.getCause() instanceof TransactionTooLargeException) {
+            if (e.getCause() instanceof TransactionTooLargeException) {
                 Log.e(TAG, "Could not resolve Activity for intent " + intent.toString(), e);
             } else {
                 throw e;
@@ -305,4 +343,39 @@ public class CustomTab extends ChromeTab {
         }
     }
 
+    @Override
+    protected TabChromeWebContentsDelegateAndroid createWebContentsDelegate() {
+        return new TabChromeWebContentsDelegateAndroidImpl() {
+            private String mTargetUrl;
+
+            @Override
+            public boolean shouldResumeRequestsForCreatedWindow() {
+                return true;
+            }
+
+            @Override
+            public void webContentsCreated(WebContents sourceWebContents, long openerRenderFrameId,
+                    String frameName, String targetUrl, WebContents newWebContents) {
+                super.webContentsCreated(
+                        sourceWebContents, openerRenderFrameId, frameName, targetUrl,
+                        newWebContents);
+                mTargetUrl = targetUrl;
+            }
+
+            @Override
+            public boolean addNewContents(WebContents sourceWebContents, WebContents webContents,
+                    int disposition, Rect initialPosition, boolean userGesture) {
+                assert mTargetUrl != null;
+                loadUrlAndTrackFromTimestamp(
+                        new LoadUrlParams(mTargetUrl), SystemClock.elapsedRealtime());
+                mTargetUrl = null;
+                return false;
+            }
+
+            @Override
+            protected void bringActivityToForeground() {
+                // No-op here. If client's task is in background Chrome is unable to foreground it.
+            }
+        };
+    }
 }

@@ -6,6 +6,7 @@
 
 #include "base/guid.h"
 #include "base/stl_util.h"
+#include "base/time/time.h"
 #include "content/browser/frame_host/frame_tree.h"
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
@@ -332,6 +333,7 @@ scoped_ptr<ServiceWorkerRequestHandler>
 ServiceWorkerProviderHost::CreateRequestHandler(
     FetchRequestMode request_mode,
     FetchCredentialsMode credentials_mode,
+    FetchRedirectMode redirect_mode,
     ResourceType resource_type,
     RequestContextType request_context_type,
     RequestContextFrameType frame_type,
@@ -345,15 +347,10 @@ ServiceWorkerProviderHost::CreateRequestHandler(
   if (ServiceWorkerUtils::IsMainResourceType(resource_type) ||
       controlling_version()) {
     return scoped_ptr<ServiceWorkerRequestHandler>(
-        new ServiceWorkerControlleeRequestHandler(context_,
-                                                  AsWeakPtr(),
-                                                  blob_storage_context,
-                                                  request_mode,
-                                                  credentials_mode,
-                                                  resource_type,
-                                                  request_context_type,
-                                                  frame_type,
-                                                  body));
+        new ServiceWorkerControlleeRequestHandler(
+            context_, AsWeakPtr(), blob_storage_context, request_mode,
+            credentials_mode, redirect_mode, resource_type,
+            request_context_type, frame_type, body));
   }
   return scoped_ptr<ServiceWorkerRequestHandler>();
 }
@@ -447,11 +444,11 @@ ServiceWorkerClientInfo ServiceWorkerProviderHost::GetWindowClientInfoOnUI(
   // for a frame that is actually being navigated and isn't exactly what we are
   // expecting.
   return ServiceWorkerClientInfo(
-      render_frame_host->GetVisibilityState(),
-      render_frame_host->IsFocused(),
+      render_frame_host->GetVisibilityState(), render_frame_host->IsFocused(),
       render_frame_host->GetLastCommittedURL(),
       render_frame_host->GetParent() ? REQUEST_CONTEXT_FRAME_TYPE_NESTED
                                      : REQUEST_CONTEXT_FRAME_TYPE_TOP_LEVEL,
+      render_frame_host->frame_tree_node()->last_focus_time(),
       blink::WebServiceWorkerClientTypeWindow);
 }
 
@@ -626,7 +623,7 @@ void ServiceWorkerProviderHost::SendAssociateRegistrationMessage() {
     return;
 
   ServiceWorkerRegistrationHandle* handle =
-      dispatcher_host_->GetOrCreateRegistrationHandle(
+      dispatcher_host_->CreateRegistrationHandle(
           AsWeakPtr(), associated_registration_.get());
 
   ServiceWorkerVersionAttributes attrs;

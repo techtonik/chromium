@@ -6,22 +6,33 @@
 #define CHROME_BROWSER_UI_BROWSER_DIALOGS_H_
 
 #include "base/callback.h"
+#include "chrome/browser/ui/bookmarks/bookmark_editor.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/native_widget_types.h"
 
 class Browser;
+class GURL;
 class LoginHandler;
 class Profile;
 class SkBitmap;
 
+namespace bookmarks {
+class BookmarkBubbleObserver;
+}
+
 namespace content {
 class BrowserContext;
 class ColorChooser;
+struct SSLStatus;
 class WebContents;
 }
 
 namespace extensions {
 class Extension;
+}
+
+namespace gfx {
+class Point;
 }
 
 namespace net {
@@ -81,6 +92,23 @@ content::ColorChooser* ShowColorChooser(content::WebContents* web_contents,
 // dialog using one of the functions below, rather than showing a Cocoa dialog.
 bool ToolkitViewsDialogsEnabled();
 
+// Shows a Views website settings bubble at the given anchor point.
+void ShowWebsiteSettingsBubbleViewsAtPoint(const gfx::Point& anchor_point,
+                                           Profile* profile,
+                                           content::WebContents* web_contents,
+                                           const GURL& url,
+                                           const content::SSLStatus& ssl);
+
+// Show a Views bookmark bubble at the given point. This occurs when the
+// bookmark star is clicked or "Bookmark This Page..." is selected from a menu
+// or via a key equivalent.
+void ShowBookmarkBubbleViewsAtPoint(const gfx::Point& anchor_point,
+                                    gfx::NativeView parent,
+                                    bookmarks::BookmarkBubbleObserver* observer,
+                                    Browser* browser,
+                                    const GURL& url,
+                                    bool newly_bookmarked);
+
 #endif  // OS_MACOSX
 
 #if defined(TOOLKIT_VIEWS)
@@ -88,6 +116,12 @@ bool ToolkitViewsDialogsEnabled();
 // Creates a toolkit-views based LoginHandler (e.g. HTTP-Auth dialog).
 LoginHandler* CreateLoginHandlerViews(net::AuthChallengeInfo* auth_info,
                                       net::URLRequest* request);
+
+// Shows the toolkit-views based BookmarkEditor.
+void ShowBookmarkEditorViews(gfx::NativeWindow parent_window,
+                             Profile* profile,
+                             const BookmarkEditor::EditDetails& details,
+                             BookmarkEditor::Configuration configuration);
 
 #endif  // TOOLKIT_VIEWS
 

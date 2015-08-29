@@ -292,7 +292,8 @@ void RenderWidgetHostViewChildFrame::OnSwapCompositorFrame(
   ack_pending_count_++;
   // If this value grows very large, something is going wrong.
   DCHECK(ack_pending_count_ < 1000);
-  surface_factory_->SubmitFrame(surface_id_, frame.Pass(), ack_callback);
+  surface_factory_->SubmitCompositorFrame(surface_id_, frame.Pass(),
+                                          ack_callback);
 }
 
 void RenderWidgetHostViewChildFrame::GetScreenInfo(
@@ -300,6 +301,15 @@ void RenderWidgetHostViewChildFrame::GetScreenInfo(
   if (!frame_connector_)
     return;
   frame_connector_->GetScreenInfo(results);
+}
+
+bool RenderWidgetHostViewChildFrame::GetScreenColorProfile(
+    std::vector<char>* color_profile) {
+  if (!frame_connector_)
+    return false;
+  DCHECK(color_profile->empty());
+  NOTIMPLEMENTED(); // TODO(port): Implement.
+  return false;
 }
 
 gfx::Rect RenderWidgetHostViewChildFrame::GetBoundsInRootWindow() {

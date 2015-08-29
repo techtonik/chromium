@@ -10,7 +10,7 @@
 #include "content/browser/frame_host/navigation_entry_impl.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/browser/frame_host/render_frame_proxy_host.h"
-#include "content/browser/media/audio_state_provider.h"
+#include "content/browser/media/audio_stream_monitor.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/site_instance_impl.h"
 #include "content/browser/webui/content_web_ui_controller_factory.h"
@@ -1096,25 +1096,30 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationPreempted) {
   EXPECT_EQ(nullptr, contents()->GetPendingMainFrame());
 }
 
+// Tests that if we go back twice (same-site then cross-site), and the same-site
+// RFH commits first, the cross-site RFH's navigation is canceled.
+// TODO(avi,creis): Consider changing this behavior to better match the user's
+// intent.
 TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
   // Start with a web ui page, which gets a new RVH with WebUI bindings.
-  const GURL url1("chrome://gpu");
+  GURL url1(std::string(kChromeUIScheme) + "://" +
+            std::string(kChromeUIGpuHost));
   controller().LoadURL(
       url1, Referrer(), ui::PAGE_TRANSITION_TYPED, std::string());
   int entry_id = controller().GetPendingEntry()->GetUniqueID();
-  TestRenderFrameHost* ntp_rfh = contents()->GetMainFrame();
-  ntp_rfh->PrepareForCommit();
-  contents()->TestDidNavigate(ntp_rfh, 1, entry_id, true, url1,
+  TestRenderFrameHost* webui_rfh = contents()->GetMainFrame();
+  webui_rfh->PrepareForCommit();
+  contents()->TestDidNavigate(webui_rfh, 1, entry_id, true, url1,
                               ui::PAGE_TRANSITION_TYPED);
   NavigationEntry* entry1 = controller().GetLastCommittedEntry();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
   EXPECT_FALSE(contents()->CrossProcessNavigationPending());
-  EXPECT_EQ(ntp_rfh, contents()->GetMainFrame());
+  EXPECT_EQ(webui_rfh, contents()->GetMainFrame());
   EXPECT_EQ(url1, entry1->GetURL());
   EXPECT_EQ(instance1,
             NavigationEntryImpl::FromNavigationEntry(entry1)->site_instance());
-  EXPECT_TRUE(ntp_rfh->GetRenderViewHost()->GetEnabledBindings() &
+  EXPECT_TRUE(webui_rfh->GetRenderViewHost()->GetEnabledBindings() &
               BINDINGS_POLICY_WEB_UI);
 
   // Navigate to new site.
@@ -1126,9 +1131,8 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
   TestRenderFrameHost* google_rfh = contents()->GetPendingMainFrame();
 
   // Simulate beforeunload approval.
-  EXPECT_TRUE(ntp_rfh->is_waiting_for_beforeunload_ack());
-  base::TimeTicks now = base::TimeTicks::Now();
-  ntp_rfh->PrepareForCommit();
+  EXPECT_TRUE(webui_rfh->is_waiting_for_beforeunload_ack());
+  webui_rfh->PrepareForCommit();
 
   // DidNavigate from the pending page.
   contents()->TestDidNavigate(google_rfh, 1, entry_id, true, url2,
@@ -1180,7 +1184,7 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
 
   // Simulate beforeunload approval.
   EXPECT_TRUE(google_rfh->is_waiting_for_beforeunload_ack());
-  now = base::TimeTicks::Now();
+  base::TimeTicks now = base::TimeTicks::Now();
   google_rfh->PrepareForCommit();
   google_rfh->OnMessageReceived(
       FrameHostMsg_BeforeUnload_ACK(0, true, now, now));
@@ -1203,6 +1207,103 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
   EXPECT_EQ(instance1,
             NavigationEntryImpl::FromNavigationEntry(entry1)->site_instance());
   EXPECT_EQ(url1, entry1->GetURL());
+}
+
+// Tests that if we go back twice (same-site then cross-site), and the cross-
+// site RFH commits first, we ignore the now-swapped-out RFH's commit.
+TEST_F(WebContentsImplTest, CrossSiteNavigationBackOldNavigationIgnored) {
+  // Start with a web ui page, which gets a new RVH with WebUI bindings.
+  GURL url1(std::string(kChromeUIScheme) + "://" +
+            std::string(kChromeUIGpuHost));
+  controller().LoadURL(url1, Referrer(), ui::PAGE_TRANSITION_TYPED,
+                       std::string());
+  int entry_id = controller().GetPendingEntry()->GetUniqueID();
+  TestRenderFrameHost* webui_rfh = contents()->GetMainFrame();
+  webui_rfh->PrepareForCommit();
+  contents()->TestDidNavigate(webui_rfh, 1, entry_id, true, url1,
+                              ui::PAGE_TRANSITION_TYPED);
+  NavigationEntry* entry1 = controller().GetLastCommittedEntry();
+  SiteInstance* instance1 = contents()->GetSiteInstance();
+
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+  EXPECT_EQ(webui_rfh, contents()->GetMainFrame());
+  EXPECT_EQ(url1, entry1->GetURL());
+  EXPECT_EQ(instance1,
+            NavigationEntryImpl::FromNavigationEntry(entry1)->site_instance());
+  EXPECT_TRUE(webui_rfh->GetRenderViewHost()->GetEnabledBindings() &
+              BINDINGS_POLICY_WEB_UI);
+
+  // Navigate to new site.
+  const GURL url2("http://www.google.com");
+  controller().LoadURL(url2, Referrer(), ui::PAGE_TRANSITION_TYPED,
+                       std::string());
+  entry_id = controller().GetPendingEntry()->GetUniqueID();
+  EXPECT_TRUE(contents()->CrossProcessNavigationPending());
+  TestRenderFrameHost* google_rfh = contents()->GetPendingMainFrame();
+
+  // Simulate beforeunload approval.
+  EXPECT_TRUE(webui_rfh->is_waiting_for_beforeunload_ack());
+  webui_rfh->PrepareForCommit();
+
+  // DidNavigate from the pending page.
+  contents()->TestDidNavigate(google_rfh, 1, entry_id, true, url2,
+                              ui::PAGE_TRANSITION_TYPED);
+  NavigationEntry* entry2 = controller().GetLastCommittedEntry();
+  SiteInstance* instance2 = contents()->GetSiteInstance();
+
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+  EXPECT_EQ(google_rfh, contents()->GetMainFrame());
+  EXPECT_NE(instance1, instance2);
+  EXPECT_FALSE(contents()->GetPendingMainFrame());
+  EXPECT_EQ(url2, entry2->GetURL());
+  EXPECT_EQ(instance2,
+            NavigationEntryImpl::FromNavigationEntry(entry2)->site_instance());
+  EXPECT_FALSE(google_rfh->GetRenderViewHost()->GetEnabledBindings() &
+               BINDINGS_POLICY_WEB_UI);
+
+  // Navigate to third page on same site.
+  const GURL url3("http://news.google.com");
+  controller().LoadURL(url3, Referrer(), ui::PAGE_TRANSITION_TYPED,
+                       std::string());
+  entry_id = controller().GetPendingEntry()->GetUniqueID();
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+  contents()->GetMainFrame()->PrepareForCommit();
+  contents()->TestDidNavigate(google_rfh, 2, entry_id, true, url3,
+                              ui::PAGE_TRANSITION_TYPED);
+  NavigationEntry* entry3 = controller().GetLastCommittedEntry();
+  SiteInstance* instance3 = contents()->GetSiteInstance();
+
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+  EXPECT_EQ(google_rfh, contents()->GetMainFrame());
+  EXPECT_EQ(instance2, instance3);
+  EXPECT_FALSE(contents()->GetPendingMainFrame());
+  EXPECT_EQ(url3, entry3->GetURL());
+  EXPECT_EQ(instance3,
+            NavigationEntryImpl::FromNavigationEntry(entry3)->site_instance());
+
+  // Go back within the site.
+  controller().GoBack();
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+  EXPECT_EQ(entry2, controller().GetPendingEntry());
+
+  // Before that commits, go back again.
+  controller().GoBack();
+  EXPECT_TRUE(contents()->CrossProcessNavigationPending());
+  EXPECT_TRUE(contents()->GetPendingMainFrame());
+  EXPECT_EQ(entry1, controller().GetPendingEntry());
+  webui_rfh = contents()->GetPendingMainFrame();
+
+  // DidNavigate from the second back.
+  contents()->TestDidNavigate(webui_rfh, 1, entry1->GetUniqueID(), false, url1,
+                              ui::PAGE_TRANSITION_TYPED);
+
+  // That should have landed us on the first entry.
+  EXPECT_EQ(entry1, controller().GetLastCommittedEntry());
+
+  // When the second back commits, it should be ignored.
+  contents()->TestDidNavigate(google_rfh, 1, entry2->GetUniqueID(), false, url2,
+                              ui::PAGE_TRANSITION_TYPED);
+  EXPECT_EQ(entry1, controller().GetLastCommittedEntry());
 }
 
 // Test that during a slow cross-site navigation, a sub-frame navigation in the
@@ -3070,23 +3171,23 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
   EXPECT_FALSE(contents()->has_video_power_save_blocker_for_testing());
 
   TestRenderFrameHost* rfh = contents()->GetMainFrame();
-  AudioStateProvider* audio_state = contents()->audio_state_provider();
+  AudioStreamMonitor* monitor = contents()->audio_stream_monitor();
 
   // Ensure RenderFrame is initialized before simulating events coming from it.
   main_test_rfh()->InitializeRenderFrameIfNeeded();
 
   // The audio power save blocker should not be based on having a media player
   // when audio stream monitoring is available.
-  if (audio_state->IsAudioStateAvailable()) {
+  if (AudioStreamMonitor::monitoring_available()) {
     // Send a fake audio stream monitor notification.  The audio power save
     // blocker should be created.
-    audio_state->set_was_recently_audible_for_testing(true);
+    monitor->set_was_recently_audible_for_testing(true);
     contents()->NotifyNavigationStateChanged(INVALIDATE_TYPE_TAB);
     EXPECT_TRUE(contents()->has_audio_power_save_blocker_for_testing());
 
     // Send another fake notification, this time when WasRecentlyAudible() will
     // be false.  The power save blocker should be released.
-    audio_state->set_was_recently_audible_for_testing(false);
+    monitor->set_was_recently_audible_for_testing(false);
     contents()->NotifyNavigationStateChanged(INVALIDATE_TYPE_TAB);
     EXPECT_FALSE(contents()->has_audio_power_save_blocker_for_testing());
   }
@@ -3098,7 +3199,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       0, kPlayerAudioVideoId, true, true, false));
   EXPECT_TRUE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Upon hiding the video power save blocker should be released.
   contents()->WasHidden();
@@ -3111,7 +3212,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       0, kPlayerVideoOnlyId, true, false, false));
   EXPECT_FALSE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Showing the WebContents should result in the creation of the blocker.
   contents()->WasShown();
@@ -3123,7 +3224,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       0, kPlayerAudioOnlyId, false, true, false));
   EXPECT_TRUE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Start a remote player. There should be no change in the power save
   // blockers.
@@ -3131,7 +3232,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       0, kPlayerRemoteId, true, true, true));
   EXPECT_TRUE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Destroy the original audio video player.  Both power save blockers should
   // remain.
@@ -3139,7 +3240,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       FrameHostMsg_MediaPausedNotification(0, kPlayerAudioVideoId));
   EXPECT_TRUE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Destroy the audio only player.  The video power save blocker should remain.
   rfh->OnMessageReceived(
@@ -3166,7 +3267,7 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
       0, kPlayerAudioVideoId, true, true, false));
   EXPECT_TRUE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_EQ(contents()->has_audio_power_save_blocker_for_testing(),
-            !audio_state->IsAudioStateAvailable());
+            !AudioStreamMonitor::monitoring_available());
 
   // Crash the renderer.
   contents()->GetMainFrame()->GetProcess()->SimulateCrash();

@@ -19,6 +19,8 @@
         '../ui/gfx/gfx.gyp:gfx',
         '../url/url.gyp:url_lib',
         'bookmarks_browser',
+        'crash_keys',  # TODO(mpearson): remove once 464926 is fixed.
+        'metrics',
         'component_metrics_proto',
         'components_resources.gyp:components_resources',
         'components_strings.gyp:components_strings',
@@ -99,6 +101,8 @@
         'omnibox/browser/omnibox_field_trial.h',
         'omnibox/browser/omnibox_log.cc',
         'omnibox/browser/omnibox_log.h',
+        'omnibox/browser/omnibox_metrics_provider.cc',
+        'omnibox/browser/omnibox_metrics_provider.h',
         'omnibox/browser/omnibox_navigation_observer.h',
         'omnibox/browser/omnibox_popup_model.cc',
         'omnibox/browser/omnibox_popup_model.h',

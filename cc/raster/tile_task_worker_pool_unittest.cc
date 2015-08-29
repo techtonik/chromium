@@ -18,7 +18,6 @@
 #include "cc/raster/gpu_rasterizer.h"
 #include "cc/raster/gpu_tile_task_worker_pool.h"
 #include "cc/raster/one_copy_tile_task_worker_pool.h"
-#include "cc/raster/pixel_buffer_tile_task_worker_pool.h"
 #include "cc/raster/raster_buffer.h"
 #include "cc/raster/tile_task_runner.h"
 #include "cc/raster/zero_copy_tile_task_worker_pool.h"
@@ -39,15 +38,10 @@
 namespace cc {
 namespace {
 
-const size_t kMaxTransferBufferUsageBytes = 10000U;
 const size_t kMaxBytesPerCopyOperation = 1000U;
-
-// A resource of this dimension^2 * 4 must be greater than the above transfer
-// buffer constant.
-const size_t kLargeResourceDimension = 1000U;
+const size_t kMaxStagingBuffers = 32U;
 
 enum TileTaskWorkerPoolType {
-  TILE_TASK_WORKER_POOL_TYPE_PIXEL_BUFFER,
   TILE_TASK_WORKER_POOL_TYPE_ZERO_COPY,
   TILE_TASK_WORKER_POOL_TYPE_ONE_COPY,
   TILE_TASK_WORKER_POOL_TYPE_GPU,
@@ -150,13 +144,6 @@ class TileTaskWorkerPoolTest
   // Overridden from testing::Test:
   void SetUp() override {
     switch (GetParam()) {
-      case TILE_TASK_WORKER_POOL_TYPE_PIXEL_BUFFER:
-        Create3dOutputSurfaceAndResourceProvider();
-        tile_task_worker_pool_ = PixelBufferTileTaskWorkerPool::Create(
-            base::ThreadTaskRunnerHandle::Get().get(), &task_graph_runner_,
-            context_provider_.get(), resource_provider_.get(),
-            kMaxTransferBufferUsageBytes);
-        break;
       case TILE_TASK_WORKER_POOL_TYPE_ZERO_COPY:
         Create3dOutputSurfaceAndResourceProvider();
         tile_task_worker_pool_ = ZeroCopyTileTaskWorkerPool::Create(
@@ -165,12 +152,10 @@ class TileTaskWorkerPoolTest
         break;
       case TILE_TASK_WORKER_POOL_TYPE_ONE_COPY:
         Create3dOutputSurfaceAndResourceProvider();
-        staging_resource_pool_ = ResourcePool::Create(resource_provider_.get(),
-                                                      GL_TEXTURE_2D);
         tile_task_worker_pool_ = OneCopyTileTaskWorkerPool::Create(
             base::ThreadTaskRunnerHandle::Get().get(), &task_graph_runner_,
             context_provider_.get(), resource_provider_.get(),
-            staging_resource_pool_.get(), kMaxBytesPerCopyOperation, false);
+            kMaxBytesPerCopyOperation, false, kMaxStagingBuffers);
         break;
       case TILE_TASK_WORKER_POOL_TYPE_GPU:
         Create3dOutputSurfaceAndResourceProvider();
@@ -208,10 +193,6 @@ class TileTaskWorkerPoolTest
       EXPECT_TRUE((~completed_task_sets_).none());
       all_tile_tasks_finished_.Schedule();
     }
-  }
-
-  TaskSetCollection TasksThatShouldBeForcedToComplete() const override {
-    return TaskSetCollection();
   }
 
   void RunMessageLoopUntilAllTasksHaveCompleted() {
@@ -332,7 +313,6 @@ class TileTaskWorkerPoolTest
   FakeOutputSurfaceClient output_surface_client_;
   scoped_ptr<FakeOutputSurface> output_surface_;
   scoped_ptr<ResourceProvider> resource_provider_;
-  scoped_ptr<ResourcePool> staging_resource_pool_;
   scoped_ptr<TileTaskWorkerPool> tile_task_worker_pool_;
   TestGpuMemoryBufferManager gpu_memory_buffer_manager_;
   TestSharedBitmapManager shared_bitmap_manager_;
@@ -397,30 +377,6 @@ TEST_P(TileTaskWorkerPoolTest, FalseThrottling) {
   RunMessageLoopUntilAllTasksHaveCompleted();
 }
 
-TEST_P(TileTaskWorkerPoolTest, LargeResources) {
-  gfx::Size size(kLargeResourceDimension, kLargeResourceDimension);
-
-  {
-    // Verify a resource of this size is larger than the transfer buffer.
-    scoped_ptr<ScopedResource> resource(
-        ScopedResource::Create(resource_provider_.get()));
-    resource->Allocate(size, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
-                       RGBA_8888);
-    EXPECT_GE(ResourceUtil::UncheckedSizeInBytes<size_t>(resource->size(),
-                                                         resource->format()),
-              kMaxTransferBufferUsageBytes);
-  }
-
-  AppendTask(0u, size);
-  AppendTask(1u, size);
-  AppendTask(2u, size);
-  ScheduleTasks();
-
-  // This will time out if a resource that is larger than the throttle limit
-  // never gets scheduled.
-  RunMessageLoopUntilAllTasksHaveCompleted();
-}
-
 TEST_P(TileTaskWorkerPoolTest, LostContext) {
   LoseContext(output_surface_->context_provider());
   LoseContext(output_surface_->worker_context_provider());
@@ -451,14 +407,12 @@ TEST_P(TileTaskWorkerPoolTest, ScheduleEmptyStillTriggersCallback) {
   EXPECT_TRUE(completed_task_sets_[ALL]);
 }
 
-INSTANTIATE_TEST_CASE_P(
-    TileTaskWorkerPoolTests,
-    TileTaskWorkerPoolTest,
-    ::testing::Values(TILE_TASK_WORKER_POOL_TYPE_PIXEL_BUFFER,
-                      TILE_TASK_WORKER_POOL_TYPE_ZERO_COPY,
-                      TILE_TASK_WORKER_POOL_TYPE_ONE_COPY,
-                      TILE_TASK_WORKER_POOL_TYPE_GPU,
-                      TILE_TASK_WORKER_POOL_TYPE_BITMAP));
+INSTANTIATE_TEST_CASE_P(TileTaskWorkerPoolTests,
+                        TileTaskWorkerPoolTest,
+                        ::testing::Values(TILE_TASK_WORKER_POOL_TYPE_ZERO_COPY,
+                                          TILE_TASK_WORKER_POOL_TYPE_ONE_COPY,
+                                          TILE_TASK_WORKER_POOL_TYPE_GPU,
+                                          TILE_TASK_WORKER_POOL_TYPE_BITMAP));
 
 }  // namespace
 }  // namespace cc

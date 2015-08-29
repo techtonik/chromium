@@ -302,7 +302,8 @@ void RenderWidgetCompositor::Initialize() {
   settings.use_distance_field_text =
       compositor_deps_->IsDistanceFieldTextEnabled();
   settings.use_zero_copy = compositor_deps_->IsZeroCopyEnabled();
-  settings.use_one_copy = compositor_deps_->IsOneCopyEnabled();
+  settings.use_persistent_map_for_gpu_memory_buffers =
+      compositor_deps_->IsPersistentGpuMemoryBufferEnabled();
   settings.enable_elastic_overscroll =
       compositor_deps_->IsElasticOverscrollEnabled();
   settings.use_image_texture_targets =
@@ -373,18 +374,6 @@ void RenderWidgetCompositor::Initialize() {
   settings.invert_viewport_scroll_order =
       cmd->HasSwitch(switches::kInvertViewportScrollOrder);
 
-  if (cmd->HasSwitch(cc::switches::kMaxUnusedResourceMemoryUsagePercentage)) {
-    int max_unused_resource_memory_percentage;
-    if (GetSwitchValueAsInt(
-            *cmd,
-            cc::switches::kMaxUnusedResourceMemoryUsagePercentage,
-            0, 100,
-            &max_unused_resource_memory_percentage)) {
-      settings.max_unused_resource_memory_percentage =
-          max_unused_resource_memory_percentage;
-    }
-  }
-
   settings.strict_layer_property_change_checking =
       cmd->HasSwitch(cc::switches::kStrictLayerPropertyChangeChecking);
 
@@ -399,7 +388,6 @@ void RenderWidgetCompositor::Initialize() {
   settings.using_synchronous_renderer_compositor =
       synchronous_compositor_factory;
   settings.record_full_layer = widget_->DoesRecordFullLayer();
-  settings.max_partial_texture_updates = 0;
   if (synchronous_compositor_factory) {
     // Android WebView uses system scrollbars, so make ours invisible.
     settings.scrollbar_animator = cc::LayerTreeSettings::NO_ANIMATOR;
@@ -419,7 +407,7 @@ void RenderWidgetCompositor::Initialize() {
   // low end, so always use default policy.
   bool use_low_memory_policy =
       base::SysInfo::IsLowEndDevice() && !synchronous_compositor_factory;
-  // RGBA_4444 textures are only enabled for low end devices
+  // RGBA_4444 textures are only enabled by default for low end devices
   // and are disabled for Android WebView as it doesn't support the format.
   settings.renderer_settings.use_rgba_4444_textures = use_low_memory_policy;
   if (use_low_memory_policy) {
@@ -462,11 +450,21 @@ void RenderWidgetCompositor::Initialize() {
   if (cmd->HasSwitch(cc::switches::kEnableBeginFrameScheduling))
     settings.use_external_begin_frame_source = true;
 
+  settings.renderer_settings.use_rgba_4444_textures |=
+      cmd->HasSwitch(switches::kEnableRGBA4444Textures);
+  settings.renderer_settings.use_rgba_4444_textures &=
+      !cmd->HasSwitch(switches::kDisableRGBA4444Textures);
+
   if (widget_->for_oopif()) {
     // TODO(simonhong): Apply BeginFrame scheduling for OOPIF.
     // See crbug.com/471411.
     settings.use_external_begin_frame_source = false;
   }
+
+  settings.max_staging_buffers = 32;
+  // Use 1/4th of staging buffers on low-end devices.
+  if (base::SysInfo::IsLowEndDevice())
+    settings.max_staging_buffers /= 4;
 
   scoped_refptr<base::SingleThreadTaskRunner> compositor_thread_task_runner =
       compositor_deps_->GetCompositorImplThreadTaskRunner();

@@ -1160,15 +1160,28 @@ void GL_APIENTRY GLES2GetQueryivEXT(GLenum target,
                                     GLint* params) {
   gles2::GetGLContext()->GetQueryivEXT(target, pname, params);
 }
+void GL_APIENTRY GLES2GetQueryObjectivEXT(GLuint id,
+                                          GLenum pname,
+                                          GLint* params) {
+  gles2::GetGLContext()->GetQueryObjectivEXT(id, pname, params);
+}
 void GL_APIENTRY GLES2GetQueryObjectuivEXT(GLuint id,
                                            GLenum pname,
                                            GLuint* params) {
   gles2::GetGLContext()->GetQueryObjectuivEXT(id, pname, params);
 }
+void GL_APIENTRY GLES2GetQueryObjecti64vEXT(GLuint id,
+                                            GLenum pname,
+                                            GLint64* params) {
+  gles2::GetGLContext()->GetQueryObjecti64vEXT(id, pname, params);
+}
 void GL_APIENTRY GLES2GetQueryObjectui64vEXT(GLuint id,
                                              GLenum pname,
                                              GLuint64* params) {
   gles2::GetGLContext()->GetQueryObjectui64vEXT(id, pname, params);
+}
+void GL_APIENTRY GLES2SetDisjointValueSyncCHROMIUM() {
+  gles2::GetGLContext()->SetDisjointValueSyncCHROMIUM();
 }
 void GL_APIENTRY GLES2InsertEventMarkerEXT(GLsizei length,
                                            const GLchar* marker) {
@@ -1361,6 +1374,18 @@ void GL_APIENTRY GLES2CompressedCopyTextureCHROMIUM(GLenum target,
   gles2::GetGLContext()->CompressedCopyTextureCHROMIUM(target, source_id,
                                                        dest_id);
 }
+void GL_APIENTRY GLES2CompressedCopySubTextureCHROMIUM(GLenum target,
+                                                       GLenum source_id,
+                                                       GLenum dest_id,
+                                                       GLint xoffset,
+                                                       GLint yoffset,
+                                                       GLint x,
+                                                       GLint y,
+                                                       GLsizei width,
+                                                       GLsizei height) {
+  gles2::GetGLContext()->CompressedCopySubTextureCHROMIUM(
+      target, source_id, dest_id, xoffset, yoffset, x, y, width, height);
+}
 void GL_APIENTRY GLES2DrawArraysInstancedANGLE(GLenum mode,
                                                GLint first,
                                                GLsizei count,
@@ -1444,37 +1469,6 @@ void GL_APIENTRY GLES2TraceBeginCHROMIUM(const char* category_name,
 }
 void GL_APIENTRY GLES2TraceEndCHROMIUM() {
   gles2::GetGLContext()->TraceEndCHROMIUM();
-}
-void GL_APIENTRY GLES2AsyncTexSubImage2DCHROMIUM(GLenum target,
-                                                 GLint level,
-                                                 GLint xoffset,
-                                                 GLint yoffset,
-                                                 GLsizei width,
-                                                 GLsizei height,
-                                                 GLenum format,
-                                                 GLenum type,
-                                                 const void* data) {
-  gles2::GetGLContext()->AsyncTexSubImage2DCHROMIUM(
-      target, level, xoffset, yoffset, width, height, format, type, data);
-}
-void GL_APIENTRY GLES2AsyncTexImage2DCHROMIUM(GLenum target,
-                                              GLint level,
-                                              GLenum internalformat,
-                                              GLsizei width,
-                                              GLsizei height,
-                                              GLint border,
-                                              GLenum format,
-                                              GLenum type,
-                                              const void* pixels) {
-  gles2::GetGLContext()->AsyncTexImage2DCHROMIUM(target, level, internalformat,
-                                                 width, height, border, format,
-                                                 type, pixels);
-}
-void GL_APIENTRY GLES2WaitAsyncTexImage2DCHROMIUM(GLenum target) {
-  gles2::GetGLContext()->WaitAsyncTexImage2DCHROMIUM(target);
-}
-void GL_APIENTRY GLES2WaitAllAsyncTexImage2DCHROMIUM() {
-  gles2::GetGLContext()->WaitAllAsyncTexImage2DCHROMIUM();
 }
 void GL_APIENTRY GLES2DiscardFramebufferEXT(GLenum target,
                                             GLsizei count,
@@ -2461,12 +2455,24 @@ extern const NameToFunc g_gles2_function_table[] = {
         reinterpret_cast<GLES2FunctionPointer>(glGetQueryivEXT),
     },
     {
+        "glGetQueryObjectivEXT",
+        reinterpret_cast<GLES2FunctionPointer>(glGetQueryObjectivEXT),
+    },
+    {
         "glGetQueryObjectuivEXT",
         reinterpret_cast<GLES2FunctionPointer>(glGetQueryObjectuivEXT),
     },
     {
+        "glGetQueryObjecti64vEXT",
+        reinterpret_cast<GLES2FunctionPointer>(glGetQueryObjecti64vEXT),
+    },
+    {
         "glGetQueryObjectui64vEXT",
         reinterpret_cast<GLES2FunctionPointer>(glGetQueryObjectui64vEXT),
+    },
+    {
+        "glSetDisjointValueSyncCHROMIUM",
+        reinterpret_cast<GLES2FunctionPointer>(glSetDisjointValueSyncCHROMIUM),
     },
     {
         "glInsertEventMarkerEXT",
@@ -2616,6 +2622,11 @@ extern const NameToFunc g_gles2_function_table[] = {
         reinterpret_cast<GLES2FunctionPointer>(glCompressedCopyTextureCHROMIUM),
     },
     {
+        "glCompressedCopySubTextureCHROMIUM",
+        reinterpret_cast<GLES2FunctionPointer>(
+            glCompressedCopySubTextureCHROMIUM),
+    },
+    {
         "glDrawArraysInstancedANGLE",
         reinterpret_cast<GLES2FunctionPointer>(glDrawArraysInstancedANGLE),
     },
@@ -2696,23 +2707,6 @@ extern const NameToFunc g_gles2_function_table[] = {
     {
         "glTraceEndCHROMIUM",
         reinterpret_cast<GLES2FunctionPointer>(glTraceEndCHROMIUM),
-    },
-    {
-        "glAsyncTexSubImage2DCHROMIUM",
-        reinterpret_cast<GLES2FunctionPointer>(glAsyncTexSubImage2DCHROMIUM),
-    },
-    {
-        "glAsyncTexImage2DCHROMIUM",
-        reinterpret_cast<GLES2FunctionPointer>(glAsyncTexImage2DCHROMIUM),
-    },
-    {
-        "glWaitAsyncTexImage2DCHROMIUM",
-        reinterpret_cast<GLES2FunctionPointer>(glWaitAsyncTexImage2DCHROMIUM),
-    },
-    {
-        "glWaitAllAsyncTexImage2DCHROMIUM",
-        reinterpret_cast<GLES2FunctionPointer>(
-            glWaitAllAsyncTexImage2DCHROMIUM),
     },
     {
         "glDiscardFramebufferEXT",

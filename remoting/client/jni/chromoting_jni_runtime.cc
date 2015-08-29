@@ -16,9 +16,7 @@
 #include "base/synchronization/waitable_event.h"
 #include "google_apis/google_api_keys.h"
 #include "jni/JniInterface_jni.h"
-#include "media/base/yuv_convert.h"
 #include "remoting/base/url_request_context_getter.h"
-#include "third_party/webrtc/modules/desktop_capture/desktop_frame.h"
 
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF8ToJavaString;
@@ -53,21 +51,20 @@ static void LoadNative(JNIEnv* env, jclass clazz, jobject context) {
   remoting::ChromotingJniRuntime::GetInstance();
 }
 
-static jstring GetApiKey(JNIEnv* env, jclass clazz) {
-  return ConvertUTF8ToJavaString(
-      env, google_apis::GetAPIKey().c_str()).Release();
+static ScopedJavaLocalRef<jstring> GetApiKey(JNIEnv* env, jclass clazz) {
+  return ConvertUTF8ToJavaString(env, google_apis::GetAPIKey().c_str());
 }
 
-static jstring GetClientId(JNIEnv* env, jclass clazz) {
+static ScopedJavaLocalRef<jstring> GetClientId(JNIEnv* env, jclass clazz) {
   return ConvertUTF8ToJavaString(
-      env, google_apis::GetOAuth2ClientID(
-          google_apis::CLIENT_REMOTING).c_str()).Release();
+      env,
+      google_apis::GetOAuth2ClientID(google_apis::CLIENT_REMOTING).c_str());
 }
 
-static jstring GetClientSecret(JNIEnv* env, jclass clazz) {
+static ScopedJavaLocalRef<jstring> GetClientSecret(JNIEnv* env, jclass clazz) {
   return ConvertUTF8ToJavaString(
-      env, google_apis::GetOAuth2ClientSecret(
-          google_apis::CLIENT_REMOTING).c_str()).Release();
+      env,
+      google_apis::GetOAuth2ClientSecret(google_apis::CLIENT_REMOTING).c_str());
 }
 
 static void Connect(JNIEnv* env,
@@ -199,9 +196,6 @@ ChromotingJniRuntime::ChromotingJniRuntime() {
 
   url_requester_ =
       new URLRequestContextGetter(network_task_runner_, network_task_runner_);
-
-  // Allows later decoding of video frames.
-  media::InitializeCPUSpecificYUVConversions();
 }
 
 ChromotingJniRuntime::~ChromotingJniRuntime() {
@@ -324,9 +318,9 @@ void ChromotingJniRuntime::HandleExtensionMessage(const std::string& type,
 }
 
 base::android::ScopedJavaLocalRef<jobject> ChromotingJniRuntime::NewBitmap(
-    webrtc::DesktopSize size) {
+    int width, int height) {
   JNIEnv* env = base::android::AttachCurrentThread();
-  return Java_JniInterface_newBitmap(env, size.width(), size.height());
+  return Java_JniInterface_newBitmap(env, width, height);
 }
 
 void ChromotingJniRuntime::UpdateFrameBitmap(jobject bitmap) {

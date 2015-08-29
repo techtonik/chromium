@@ -59,6 +59,8 @@ source_set("browser") {
     "omnibox_field_trial.h",
     "omnibox_log.cc",
     "omnibox_log.h",
+    "omnibox_metrics_provider.cc",
+    "omnibox_metrics_provider.h",
     "omnibox_navigation_observer.h",
     "omnibox_popup_model.cc",
     "omnibox_popup_model.h",
@@ -105,7 +107,9 @@ source_set("browser") {
     "//base:i18n",
     "//base:prefs",
     "//components/bookmarks/browser",
+    "//components/crash_keys",  # TODO(mpearson): remove once 464926 is fixed.
     "//components/keyed_service/core",
+    "//components/metrics",
     "//components/omnibox/common",
     "//components/open_from_clipboard",
     "//components/pref_registry",

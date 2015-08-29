@@ -372,6 +372,7 @@ class SmoothnessToughAnimatedImageCases(perf_benchmark.PerfBenchmark):
     return 'smoothness.tough_animated_image_cases'
 
 
+@benchmark.Disabled('reference')  # http://crbug.com/499489
 class SmoothnessToughTextureUploadCases(perf_benchmark.PerfBenchmark):
   test = smoothness.Smoothness
   page_set = page_sets.ToughTextureUploadCasesPageSet
@@ -392,7 +393,9 @@ class SmoothnessToughAdCases(perf_benchmark.PerfBenchmark):
     return 'smoothness.tough_ad_cases'
 
 
-@benchmark.Disabled('reference')  # http://crbug.com/496684
+# http://crbug.com/496684 (reference)
+# http://crbug.com/522619 (mac/win)
+@benchmark.Disabled('reference', 'win', 'mac')
 class SmoothnessScrollingToughAdCases(perf_benchmark.PerfBenchmark):
   """Measures rendering statistics while scrolling advertisements."""
   test = smoothness.Smoothness
@@ -401,3 +404,32 @@ class SmoothnessScrollingToughAdCases(perf_benchmark.PerfBenchmark):
   @classmethod
   def Name(cls):
     return 'smoothness.scrolling_tough_ad_cases'
+
+
+# http://crbug.com/496684 (reference)
+# http://crbug.com/522619 (mac/win)
+@benchmark.Disabled('reference', 'win', 'mac')
+class SmoothnessBidirectionallyScrollingToughAdCases(
+    perf_benchmark.PerfBenchmark):
+  """Measures rendering statistics while scrolling advertisements."""
+  test = smoothness.Smoothness
+  page_set = page_sets.BidirectionallyScrollingToughAdCasesPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    # Don't accidentally reload the page while scrolling.
+    options.AppendExtraBrowserArgs('--disable-pull-to-refresh-effect')
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.bidirectionally_scrolling_tough_ad_cases'
+
+
+@benchmark.Disabled('reference')  # http://crbug.com/496684
+class SmoothnessToughWebGLAdCases(perf_benchmark.PerfBenchmark):
+  """Measures rendering statistics while scrolling advertisements."""
+  test = smoothness.Smoothness
+  page_set = page_sets.ToughWebglAdCasesPageSet
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.tough_webgl_ad_cases'

@@ -3,6 +3,10 @@
  * found in the LICENSE file. */
 
 /* Special attribute used in HTML to hide elements. */
+body:not([type]) [visibleif] {
+  display: none;
+}
+
 body[type='folder'] [invisibleif~='folder'],
 body[type='upload-folder'] [invisibleif~='upload-folder'],
 body[type='saveas-file'] [invisibleif~='saveas-file'],
@@ -801,7 +805,6 @@ html[dir='rtl'] #search-box .clear {
 }
 
 .dialog-footer input {
-  color: red;
   margin: 3px 0 !important;
 }
 
@@ -997,7 +1000,8 @@ html[dir='rtl'] .breadcrumbs .separator {
 }
 
 .spinner {
-  background: url(chrome://resources/images/throbber.svg) center/100% no-repeat;
+  background: url(chrome://resources/images/throbber_small.svg) center/100%
+      no-repeat;
   height: 16px;
   left: 50%;
   margin-left: -8px;

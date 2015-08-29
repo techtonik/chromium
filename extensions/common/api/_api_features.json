@@ -136,9 +136,7 @@
       "internal": true,
       "channel": "stable",
       "contexts": ["webui"],
-      "matches": [
-        "chrome://media-router/*"
-      ]
+      "matches": ["chrome://media-router/*"]
     }
   ],
   "events": {
@@ -339,12 +337,6 @@
   "storage": {
     "dependencies": ["permission:storage"],
     "contexts": ["blessed_extension", "unblessed_extension", "content_script"]
-  },
-  "surfaceWorkerInternal": {
-    "internal": true,
-    "channel": "trunk",
-    "contexts": "all",
-    "matches": ["<all_urls>"]
   },
   "system.cpu": {
     "dependencies": ["permission:system.cpu"],

@@ -5,7 +5,6 @@
 {
   'variables': {
     'lastchange_path': '../build/util/LASTCHANGE',
-    'libpeer_target_type%': 'static_library',
     'branding_dir': 'app/theme/<(branding_path_component)',
     'branding_dir_100': 'app/theme/default_100_percent/<(branding_path_component)',
   },
@@ -33,6 +32,7 @@
             'installer_util',
             '../base/base.gyp:base',
             '../chrome/chrome.gyp:launcher_support',
+            '../components/components.gyp:variations',
             '../google_update/google_update.gyp:google_update',
           ],
           'include_dirs': [
@@ -59,6 +59,7 @@
             'installer_util',
             '../base/base.gyp:base',
             '../base/base.gyp:test_support_base',
+            '../components/components.gyp:variations',
             '../testing/gtest.gyp:gtest',
           ],
           'include_dirs': [
@@ -87,6 +88,7 @@
             '../base/base.gyp:base_i18n',
             '../base/base.gyp:test_support_base',
             '../chrome/chrome.gyp:chrome_version_resources',
+            '../components/components.gyp:variations',
             '../content/content.gyp:content_common',
             '../testing/gmock.gyp:gmock',
             '../testing/gtest.gyp:gtest',
@@ -130,7 +132,6 @@
             'installer/util/move_tree_work_item_unittest.cc',
             'installer/util/product_state_unittest.cc',
             'installer/util/product_unittest.cc',
-            'installer/util/product_unittest.h',
             'installer/util/registry_key_backup_unittest.cc',
             'installer/util/registry_test_data.cc',
             'installer/util/registry_test_data.h',
@@ -208,6 +209,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/setup
           'target_name': 'setup',
           'type': 'executable',
           'dependencies': [
@@ -266,8 +268,6 @@
               ],
             },
           },
-          # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-          'msvs_disabled_warnings': [ 4267, ],
           'rules': [
             {
               'rule_name': 'setup_version',
@@ -459,10 +459,14 @@
         'flock_bash': ['flock', '--', '/tmp/linux_package_lock', 'bash'],
         'deb_build': '<(PRODUCT_DIR)/installer/debian/build.sh',
         'rpm_build': '<(PRODUCT_DIR)/installer/rpm/build.sh',
+        # The script expects either "google_chrome" or "chromium" for -d,
+        # which is also what branding_path_component contains.
         'deb_cmd': ['<@(flock_bash)', '<(deb_build)', '-o' '<(PRODUCT_DIR)',
-                    '-b', '<(PRODUCT_DIR)', '-a', '<(target_arch)'],
+                    '-b', '<(PRODUCT_DIR)', '-a', '<(target_arch)',
+                    '-d', '<(branding_path_component)'],
         'rpm_cmd': ['<@(flock_bash)', '<(rpm_build)', '-o' '<(PRODUCT_DIR)',
-                    '-b', '<(PRODUCT_DIR)', '-a', '<(target_arch)'],
+                    '-b', '<(PRODUCT_DIR)', '-a', '<(target_arch)',
+                    '-d', '<(branding_path_component)'],
         'conditions': [
           ['target_arch=="ia32"', {
             'deb_arch': 'i386',
@@ -492,11 +496,6 @@
             'deb_arch': 'arm',
             'rpm_arch': 'arm',
           }],
-          ['libpeer_target_type!="static_library"', {
-            'packaging_files_binaries': [
-              '<(PRODUCT_DIR)/lib/libpeerconnection.so',
-            ],
-          }],
           ['asan==1', {
             'packaging_files_binaries': [
               '<(PRODUCT_DIR)/lib/libc++.so',
@@ -513,18 +512,21 @@
           # we only create packages for official builds.
           'copies': [
             {
+              # GN version: //chrome/installer/linux:deb_packaging_files
               'destination': '<(PRODUCT_DIR)/installer/debian/',
               'files': [
                 '<@(packaging_files_deb)',
               ]
             },
             {
+              # GN version: //chrome/installer/linux:rpm_packaging_files
               'destination': '<(PRODUCT_DIR)/installer/rpm/',
               'files': [
                 '<@(packaging_files_rpm)',
               ]
             },
             {
+              # GN version: //chrome/installer/linux:common_packaging_files
               'destination': '<(PRODUCT_DIR)/installer/common/',
               'files': [
                 '<@(packaging_files_common)',
@@ -532,6 +534,7 @@
             },
             # Additional theme resources needed for package building.
             {
+              # GN version: //chrome/installer/linux:theme_files
               'destination': '<(PRODUCT_DIR)/installer/theme/',
               'files': [
                 '<(branding_dir)/linux/product_logo_32.xpm',
@@ -549,6 +552,7 @@
           ],
           'actions': [
             {
+              # GN version: //chrome/installer/linux:save_build_info
               'action_name': 'save_build_info',
               'inputs': [
                 '<(branding_dir)/BRANDING',
@@ -570,6 +574,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux
           'target_name': 'linux_packages_all',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -616,6 +621,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:unstable
           'target_name': 'linux_packages_unstable',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -632,6 +638,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:beta
           'target_name': 'linux_packages_beta',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -648,6 +655,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:stable
           'target_name': 'linux_packages_stable',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -666,6 +674,7 @@
         # TODO(mmoss) gyp looping construct would be handy here ...
         # These package actions are the same except for the 'channel' variable.
         {
+          # GN version: //chrome/installer/linux:asan
           'target_name': 'linux_packages_asan_deb',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -694,6 +703,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:trunk
           'target_name': 'linux_packages_trunk_deb',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -722,6 +732,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:unstable
           'target_name': 'linux_packages_unstable_deb',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -750,6 +761,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:beta
           'target_name': 'linux_packages_beta_deb',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -778,6 +790,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:stable
           'target_name': 'linux_packages_stable_deb',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -806,6 +819,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:asan
           'target_name': 'linux_packages_asan_rpm',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -835,6 +849,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:trunk
           'target_name': 'linux_packages_trunk_rpm',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -864,6 +879,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:unstable
           'target_name': 'linux_packages_unstable_rpm',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -893,6 +909,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:beta
           'target_name': 'linux_packages_beta_rpm',
           'suppress_wildcard': 1,
           'type': 'none',
@@ -922,6 +939,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/linux:stable
           'target_name': 'linux_packages_stable_rpm',
           'suppress_wildcard': 1,
           'type': 'none',

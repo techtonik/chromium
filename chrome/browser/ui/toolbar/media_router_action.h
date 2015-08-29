@@ -27,7 +27,7 @@ class MediaRouterAction : public ToolbarActionViewController,
   ~MediaRouterAction() override;
 
   // ToolbarActionViewController implementation.
-  const std::string& GetId() const override;
+  std::string GetId() const override;
   void SetDelegate(ToolbarActionViewDelegate* delegate) override;
   gfx::Image GetIcon(content::WebContents* web_contents,
                      const gfx::Size& size) override;
@@ -42,7 +42,6 @@ class MediaRouterAction : public ToolbarActionViewController,
   void HidePopup() override;
   gfx::NativeView GetPopupNativeView() override;
   ui::MenuModel* GetContextMenu() override;
-  bool CanDrag() const override;
   bool ExecuteAction(bool by_user) override;
   void UpdateState() override;
   bool DisabledClickOpensMenu() const override;
@@ -68,9 +67,6 @@ class MediaRouterAction : public ToolbarActionViewController,
   void MaybeUpdateIcon();
 
   const gfx::Image* GetCurrentIcon() const;
-
-  const std::string id_;
-  const base::string16 name_;
 
   // Cached icons.
   // Indicates that the current Chrome profile is using at least one device.

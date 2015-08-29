@@ -652,7 +652,8 @@ void RenderThreadImpl::Init() {
       !command_line.HasSwitch(cc::switches::kDisableThreadedAnimation);
 
   is_zero_copy_enabled_ = command_line.HasSwitch(switches::kEnableZeroCopy);
-  is_one_copy_enabled_ = !command_line.HasSwitch(switches::kDisableOneCopy);
+  is_persistent_gpu_memory_buffer_enabled_ =
+      command_line.HasSwitch(switches::kEnablePersistentGpuMemoryBuffer);
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
   is_elastic_overscroll_enabled_ = base::mac::IsOSLionOrLater();
@@ -698,7 +699,7 @@ void RenderThreadImpl::Init() {
     DCHECK(parsed_msaa_sample_count) << string_value;
     DCHECK_GE(gpu_rasterization_msaa_sample_count_, 0);
   } else {
-    gpu_rasterization_msaa_sample_count_ = 0;
+    gpu_rasterization_msaa_sample_count_ = -1;
   }
 
   if (command_line.HasSwitch(switches::kDisableDistanceFieldText)) {
@@ -1349,21 +1350,29 @@ RenderThreadImpl::GetGpuFactories() {
         GPU_VIDEO_ACCELERATOR_CONTEXT);
   }
   if (gpu_va_context_provider_.get()) {
-    bool enable_video_accelerator =
+    const bool enable_video_accelerator =
         !cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode);
+    const bool enable_gpu_memory_buffer_video_frames =
+        cmd_line->HasSwitch(switches::kEnableGpuMemoryBufferVideoFrames);
     std::string image_texture_target_string =
         cmd_line->GetSwitchValueASCII(switches::kVideoImageTextureTarget);
     unsigned image_texture_target = 0;
-    bool parsed_image_texture_target =
+    const bool parsed_image_texture_target =
         base::StringToUint(image_texture_target_string, &image_texture_target);
     DCHECK(parsed_image_texture_target);
     CHECK(gpu_channel_.get()) << "Have gpu_va_context_provider but no "
                                  "gpu_channel_. See crbug.com/495185.";
     CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but lost "
                                      "gpu_channel_. See crbug.com/495185.";
+    media::VideoPixelFormat video_pixel_format = media::PIXEL_FORMAT_I420;
+#if defined(OS_MACOSX)
+    // TODO(dcastagna): Check that the extension is available.
+    video_pixel_format = media::PIXEL_FORMAT_UYVY;
+#endif
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
         gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
-        image_texture_target, enable_video_accelerator);
+        enable_gpu_memory_buffer_video_frames, image_texture_target,
+        video_pixel_format, enable_video_accelerator);
   }
   return gpu_factories;
 }
@@ -1473,8 +1482,8 @@ bool RenderThreadImpl::IsZeroCopyEnabled() {
   return is_zero_copy_enabled_;
 }
 
-bool RenderThreadImpl::IsOneCopyEnabled() {
-  return is_one_copy_enabled_;
+bool RenderThreadImpl::IsPersistentGpuMemoryBufferEnabled() {
+  return is_persistent_gpu_memory_buffer_enabled_;
 }
 
 bool RenderThreadImpl::IsElasticOverscrollEnabled() {
@@ -1693,12 +1702,6 @@ GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(
 
 blink::WebMediaStreamCenter* RenderThreadImpl::CreateMediaStreamCenter(
     blink::WebMediaStreamCenterClient* client) {
-#if defined(OS_ANDROID)
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableWebRTC))
-    return NULL;
-#endif
-
 #if defined(ENABLE_WEBRTC)
   if (!media_stream_center_) {
     media_stream_center_ = GetContentClient()->renderer()

@@ -25,8 +25,8 @@ namespace media {
 class AudioManagerFactory;
 }
 
-namespace net {
-class HostResolver;
+namespace metrics {
+class MetricsService;
 }
 
 namespace chromecast {
@@ -40,7 +40,7 @@ namespace shell {
 class CastBrowserMainParts;
 class URLRequestContextFactory;
 
-class CastContentBrowserClient: public content::ContentBrowserClient {
+class CastContentBrowserClient : public content::ContentBrowserClient {
  public:
   // Creates an implementation of CastContentBrowserClient. Platform should
   // link in an implementation as needed.
@@ -65,6 +65,16 @@ class CastContentBrowserClient: public content::ContentBrowserClient {
   virtual scoped_ptr<media::MediaPipelineBackend> CreateMediaPipelineBackend(
       const media::MediaPipelineDeviceParams& params);
 #endif
+
+  // Performs cleanup for process exit (but before AtExitManager cleanup).
+  void ProcessExiting();
+
+  // Invoked when the metrics client ID changes.
+  virtual void SetMetricsClientId(const std::string& client_id);
+
+  // Allows registration of extra metrics providers.
+  virtual void RegisterMetricsProviders(
+      ::metrics::MetricsService* metrics_service);
 
   // content::ContentBrowserClient implementation:
   content::BrowserMainParts* CreateBrowserMainParts(

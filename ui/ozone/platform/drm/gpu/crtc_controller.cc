@@ -16,12 +16,20 @@ CrtcController::CrtcController(const scoped_refptr<DrmDevice>& drm,
                                uint32_t crtc,
                                uint32_t connector)
     : drm_(drm),
-      overlay_plane_manager_(nullptr),
       crtc_(crtc),
       connector_(connector) {}
 
 CrtcController::~CrtcController() {
   if (!is_disabled_) {
+    const ScopedVector<HardwareDisplayPlane>& all_planes =
+        drm_->plane_manager()->planes();
+    for (auto* plane : all_planes) {
+      if (plane->owning_crtc() == crtc_) {
+        plane->set_owning_crtc(0);
+        plane->set_in_use(false);
+      }
+    }
+
     SetCursor(nullptr);
     drm_->DisableCrtc(crtc_);
     SignalPageFlipRequest();

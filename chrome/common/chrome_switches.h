@@ -81,6 +81,7 @@ extern const char kDisableExtensionsHttpThrottling[];
 extern const char kDisableExtensions[];
 extern const char kDisableFieldTrialTestingConfig[];
 extern const char kDisableJavaScriptHarmonyShipping[];
+extern const char kDisableMaterialDesignDownloads[];
 extern const char kDisableMinimizeOnSecondLauncherItemClick[];
 extern const char kDisableNewBookmarkApps[];
 extern const char kDisableNTPPopularSites[];
@@ -141,7 +142,6 @@ extern const char kEnableOfflineAutoReloadVisibleOnly[];
 extern const char kEnablePanels[];
 extern const char kEnablePdfMaterialUI[];
 extern const char kEnablePermissionsBubbles[];
-extern const char kEnablePluginPlaceholderShadowDom[];
 extern const char kEnablePotentiallyAnnoyingSecurityFeatures[];
 extern const char kEnablePowerOverlay[];
 extern const char kEnablePrintPreviewRegisterPromos[];
@@ -170,7 +170,6 @@ extern const char kExtensionContentVerification[];
 extern const char kExtensionsInstallVerification[];
 extern const char kExtensionsNotWebstore[];
 extern const char kExtensionsUpdateFrequency[];
-extern const char kFakeVariationsChannel[];
 extern const char kFastStart[];
 extern const char kFlagSwitchesBegin[];
 extern const char kFlagSwitchesEnd[];
@@ -186,7 +185,6 @@ extern const char kHostResolverRetryAttempts[];
 extern const char kIgnoreUrlFetcherCertRequests[];
 extern const char kIncognito[];
 extern const char kInstallChromeApp[];
-extern const char kInstallEphemeralAppFromWebstore[];
 extern const char kInstallSupervisedUserWhitelists[];
 extern const char kInstantProcess[];
 extern const char kInvalidationUseGCMChannel[];
@@ -205,7 +203,6 @@ extern const char kManualEnhancedBookmarks[];
 extern const char kManualEnhancedBookmarksOptout[];
 extern const char kMarkNonSecureAs[];
 extern const char kMarkNonSecureAsNeutral[];
-extern const char kMarkNonSecureAsDubious[];
 extern const char kMarkNonSecureAsNonSecure[];
 extern const char kMediaCacheSize[];
 extern const char kMessageLoopHistogrammer[];
@@ -317,7 +314,6 @@ extern const char kUserDataDir[];
 extern const char kV8PacMojoInProcess[];
 extern const char kV8PacMojoOutOfProcess[];
 extern const char kValidateCrx[];
-extern const char kVariationsServerURL[];
 extern const char kVersion[];
 extern const char kWindowPosition[];
 extern const char kWindowSize[];
@@ -326,16 +322,12 @@ extern const char kWinJumplistAction[];
 
 #if defined(OS_ANDROID)
 extern const char kAuthAndroidNegotiateAccountType[];
-extern const char kDisableCast[];
 extern const char kDisableContextualSearch[];
-extern const char kDisableZeroSuggest[];
 extern const char kEnableAccessibilityTabSwitcher[];
 extern const char kEnableContextualSearch[];
 extern const char kEnableDomDistillerButtonAnimation[];
 extern const char kEnableHostedMode[];
 extern const char kEnableReaderModeToolbarIcon[];
-extern const char kEnableZeroSuggestMostVisited[];
-extern const char kEnableZeroSuggestMostVisitedWithoutSerp[];
 extern const char kProgressBarAnimation[];
 #endif  // defined(OS_ANDROID)
 
@@ -359,9 +351,12 @@ extern const char kHostedAppQuitNotification[];
 extern const char kDisableAppInfoDialogMac[];
 extern const char kDisableAppWindowCycling[];
 extern const char kDisableHostedAppShimCreation[];
+extern const char kDisableHostedAppsInWindows[];
 extern const char kDisableMacViewsNativeAppWindows[];
+extern const char kDisableTranslateNewUX[];
 extern const char kEnableAppInfoDialogMac[];
 extern const char kEnableAppWindowCycling[];
+extern const char kEnableHostedAppsInWindows[];
 extern const char kEnableMacViewsNativeAppWindows[];
 extern const char kEnableMacViewsDialogs[];
 extern const char kEnableTranslateNewUX[];
@@ -405,11 +400,10 @@ extern const char kEnablePluginPowerSaver[];
 #endif
 
 #if defined(ENABLE_TASK_MANAGER)
-extern const char kEnableNewTaskManager[];
+extern const char kDisableNewTaskManager[];
 #endif  // defined(ENABLE_TASK_MANAGER)
 
 bool AboutInSettingsEnabled();
-bool MdDownloadsEnabled();
 bool MdSettingsEnabled();
 bool MediaRouterEnabled();
 bool PdfMaterialUIEnabled();

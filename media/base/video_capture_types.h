@@ -19,7 +19,8 @@ typedef int VideoCaptureSessionId;
 
 // TODO(dshwang): replace it with media::VideoPixelFormat. crbug.com/489744
 // Color formats from camera. This list is sorted in order of preference.
-// TODO(mcasas): Consider if this list can be merged with media::Format.
+// TODO(emircan): http://crbug.com/521068 Consider if this list can be merged
+// with media::Format.
 // TODO(mcasas): http://crbug.com/504160 Consider making this an enum class.
 enum VideoCapturePixelFormat {
   VIDEO_CAPTURE_PIXEL_FORMAT_I420,
@@ -69,6 +70,24 @@ enum ResolutionChangePolicy {
   // Must always be equal to largest entry in the enum.
   RESOLUTION_POLICY_LAST = RESOLUTION_POLICY_ANY_WITHIN_LIMIT,
 };
+
+// Potential values of the googPowerLineFrequency optional constraint passed to
+// getUserMedia. Note that the numeric values are currently significant, and are
+// used to map enum values to corresponding frequency values.
+// TODO(ajose): http://crbug.com/525167 Consider making this a class.
+enum class PowerLineFrequency {
+  FREQUENCY_DEFAULT = 0,
+  FREQUENCY_50HZ = 50,
+  FREQUENCY_60HZ = 60,
+  FREQUENCY_MAX = FREQUENCY_60HZ
+};
+// Assert that the int:frequency mapping is correct.
+static_assert(static_cast<int>(PowerLineFrequency::FREQUENCY_DEFAULT) == 0,
+              "static_cast<int>(FREQUENCY_DEFAULT) must equal 0.");
+static_assert(static_cast<int>(PowerLineFrequency::FREQUENCY_50HZ) == 50,
+              "static_cast<int>(FREQUENCY_DEFAULT) must equal 50.");
+static_assert(static_cast<int>(PowerLineFrequency::FREQUENCY_60HZ) == 60,
+              "static_cast<int>(FREQUENCY_DEFAULT) must equal 60.");
 
 // Some drivers use rational time per frame instead of float frame rate, this
 // constant k is used to convert between both: A fps -> [k/k*A] seconds/frame.
@@ -123,8 +142,8 @@ struct MEDIA_EXPORT VideoCaptureParams {
 
   bool operator==(const VideoCaptureParams& other) const {
     return requested_format == other.requested_format &&
-           use_gpu_memory_buffers == other.use_gpu_memory_buffers &&
-           resolution_change_policy == other.resolution_change_policy;
+           resolution_change_policy == other.resolution_change_policy &&
+           power_line_frequency == other.power_line_frequency;
   }
 
   // Requests a resolution and format at which the capture will occur.
@@ -133,8 +152,8 @@ struct MEDIA_EXPORT VideoCaptureParams {
   // Policy for resolution change.
   ResolutionChangePolicy resolution_change_policy;
 
-  // Indication to the Driver to try to use GpuMemoryBuffers.
-  bool use_gpu_memory_buffers;
+  // User-specified power line frequency.
+  PowerLineFrequency power_line_frequency;
 };
 
 }  // namespace media

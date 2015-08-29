@@ -33,6 +33,8 @@ class UsbService : public base::NonThreadSafe {
 
   class Observer {
    public:
+    virtual ~Observer();
+
     // These events are delivered from the thread on which the UsbService object
     // was created.
     virtual void OnDeviceAdded(scoped_refptr<UsbDevice> device);
@@ -43,9 +45,11 @@ class UsbService : public base::NonThreadSafe {
   };
 
   // The file task runner reference is used for blocking I/O operations.
-  // Returns NULL when initialization fails.
-  static UsbService* GetInstance(
+  // Returns nullptr when initialization fails.
+  static scoped_ptr<UsbService> Create(
       scoped_refptr<base::SequencedTaskRunner> blocking_task_runner);
+
+  virtual ~UsbService();
 
   virtual scoped_refptr<UsbDevice> GetDevice(const std::string& guid) = 0;
 
@@ -57,7 +61,6 @@ class UsbService : public base::NonThreadSafe {
 
  protected:
   UsbService();
-  virtual ~UsbService();
 
   void NotifyDeviceAdded(scoped_refptr<UsbDevice> device);
   void NotifyDeviceRemoved(scoped_refptr<UsbDevice> device);

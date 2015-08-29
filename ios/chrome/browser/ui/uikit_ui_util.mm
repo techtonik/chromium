@@ -14,7 +14,6 @@
 #include "base/logging.h"
 #include "base/mac/foundation_util.h"
 #include "ios/chrome/browser/ui/ui_util.h"
-#include "ios/chrome/browser/ui/ui_util.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
 #include "ui/gfx/ios/uikit_util.h"
@@ -463,17 +462,6 @@ void ApplyVisualConstraintsWithMetricsAndOptions(
   }
 }
 
-NSLayoutFormatOptions LayoutOptionForRTLSupport() {
-// Under iOS9 when full RTL support is available return LeadingToTrailing.
-// Otherwise return LeftToRight
-#if __IPHONE_9_0
-  if (base::ios::IsRunningOnIOS9OrLater()) {
-    return NSLayoutFormatDirectionLeadingToTrailing;
-  }
-#endif
-  return NSLayoutFormatDirectionLeftToRight;
-}
-
 void AddSameCenterXConstraint(UIView* parentView, UIView* subview) {
   DCHECK_EQ(parentView, [subview superview]);
   [parentView addConstraint:[NSLayoutConstraint
@@ -529,36 +517,18 @@ void AddSameCenterYConstraint(UIView* parentView,
                                           constant:0]];
 }
 
-bool IsCompactTablet() {
+bool IsCompact() {
   if (base::ios::IsRunningOnIOS8OrLater()) {
     UIViewController* rootController =
         [UIApplication sharedApplication].keyWindow.rootViewController;
-    return IsCompactTabletSizeClass(
-        [rootController.traitCollection horizontalSizeClass]);
+    return [rootController.traitCollection horizontalSizeClass] ==
+           UIUserInterfaceSizeClassCompact;
   } else {
-    return IsCompactTabletSizeClass(UIUserInterfaceSizeClassRegular);
+    // Prior to iOS 8, iPad is always regular, iPhone is always compact.
+    return !IsIPadIdiom();
   }
 }
 
-bool IsCompactTabletSizeClass(UIUserInterfaceSizeClass sizeClass) {
-  return IsIPadIdiom() && sizeClass == UIUserInterfaceSizeClassCompact;
-}
-
-BOOL IsRTLUILayout() {
-  if (base::ios::IsRunningOnIOS9OrLater()) {
-#if __IPHONE_9_0
-    // Calling this method is better than using the locale on iOS9 since it will
-    // work with the right to left pseudolanguage.
-    return [UIView userInterfaceLayoutDirectionForSemanticContentAttribute:
-                       UISemanticContentAttributeUnspecified] ==
-           UIUserInterfaceLayoutDirectionRightToLeft;
-#endif
-  }
-  // Using NSLocale instead of base::i18n::IsRTL() in order to take into account
-  // right to left pseudolanguage correctly (which base::i18n::IsRTL() doesn't).
-  return
-      [NSLocale
-          characterDirectionForLanguage:
-              [[NSLocale currentLocale] objectForKey:NSLocaleLanguageCode]] ==
-      NSLocaleLanguageDirectionRightToLeft;
+bool IsCompactTablet() {
+  return IsIPadIdiom() && IsCompact();
 }

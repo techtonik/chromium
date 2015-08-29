@@ -178,6 +178,14 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual bool ShouldUseProcessPerSite(BrowserContext* browser_context,
                                        const GURL& effective_url);
 
+  // Returns true unless the effective URL is part of a site that cannot live in
+  // a process dedicated to that site.  This is only called if
+  // SiteIsolationPolicy::DoesSiteRequireDedicatedProcess returns true.
+  // TODO(nick): Remove this function once https://crbug.com/160576 is fixed,
+  // and origin lock can be applied to all URLs.
+  virtual bool ShouldLockToOrigin(BrowserContext* browser_context,
+                                  const GURL& effective_url);
+
   // Returns a list additional WebUI schemes, if any.  These additional schemes
   // act as aliases to the chrome: scheme.  The additional schemes may or may
   // not serve specific WebUI pages depending on the particular URLDataSource
@@ -217,7 +225,16 @@ class CONTENT_EXPORT ContentBrowserClient {
   // more conservative check than IsSuitableHost, since it is used after a
   // navigation has committed to ensure that the process did not exceed its
   // authority.
+  // This is called on the UI thread.
   virtual bool CanCommitURL(RenderProcessHost* process_host, const GURL& url);
+
+  // Returns true if no URL within |origin| is allowed to commit in the given
+  // process.  Must return false if there exists at least one URL in |origin|
+  // that is allowed to commit.
+  // This is called on the IO thread.
+  virtual bool IsIllegalOrigin(ResourceContext* resource_context,
+                               int child_process_id,
+                               const GURL& origin);
 
   // Returns whether a URL should be allowed to open from a specific context.
   // This also applies in cases where the new URL will open in another process.
@@ -513,6 +530,9 @@ class CONTENT_EXPORT ContentBrowserClient {
   // Returns the default filename used in downloads when we have no idea what
   // else we should do with the file.
   virtual std::string GetDefaultDownloadName();
+
+  // Returns the path to the browser shader disk cache root.
+  virtual base::FilePath GetShaderDiskCacheDirectory();
 
   // Notification that a pepper plugin has just been spawned. This allows the
   // embedder to add filters onto the host to implement interfaces.

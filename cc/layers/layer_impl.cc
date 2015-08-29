@@ -75,9 +75,10 @@ LayerImpl::LayerImpl(LayerTreeImpl* tree_impl,
       background_color_(0),
       opacity_(1.0),
       blend_mode_(SkXfermode::kSrcOver_Mode),
+      draw_blend_mode_(SkXfermode::kSrcOver_Mode),
       num_descendants_that_draw_content_(0),
       transform_tree_index_(-1),
-      opacity_tree_index_(-1),
+      effect_tree_index_(-1),
       clip_tree_index_(-1),
       draw_depth_(0.f),
       needs_push_properties_(false),
@@ -253,8 +254,8 @@ void LayerImpl::SetClipTreeIndex(int index) {
   SetNeedsPushProperties();
 }
 
-void LayerImpl::SetOpacityTreeIndex(int index) {
-  opacity_tree_index_ = index;
+void LayerImpl::SetEffectTreeIndex(int index) {
+  effect_tree_index_ = index;
   SetNeedsPushProperties();
 }
 
@@ -315,8 +316,8 @@ void LayerImpl::ClearRenderSurfaceLayerList() {
 void LayerImpl::PopulateSharedQuadState(SharedQuadState* state) const {
   state->SetAll(draw_properties_.target_space_transform, bounds(),
                 draw_properties_.visible_layer_rect, draw_properties_.clip_rect,
-                is_clipped_, draw_properties_.opacity,
-                draw_properties_.blend_mode, sorting_context_id_);
+                is_clipped_, draw_properties_.opacity, draw_blend_mode_,
+                sorting_context_id_);
 }
 
 void LayerImpl::PopulateScaledSharedQuadState(SharedQuadState* state,
@@ -331,7 +332,7 @@ void LayerImpl::PopulateScaledSharedQuadState(SharedQuadState* state,
 
   state->SetAll(scaled_draw_transform, scaled_bounds, scaled_visible_layer_rect,
                 draw_properties().clip_rect, is_clipped_,
-                draw_properties().opacity, draw_properties().blend_mode,
+                draw_properties().opacity, draw_blend_mode_,
                 sorting_context_id_);
 }
 
@@ -570,6 +571,7 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->set_should_flatten_transform_from_property_tree(
       should_flatten_transform_from_property_tree_);
   layer->set_is_clipped(is_clipped_);
+  layer->set_draw_blend_mode(draw_blend_mode_);
   layer->SetUseParentBackfaceVisibility(use_parent_backface_visibility_);
   layer->SetTransformAndInvertibility(transform_, transform_is_invertible_);
 
@@ -587,7 +589,7 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
 
   layer->SetTransformTreeIndex(transform_tree_index_);
   layer->SetClipTreeIndex(clip_tree_index_);
-  layer->SetOpacityTreeIndex(opacity_tree_index_);
+  layer->SetEffectTreeIndex(effect_tree_index_);
   layer->set_offset_to_transform_parent(offset_to_transform_parent_);
 
   LayerImpl* scroll_parent = nullptr;
@@ -776,8 +778,8 @@ const char* LayerImpl::LayerTypeAsString() const {
 void LayerImpl::ResetAllChangeTrackingForSubtree() {
   layer_property_changed_ = false;
 
-  update_rect_ = gfx::Rect();
-  damage_rect_ = gfx::RectF();
+  update_rect_.SetRect(0, 0, 0, 0);
+  damage_rect_.SetRect(0, 0, 0, 0);
 
   if (render_surface_)
     render_surface_->ResetPropertyChangedFlag();
@@ -842,16 +844,34 @@ void LayerImpl::UpdatePropertyTreeTransformIsAnimated(bool is_animated) {
       return;
     if (node->data.is_animated != is_animated) {
       node->data.is_animated = is_animated;
+      if (is_animated) {
+        float maximum_target_scale = 0.f;
+        node->data.local_maximum_animation_target_scale =
+            MaximumTargetScale(&maximum_target_scale) ? maximum_target_scale
+                                                      : 0.f;
+
+        float animation_start_scale = 0.f;
+        node->data.local_starting_animation_scale =
+            AnimationStartScale(&animation_start_scale) ? animation_start_scale
+                                                        : 0.f;
+
+        node->data.has_only_translation_animations =
+            HasOnlyTranslationTransforms();
+      } else {
+        node->data.local_maximum_animation_target_scale = 0.f;
+        node->data.local_starting_animation_scale = 0.f;
+        node->data.has_only_translation_animations = true;
+      }
+
       transform_tree.set_needs_update(true);
     }
   }
 }
 
 void LayerImpl::UpdatePropertyTreeOpacity() {
-  if (opacity_tree_index_ != -1) {
-    OpacityTree& opacity_tree =
-        layer_tree_impl()->property_trees()->opacity_tree;
-    OpacityNode* node = opacity_tree.Node(opacity_tree_index_);
+  if (effect_tree_index_ != -1) {
+    EffectTree& effect_tree = layer_tree_impl()->property_trees()->effect_tree;
+    EffectNode* node = effect_tree.Node(effect_tree_index_);
     // A LayerImpl's own current state is insufficient for determining whether
     // it owns an OpacityNode, since this depends on the state of the
     // corresponding Layer at the time of the last commit. For example, an
@@ -860,7 +880,7 @@ void LayerImpl::UpdatePropertyTreeOpacity() {
     if (node->owner_id != id())
       return;
     node->data.opacity = opacity_;
-    opacity_tree.set_needs_update(true);
+    effect_tree.set_needs_update(true);
   }
 }
 
@@ -1277,21 +1297,33 @@ bool LayerImpl::HasOnlyTranslationTransforms() const {
   if (!layer_animation_controller_)
     return layer_tree_impl_->HasOnlyTranslationTransforms(this);
 
-  return layer_animation_controller_->HasOnlyTranslationTransforms();
+  LayerAnimationController::ObserverType observer_type =
+      IsActive() ? LayerAnimationController::ObserverType::ACTIVE
+                 : LayerAnimationController::ObserverType::PENDING;
+  return layer_animation_controller_->HasOnlyTranslationTransforms(
+      observer_type);
 }
 
 bool LayerImpl::MaximumTargetScale(float* max_scale) const {
   if (!layer_animation_controller_)
     return layer_tree_impl_->MaximumTargetScale(this, max_scale);
 
-  return layer_animation_controller_->MaximumTargetScale(max_scale);
+  LayerAnimationController::ObserverType observer_type =
+      IsActive() ? LayerAnimationController::ObserverType::ACTIVE
+                 : LayerAnimationController::ObserverType::PENDING;
+  return layer_animation_controller_->MaximumTargetScale(observer_type,
+                                                         max_scale);
 }
 
 bool LayerImpl::AnimationStartScale(float* start_scale) const {
   if (!layer_animation_controller_)
     return layer_tree_impl_->AnimationStartScale(this, start_scale);
 
-  return layer_animation_controller_->AnimationStartScale(start_scale);
+  LayerAnimationController::ObserverType observer_type =
+      IsActive() ? LayerAnimationController::ObserverType::ACTIVE
+                 : LayerAnimationController::ObserverType::PENDING;
+  return layer_animation_controller_->AnimationStartScale(observer_type,
+                                                          start_scale);
 }
 
 bool LayerImpl::HasAnyAnimationTargetingProperty(
@@ -1345,8 +1377,8 @@ void LayerImpl::SetUpdateRect(const gfx::Rect& update_rect) {
   SetNeedsPushProperties();
 }
 
-void LayerImpl::AddDamageRect(const gfx::RectF& damage_rect) {
-  damage_rect_ = gfx::UnionRects(damage_rect_, damage_rect);
+void LayerImpl::AddDamageRect(const gfx::Rect& damage_rect) {
+  damage_rect_.Union(damage_rect);
 }
 
 bool LayerImpl::IsExternalScrollActive() const {

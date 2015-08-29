@@ -768,6 +768,12 @@
               'memory/shared_memory_posix.cc',
             ],
           }],
+          ['OS == "ios"', {
+            'sources!': [
+               'memory/discardable_shared_memory.cc',
+               'memory/discardable_shared_memory.h',
+            ],
+          }],
           ['(<(desktop_linux) == 0 and <(chromeos) == 0) or >(nacl_untrusted_build)==1', {
               'sources/': [
                 ['exclude', '^nix/'],
@@ -932,6 +938,10 @@
           ['OS == "win" and >(nacl_untrusted_build)==0', {
             'include_dirs': [
               '<(DEPTH)/third_party/wtl/include',
+            ],
+            'sources': [
+              'profiler/win32_stack_frame_unwinder.cc',
+              'profiler/win32_stack_frame_unwinder.h',
             ],
             'sources!': [
               'files/file_path_watcher_fsevents.cc',

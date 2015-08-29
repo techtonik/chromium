@@ -70,7 +70,6 @@
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate_factory.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
-#include "chrome/browser/ui/zoom/chrome_zoom_level_prefs.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths_internal.h"
 #include "chrome/common/chrome_switches.h"
@@ -360,12 +359,6 @@ void ProfileImpl::RegisterProfilePrefs(
   registry->RegisterFilePathPref(prefs::kDiskCacheDir, base::FilePath());
   registry->RegisterIntegerPref(prefs::kDiskCacheSize, 0);
   registry->RegisterIntegerPref(prefs::kMediaCacheSize, 0);
-
-  // Deprecated. Kept around for migration.
-  registry->RegisterBooleanPref(
-      prefs::kClearSiteDataOnExit,
-      false,
-      user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
 }
 
 ProfileImpl::ProfileImpl(
@@ -614,9 +607,6 @@ void ProfileImpl::DoFinalInit() {
   TRACE_EVENT0("browser", "ProfileImpl::SetSaveSessionStorageOnDisk");
   content::BrowserContext::GetDefaultStoragePartition(this)->
       GetDOMStorageContext()->SetSaveSessionStorageOnDisk();
-
-  // TODO(wjmaclean): Remove this. crbug.com/420643
-  chrome::MigrateProfileZoomLevelPrefs(this);
 
   // The DomDistillerViewerSource is not a normal WebUI so it must be registered
   // as a URLDataSource early.

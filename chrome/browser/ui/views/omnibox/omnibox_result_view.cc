@@ -14,7 +14,6 @@
 #include <algorithm>  // NOLINT
 
 #include "base/i18n/bidi_line_iterator.h"
-#include "base/memory/scoped_vector.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/themes/theme_properties.h"
@@ -39,10 +38,6 @@
 using ui::NativeTheme;
 
 namespace {
-
-// The minimum distance between the top and bottom of the icon and the
-// top or bottom of the row.
-const int kMinimumIconVerticalPadding = 2;
 
 // A mapping from OmniboxResultView's ResultViewState/ColorKind types to
 // NativeTheme colors.
@@ -629,26 +624,25 @@ void OmniboxResultView::Layout() {
   const int trailing_padding = theme_provider->GetDisplayProperty(
       ThemeProperties::PROPERTY_ICON_LABEL_VIEW_TRAILING_PADDING);
 
-  icon_bounds_.SetRect(
-      horizontal_padding +
-          ((icon.width() == default_icon_size_) ? 0 : trailing_padding),
-      (GetContentLineHeight() - icon.height()) / 2, icon.width(),
-      icon.height());
+  const int start_x = StartMargin() + horizontal_padding;
+  const int end_x = width() - EndMargin() - horizontal_padding;
 
-  int text_x = (2 * horizontal_padding) + default_icon_size_;
-  int text_width = width() - text_x - horizontal_padding;
+  icon_bounds_.SetRect(
+      start_x + ((icon.width() == default_icon_size_) ? 0 : trailing_padding),
+      (GetContentLineHeight() - icon.height()) / 2,
+      icon.width(), icon.height());
+
+  const int text_x = start_x + default_icon_size_ + horizontal_padding;
+  int text_width = end_x - text_x;
 
   if (match_.associated_keyword.get()) {
-    const int kw_collapsed_size = keyword_icon_->width() + horizontal_padding;
-    const int max_kw_x = width() - kw_collapsed_size;
-    const int kw_x =
-        animation_->CurrentValueBetween(max_kw_x, horizontal_padding);
+    const int max_kw_x = end_x - keyword_icon_->width();
+    const int kw_x = animation_->CurrentValueBetween(max_kw_x, start_x);
     const int kw_text_x = kw_x + keyword_icon_->width() + horizontal_padding;
 
     text_width = kw_x - text_x - horizontal_padding;
     keyword_text_bounds_.SetRect(
-        kw_text_x, 0, std::max(width() - kw_text_x - horizontal_padding, 0),
-        height());
+        kw_text_x, 0, std::max(end_x - kw_text_x, 0), height());
     keyword_icon_->SetPosition(
         gfx::Point(kw_x, (height() - keyword_icon_->height()) / 2));
   }
@@ -657,7 +651,7 @@ void OmniboxResultView::Layout() {
 }
 
 void OmniboxResultView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
-  animation_->SetSlideDuration(width() / 4);
+  animation_->SetSlideDuration((width() - StartMargin() - EndMargin()) / 4);
 }
 
 void OmniboxResultView::OnPaint(gfx::Canvas* canvas) {
@@ -727,8 +721,14 @@ int OmniboxResultView::GetAnswerLineHeight() const {
 }
 
 int OmniboxResultView::GetContentLineHeight() const {
-  return std::max(default_icon_size_ + (kMinimumIconVerticalPadding * 2),
-                  GetTextHeight() + (kMinimumTextVerticalPadding * 2));
+  ui::ThemeProvider* theme_provider = location_bar_view_->GetThemeProvider();
+  const int min_icon_vertical_padding = theme_provider->GetDisplayProperty(
+      ThemeProperties::PROPERTY_OMNIBOX_DROPDOWN_MIN_ICON_VERTICAL_PADDING);
+  const int min_text_vertical_padding = theme_provider->GetDisplayProperty(
+      ThemeProperties::PROPERTY_OMNIBOX_DROPDOWN_MIN_TEXT_VERTICAL_PADDING);
+
+  return std::max(default_icon_size_ + (min_icon_vertical_padding * 2),
+                  GetTextHeight() + (min_text_vertical_padding * 2));
 }
 
 scoped_ptr<gfx::RenderText> OmniboxResultView::CreateAnswerLine(
@@ -797,4 +797,14 @@ void OmniboxResultView::AppendAnswerTextHelper(gfx::RenderText* destination,
   destination->ApplyColor(
       GetNativeTheme()->GetSystemColor(text_style.colors[GetState()]), range);
   destination->ApplyBaselineStyle(text_style.baseline, range);
+}
+
+int OmniboxResultView::StartMargin() const {
+  return ui::MaterialDesignController::IsModeMaterial() ?
+      model_->start_margin() : 0;
+}
+
+int OmniboxResultView::EndMargin() const {
+  return ui::MaterialDesignController::IsModeMaterial() ?
+      model_->end_margin() : 0;
 }

@@ -4,6 +4,9 @@
 
 #include "components/sync_driver/fake_sync_service.h"
 
+#include "sync/internal_api/public/base_transaction.h"
+#include "sync/internal_api/public/user_share.h"
+
 namespace sync_driver {
 
 FakeSyncService::FakeSyncService() : error_(GoogleServiceAuthError::NONE) {
@@ -109,6 +112,10 @@ bool FakeSyncService::IsUsingSecondaryPassphrase() const {
 void FakeSyncService::EnableEncryptEverything() {
 }
 
+bool FakeSyncService::EncryptEverythingEnabled() const {
+  return false;
+}
+
 void FakeSyncService::SetEncryptionPassphrase(const std::string& passphrase,
                                               PassphraseType type) {
 }
@@ -116,6 +123,27 @@ void FakeSyncService::SetEncryptionPassphrase(const std::string& passphrase,
 bool FakeSyncService::SetDecryptionPassphrase(const std::string& passphrase) {
   return false;
 }
+
+bool FakeSyncService::IsCryptographerReady(
+    const syncer::BaseTransaction* trans) const {
+  return false;
+}
+
+syncer::UserShare* FakeSyncService::GetUserShare() const {
+  return new syncer::UserShare();
+}
+
+LocalDeviceInfoProvider* FakeSyncService::GetLocalDeviceInfoProvider() const {
+  return nullptr;
+}
+
+void FakeSyncService::RegisterDataTypeController(
+      sync_driver::DataTypeController* data_type_controller) {
+}
+
+void FakeSyncService::ReenableDatatype(syncer::ModelType type) {}
+
+void FakeSyncService::DeactivateDataType(syncer::ModelType type) {}
 
 bool FakeSyncService::IsPassphraseRequired() const {
   return false;

@@ -381,8 +381,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
 
   prefs.web_security_enabled =
       !command_line.HasSwitch(switches::kDisableWebSecurity);
-  prefs.java_enabled =
-      !command_line.HasSwitch(switches::kDisableJava);
 
   prefs.remote_fonts_enabled =
       !command_line.HasSwitch(switches::kDisableRemoteFonts);
@@ -430,8 +428,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.accelerated_2d_canvas_msaa_sample_count =
       atoi(command_line.GetSwitchValueASCII(
       switches::kAcceleratedCanvas2dMSAASampleCount).c_str());
-  prefs.text_blobs_enabled =
-      !command_line.HasSwitch(switches::kDisableTextBlobs);
 
   prefs.pinch_overlay_scrollbar_thickness = 10;
   prefs.use_solid_color_scrollbars = ui::IsOverlayScrollbarEnabled();
@@ -501,9 +497,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
       prefs.connection_type != net::NetworkChangeNotifier::CONNECTION_NONE;
 
   prefs.number_of_cpu_cores = base::SysInfo::NumberOfProcessors();
-
-  prefs.viewport_meta_enabled =
-      command_line.HasSwitch(switches::kEnableViewportMeta);
 
   prefs.viewport_enabled =
       command_line.HasSwitch(switches::kEnableViewport) ||

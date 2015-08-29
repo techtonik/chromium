@@ -22,7 +22,7 @@
 #include "chrome/browser/ui/bookmarks/bookmark_tab_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window_state.h"
-#import "chrome/browser/ui/cocoa/browser_window_enter_fullscreen_transition.h"
+#import "chrome/browser/ui/cocoa/browser_window_fullscreen_transition.h"
 #import "chrome/browser/ui/cocoa/browser_window_layout.h"
 #import "chrome/browser/ui/cocoa/custom_frame_view.h"
 #import "chrome/browser/ui/cocoa/dev_tools_controller.h"
@@ -235,6 +235,8 @@ willPositionSheet:(NSWindow*)sheet
   PermissionBubbleManager* manager = [self permissionBubbleManager];
   if (manager)
     manager->UpdateAnchorPosition();
+
+  browser_->GetBubbleManager()->UpdateAllBubbleAnchors();
 }
 
 - (void)applyTabStripLayout:(const chrome::TabStripLayout&)layout {
@@ -461,19 +463,6 @@ willPositionSheet:(NSWindow*)sheet
                selector:@selector(permissionBubbleWindowWillClose:)
                    name:NSWindowWillCloseNotification
                  object:bubbleWindow];
-  }
-
-  if (showDropdown) {
-    // Turn on layered mode for the window's root view for the entry
-    // animation.  Without this, the OS fullscreen animation for entering
-    // fullscreen mode does not correctly draw the tab strip.
-    // It will be turned off (set back to NO) when the animation finishes,
-    // in -windowDidEnterFullScreen:.
-    // Leaving wantsLayer on for the duration of presentation mode causes
-    // performance issues when the dropdown is animated in/out.  It also does
-    // not seem to be required for the exit animation.
-    windowViewWantsLayer_ = [[[self window] contentView] wantsLayer];
-    [[[self window] contentView] setWantsLayer:YES];
   }
 
   NSView* contentView = [[self window] contentView];
@@ -706,7 +695,7 @@ willPositionSheet:(NSWindow*)sheet
 }
 
 - (void)windowDidEnterFullScreen:(NSNotification*)notification {
-  enterFullscreenTransition_.reset();
+  fullscreenTransition_.reset();
 
   // In Yosemite, some combination of the titlebar and toolbar always show in
   // full-screen mode. We do not want either to show. Search for the window that
@@ -755,31 +744,43 @@ willPositionSheet:(NSWindow*)sheet
 
   [self showFullscreenExitBubbleIfNecessary];
   browser_->WindowFullscreenStateChanged();
-  [[[self window] contentView] setWantsLayer:windowViewWantsLayer_];
 }
 
 - (void)windowWillExitFullScreen:(NSNotification*)notification {
   if (notification)  // For System Fullscreen when non-nil.
     [self registerForContentViewResizeNotifications];
+  exitingAppKitFullscreen_ = YES;
+
   [self destroyFullscreenExitBubbleIfNecessary];
   [self adjustUIForExitingFullscreenAndStopOmniboxSliding];
 }
 
 - (void)windowDidExitFullScreen:(NSNotification*)notification {
+  DCHECK(exitingAppKitFullscreen_);
+
   if (notification)  // For System Fullscreen when non-nil.
     [self deregisterForContentViewResizeNotifications];
+
+  // Since the content view was forcefully resized during the transition, we
+  // want to ensure that the subviews are layout correctly after it ended.
+  [self layoutSubviews];
   browser_->WindowFullscreenStateChanged();
+
+  exitingAppKitFullscreen_ = NO;
+  fullscreenTransition_.reset();
 }
 
 - (void)windowDidFailToEnterFullScreen:(NSWindow*)window {
   [self deregisterForContentViewResizeNotifications];
   enteringAppKitFullscreen_ = NO;
+  fullscreenTransition_.reset();
   [self adjustUIForExitingFullscreenAndStopOmniboxSliding];
 }
 
 - (void)windowDidFailToExitFullScreen:(NSWindow*)window {
   [self deregisterForContentViewResizeNotifications];
-
+  exitingAppKitFullscreen_ = NO;
+  fullscreenTransition_.reset();
   // Force a relayout to try and get the window back into a reasonable state.
   [self layoutSubviews];
 }
@@ -876,7 +877,12 @@ willPositionSheet:(NSWindow*)sheet
 
 - (void)updateLayoutParameters:(BrowserWindowLayout*)layout {
   [layout setContentViewSize:[[[self window] contentView] bounds].size];
-  [layout setWindowSize:[[self window] frame].size];
+
+  NSSize windowSize = (fullscreenTransition_.get())
+                          ? [fullscreenTransition_ desiredWindowLayoutSize]
+                          : [[self window] frame].size;
+
+  [layout setWindowSize:windowSize];
 
   [layout setInAnyFullscreen:[self isInAnyFullscreenMode]];
   [layout setFullscreenSlidingStyle:
@@ -1094,21 +1100,43 @@ willPositionSheet:(NSWindow*)sheet
   if (![self shouldUseCustomAppKitFullscreenTransition])
     return nil;
 
-  enterFullscreenTransition_.reset(
-      [[BrowserWindowEnterFullscreenTransition alloc]
-          initWithWindow:self.window]);
-  return [enterFullscreenTransition_ customWindowsToEnterFullScreen];
+  FramedBrowserWindow* framedBrowserWindow =
+      base::mac::ObjCCast<FramedBrowserWindow>([self window]);
+  fullscreenTransition_.reset([[BrowserWindowFullscreenTransition alloc]
+      initEnterWithWindow:framedBrowserWindow]);
+  return [fullscreenTransition_ customWindowsForFullScreenTransition];
+}
+
+- (NSArray*)customWindowsToExitFullScreenForWindow:(NSWindow*)window {
+  DCHECK([window isEqual:self.window]);
+
+  if (![self shouldUseCustomAppKitFullscreenTransition])
+    return nil;
+
+  FramedBrowserWindow* framedBrowserWindow =
+      base::mac::ObjCCast<FramedBrowserWindow>([self window]);
+  fullscreenTransition_.reset([[BrowserWindowFullscreenTransition alloc]
+      initExitWithWindow:framedBrowserWindow
+                   frame:savedRegularWindowFrame_]);
+
+  return [fullscreenTransition_ customWindowsForFullScreenTransition];
 }
 
 - (void)window:(NSWindow*)window
     startCustomAnimationToEnterFullScreenWithDuration:(NSTimeInterval)duration {
   DCHECK([window isEqual:self.window]);
-  [enterFullscreenTransition_
-      startCustomAnimationToEnterFullScreenWithDuration:duration];
+  [fullscreenTransition_ startCustomFullScreenAnimationWithDuration:duration];
+}
+
+- (void)window:(NSWindow*)window
+    startCustomAnimationToExitFullScreenWithDuration:(NSTimeInterval)duration {
+  DCHECK([window isEqual:self.window]);
+
+  [fullscreenTransition_ startCustomFullScreenAnimationWithDuration:duration];
 }
 
 - (BOOL)shouldConstrainFrameRect {
-  if ([enterFullscreenTransition_ shouldWindowBeUnconstrained])
+  if ([fullscreenTransition_ shouldWindowBeUnconstrained])
     return NO;
 
   return [super shouldConstrainFrameRect];

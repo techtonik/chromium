@@ -9,9 +9,8 @@
 #include "base/threading/simple_thread.h"
 #include "components/clipboard/clipboard_application_delegate.h"
 #include "components/filesystem/file_system_app.h"
-#include "components/view_manager/surfaces/surfaces_service_application.h"
 #include "mandoline/services/core_services/application_delegate_factory.h"
-#include "mandoline/ui/browser/browser_manager.h"
+#include "mandoline/tab/web_view_application_delegate.h"
 #include "mojo/application/public/cpp/application_connection.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/application_runner.h"
@@ -115,16 +114,14 @@ void CoreServicesApplicationDelegate::StartApplication(
   const std::string url = response->url;
 
   scoped_ptr<mojo::ApplicationDelegate> delegate;
-  if (url == "mojo://browser/") {
-    delegate.reset(new mandoline::BrowserManager);
-  } else if (url == "mojo://clipboard/") {
+  if (url == "mojo://clipboard/") {
     delegate.reset(new clipboard::ClipboardApplicationDelegate);
   } else if (url == "mojo://filesystem/") {
     delegate.reset(new filesystem::FileSystemApp);
-  } else if (url == "mojo://surfaces_service/") {
-    delegate.reset(new surfaces::SurfacesServiceApplication);
   } else if (url == "mojo://tracing/") {
     delegate.reset(new tracing::TracingApp);
+  } else if (url == "mojo://web_view/") {
+    delegate.reset(new web_view::WebViewApplicationDelegate);
   } else {
 #if defined(USE_AURA)
     delegate = CreateApplicationDelegateAura(url);

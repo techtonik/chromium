@@ -81,8 +81,9 @@ class RequestContext : public URLRequestContext {
         network_session.get(), HttpCache::DefaultBackend::InMemory(0)));
     URLRequestJobFactoryImpl* job_factory = new URLRequestJobFactoryImpl();
 #if !defined(DISABLE_FILE_SUPPORT)
-    job_factory->SetProtocolHandler(
-        "file", new FileProtocolHandler(base::ThreadTaskRunnerHandle::Get()));
+    job_factory->SetProtocolHandler("file",
+                                    make_scoped_ptr(new FileProtocolHandler(
+                                        base::ThreadTaskRunnerHandle::Get())));
 #endif
     storage_.set_job_factory(job_factory);
   }
@@ -145,8 +146,6 @@ class BasicNetworkDelegate : public NetworkDelegateImpl {
                         const GURL& new_location) override {}
 
   void OnResponseStarted(URLRequest* request) override {}
-
-  void OnRawBytesRead(const URLRequest& request, int bytes_read) override {}
 
   void OnCompleted(URLRequest* request, bool started) override {}
 

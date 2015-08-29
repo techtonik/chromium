@@ -215,10 +215,10 @@ class CC_EXPORT TileManager : public TileTaskRunnerClient {
   friend class Tile;
   // Virtual for testing.
   virtual void Release(Tile* tile);
+  Tile::Id GetUniqueTileId() { return ++next_tile_id_; }
 
   // Overriden from TileTaskRunnerClient:
   void DidFinishRunningTileTasks(TaskSet task_set) override;
-  TaskSetCollection TasksThatShouldBeForcedToComplete() const override;
 
   typedef std::vector<PrioritizedTile> PrioritizedTileVector;
   typedef std::set<Tile*> TileSet;
@@ -254,11 +254,11 @@ class CC_EXPORT TileManager : public TileTaskRunnerClient {
   };
 
   void OnRasterTaskCompleted(Tile::Id tile,
-                             scoped_ptr<ScopedResource> resource,
+                             Resource* resource,
                              const RasterSource::SolidColorAnalysis& analysis,
                              bool was_canceled);
   void UpdateTileDrawInfo(Tile* tile,
-                          scoped_ptr<ScopedResource> resource,
+                          Resource* resource,
                           const RasterSource::SolidColorAnalysis& analysis);
 
   void FreeResourcesForTile(Tile* tile);
@@ -329,6 +329,7 @@ class CC_EXPORT TileManager : public TileTaskRunnerClient {
   bool has_scheduled_tile_tasks_;
 
   uint64_t prepare_tiles_count_;
+  uint64_t next_tile_id_;
 
   DISALLOW_COPY_AND_ASSIGN(TileManager);
 };

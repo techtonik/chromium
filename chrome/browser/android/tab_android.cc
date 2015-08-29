@@ -13,6 +13,8 @@
 #include "chrome/browser/android/chrome_web_contents_delegate_android.h"
 #include "chrome/browser/android/compositor/tab_content_manager.h"
 #include "chrome/browser/android/metrics/uma_utils.h"
+#include "chrome/browser/android/offline_pages/offline_page_bridge.h"
+#include "chrome/browser/android/offline_pages/offline_page_model_factory.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/managed_bookmark_service_factory.h"
 #include "chrome/browser/browser_about_handler.h"
@@ -56,6 +58,9 @@
 #include "components/infobars/core/infobar_container.h"
 #include "components/navigation_interception/intercept_navigation_delegate.h"
 #include "components/navigation_interception/navigation_params.h"
+#include "components/offline_pages/offline_page_feature.h"
+#include "components/offline_pages/offline_page_item.h"
+#include "components/offline_pages/offline_page_model.h"
 #include "components/url_formatter/url_fixer.h"
 #include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/content_view_core.h"
@@ -522,17 +527,19 @@ base::android::ScopedJavaLocalRef<jobject> TabAndroid::GetProfileAndroid(
   return profile_android->GetJavaObject();
 }
 
-TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
-                                              jobject obj,
-                                              jstring url,
-                                              jstring j_extra_headers,
-                                              jbyteArray j_post_data,
-                                              jint page_transition,
-                                              jstring j_referrer_url,
-                                              jint referrer_policy,
-                                              jboolean is_renderer_initiated,
-                                              jlong intent_received_timestamp,
-                                              jboolean has_user_gesture) {
+TabAndroid::TabLoadStatus TabAndroid::LoadUrl(
+    JNIEnv* env,
+    jobject obj,
+    jstring url,
+    jstring j_extra_headers,
+    jbyteArray j_post_data,
+    jint page_transition,
+    jstring j_referrer_url,
+    jint referrer_policy,
+    jboolean is_renderer_initiated,
+    jboolean should_replace_current_entry,
+    jlong intent_received_timestamp,
+    jboolean has_user_gesture) {
   if (!web_contents())
     return PAGE_LOAD_FAILED;
 
@@ -614,6 +621,7 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
       return DEFAULT_PAGE_LOAD;
     }
     load_params.is_renderer_initiated = is_renderer_initiated;
+    load_params.should_replace_current_entry = should_replace_current_entry;
     load_params.intent_received_timestamp = intent_received_timestamp;
     load_params.has_user_gesture = has_user_gesture;
     web_contents()->GetController().LoadURLWithParams(load_params);
@@ -766,9 +774,14 @@ void TabAndroid::SearchByImageInNewTabAsync(JNIEnv* env, jobject obj) {
 jlong TabAndroid::GetBookmarkId(JNIEnv* env,
                                jobject obj,
                                jboolean only_editable) {
-  const GURL& url = dom_distiller::url_utils::GetOriginalUrlFromDistillerUrl(
+  GURL url = dom_distiller::url_utils::GetOriginalUrlFromDistillerUrl(
       web_contents()->GetURL());
   Profile* profile = GetProfile();
+
+  // If the url points to an offline page, replace it with the original url.
+  const offline_pages::OfflinePageItem* offline_page = GetOfflinePage(url);
+  if (offline_page)
+    url = offline_page->url;
 
   // Get all the nodes for |url| and sort them by date added.
   std::vector<const bookmarks::BookmarkNode*> nodes;
@@ -787,6 +800,29 @@ jlong TabAndroid::GetBookmarkId(JNIEnv* env,
   }
 
   return -1;
+}
+
+jboolean TabAndroid::IsOfflinePage(JNIEnv* env, jobject obj) {
+  GURL url = dom_distiller::url_utils::GetOriginalUrlFromDistillerUrl(
+      web_contents()->GetURL());
+  return GetOfflinePage(url) != nullptr;
+}
+
+const offline_pages::OfflinePageItem* TabAndroid::GetOfflinePage(
+    const GURL& url) const {
+  if (!offline_pages::IsOfflinePagesEnabled())
+    return nullptr;
+
+  // Note that we first check if the url likely points to an offline page
+  // before calling GetPageByOfflineURL in order to avoid unnecessary lookup
+  // cost.
+  if (!offline_pages::android::OfflinePageBridge::MightBeOfflineURL(url))
+    return nullptr;
+
+  offline_pages::OfflinePageModel* offline_page_model =
+      offline_pages::OfflinePageModelFactory::GetForBrowserContext(
+          GetProfile());
+  return offline_page_model->GetPageByOfflineURL(url);
 }
 
 bool TabAndroid::HasPrerenderedUrl(JNIEnv* env, jobject obj, jstring url) {

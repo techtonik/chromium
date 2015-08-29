@@ -92,7 +92,7 @@ class URL_EXPORT GURL {
 
   // Returns the potentially invalid spec for a the URL. This spec MUST NOT be
   // modified or sent over the network. It is designed to be displayed in error
-  // messages to the user, as the apperance of the spec may explain the error.
+  // messages to the user, as the appearance of the spec may explain the error.
   // If the spec is valid, the valid spec will be returned.
   //
   // The returned string is guaranteed to be valid UTF-8.
@@ -125,9 +125,8 @@ class URL_EXPORT GURL {
   // pages.
   //
   // It may be impossible to resolve the URLs properly. If the input is not
-  // "standard" (SchemeIsStandard() == false) and the input looks relative, we
-  // can't resolve it. In these cases, the result will be an empty, invalid
-  // GURL.
+  // "standard" (IsStandard() == false) and the input looks relative, we can't
+  // resolve it. In these cases, the result will be an empty, invalid GURL.
   //
   // The result may also be a nonempty, invalid URL if the input has some kind
   // of encoding error. In these cases, we will try to construct a "good" URL
@@ -211,23 +210,6 @@ class URL_EXPORT GURL {
     return SchemeIs(url::kFileSystemScheme);
   }
 
-  // Returns true if the scheme indicates a secure connection.
-  //
-  // NOTE: This function is deprecated. You probably want
-  // |SchemeIsCryptographic| (if you just want to know if a scheme uses TLS for
-  // network transport) or Chromium's |IsOriginSecure| for a higher-level test
-  // about an origin's security. See those functions' documentation for more
-  // detail.
-  //
-  // TODO(palmer): Audit callers and change them to |SchemeIsCryptographic| or
-  // |IsOriginSecure|, as appropriate. Then remove |SchemeIsSecure|.
-  // crbug.com/362214
-  bool SchemeIsSecure() const {
-    return SchemeIs(url::kHttpsScheme) || SchemeIs(url::kWssScheme) ||
-           (SchemeIsFileSystem() && inner_url() &&
-            inner_url()->SchemeIsSecure());
-  }
-
   // Returns true if the scheme indicates a network connection that uses TLS or
   // some other cryptographic protocol (e.g. QUIC) for security.
   //
@@ -283,8 +265,8 @@ class URL_EXPORT GURL {
     return ComponentString(parsed_.ref);
   }
 
-  // Existance querying. These functions will return true if the corresponding
-  // URL component exists in this URL. Note that existance is different than
+  // Existence querying. These functions will return true if the corresponding
+  // URL component exists in this URL. Note that existence is different than
   // being nonempty. http://www.google.com/? has a query that just happens to
   // be empty, and has_query() will return true.
   bool has_scheme() const {
@@ -297,7 +279,7 @@ class URL_EXPORT GURL {
     return parsed_.password.len >= 0;
   }
   bool has_host() const {
-    // Note that hosts are special, absense of host means length 0.
+    // Note that hosts are special, absence of host means length 0.
     return parsed_.host.len > 0;
   }
   bool has_port() const {
@@ -347,7 +329,7 @@ class URL_EXPORT GURL {
   // object constructions are done.
   bool DomainIs(base::StringPiece lower_ascii_domain) const;
 
-  // Swaps the contents of this GURL object with the argument without doing
+  // Swaps the contents of this GURL object with |other|, without doing
   // any memory allocations.
   void Swap(GURL* other);
 
@@ -364,8 +346,8 @@ class URL_EXPORT GURL {
 
  private:
   // Variant of the string parsing constructor that allows the caller to elect
-  // retain trailing whitespace, if any, on the passed URL spec but only  if the
-  // scheme is one that allows trailing whitespace. The primary use-case is
+  // retain trailing whitespace, if any, on the passed URL spec, but only if
+  // the scheme is one that allows trailing whitespace. The primary use-case is
   // for data: URLs. In most cases, you want to use the single parameter
   // constructor above.
   enum RetainWhiteSpaceSelector { RETAIN_TRAILING_PATH_WHITEPACE };

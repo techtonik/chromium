@@ -69,9 +69,6 @@ class BasicNetworkDelegate : public net::NetworkDelegateImpl {
 
   void OnResponseStarted(net::URLRequest* request) override {}
 
-  void OnRawBytesRead(const net::URLRequest& request,
-                      int bytes_read) override {}
-
   void OnCompleted(net::URLRequest* request, bool started) override {}
 
   void OnURLRequestDestroyed(net::URLRequest* request) override {}
@@ -195,7 +192,7 @@ void URLRequestContextAdapter::InitRequestContextOnNetworkThread() {
           static_cast<uint16>(quic_hint.alternate_port));
       context_->http_server_properties()->SetAlternativeService(
           quic_hint_host_port_pair, alternative_service, 1.0f,
-          base::Time::Now() + base::TimeDelta::FromDays(1));
+          base::Time::Max());
     }
   }
   load_disable_cache_ = config_->load_disable_cache;

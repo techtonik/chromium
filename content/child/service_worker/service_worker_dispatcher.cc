@@ -21,9 +21,9 @@
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "content/public/common/url_utils.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerClientsInfo.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerProviderClient.h"
 #include "third_party/WebKit/public/platform/WebString.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerClientsInfo.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerProviderClient.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 
 using blink::WebServiceWorkerError;
@@ -34,11 +34,10 @@ namespace content {
 
 namespace {
 
-base::LazyInstance<ThreadLocalPointer<ServiceWorkerDispatcher> >::Leaky
-    g_dispatcher_tls = LAZY_INSTANCE_INITIALIZER;
+base::LazyInstance<ThreadLocalPointer<void>>::Leaky g_dispatcher_tls =
+    LAZY_INSTANCE_INITIALIZER;
 
-ServiceWorkerDispatcher* const kHasBeenDeleted =
-    reinterpret_cast<ServiceWorkerDispatcher*>(0x1);
+void* const kHasBeenDeleted = reinterpret_cast<void*>(0x1);
 
 int CurrentWorkerId() {
   return WorkerTaskRunner::Instance()->CurrentWorkerId();
@@ -51,7 +50,7 @@ ServiceWorkerDispatcher::ServiceWorkerDispatcher(
     base::SingleThreadTaskRunner* main_thread_task_runner)
     : thread_safe_sender_(thread_safe_sender),
       main_thread_task_runner_(main_thread_task_runner) {
-  g_dispatcher_tls.Pointer()->Set(this);
+  g_dispatcher_tls.Pointer()->Set(static_cast<void*>(this));
 }
 
 ServiceWorkerDispatcher::~ServiceWorkerDispatcher() {
@@ -120,8 +119,8 @@ void ServiceWorkerDispatcher::RegisterServiceWorker(
     std::string error_message(kServiceWorkerRegisterErrorPrefix);
     error_message += "The provided scriptURL or scope is too long.";
     callbacks->onError(
-        new WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
-                                  blink::WebString::fromUTF8(error_message)));
+        WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
+                              blink::WebString::fromUTF8(error_message)));
     return;
   }
 
@@ -161,17 +160,17 @@ void ServiceWorkerDispatcher::UnregisterServiceWorker(
 void ServiceWorkerDispatcher::GetRegistration(
     int provider_id,
     const GURL& document_url,
-    WebServiceWorkerRegistrationCallbacks* callbacks) {
+    WebServiceWorkerGetRegistrationCallbacks* callbacks) {
   DCHECK(callbacks);
 
   if (document_url.possibly_invalid_spec().size() > GetMaxURLChars()) {
-    scoped_ptr<WebServiceWorkerRegistrationCallbacks>
-        owned_callbacks(callbacks);
+    scoped_ptr<WebServiceWorkerGetRegistrationCallbacks> owned_callbacks(
+        callbacks);
     std::string error_message(kServiceWorkerGetRegistrationErrorPrefix);
     error_message += "The provided documentURL is too long.";
     callbacks->onError(
-        new WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
-                                  blink::WebString::fromUTF8(error_message)));
+        WebServiceWorkerError(WebServiceWorkerError::ErrorTypeSecurity,
+                              blink::WebString::fromUTF8(error_message)));
     return;
   }
 
@@ -250,7 +249,8 @@ ServiceWorkerDispatcher::GetOrCreateThreadSpecificInstance(
     g_dispatcher_tls.Pointer()->Set(NULL);
   }
   if (g_dispatcher_tls.Pointer()->Get())
-    return g_dispatcher_tls.Pointer()->Get();
+    return static_cast<ServiceWorkerDispatcher*>(
+        g_dispatcher_tls.Pointer()->Get());
 
   ServiceWorkerDispatcher* dispatcher =
       new ServiceWorkerDispatcher(thread_safe_sender, main_thread_task_runner);
@@ -262,7 +262,8 @@ ServiceWorkerDispatcher::GetOrCreateThreadSpecificInstance(
 ServiceWorkerDispatcher* ServiceWorkerDispatcher::GetThreadSpecificInstance() {
   if (g_dispatcher_tls.Pointer()->Get() == kHasBeenDeleted)
     return NULL;
-  return g_dispatcher_tls.Pointer()->Get();
+  return static_cast<ServiceWorkerDispatcher*>(
+      g_dispatcher_tls.Pointer()->Get());
 }
 
 void ServiceWorkerDispatcher::OnWorkerRunLoopStopped() {
@@ -296,23 +297,24 @@ WebServiceWorkerImpl* ServiceWorkerDispatcher::GetServiceWorker(
   return new WebServiceWorkerImpl(handle_ref.Pass(), thread_safe_sender_.get());
 }
 
-WebServiceWorkerRegistrationImpl*
-ServiceWorkerDispatcher::CreateServiceWorkerRegistration(
+scoped_ptr<WebServiceWorkerRegistrationImpl>
+ServiceWorkerDispatcher::CreateRegistration(
     const ServiceWorkerRegistrationObjectInfo& info,
-    bool adopt_handle) {
-  DCHECK(!ContainsKey(registrations_, info.handle_id));
-  if (info.handle_id == kInvalidServiceWorkerRegistrationHandleId)
-    return NULL;
+    const ServiceWorkerVersionAttributes& attrs) {
+  return CreateRegistrationInternal(
+      ServiceWorkerRegistrationHandleReference::Create(
+          info, thread_safe_sender_.get()),
+      attrs, false /* adopt_handle */);
+}
 
-  scoped_ptr<ServiceWorkerRegistrationHandleReference> handle_ref =
-      adopt_handle ? ServiceWorkerRegistrationHandleReference::Adopt(
-                         info, thread_safe_sender_.get())
-                   : ServiceWorkerRegistrationHandleReference::Create(
-                         info, thread_safe_sender_.get());
-
-  // WebServiceWorkerRegistrationImpl constructor calls
-  // AddServiceWorkerRegistration.
-  return new WebServiceWorkerRegistrationImpl(handle_ref.Pass());
+scoped_ptr<WebServiceWorkerRegistrationImpl>
+ServiceWorkerDispatcher::AdoptRegistration(
+    const ServiceWorkerRegistrationObjectInfo& info,
+    const ServiceWorkerVersionAttributes& attrs) {
+  return CreateRegistrationInternal(
+      ServiceWorkerRegistrationHandleReference::Adopt(
+          info, thread_safe_sender_.get()),
+      attrs, true /* adopt_handle */);
 }
 
 // We can assume that this message handler is called before the worker context
@@ -384,7 +386,8 @@ void ServiceWorkerDispatcher::OnRegistered(
   if (!callbacks)
     return;
 
-  callbacks->onSuccess(FindOrCreateRegistration(info, attrs));
+  callbacks->onSuccess(
+      blink::adoptWebPtr(AdoptRegistration(info, attrs).release()));
   pending_registration_callbacks_.Remove(request_id);
 }
 
@@ -438,17 +441,17 @@ void ServiceWorkerDispatcher::OnDidGetRegistration(
   TRACE_EVENT_ASYNC_END0("ServiceWorker",
                          "ServiceWorkerDispatcher::GetRegistration",
                          request_id);
-  WebServiceWorkerRegistrationCallbacks* callbacks =
+  WebServiceWorkerGetRegistrationCallbacks* callbacks =
       pending_get_registration_callbacks_.Lookup(request_id);
   DCHECK(callbacks);
   if (!callbacks)
     return;
 
-  WebServiceWorkerRegistrationImpl* registration = NULL;
+  scoped_ptr<WebServiceWorkerRegistrationImpl> registration;
   if (info.handle_id != kInvalidServiceWorkerHandleId)
-    registration = FindOrCreateRegistration(info, attrs);
+    registration = AdoptRegistration(info, attrs);
 
-  callbacks->onSuccess(registration);
+  callbacks->onSuccess(blink::adoptWebPtr(registration.release()));
   pending_get_registration_callbacks_.Remove(request_id);
 }
 
@@ -474,17 +477,17 @@ void ServiceWorkerDispatcher::OnDidGetRegistrations(
 
   typedef blink::WebVector<blink::WebServiceWorkerRegistration*>
       WebServiceWorkerRegistrationArray;
-  WebServiceWorkerRegistrationArray* registrations =
-      new WebServiceWorkerRegistrationArray(infos.size());
+  scoped_ptr<WebServiceWorkerRegistrationArray> registrations(
+      new WebServiceWorkerRegistrationArray(infos.size()));
   for (size_t i = 0; i < infos.size(); ++i) {
     if (infos[i].handle_id != kInvalidServiceWorkerHandleId) {
       ServiceWorkerRegistrationObjectInfo info(infos[i]);
       ServiceWorkerVersionAttributes attr(attrs[i]);
-      (*registrations)[i] = FindOrCreateRegistration(info, attr);
+      (*registrations)[i] = AdoptRegistration(info, attr).release();
     }
   }
 
-  callbacks->onSuccess(registrations);
+  callbacks->onSuccess(blink::adoptWebPtr(registrations.release()));
   pending_get_registrations_callbacks_.Remove(request_id);
 }
 
@@ -507,10 +510,8 @@ void ServiceWorkerDispatcher::OnDidGetRegistrationForReady(
   if (!callbacks)
     return;
 
-  WebServiceWorkerRegistrationImpl* registration = NULL;
-  DCHECK(info.handle_id != kInvalidServiceWorkerHandleId);
-  registration = FindOrCreateRegistration(info, attrs);
-  callbacks->onSuccess(registration);
+  callbacks->onSuccess(
+      blink::adoptWebPtr(AdoptRegistration(info, attrs).release()));
   get_for_ready_callbacks_.Remove(request_id);
 }
 
@@ -532,7 +533,7 @@ void ServiceWorkerDispatcher::OnRegistrationError(
   if (!callbacks)
     return;
 
-  callbacks->onError(new WebServiceWorkerError(error_type, message));
+  callbacks->onError(WebServiceWorkerError(error_type, message));
   pending_registration_callbacks_.Remove(request_id);
 }
 
@@ -599,7 +600,7 @@ void ServiceWorkerDispatcher::OnGetRegistrationError(
   if (!callbacks)
     return;
 
-  callbacks->onError(new WebServiceWorkerError(error_type, message));
+  callbacks->onError(WebServiceWorkerError(error_type, message));
   pending_get_registration_callbacks_.Remove(request_id);
 }
 
@@ -622,7 +623,7 @@ void ServiceWorkerDispatcher::OnGetRegistrationsError(
   if (!callbacks)
     return;
 
-  callbacks->onError(new WebServiceWorkerError(error_type, message));
+  callbacks->onError(WebServiceWorkerError(error_type, message));
   pending_get_registrations_callbacks_.Remove(request_id);
 }
 
@@ -775,30 +776,19 @@ void ServiceWorkerDispatcher::RemoveServiceWorkerRegistration(
   registrations_.erase(registration_handle_id);
 }
 
-WebServiceWorkerRegistrationImpl*
-ServiceWorkerDispatcher::FindOrCreateRegistration(
-    const ServiceWorkerRegistrationObjectInfo& info,
-    const ServiceWorkerVersionAttributes& attrs) {
-  RegistrationObjectMap::iterator found = registrations_.find(info.handle_id);
-  if (found != registrations_.end()) {
-    ServiceWorkerRegistrationHandleReference::Adopt(info,
-                                                    thread_safe_sender_.get());
-    ServiceWorkerHandleReference::Adopt(attrs.installing,
-                                        thread_safe_sender_.get());
-    ServiceWorkerHandleReference::Adopt(attrs.waiting,
-                                        thread_safe_sender_.get());
-    ServiceWorkerHandleReference::Adopt(attrs.active,
-                                        thread_safe_sender_.get());
-    return found->second;
-  }
-
-  bool adopt_handle = true;
-  WebServiceWorkerRegistrationImpl* registration =
-      CreateServiceWorkerRegistration(info, adopt_handle);
+scoped_ptr<WebServiceWorkerRegistrationImpl>
+ServiceWorkerDispatcher::CreateRegistrationInternal(
+    scoped_ptr<ServiceWorkerRegistrationHandleReference> handle_ref,
+    const ServiceWorkerVersionAttributes& attrs,
+    bool adopt_handle) {
+  // WebServiceWorkerRegistrationImpl constructor calls
+  // AddServiceWorkerRegistration.
+  scoped_ptr<WebServiceWorkerRegistrationImpl> registration(
+      new WebServiceWorkerRegistrationImpl(handle_ref.Pass()));
   registration->SetInstalling(GetServiceWorker(attrs.installing, adopt_handle));
   registration->SetWaiting(GetServiceWorker(attrs.waiting, adopt_handle));
   registration->SetActive(GetServiceWorker(attrs.active, adopt_handle));
-  return registration;
+  return registration.Pass();
 }
 
 }  // namespace content

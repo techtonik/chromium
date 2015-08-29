@@ -20,11 +20,9 @@
 #include "cc/base/scoped_ptr_vector.h"
 #include "cc/debug/frame_timing_request.h"
 #include "cc/debug/micro_benchmark.h"
-#include "cc/layers/draw_properties.h"
 #include "cc/layers/layer_lists.h"
 #include "cc/layers/layer_position_constraint.h"
 #include "cc/layers/paint_properties.h"
-#include "cc/layers/render_surface.h"
 #include "cc/layers/scroll_blocks_on.h"
 #include "cc/output/filter_operations.h"
 #include "cc/trees/property_tree.h"
@@ -75,9 +73,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
                         public LayerAnimationValueObserver,
                         public LayerAnimationValueProvider {
  public:
-  typedef RenderSurfaceLayerList RenderSurfaceListType;
   typedef LayerList LayerListType;
-  typedef RenderSurface RenderSurfaceType;
 
   enum LayerIdLabels {
     INVALID_ID = -1,
@@ -141,6 +137,14 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetBlendMode(SkXfermode::Mode blend_mode);
   SkXfermode::Mode blend_mode() const { return blend_mode_; }
 
+  void set_draw_blend_mode(SkXfermode::Mode blend_mode) {
+    if (draw_blend_mode_ == blend_mode)
+      return;
+    draw_blend_mode_ = blend_mode;
+    SetNeedsPushProperties();
+  }
+  SkXfermode::Mode draw_blend_mode() const { return draw_blend_mode_; }
+
   bool uses_default_blend_mode() const {
     return blend_mode_ == SkXfermode::kSrcOver_Mode;
   }
@@ -191,8 +195,12 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   const gfx::Transform& transform() const { return transform_; }
   bool TransformIsAnimating() const;
   bool HasPotentiallyRunningTransformAnimation() const;
+  bool HasOnlyTranslationTransforms() const;
   bool AnimationsPreserveAxisAlignment() const;
   bool transform_is_invertible() const { return transform_is_invertible_; }
+
+  bool MaximumTargetScale(float* max_scale) const;
+  bool AnimationStartScale(float* start_scale) const;
 
   void SetTransformOrigin(const gfx::Point3F&);
   gfx::Point3F transform_origin() const { return transform_origin_; }
@@ -230,45 +238,17 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return clip_children_.get();
   }
 
-  DrawProperties<Layer>& draw_properties() { return draw_properties_; }
-  const DrawProperties<Layer>& draw_properties() const {
-    return draw_properties_;
-  }
+  // TODO(enne): Fix style here (and everywhere) once LayerImpl does the same.
+  gfx::Transform draw_transform() const;
+  gfx::Transform screen_space_transform() const;
 
-  // The following are shortcut accessors to get various information from
-  // draw_properties_
-  const gfx::Transform& draw_transform() const {
-    return draw_properties_.target_space_transform;
-  }
-  const gfx::Transform& screen_space_transform() const {
-    return draw_properties_.screen_space_transform;
-  }
-  float draw_opacity() const { return draw_properties_.opacity; }
-  bool screen_space_transform_is_animating() const {
-    return draw_properties_.screen_space_transform_is_animating;
-  }
-  gfx::Rect clip_rect() const { return draw_properties_.clip_rect; }
-  gfx::Rect drawable_content_rect() const {
-    return draw_properties_.drawable_content_rect;
-  }
-  gfx::Rect visible_layer_rect() const {
-    return draw_properties_.visible_layer_rect;
-  }
-  Layer* render_target() {
-    DCHECK(!draw_properties_.render_target ||
-           draw_properties_.render_target->render_surface());
-    return draw_properties_.render_target;
-  }
-  const Layer* render_target() const {
-    DCHECK(!draw_properties_.render_target ||
-           draw_properties_.render_target->render_surface());
-    return draw_properties_.render_target;
+  void set_num_unclipped_descendants(size_t descendants) {
+    num_unclipped_descendants_ = descendants;
   }
   size_t num_unclipped_descendants() const {
-    return draw_properties_.num_unclipped_descendants;
+    return num_unclipped_descendants_;
   }
 
-  RenderSurface* render_surface() const { return render_surface_.get(); }
   void SetScrollOffset(const gfx::ScrollOffset& scroll_offset);
   void SetScrollCompensationAdjustment(
       const gfx::Vector2dF& scroll_compensation_adjustment);
@@ -368,10 +348,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   virtual void SavePaintProperties();
   // Returns true iff anything was updated that needs to be committed.
   virtual bool Update();
-  virtual bool NeedMoreUpdates();
   virtual void SetIsMask(bool is_mask) {}
-  virtual void ReduceMemoryUsage() {}
-  virtual void OnOutputSurfaceCreated() {}
   virtual bool IsSuitableForGpuRasterization() const;
 
   virtual scoped_refptr<base::trace_event::ConvertableToTraceFormat>
@@ -380,11 +357,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetLayerClient(LayerClient* client) { client_ = client; }
 
   virtual void PushPropertiesTo(LayerImpl* layer);
-
-  void CreateRenderSurface();
-  void ClearRenderSurface();
-
-  void ClearRenderSurfaceLayerList();
 
   LayerTreeHost* layer_tree_host() { return layer_tree_host_; }
   const LayerTreeHost* layer_tree_host() const { return layer_tree_host_; }
@@ -452,8 +424,8 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetClipTreeIndex(int index);
   int clip_tree_index() const;
 
-  void SetOpacityTreeIndex(int index);
-  int opacity_tree_index() const;
+  void SetEffectTreeIndex(int index);
+  int effect_tree_index() const;
 
   void set_offset_to_transform_parent(gfx::Vector2dF offset) {
     if (offset_to_transform_parent_ == offset)
@@ -465,28 +437,24 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return offset_to_transform_parent_;
   }
 
-  // TODO(vollick): Once we transition to transform and clip trees, rename these
-  // functions and related values.  The "from property trees" functions below
-  // use the transform and clip trees.  Eventually, we will use these functions
-  // to compute the official values, but these functions are retained for
-  // testing purposes until we've migrated.
-
+  // TODO(enne): Once LayerImpl only uses property trees, remove these
+  // functions.
   const gfx::Rect& visible_rect_from_property_trees() const {
-    return visible_rect_from_property_trees_;
+    return visible_layer_rect();
   }
   void set_visible_rect_from_property_trees(const gfx::Rect& rect) {
-    // No push properties here, as this acts like a draw property.
-    visible_rect_from_property_trees_ = rect;
+    set_visible_layer_rect(rect);
   }
-
   const gfx::Rect& clip_rect_in_target_space_from_property_trees() const {
-    return clip_rect_in_target_space_from_property_trees_;
+    return clip_rect();
   }
   void set_clip_rect_in_target_space_from_property_trees(
       const gfx::Rect& rect) {
-    clip_rect_in_target_space_from_property_trees_ = rect;
+    set_clip_rect(rect);
   }
-
+  // TODO(enne): This needs a different name.  It is a calculated value
+  // from the property tree builder and not a synonym for "should
+  // flatten transform".
   void set_should_flatten_transform_from_property_tree(bool should_flatten) {
     if (should_flatten_transform_from_property_tree_ == should_flatten)
       return;
@@ -497,6 +465,14 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return should_flatten_transform_from_property_tree_;
   }
 
+  const gfx::Rect& visible_layer_rect() const { return visible_layer_rect_; }
+  void set_visible_layer_rect(const gfx::Rect& rect) {
+    visible_layer_rect_ = rect;
+  }
+
+  const gfx::Rect& clip_rect() const { return clip_rect_; }
+  void set_clip_rect(const gfx::Rect& rect) { clip_rect_ = rect; }
+
   void set_is_clipped(bool is_clipped) {
     if (is_clipped_ == is_clipped)
       return;
@@ -505,13 +481,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   }
   bool is_clipped() const { return is_clipped_; }
 
-  // TODO(vollick): These values are temporary and will be removed as soon as
-  // render surface determinations are moved out of CDP. They only exist because
-  // certain logic depends on whether or not a layer would render to a separate
-  // surface, but CDP destroys surfaces and targets it doesn't need, so without
-  // this boolean, this is impossible to determine after the fact without
-  // wastefully recomputing it. This is public for the time being so that it can
-  // be accessed from CDP.
   bool has_render_surface() const {
     return has_render_surface_;
   }
@@ -525,20 +494,13 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   }
 
   void DidBeginTracing();
-  void set_num_layer_or_descandant_with_copy_request(
+  void set_num_layer_or_descendant_with_copy_request(
       int num_layer_or_descendants_with_copy_request) {
     num_layer_or_descendants_with_copy_request_ =
         num_layer_or_descendants_with_copy_request;
   }
-
-  void set_num_layer_or_descandant_with_input_handler(
-      int num_layer_or_descendants_with_input_handler) {
-    num_layer_or_descendants_with_input_handler_ =
-        num_layer_or_descendants_with_input_handler;
-  }
-
-  int num_layer_or_descendants_with_input_handler() {
-    return num_layer_or_descendants_with_input_handler_;
+  int num_layer_or_descendants_with_copy_request() {
+    return num_layer_or_descendants_with_copy_request_;
   }
 
   void set_num_children_with_scroll_parent(
@@ -673,7 +635,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void InvalidatePropertyTreesIndices();
 
   void UpdateNumCopyRequestsForSubtree(bool add);
-  void UpdateNumInputHandlersForSubtree(bool add);
 
   LayerList children_;
   Layer* parent_;
@@ -696,11 +657,10 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   int scroll_clip_layer_id_;
   int num_descendants_that_draw_content_;
   int transform_tree_index_;
-  int opacity_tree_index_;
+  int effect_tree_index_;
   int clip_tree_index_;
   int property_tree_sequence_number_;
   int num_layer_or_descendants_with_copy_request_;
-  int num_layer_or_descendants_with_input_handler_;
   int num_children_with_scroll_parent_;
   gfx::Vector2dF offset_to_transform_parent_;
   bool should_flatten_transform_from_property_tree_ : 1;
@@ -730,6 +690,9 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   SkColor background_color_;
   float opacity_;
   SkXfermode::Mode blend_mode_;
+  // draw_blend_mode may be different than blend_mode_,
+  // when a RenderSurface re-parents the layer's blend_mode.
+  SkXfermode::Mode draw_blend_mode_;
   FilterOperations filters_;
   FilterOperations background_filters_;
   LayerPositionConstraint position_constraint_;
@@ -759,15 +722,12 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
 
   base::Closure did_scroll_callback_;
 
-  DrawProperties<Layer> draw_properties_;
-
   PaintProperties paint_properties_;
-  // TODO(awoloszyn): This is redundant with has_render_surface_,
-  // and should get removed once it is no longer needed on main thread.
-  scoped_ptr<RenderSurface> render_surface_;
 
-  gfx::Rect visible_rect_from_property_trees_;
-  gfx::Rect clip_rect_in_target_space_from_property_trees_;
+  // These all act like draw properties, so don't need push properties.
+  gfx::Rect visible_layer_rect_;
+  gfx::Rect clip_rect_;
+  size_t num_unclipped_descendants_;
 
   std::vector<FrameTimingRequest> frame_timing_requests_;
   bool frame_timing_requests_dirty_;

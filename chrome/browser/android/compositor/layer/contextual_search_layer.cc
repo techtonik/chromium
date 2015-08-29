@@ -37,7 +37,6 @@ void ContextualSearchLayer::SetProperties(
     int search_bar_text_resource_id,
     int search_bar_shadow_resource_id,
     int search_provider_icon_resource_id,
-    int search_icon_resource_id,
     int arrow_up_resource_id,
     int close_icon_resource_id,
     int progress_bar_background_resource_id,
@@ -59,11 +58,6 @@ void ContextualSearchLayer::SetProperties(
     float search_bar_border_height,
     bool search_bar_shadow_visible,
     float search_bar_shadow_opacity,
-    bool side_search_provider_icon_visible,
-    float search_provider_icon_opacity,
-    bool search_icon_visible,
-    float search_icon_opacity,
-    bool arrow_icon_visible,
     float arrow_icon_opacity,
     float arrow_icon_rotation,
     bool close_icon_visible,
@@ -140,114 +134,64 @@ void ContextualSearchLayer::SetProperties(
   // ---------------------------------------------------------------------------
   float search_provider_icon_left;
   float search_provider_icon_top;
-  if (side_search_provider_icon_visible) {
-    // Positions the Search Provider Icon at the start of the Search Bar.
-    if (is_rtl) {
-      search_provider_icon_left = search_panel_width -
-          search_provider_icon_resource->size.width() - search_bar_margin_side;
-    } else {
-      search_provider_icon_left = search_bar_margin_side;
-    }
-    // Centers the Search Provider Icon vertically in the Search Bar.
-    search_provider_icon_top =
-        search_bar_height / 2 -
-        search_provider_icon_resource->size.height() / 2;
+  // Positions the Search Provider Icon at the start of the Search Bar.
+  if (is_rtl) {
+    search_provider_icon_left = search_panel_width -
+        search_provider_icon_resource->size.width() - search_bar_margin_side;
   } else {
-    // Centers the Search Provider Icon horizontally in the Search Bar.
-    search_provider_icon_left =
-        search_panel_width / 2.f -
-        search_provider_icon_resource->size.width() / 2.f;
-    search_provider_icon_top =
-        -search_provider_icon_resource->size.height() / 2;
+    search_provider_icon_left = search_bar_margin_side;
   }
+  // Centers the Search Provider Icon vertically in the Search Bar.
+  search_provider_icon_top =
+      search_bar_height / 2 -
+      search_provider_icon_resource->size.height() / 2;
   search_provider_icon_->SetUIResourceId(
       search_provider_icon_resource->ui_resource->id());
   search_provider_icon_->SetBounds(search_provider_icon_resource->size);
   search_provider_icon_->SetPosition(
       gfx::PointF(search_provider_icon_left, search_provider_icon_top));
-  search_provider_icon_->SetOpacity(search_provider_icon_opacity);
-
-  // ---------------------------------------------------------------------------
-  // Search Icon
-  // ---------------------------------------------------------------------------
-  if (search_icon_visible) {
-    // Grabs the Search Icon resource.
-    ui::ResourceManager::Resource* search_icon_resource =
-        resource_manager_->GetResource(ui::ANDROID_RESOURCE_TYPE_STATIC,
-                                       search_icon_resource_id);
-    if (search_icon_->parent() != layer_) {
-      layer_->AddChild(search_icon_);
-    }
-
-    // Positions the icon at the start of the Search Bar.
-    float search_icon_left;
-    if (is_rtl) {
-      search_icon_left = search_panel_width -
-          search_icon_resource->size.width() - search_bar_margin_side;
-    } else {
-      search_icon_left = search_bar_margin_side;
-    }
-
-    // Centers the Search Icon vertically in the Search Bar.
-    float search_icon_top =
-        search_bar_height / 2 -
-        search_icon_resource->size.height() / 2;
-    search_icon_->SetUIResourceId(search_icon_resource->ui_resource->id());
-    search_icon_->SetBounds(search_icon_resource->size);
-    search_icon_->SetPosition(
-        gfx::PointF(search_icon_left, search_icon_top));
-    search_icon_->SetOpacity(search_icon_opacity);
-  } else {
-    if (search_icon_.get() && search_icon_->parent())
-      search_icon_->RemoveFromParent();
-  }
 
   // ---------------------------------------------------------------------------
   // Arrow Icon
   // ---------------------------------------------------------------------------
-  if (arrow_icon_visible) {
-    // Grabs the Search Arrow Icon resource.
-    ui::ResourceManager::Resource* arrow_icon_resource =
-        resource_manager_->GetResource(ui::ANDROID_RESOURCE_TYPE_STATIC,
-                                       arrow_up_resource_id);
-    if (arrow_icon_->parent() != layer_) {
-      layer_->AddChild(arrow_icon_);
-    }
-
-    // Positions the icon at the end of the Search Bar.
-    float arrow_icon_left;
-    if (is_rtl) {
-      arrow_icon_left = search_bar_margin_side;
-    } else {
-      arrow_icon_left = search_panel_width -
-          arrow_icon_resource->size.width() - search_bar_margin_side;
-    }
-
-    // Centers the Arrow Icon vertically in the Search Bar.
-    float arrow_icon_top = search_bar_height / 2 -
-        arrow_icon_resource->size.height() / 2;
-
-    arrow_icon_->SetUIResourceId(arrow_icon_resource->ui_resource->id());
-    arrow_icon_->SetBounds(arrow_icon_resource->size);
-    arrow_icon_->SetPosition(
-        gfx::PointF(arrow_icon_left, arrow_icon_top));
-    arrow_icon_->SetOpacity(arrow_icon_opacity);
-
-    gfx::Transform transform;
-    if (arrow_icon_rotation != 0.f) {
-      // Apply rotation about the center of the icon.
-      float pivot_x = floor(arrow_icon_resource->size.width() / 2);
-      float pivot_y = floor(arrow_icon_resource->size.height() / 2);
-      gfx::PointF pivot_origin(pivot_x, pivot_y);
-      transform.Translate(pivot_origin.x(), pivot_origin.y());
-      transform.RotateAboutZAxis(arrow_icon_rotation);
-      transform.Translate(-pivot_origin.x(), -pivot_origin.y());
-    }
-    arrow_icon_->SetTransform(transform);
-  } else {
-    if (arrow_icon_.get() && arrow_icon_->parent())
-      arrow_icon_->RemoveFromParent();
+  // Grabs the Search Arrow Icon resource.
+  ui::ResourceManager::Resource* arrow_icon_resource =
+      resource_manager_->GetResource(ui::ANDROID_RESOURCE_TYPE_STATIC,
+                                     arrow_up_resource_id);
+  if (arrow_icon_->parent() != layer_) {
+    layer_->AddChild(arrow_icon_);
   }
+
+  // Positions the icon at the end of the Search Bar.
+  float arrow_icon_left;
+  if (is_rtl) {
+    arrow_icon_left = search_bar_margin_side;
+  } else {
+    arrow_icon_left = search_panel_width -
+        arrow_icon_resource->size.width() - search_bar_margin_side;
+  }
+
+  // Centers the Arrow Icon vertically in the Search Bar.
+  float arrow_icon_top = search_bar_height / 2 -
+      arrow_icon_resource->size.height() / 2;
+
+  arrow_icon_->SetUIResourceId(arrow_icon_resource->ui_resource->id());
+  arrow_icon_->SetBounds(arrow_icon_resource->size);
+  arrow_icon_->SetPosition(
+      gfx::PointF(arrow_icon_left, arrow_icon_top));
+  arrow_icon_->SetOpacity(arrow_icon_opacity);
+
+  gfx::Transform transform;
+  if (arrow_icon_rotation != 0.f) {
+    // Apply rotation about the center of the icon.
+    float pivot_x = floor(arrow_icon_resource->size.width() / 2);
+    float pivot_y = floor(arrow_icon_resource->size.height() / 2);
+    gfx::PointF pivot_origin(pivot_x, pivot_y);
+    transform.Translate(pivot_origin.x(), pivot_origin.y());
+    transform.RotateAboutZAxis(arrow_icon_rotation);
+    transform.Translate(-pivot_origin.x(), -pivot_origin.y());
+  }
+  arrow_icon_->SetTransform(transform);
 
   // ---------------------------------------------------------------------------
   // Close Icon
@@ -452,8 +396,6 @@ ContextualSearchLayer::ContextualSearchLayer(
           cc::UIResourceLayer::Create(content::Compositor::LayerSettings())),
       search_provider_icon_(
           cc::UIResourceLayer::Create(content::Compositor::LayerSettings())),
-      search_icon_(
-          cc::UIResourceLayer::Create(content::Compositor::LayerSettings())),
       arrow_icon_(
           cc::UIResourceLayer::Create(content::Compositor::LayerSettings())),
       close_icon_(
@@ -490,9 +432,6 @@ ContextualSearchLayer::ContextualSearchLayer(
   // Search Provider Icon
   search_provider_icon_->SetIsDrawable(true);
   layer_->AddChild(search_provider_icon_);
-
-  // Search Icon
-  search_icon_->SetIsDrawable(true);
 
   // Arrow Icon
   arrow_icon_->SetIsDrawable(true);

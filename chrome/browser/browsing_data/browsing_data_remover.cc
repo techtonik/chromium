@@ -132,7 +132,7 @@ enum CookieOrCacheDeletionChoice {
 bool BrowsingDataRemover::is_removing_ = false;
 
 BrowsingDataRemover::CompletionInhibitor*
-    BrowsingDataRemover::completion_inhibitor_ = NULL;
+    BrowsingDataRemover::completion_inhibitor_ = nullptr;
 
 // Helper to create callback for BrowsingDataRemover::DoesOriginMatchMask.
 // Static.
@@ -217,35 +217,7 @@ BrowsingDataRemover::BrowsingDataRemover(Profile* profile,
       delete_begin_(delete_begin),
       delete_end_(delete_end),
       main_context_getter_(profile->GetRequestContext()),
-      media_context_getter_(profile->GetMediaRequestContext()),
-      deauthorize_content_licenses_request_id_(0),
-      waiting_for_clear_autofill_origin_urls_(false),
-      waiting_for_clear_cache_(false),
-      waiting_for_clear_channel_ids_(false),
-      waiting_for_clear_content_licenses_(false),
-      waiting_for_clear_cookies_count_(0),
-      waiting_for_clear_domain_reliability_monitor_(false),
-      waiting_for_clear_form_(false),
-      waiting_for_clear_history_(false),
-      waiting_for_clear_hostname_resolution_cache_(false),
-      waiting_for_clear_keyword_data_(false),
-      waiting_for_clear_nacl_cache_(false),
-      waiting_for_clear_network_predictor_(false),
-      waiting_for_clear_networking_history_(false),
-      waiting_for_clear_passwords_(false),
-      waiting_for_clear_platform_keys_(false),
-      waiting_for_clear_plugin_data_(false),
-      waiting_for_clear_pnacl_cache_(false),
-#if defined(OS_ANDROID)
-      waiting_for_clear_precache_history_(false),
-#endif
-      waiting_for_clear_storage_partition_data_(false),
-#if defined(ENABLE_WEBRTC)
-      waiting_for_clear_webrtc_logs_(false),
-#endif
-      remove_mask_(0),
-      origin_type_mask_(0),
-      storage_partition_for_testing_(NULL) {
+      media_context_getter_(profile->GetMediaRequestContext()) {
   DCHECK(profile);
   // crbug.com/140910: Many places were calling this with base::Time() as
   // delete_end, even though they should've used base::Time::Max(). Work around
@@ -460,7 +432,7 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
 #if defined(OS_ANDROID)
     precache::PrecacheManager* precache_manager =
         precache::PrecacheManagerFactory::GetForBrowserContext(profile_);
-    // |precache_manager| could be NULL if the profile is off the record.
+    // |precache_manager| could be nullptr if the profile is off the record.
     if (!precache_manager) {
       waiting_for_clear_precache_history_ = true;
       precache_manager->ClearHistory();
@@ -565,6 +537,10 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
   if (remove_mask & REMOVE_SERVICE_WORKERS) {
     storage_partition_remove_mask |=
         content::StoragePartition::REMOVE_DATA_MASK_SERVICE_WORKERS;
+  }
+  if (remove_mask & REMOVE_CACHE_STORAGE) {
+    storage_partition_remove_mask |=
+        content::StoragePartition::REMOVE_DATA_MASK_CACHE_STORAGE;
   }
   if (remove_mask & REMOVE_FILE_SYSTEMS) {
     storage_partition_remove_mask |=
@@ -687,8 +663,9 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
         content::StoragePartition::REMOVE_DATA_MASK_WEBRTC_IDENTITY;
 
 #if defined(ENABLE_EXTENSIONS)
-    // Clear the ephemeral apps cache. This is NULL while testing. OTR Profile
-    // has neither apps nor an ExtensionService, so ClearCachedApps fails.
+    // Clear the ephemeral apps cache. This is nullptr while testing. OTR
+    // Profile has neither apps nor an ExtensionService, so ClearCachedApps
+    // fails.
     EphemeralAppService* ephemeral_app_service =
         EphemeralAppService::Get(profile_);
     if (ephemeral_app_service && !profile_->IsOffTheRecord())
@@ -804,7 +781,8 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
   }
 
   UMA_HISTOGRAM_ENUMERATION(
-      "ClearBrowsingData.UserDeletedCookieOrCache", choice, MAX_CHOICE_VALUE);
+      "History.ClearBrowsingData.UserDeletedCookieOrCache",
+      choice, MAX_CHOICE_VALUE);
 }
 
 void BrowsingDataRemover::AddObserver(Observer* observer) {

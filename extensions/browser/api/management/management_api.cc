@@ -37,8 +37,7 @@
 #include "extensions/common/manifest_handlers/offline_enabled_info.h"
 #include "extensions/common/manifest_handlers/options_page_info.h"
 #include "extensions/common/manifest_url_handlers.h"
-#include "extensions/common/permissions/coalesced_permission_message.h"
-#include "extensions/common/permissions/permission_set.h"
+#include "extensions/common/permissions/permission_message.h"
 #include "extensions/common/permissions/permissions_data.h"
 #include "extensions/common/url_pattern.h"
 
@@ -62,7 +61,7 @@ AutoConfirmForTest auto_confirm_for_test = DO_NOT_SKIP;
 
 std::vector<std::string> CreateWarningsList(const Extension* extension) {
   std::vector<std::string> warnings_list;
-  for (const CoalescedPermissionMessage& msg :
+  for (const PermissionMessage& msg :
        extension->permissions_data()->GetPermissionMessages()) {
     warnings_list.push_back(base::UTF16ToUTF8(msg.message()));
   }
@@ -81,15 +80,14 @@ std::vector<management::LaunchType> GetAvailableLaunchTypes(
 
   launch_type_list.push_back(management::LAUNCH_TYPE_OPEN_AS_REGULAR_TAB);
 
-#if !defined(OS_MACOSX)
-  // Open as window is currently disabled on Mac.
-  launch_type_list.push_back(management::LAUNCH_TYPE_OPEN_AS_WINDOW);
+  // TODO(dominickn): remove check when hosted apps can open in windows on Mac.
+  if (delegate->CanHostedAppsOpenInWindows())
+    launch_type_list.push_back(management::LAUNCH_TYPE_OPEN_AS_WINDOW);
 
   if (!delegate->IsNewBookmarkAppsEnabled()) {
     launch_type_list.push_back(management::LAUNCH_TYPE_OPEN_AS_PINNED_TAB);
     launch_type_list.push_back(management::LAUNCH_TYPE_OPEN_FULL_SCREEN);
   }
-#endif
   return launch_type_list;
 }
 

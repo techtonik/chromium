@@ -12,7 +12,7 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.BookmarkUtils;
+import org.chromium.chrome.browser.ShortcutHelper;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.content_public.browser.WebContents;
@@ -39,7 +39,7 @@ public class AppBannerManager extends EmptyTabObserver {
     private static Boolean sIsEnabled;
 
     /** Pointer to the native side AppBannerManager. */
-    private final long mNativePointer;
+    private long mNativePointer;
 
     /** Tab that the AppBannerView/AppBannerManager is owned by. */
     private final Tab mTab;
@@ -51,7 +51,7 @@ public class AppBannerManager extends EmptyTabObserver {
     public static boolean isEnabled() {
         if (sIsEnabled == null) {
             Context context = ApplicationStatus.getApplicationContext();
-            sIsEnabled = nativeIsEnabled() && BookmarkUtils.isAddToHomeIntentSupported(context);
+            sIsEnabled = nativeIsEnabled() && ShortcutHelper.isAddToHomeIntentSupported(context);
         }
         return sIsEnabled;
     }
@@ -95,6 +95,7 @@ public class AppBannerManager extends EmptyTabObserver {
      */
     public void destroy() {
         nativeDestroy(mNativePointer);
+        mNativePointer = 0;
     }
 
     /**
@@ -125,7 +126,7 @@ public class AppBannerManager extends EmptyTabObserver {
              */
             @Override
             public void onAppDetailsRetrieved(AppData data) {
-                if (data == null) return;
+                if (data == null || mNativePointer == 0) return;
 
                 String imageUrl = data.imageUrl();
                 if (TextUtils.isEmpty(imageUrl)) return;
@@ -156,9 +157,8 @@ public class AppBannerManager extends EmptyTabObserver {
 
     /** Sets the weights of direct and indirect page navigations for testing. */
     @VisibleForTesting
-    static void forceEngagementWeightsForTesting(double directEngagement,
-            double indirectEngagement) {
-        nativeForceEngagementWeightsForTesting(directEngagement, indirectEngagement);
+    static void setEngagementWeights(double directEngagement, double indirectEngagement) {
+        nativeSetEngagementWeights(directEngagement, indirectEngagement);
     }
 
     /** Returns whether a AppBannerDataFetcher is actively retrieving data. */
@@ -178,7 +178,7 @@ public class AppBannerManager extends EmptyTabObserver {
     // Testing methods.
     private static native void nativeSetTimeDeltaForTesting(int days);
     private static native void nativeDisableSecureSchemeCheckForTesting();
-    private static native void nativeForceEngagementWeightsForTesting(
-            double directEngagement, double indirectEngagement);
+    private static native void nativeSetEngagementWeights(double directEngagement,
+            double indirectEngagement);
     private native boolean nativeIsFetcherActive(long nativeAppBannerManagerAndroid);
 }

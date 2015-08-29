@@ -5,9 +5,6 @@
 {
   'variables': {
     'chromium_code': 1,
-    # Defines an extra set of libs with an alternate copy of org.apache.http.
-    # TODO(yfriedman): Remove this when crbug.com/488192 is fixed.
-    'net_test_extra_libs': [],
     'linux_link_kerberos%': 0,
     'conditions': [
       ['chromeos==1 or embedded==1 or OS=="ios"', {
@@ -184,7 +181,6 @@
             'cert/nss_cert_database_unittest.cc',
             'cert/nss_cert_database_chromeos_unittest.cc',
             'cert/nss_profile_filter_chromeos_unittest.cc',
-            'ssl/client_cert_store_chromeos_unittest.cc',
             'ssl/client_cert_store_nss_unittest.cc',
           ],
         }],
@@ -371,6 +367,7 @@
                     'data/test.html',
                     'data/url_request_unittest/',
                     'data/verify_name_match_unittest/names/',
+                    'data/parse_certificate_unittest/',
                   ],
                   'test_data_prefix': 'net',
                 },
@@ -802,17 +799,9 @@
         'net_test_support',
       ],
       'sources': [
-        'tools/dump_cache/cache_dumper.cc',
-        'tools/dump_cache/cache_dumper.h',
         'tools/dump_cache/dump_cache.cc',
         'tools/dump_cache/dump_files.cc',
         'tools/dump_cache/dump_files.h',
-        'tools/dump_cache/simple_cache_dumper.cc',
-        'tools/dump_cache/simple_cache_dumper.h',
-        'tools/dump_cache/url_to_filename_encoder.cc',
-        'tools/dump_cache/url_to_filename_encoder.h',
-        'tools/dump_cache/url_utilities.cc',
-        'tools/dump_cache/url_utilities.h',
       ],
       # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
       'msvs_disabled_warnings': [4267, ],
@@ -828,6 +817,8 @@
         'net_quic_proto',
       ],
       'sources': [
+        'tools/quic/quic_client_base.cc',
+        'tools/quic/quic_client_base.h',
         'tools/quic/quic_client_session.cc',
         'tools/quic/quic_client_session.h',
         'tools/quic/quic_dispatcher.cc',
@@ -1202,10 +1193,6 @@
             'net',
           ],
           'sources': [
-            'tools/dump_cache/url_to_filename_encoder.cc',
-            'tools/dump_cache/url_to_filename_encoder.h',
-            'tools/dump_cache/url_utilities.cc',
-            'tools/dump_cache/url_utilities.h',
             'tools/flip_server/acceptor_thread.cc',
             'tools/flip_server/acceptor_thread.h',
             'tools/flip_server/constants.h',
@@ -1233,6 +1220,10 @@
             'tools/flip_server/spdy_util.h',
             'tools/flip_server/streamer_interface.cc',
             'tools/flip_server/streamer_interface.h',
+            'tools/flip_server/url_to_filename_encoder.cc',
+            'tools/flip_server/url_to_filename_encoder.h',
+            'tools/flip_server/url_utilities.cc',
+            'tools/flip_server/url_utilities.h',
           ],
         },
         {
@@ -1253,6 +1244,8 @@
             'tools/flip_server/mem_cache_test.cc',
             'tools/flip_server/run_all_tests.cc',
             'tools/flip_server/spdy_interface_test.cc',
+            'tools/flip_server/url_to_filename_encoder_unittest.cc',
+            'tools/flip_server/url_utilities_unittest.cc',
           ],
         },
         {
@@ -1426,11 +1419,11 @@
             'java_in_dir': '../net/test/android/javatests',
           },
           'dependencies': [
+            'net_java',
             'net_test_support',
             'url_request_failed_job_java',
             '../base/base.gyp:base_java',
-            'net_java',
-            '<@(net_test_extra_libs)',
+            '../third_party/android_tools/android_tools.gyp:legacy_http_javalib',
           ],
           'includes': [ '../build/java.gypi' ],
         },
@@ -1552,6 +1545,7 @@
             'net_java',
             '../base/base.gyp:base',
             '../base/base.gyp:base_java_test_support',
+            '../base/base.gyp:base_junit_test_support',
             '../testing/android/junit/junit_test.gyp:junit_test_support',
           ],
           'variables': {

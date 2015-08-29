@@ -5,11 +5,9 @@
 import os
 import unittest
 
-from telemetry.core import util
 from telemetry import decorators
+from telemetry.core import util
 from telemetry.internal.platform import linux_platform_backend
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
 import mock
 
 

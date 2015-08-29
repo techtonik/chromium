@@ -52,7 +52,8 @@ class MEDIA_EXPORT VideoRendererImpl
   //
   // Setting |drop_frames_| to true causes the renderer to drop expired frames.
   VideoRendererImpl(
-      const scoped_refptr<base::SingleThreadTaskRunner>& task_runner,
+      const scoped_refptr<base::SingleThreadTaskRunner>& media_task_runner,
+      const scoped_refptr<base::TaskRunner>& worker_task_runner,
       VideoRendererSink* sink,
       ScopedVector<VideoDecoder> decoders,
       bool drop_frames,
@@ -95,6 +96,13 @@ class MEDIA_EXPORT VideoRendererImpl
 
   // Callback for |video_frame_stream_| initialization.
   void OnVideoFrameStreamInitialized(bool success);
+
+  // Callback for |video_frame_stream_| to deliver decoded video frames and
+  // report video decoding status. If a frame is available the planes will be
+  // copied asynchronously and FrameReady will be called once finished copying.
+  void FrameReadyForCopyingToGpuMemoryBuffers(
+      VideoFrameStream::Status status,
+      const scoped_refptr<VideoFrame>& frame);
 
   // Callback for |video_frame_stream_| to deliver decoded video frames and
   // report video decoding status.
@@ -181,8 +189,14 @@ class MEDIA_EXPORT VideoRendererImpl
   // Provides video frames to VideoRendererImpl.
   scoped_ptr<VideoFrameStream> video_frame_stream_;
 
+  // Callback called when a new frame is available from |video_frame_stream_|.
+  base::Callback<void(VideoFrameStream::Status status,
+                      const scoped_refptr<VideoFrame>&)> frame_ready_cb_;
+
   // Pool of GpuMemoryBuffers and resources used to create hardware frames.
   scoped_ptr<GpuMemoryBufferVideoFramePool> gpu_memory_buffer_pool_;
+
+  scoped_refptr<MediaLog> media_log_;
 
   // Flag indicating low-delay mode.
   bool low_delay_;

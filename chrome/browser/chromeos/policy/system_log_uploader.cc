@@ -7,7 +7,9 @@
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/location.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/task_runner_util.h"
 #include "chrome/browser/browser_process.h"
@@ -16,16 +18,18 @@
 #include "chrome/browser/chromeos/settings/device_oauth2_token_service.h"
 #include "chrome/browser/chromeos/settings/device_oauth2_token_service_factory.h"
 #include "chrome/common/chrome_switches.h"
+#include "components/policy/core/browser/browser_policy_connector.h"
+#include "components/policy/core/common/cloud/enterprise_metrics.h"
 #include "content/public/browser/browser_thread.h"
 #include "net/http/http_request_headers.h"
+#include "third_party/re2/re2/re2.h"
 
 namespace {
 // The maximum number of successive retries.
 const int kMaxNumRetries = 1;
 
-// String constant defining the url we upload system logs to.
-const char* kSystemLogUploadUrl =
-    "https://m.google.com/devicemanagement/data/api/upload";
+// String constant defining the url tail we upload system logs to.
+const char* kSystemLogUploadUrlTail = "/upload";
 
 // The file names of the system logs to upload.
 // Note: do not add anything to this list without checking for PII in the file.
@@ -34,6 +38,34 @@ const char* const kSystemLogFileNames[] = {
     "/var/log/eventlog.txt",  "/var/log/messages",
     "/var/log/net.log",       "/var/log/platform_info.txt",
     "/var/log/ui/ui.LATEST",  "/var/log/update_engine.log"};
+
+const char kEmailAddress[] =
+    "[a-zA-Z0-9\\+\\.\\_\\%\\-\\+]{1,256}\\@"
+    "[a-zA-Z0-9][a-zA-Z0-9\\-]{0,64}(\\.[a-zA-Z0-9][a-zA-Z0-9\\-]{0,25})+";
+const char kIPAddress[] =
+    "((25[0-5]|2[0-4][0-9]|[0-1][0-9]{2}|[1-9][0-9]|[1-9])"
+    "\\.(25[0-5]|2[0-4][0-9]|[0-1][0-9]{2}|[1-9][0-9]|[1-9]|0)\\.(25[0-5]|2"
+    "[0-4][0-9]|[0-1][0-9]{2}|[1-9][0-9]|[1-9]|0)\\.(25[0-5]|2[0-4][0-9]|[0-1]"
+    "[0-9]{2}|[1-9][0-9]|[0-9]))";
+const char kIPv6Address[] =
+    "(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|"
+    "([0-9a-fA-F]{1,4}:){1,7}:|"
+    "([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|"
+    "([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|"
+    "([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|"
+    "([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|"
+    "([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|"
+    "[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|"
+    ":((:[0-9a-fA-F]{1,4}){1,7}|:)|"
+    "fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|"
+    "::(ffff(:0{1,4}){0,1}:){0,1}"
+    "((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}"
+    "(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|"
+    "([0-9a-fA-F]{1,4}:){1,4}:"
+    "((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\\.){3,3}"
+    "(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))";
+
+const char kWebUrl[] = "(http|https|Http|Https|rtsp|Rtsp):\\/\\/";
 
 // Reads the system log files as binary files, stores the files as pairs
 // (file name, data) and returns. Called on blocking thread.
@@ -48,10 +80,8 @@ scoped_ptr<policy::SystemLogUploader::SystemLogs> ReadFiles() {
       LOG(ERROR) << "Failed to read the system log file from the disk "
                  << file_path << std::endl;
     }
-    // TODO(pbond): add check |data| for common PII (email, IP addresses and
-    // etc.) and modify the |data| to remove/obfuscate the PII if any found.
-    // http://crbug.com/515879.
-    system_logs->push_back(std::make_pair(file_path, data));
+    system_logs->push_back(std::make_pair(
+        file_path, policy::SystemLogUploader::RemoveSensitiveData(data)));
   }
   return system_logs.Pass();
 }
@@ -120,6 +150,16 @@ base::TimeDelta GetUploadFrequency() {
   return upload_frequency;
 }
 
+void RecordSystemLogPIILeak(policy::SystemLogPIIType type) {
+  UMA_HISTOGRAM_ENUMERATION(policy::kMetricSystemLogPII, type,
+                            policy::SYSTEM_LOG_PII_TYPE_SIZE);
+}
+
+std::string GetUploadUrl() {
+  return policy::BrowserPolicyConnector::GetDeviceManagementUrl() +
+         kSystemLogUploadUrlTail;
+}
+
 }  // namespace
 
 namespace policy {
@@ -151,10 +191,21 @@ SystemLogUploader::SystemLogUploader(
       upload_frequency_(GetUploadFrequency()),
       task_runner_(task_runner),
       syslog_delegate_(syslog_delegate.Pass()),
+      upload_enabled_(false),
       weak_factory_(this) {
   if (!syslog_delegate_)
     syslog_delegate_.reset(new SystemLogDelegate());
   DCHECK(syslog_delegate_);
+
+  // Watch for policy changes.
+  upload_enabled_observer_ = chromeos::CrosSettings::Get()->AddSettingsObserver(
+      chromeos::kLogUploadEnabled,
+      base::Bind(&SystemLogUploader::RefreshUploadSettings,
+                 base::Unretained(this)));
+
+  // Fetch the current value of the policy.
+  RefreshUploadSettings();
+
   // Immediately schedule the next system log upload (last_upload_attempt_ is
   // set to the start of the epoch, so this will trigger an update upload in the
   // immediate future).
@@ -190,12 +241,73 @@ void SystemLogUploader::OnFailure(UploadJob::ErrorCode error_code) {
   }
 }
 
+// static
+std::string SystemLogUploader::RemoveSensitiveData(const std::string& data) {
+  std::string result = "";
+  RE2 email_pattern(kEmailAddress), ipv4_pattern(kIPAddress),
+      ipv6_pattern(kIPv6Address), url_pattern(kWebUrl);
+
+  for (const std::string& line : base::SplitString(
+           data, "\n", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL)) {
+    // Email.
+    if (RE2::PartialMatch(line, email_pattern)) {
+      RecordSystemLogPIILeak(SYSTEM_LOG_PII_TYPE_EMAIL_ADDRESS);
+      continue;
+    }
+
+    // IPv4 address.
+    if (RE2::PartialMatch(line, ipv4_pattern)) {
+      RecordSystemLogPIILeak(SYSTEM_LOG_PII_TYPE_IP_ADDRESS);
+      continue;
+    }
+
+    // IPv6 address.
+    if (RE2::PartialMatch(line, ipv6_pattern)) {
+      RecordSystemLogPIILeak(SYSTEM_LOG_PII_TYPE_IP_ADDRESS);
+      continue;
+    }
+
+    // URL.
+    if (RE2::PartialMatch(line, url_pattern)) {
+      RecordSystemLogPIILeak(SYSTEM_LOG_PII_TYPE_WEB_URL);
+      continue;
+    }
+
+    // SSID.
+    if (line.find("SSID=") != std::string::npos) {
+      RecordSystemLogPIILeak(SYSTEM_LOG_PII_TYPE_SSID);
+      continue;
+    }
+
+    result += line + "\n";
+  }
+  return result;
+}
+
+void SystemLogUploader::RefreshUploadSettings() {
+  // Attempt to fetch the current value of the reporting settings.
+  // If trusted values are not available, register this function to be called
+  // back when they are available.
+  chromeos::CrosSettings* settings = chromeos::CrosSettings::Get();
+  if (chromeos::CrosSettingsProvider::TRUSTED !=
+      settings->PrepareTrustedValues(
+          base::Bind(&SystemLogUploader::RefreshUploadSettings,
+                     weak_factory_.GetWeakPtr()))) {
+    return;
+  }
+
+  // CrosSettings are trusted - we want to use the last trusted values, by
+  // default do not upload system logs.
+  if (!settings->GetBoolean(chromeos::kLogUploadEnabled, &upload_enabled_))
+    upload_enabled_ = false;
+}
+
 void SystemLogUploader::UploadSystemLogs(scoped_ptr<SystemLogs> system_logs) {
   // Must be called on the main thread.
   DCHECK(thread_checker_.CalledOnValidThread());
   DCHECK(!upload_job_);
 
-  GURL upload_url(kSystemLogUploadUrl);
+  GURL upload_url(GetUploadUrl());
   DCHECK(upload_url.is_valid());
   upload_job_ = syslog_delegate_->CreateUploadJob(upload_url, this);
 
@@ -220,8 +332,15 @@ void SystemLogUploader::StartLogUpload() {
   // Must be called on the main thread.
   DCHECK(thread_checker_.CalledOnValidThread());
 
-  syslog_delegate_->LoadSystemLogs(base::Bind(
-      &SystemLogUploader::UploadSystemLogs, weak_factory_.GetWeakPtr()));
+  if (upload_enabled_) {
+    syslog_delegate_->LoadSystemLogs(base::Bind(
+        &SystemLogUploader::UploadSystemLogs, weak_factory_.GetWeakPtr()));
+  } else {
+    // If upload is disabled, schedule the next attempt after 12h.
+    retry_count_ = 0;
+    last_upload_attempt_ = base::Time::NowFromSystemTime();
+    ScheduleNextSystemLogUpload(upload_frequency_);
+  }
 }
 
 void SystemLogUploader::ScheduleNextSystemLogUpload(base::TimeDelta frequency) {

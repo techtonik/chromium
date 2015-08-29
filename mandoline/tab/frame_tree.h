@@ -27,10 +27,12 @@ class FrameTree {
  public:
   // |view| is the view to do the initial embedding in. It is assumed |view|
   // outlives FrameTree.
+  // |client_properties| is the client properties for the root frame.
   FrameTree(mojo::View* view,
             FrameTreeDelegate* delegate,
             FrameTreeClient* root_client,
-            scoped_ptr<FrameUserData> user_data);
+            scoped_ptr<FrameUserData> user_data,
+            const Frame::ClientPropertyMap& client_properties);
   ~FrameTree();
 
   Frame* root() { return &root_; }
@@ -41,15 +43,6 @@ class FrameTree {
                            Frame* parent,
                            FrameTreeClient* client,
                            scoped_ptr<FrameUserData> user_data);
-
-  // If frame->view() == |view|, then all of |frame|'s children are destroyed
-  // and |frame| is reused. Otherwise a new Frame is created as a child of
-  // |frame|. It is expected this is called from
-  // ViewManagerDelegate::OnEmbedForDescendant().
-  Frame* CreateOrReplaceFrame(Frame* frame,
-                              mojo::View* view,
-                              FrameTreeClient* frame_tree_client,
-                              scoped_ptr<FrameUserData> user_data);
 
   // Creates a new Frame parented to |parent|. The Frame is considered shared in
   // that it is sharing the FrameTreeClient/FrameTreeServer of |parent|. There

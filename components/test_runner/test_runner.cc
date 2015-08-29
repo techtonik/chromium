@@ -24,10 +24,10 @@
 #include "third_party/WebKit/public/platform/WebData.h"
 #include "third_party/WebKit/public/platform/WebPasswordCredential.h"
 #include "third_party/WebKit/public/platform/WebPoint.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerRegistration.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "third_party/WebKit/public/platform/modules/device_orientation/WebDeviceMotionData.h"
 #include "third_party/WebKit/public/platform/modules/device_orientation/WebDeviceOrientationData.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerRegistration.h"
 #include "third_party/WebKit/public/web/WebArrayBuffer.h"
 #include "third_party/WebKit/public/web/WebArrayBufferConverter.h"
 #include "third_party/WebKit/public/web/WebBindings.h"
@@ -2543,8 +2543,6 @@ void TestRunner::OverridePreference(const std::string key,
     prefs->loads_images_automatically = value->BooleanValue();
   } else if (key == "WebKitPluginsEnabled") {
     prefs->plugins_enabled = value->BooleanValue();
-  } else if (key == "WebKitJavaEnabled") {
-    prefs->java_enabled = value->BooleanValue();
   } else if (key == "WebKitOfflineWebApplicationCacheEnabled") {
     prefs->offline_web_application_cache_enabled = value->BooleanValue();
   } else if (key == "WebKitTabToLinksPreferenceKey") {

@@ -10,6 +10,7 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
+#include "base/command_line.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -23,9 +24,11 @@
 #include "gpu/command_buffer/service/context_group.h"
 #include "gpu/command_buffer/service/gl_context_virtual.h"
 #include "gpu/command_buffer/service/gpu_scheduler.h"
+#include "gpu/command_buffer/service/gpu_switches.h"
 #include "gpu/command_buffer/service/image_factory.h"
 #include "gpu/command_buffer/service/image_manager.h"
 #include "gpu/command_buffer/service/mailbox_manager.h"
+#include "gpu/command_buffer/service/memory_program_cache.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
 #include "gpu/command_buffer/service/query_manager.h"
 #include "gpu/command_buffer/service/sync_point_manager.h"
@@ -158,6 +161,17 @@ InProcessCommandBuffer::Service::pending_valuebuffer_state() {
   return pending_valuebuffer_state_;
 }
 
+gpu::gles2::ProgramCache* InProcessCommandBuffer::Service::program_cache() {
+  if (!program_cache_.get() &&
+      (gfx::g_driver_gl.ext.b_GL_ARB_get_program_binary ||
+       gfx::g_driver_gl.ext.b_GL_OES_get_program_binary) &&
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableGpuProgramCache)) {
+    program_cache_.reset(new gpu::gles2::MemoryProgramCache());
+  }
+  return program_cache_.get();
+}
+
 InProcessCommandBuffer::InProcessCommandBuffer(
     const scoped_refptr<Service>& service)
     : context_lost_(false),
@@ -270,7 +284,7 @@ bool InProcessCommandBuffer::InitializeOnGpuThread(
 
   DCHECK(params.size.width() >= 0 && params.size.height() >= 0);
 
-  TransferBufferManager* manager = new TransferBufferManager();
+  TransferBufferManager* manager = new TransferBufferManager(nullptr);
   transfer_buffer_manager_ = manager;
   manager->Initialize();
 
@@ -299,11 +313,10 @@ bool InProcessCommandBuffer::InitializeOnGpuThread(
   decoder_.reset(gles2::GLES2Decoder::Create(
       params.context_group
           ? params.context_group->decoder_->GetContextGroup()
-          : new gles2::ContextGroup(service_->mailbox_manager(),
-                                    NULL,
+          : new gles2::ContextGroup(service_->mailbox_manager(), NULL,
                                     service_->shader_translator_cache(),
-                                    NULL,
-                                    service_->subscription_ref_set(),
+                                    service_->framebuffer_completeness_cache(),
+                                    NULL, service_->subscription_ref_set(),
                                     service_->pending_valuebuffer_state(),
                                     bind_generates_resource)));
 
@@ -362,6 +375,14 @@ bool InProcessCommandBuffer::InitializeOnGpuThread(
     LOG(ERROR) << "Could not make context current.";
     DestroyOnGpuThread();
     return false;
+  }
+
+  if (!decoder_->GetContextGroup()->has_program_cache() &&
+      !decoder_->GetContextGroup()
+           ->feature_info()
+           ->workarounds()
+           .disable_program_cache) {
+    decoder_->GetContextGroup()->set_program_cache(service_->program_cache());
   }
 
   gles2::DisallowedFeatures disallowed_features;
@@ -714,7 +735,7 @@ int32 InProcessCommandBuffer::CreateGpuMemoryBufferImage(
   scoped_ptr<gfx::GpuMemoryBuffer> buffer(
       gpu_memory_buffer_manager_->AllocateGpuMemoryBuffer(
           gfx::Size(width, height),
-          gpu::ImageFactory::ImageFormatToGpuMemoryBufferFormat(internalformat),
+          gpu::ImageFactory::DefaultBufferFormatForImageFormat(internalformat),
           gpu::ImageFactory::ImageUsageToGpuMemoryBufferUsage(usage)));
   if (!buffer)
     return -1;
@@ -923,6 +944,14 @@ GpuInProcessThread::shader_translator_cache() {
   if (!shader_translator_cache_.get())
     shader_translator_cache_ = new gpu::gles2::ShaderTranslatorCache;
   return shader_translator_cache_;
+}
+
+scoped_refptr<gles2::FramebufferCompletenessCache>
+GpuInProcessThread::framebuffer_completeness_cache() {
+  if (!framebuffer_completeness_cache_.get())
+    framebuffer_completeness_cache_ =
+        new gpu::gles2::FramebufferCompletenessCache;
+  return framebuffer_completeness_cache_;
 }
 
 SyncPointManager* GpuInProcessThread::sync_point_manager() {
