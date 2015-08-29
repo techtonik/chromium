@@ -113,8 +113,8 @@
 #include "media/base/media_log.h"
 #include "media/blink/webencryptedmediaclient_impl.h"
 #include "media/blink/webmediaplayer_impl.h"
-#include "media/blink/webmediaplayer_params.h"
 #include "media/renderers/gpu_video_accelerator_factories.h"
+#include "mojo/common/url_type_converters.h"
 #include "net/base/data_url.h"
 #include "net/base/net_errors.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -125,6 +125,7 @@
 #include "third_party/WebKit/public/platform/WebURLError.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "third_party/WebKit/public/platform/WebVector.h"
+#include "third_party/WebKit/public/platform/modules/webusb/WebUSBClient.h"
 #include "third_party/WebKit/public/web/WebColorSuggestion.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebFrameWidget.h"
@@ -135,7 +136,6 @@
 #include "third_party/WebKit/public/web/WebNavigationPolicy.h"
 #include "third_party/WebKit/public/web/WebPlugin.h"
 #include "third_party/WebKit/public/web/WebPluginParams.h"
-#include "third_party/WebKit/public/web/WebPluginPlaceholder.h"
 #include "third_party/WebKit/public/web/WebRange.h"
 #include "third_party/WebKit/public/web/WebScopedUserGesture.h"
 #include "third_party/WebKit/public/web/WebScriptSource.h"
@@ -174,6 +174,8 @@
 #include "content/renderer/media/android/webmediaplayer_android.h"
 #else
 #include "cc/blink/context_provider_web_context.h"
+#include "content/renderer/usb/web_usb_client_impl.h"
+#include "device/devices_app/public/cpp/constants.h"
 #endif
 
 #if defined(ENABLE_PEPPER_CDMS)
@@ -564,6 +566,18 @@ RenderFrameImpl* RenderFrameImpl::FromRoutingID(int routing_id) {
 }
 
 // static
+RenderFrameImpl* RenderFrameImpl::CreateMainFrame(RenderViewImpl* render_view,
+                                                  int32 routing_id) {
+  RenderFrameImpl* render_frame =
+      RenderFrameImpl::Create(render_view, routing_id);
+  WebLocalFrame* web_frame =
+      WebLocalFrame::create(blink::WebTreeScopeType::Document, render_frame);
+  render_frame->SetWebFrame(web_frame);
+  render_view->webview()->setMainFrame(web_frame);
+  return render_frame;
+}
+
+// static
 void RenderFrameImpl::CreateFrame(
     int routing_id,
     int parent_routing_id,
@@ -645,6 +659,44 @@ void RenderFrameImpl::InstallCreateHook(
   g_create_render_frame_impl = create_render_frame_impl;
 }
 
+// static
+blink::WebFrame* RenderFrameImpl::ResolveOpener(int opener_frame_routing_id,
+                                                int* opener_view_routing_id) {
+  if (opener_view_routing_id)
+    *opener_view_routing_id = MSG_ROUTING_NONE;
+
+  if (opener_frame_routing_id == MSG_ROUTING_NONE)
+    return nullptr;
+
+  // Opener routing ID could refer to either a RenderFrameProxy or a
+  // RenderFrame, so need to check both.
+  RenderFrameProxy* opener_proxy =
+      RenderFrameProxy::FromRoutingID(opener_frame_routing_id);
+  if (opener_proxy) {
+    if (opener_view_routing_id)
+      *opener_view_routing_id = opener_proxy->render_view()->GetRoutingID();
+
+    // TODO(nasko,alexmos): This check won't be needed once swappedout:// is
+    // gone.
+    if (opener_proxy->IsMainFrameDetachedFromTree()) {
+      DCHECK(!SiteIsolationPolicy::IsSwappedOutStateForbidden());
+      return opener_proxy->render_view()->webview()->mainFrame();
+    } else {
+      return opener_proxy->web_frame();
+    }
+  }
+
+  RenderFrameImpl* opener_frame =
+      RenderFrameImpl::FromRoutingID(opener_frame_routing_id);
+  if (opener_frame) {
+    if (opener_view_routing_id)
+      *opener_view_routing_id = opener_frame->render_view()->GetRoutingID();
+    return opener_frame->GetWebFrame();
+  }
+
+  return nullptr;
+}
+
 // RenderFrameImpl ----------------------------------------------------------
 RenderFrameImpl::RenderFrameImpl(const CreateParams& params)
     : frame_(NULL),
@@ -676,6 +728,7 @@ RenderFrameImpl::RenderFrameImpl(const CreateParams& params)
 #if defined(VIDEO_HOLE)
       contains_media_player_(false),
 #endif
+      has_played_media_(false),
       devtools_agent_(nullptr),
       geolocation_dispatcher_(NULL),
       push_messaging_dispatcher_(NULL),
@@ -1061,7 +1114,7 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnSetAccessibilityMode)
     IPC_MESSAGE_HANDLER(AccessibilityMsg_SnapshotTree,
                         OnSnapshotAccessibilityTree)
-    IPC_MESSAGE_HANDLER(FrameMsg_DisownOpener, OnDisownOpener)
+    IPC_MESSAGE_HANDLER(FrameMsg_UpdateOpener, OnUpdateOpener)
     IPC_MESSAGE_HANDLER(FrameMsg_CommitNavigation, OnCommitNavigation)
     IPC_MESSAGE_HANDLER(FrameMsg_DidUpdateSandboxFlags, OnDidUpdateSandboxFlags)
     IPC_MESSAGE_HANDLER(FrameMsg_SetTextTrackSettings,
@@ -1602,14 +1655,9 @@ void RenderFrameImpl::OnSnapshotAccessibilityTree(int callback_id) {
       routing_id_, callback_id, response));
 }
 
-void RenderFrameImpl::OnDisownOpener() {
-  // TODO(creis): We should only see this for main frames for now.  To support
-  // disowning the opener on subframes, we will need to move WebContentsImpl's
-  // opener_ to FrameTreeNode.
-  CHECK(!frame_->parent());
-
-  if (frame_->opener())
-    frame_->setOpener(NULL);
+void RenderFrameImpl::OnUpdateOpener(int opener_routing_id) {
+  WebFrame* opener = ResolveOpener(opener_routing_id, nullptr);
+  frame_->setOpener(opener);
 }
 
 void RenderFrameImpl::OnDidUpdateSandboxFlags(blink::WebSandboxFlags flags) {
@@ -1649,15 +1697,7 @@ void RenderFrameImpl::OnPostMessageEvent(
     const FrameMsg_PostMessage_Params& params) {
   // Find the source frame if it exists.
   WebFrame* source_frame = NULL;
-  if (params.source_view_routing_id != MSG_ROUTING_NONE) {
-    // Support a legacy postMessage path for specifying a source RenderView;
-    // this is currently used when sending messages to Android WebView.
-    // TODO(alexmos): This path can be removed once crbug.com/473258 is fixed.
-    RenderViewImpl* source_view =
-        RenderViewImpl::FromRoutingID(params.source_view_routing_id);
-    if (source_view)
-      source_frame = source_view->webview()->mainFrame();
-  } else if (params.source_routing_id != MSG_ROUTING_NONE) {
+  if (params.source_routing_id != MSG_ROUTING_NONE) {
     RenderFrameProxy* source_proxy =
         RenderFrameProxy::FromRoutingID(params.source_routing_id);
     if (source_proxy) {
@@ -1704,7 +1744,8 @@ void RenderFrameImpl::OnPostMessageEvent(
                              // |canBubble| and |cancellable| are always false
                              false, false,
                              serialized_script_value,
-                             params.source_origin, source_frame, "", channels);
+                             params.source_origin, source_frame,
+                             frame_->document(), "", channels);
 
   // We must pass in the target_origin to do the security check on this side,
   // since it may have changed since the original postMessage call was made.
@@ -1965,16 +2006,6 @@ void RenderFrameImpl::AddMessageToConsole(ConsoleMessageLevel level,
 
 // blink::WebFrameClient implementation ----------------------------------------
 
-blink::WebPluginPlaceholder* RenderFrameImpl::createPluginPlaceholder(
-    blink::WebLocalFrame* frame,
-    const blink::WebPluginParams& params) {
-  DCHECK_EQ(frame_, frame);
-  return GetContentClient()
-      ->renderer()
-      ->CreatePluginPlaceholder(this, frame, params)
-      .release();
-}
-
 blink::WebPlugin* RenderFrameImpl::createPlugin(
     blink::WebLocalFrame* frame,
     const blink::WebPluginParams& params) {
@@ -1999,9 +2030,10 @@ blink::WebPlugin* RenderFrameImpl::createPlugin(
   WebPluginInfo info;
   std::string mime_type;
   bool found = false;
-  Send(new FrameHostMsg_GetPluginInfo(
-      routing_id_, params.url, frame->top()->document().url(),
-      params.mimeType.utf8(), &found, &info, &mime_type));
+  WebString top_origin = frame->top()->securityOrigin().toString();
+  Send(new FrameHostMsg_GetPluginInfo(routing_id_, params.url, GURL(top_origin),
+                                      params.mimeType.utf8(), &found, &info,
+                                      &mime_type));
   if (!found)
     return NULL;
 
@@ -2031,23 +2063,31 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
   if (!web_stream.isNull())
     return CreateWebMediaPlayerForMediaStream(client);
 
-#if defined(OS_ANDROID) && !defined(ENABLE_MEDIA_PIPELINE_ON_ANDROID)
-  return CreateAndroidWebMediaPlayer(client, encrypted_client,
-                                     GetMediaPermission(), initial_cdm);
-#else
-  scoped_refptr<media::MediaLog> media_log(new RenderMediaLog());
-
   RenderThreadImpl* render_thread = RenderThreadImpl::current();
+
+#if defined(OS_ANDROID) && !defined(ENABLE_MEDIA_PIPELINE_ON_ANDROID)
+  scoped_refptr<media::AudioRendererSink> audio_renderer_sink;
+  media::WebMediaPlayerParams::Context3DCB context_3d_cb;
+#else
+  scoped_refptr<media::AudioRendererSink> audio_renderer_sink =
+      render_thread->GetAudioRendererMixerManager()->CreateInput(routing_id_);
+  media::WebMediaPlayerParams::Context3DCB context_3d_cb =
+      base::Bind(&GetSharedMainThreadContext3D);
+#endif  // defined(OS_ANDROID) && !defined(ENABLE_MEDIA_PIPELINE_ON_ANDROID)
+
+  scoped_refptr<media::MediaLog> media_log(new RenderMediaLog());
   media::WebMediaPlayerParams params(
       base::Bind(&ContentRendererClient::DeferMediaLoad,
                  base::Unretained(GetContentClient()->renderer()),
-                 static_cast<RenderFrame*>(this)),
-      render_thread->GetAudioRendererMixerManager()->CreateInput(routing_id_),
-      media_log, render_thread->GetMediaThreadTaskRunner(),
-      render_thread->compositor_task_runner(),
-      base::Bind(&GetSharedMainThreadContext3D), GetMediaPermission(),
-      initial_cdm);
+                 static_cast<RenderFrame*>(this), has_played_media_),
+      audio_renderer_sink, media_log, render_thread->GetMediaThreadTaskRunner(),
+      render_thread->GetWorkerTaskRunner(),
+      render_thread->compositor_task_runner(), context_3d_cb,
+      GetMediaPermission(), initial_cdm);
 
+#if defined(OS_ANDROID) && !defined(ENABLE_MEDIA_PIPELINE_ON_ANDROID)
+  return CreateAndroidWebMediaPlayer(client, encrypted_client, params);
+#else
 #if defined(ENABLE_MOJO_MEDIA)
   scoped_ptr<media::RendererFactory> media_renderer_factory(
       new media::MojoRendererFactory(GetMediaServiceFactory()));
@@ -2188,17 +2228,18 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
   return web_frame;
 }
 
-void RenderFrameImpl::didDisownOpener(blink::WebLocalFrame* frame) {
-  DCHECK(!frame_ || frame_ == frame);
-  // We only need to notify the browser if the active, top-level frame clears
-  // its opener.  We can ignore cases where a swapped out frame clears its
-  // opener after hearing about it from the browser, and the browser does not
-  // (yet) care about subframe openers.
-  if (is_swapped_out_ || frame->parent())
+void RenderFrameImpl::didChangeOpener(blink::WebFrame* opener) {
+  // Only active frames are able to disown their opener.
+  if (!opener && is_swapped_out_)
     return;
 
-  // Notify WebContents and all its swapped out RenderViews.
-  Send(new FrameHostMsg_DidDisownOpener(routing_id_));
+  // Only a local frame should be able to update another frame's opener.
+  DCHECK(!opener || opener->isWebLocalFrame());
+
+  int opener_routing_id = opener ?
+      RenderFrameImpl::FromWebFrame(opener->toWebLocalFrame())->GetRoutingID() :
+      MSG_ROUTING_NONE;
+  Send(new FrameHostMsg_DidChangeOpener(routing_id_, opener_routing_id));
 }
 
 void RenderFrameImpl::frameDetached(blink::WebFrame* frame, DetachType type) {
@@ -2366,6 +2407,7 @@ void RenderFrameImpl::loadURLExternally(
   Referrer referrer(RenderViewImpl::GetReferrerFromRequest(frame, request));
   if (policy == blink::WebNavigationPolicyDownload) {
     render_view_->Send(new ViewHostMsg_DownloadUrl(render_view_->GetRoutingID(),
+                                                   GetRoutingID(),
                                                    request.url(), referrer,
                                                    suggested_name));
   } else {
@@ -3475,10 +3517,6 @@ void RenderFrameImpl::didFirstVisuallyNonEmptyLayout(
   if (frame->parent())
     return;
 
-  InternalDocumentStateData* data =
-      InternalDocumentStateData::FromDataSource(frame->dataSource());
-  data->set_did_first_visually_non_empty_layout(true);
-
 #if defined(OS_ANDROID)
   GetRenderWidget()->DidChangeBodyBackgroundColor(
       render_view_->webwidget_->backgroundColor());
@@ -3817,6 +3855,10 @@ blink::WebBluetooth* RenderFrameImpl::bluetooth() {
   return bluetooth_.get();
 }
 
+blink::WebUSBClient* RenderFrameImpl::usbClient() {
+  return usb_client_.get();
+}
+
 #if defined(ENABLE_WEBVR)
 blink::WebVRClient* RenderFrameImpl::webVRClient() {
   if (!vr_dispatcher_)
@@ -3827,6 +3869,7 @@ blink::WebVRClient* RenderFrameImpl::webVRClient() {
 #endif
 
 void RenderFrameImpl::DidPlay(WebMediaPlayer* player) {
+  has_played_media_ = true;
   Send(new FrameHostMsg_MediaPlayingNotification(
       routing_id_, reinterpret_cast<int64>(player), player->hasVideo(),
       player->hasAudio(), player->isRemote()));
@@ -4683,12 +4726,6 @@ void RenderFrameImpl::InitializeUserMediaClient() {
   if (!RenderThreadImpl::current())  // Will be NULL during unit tests.
     return;
 
-#if defined(OS_ANDROID)
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableWebRTC))
-    return;
-#endif
-
 #if defined(ENABLE_WEBRTC)
   DCHECK(!web_user_media_client_);
   web_user_media_client_ = new UserMediaClientImpl(
@@ -4950,12 +4987,10 @@ NavigationState* RenderFrameImpl::CreateNavigationStateFromPending() {
 }
 
 #if defined(OS_ANDROID)
-
 WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
     WebMediaPlayerClient* client,
     WebMediaPlayerEncryptedMediaClient* encrypted_client,
-    media::MediaPermission* media_permission,
-    WebContentDecryptionModule* initial_cdm) {
+    const media::WebMediaPlayerParams& params) {
   scoped_refptr<StreamTextureFactory> stream_texture_factory;
   if (SynchronousCompositorFactory* factory =
           SynchronousCompositorFactory::GetInstance()) {
@@ -4984,10 +5019,7 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
 
   return new WebMediaPlayerAndroid(
       frame_, client, encrypted_client, weak_factory_.GetWeakPtr(),
-      GetMediaPlayerManager(), GetCdmFactory(), media_permission, initial_cdm,
-      stream_texture_factory,
-      RenderThreadImpl::current()->GetMediaThreadTaskRunner(),
-      new RenderMediaLog());
+      GetMediaPlayerManager(), GetCdmFactory(), stream_texture_factory, params);
 }
 
 RendererMediaPlayerManager* RenderFrameImpl::GetMediaPlayerManager() {
@@ -4995,7 +5027,6 @@ RendererMediaPlayerManager* RenderFrameImpl::GetMediaPlayerManager() {
     media_player_manager_ = new RendererMediaPlayerManager(this);
   return media_player_manager_;
 }
-
 #endif  // defined(OS_ANDROID)
 
 media::MediaPermission* RenderFrameImpl::GetMediaPermission() {
@@ -5007,17 +5038,9 @@ media::MediaPermission* RenderFrameImpl::GetMediaPermission() {
 #if defined(ENABLE_MOJO_MEDIA)
 media::interfaces::ServiceFactory* RenderFrameImpl::GetMediaServiceFactory() {
   if (!media_service_factory_) {
-    mojo::InterfacePtr<mojo::Shell> shell_ptr;
-    GetServiceRegistry()->ConnectToRemoteService(mojo::GetProxy(&shell_ptr));
-
-    mojo::ServiceProviderPtr service_provider;
-    mojo::URLRequestPtr request(mojo::URLRequest::New());
-    request->url = mojo::String::From("mojo:media");
-    shell_ptr->ConnectToApplication(request.Pass(), GetProxy(&service_provider),
-                                    nullptr, nullptr);
-
+    mojo::ServiceProviderPtr service_provider =
+        ConnectToApplication(GURL("mojo:media"));
     mojo::ConnectToService(service_provider.get(), &media_service_factory_);
-
     media_service_factory_.set_connection_error_handler(
         base::Bind(&RenderFrameImpl::OnMediaServiceFactoryConnectionError,
                    base::Unretained(this)));
@@ -5077,6 +5100,18 @@ void RenderFrameImpl::RegisterMojoServices() {
         base::Bind(&ImageDownloaderImpl::CreateMojoService,
                    base::Unretained(this)));
   }
+}
+
+mojo::ServiceProviderPtr RenderFrameImpl::ConnectToApplication(
+    const GURL& url) {
+  if (!mojo_shell_)
+    GetServiceRegistry()->ConnectToRemoteService(mojo::GetProxy(&mojo_shell_));
+  mojo::ServiceProviderPtr service_provider;
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  request->url = mojo::String::From(url);
+  mojo_shell_->ConnectToApplication(request.Pass(), GetProxy(&service_provider),
+                                    nullptr, nullptr);
+  return service_provider.Pass();
 }
 
 }  // namespace content

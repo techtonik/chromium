@@ -43,10 +43,8 @@
 #include "chrome/renderer/plugins/non_loadable_plugin_placeholder.h"
 #include "chrome/renderer/plugins/plugin_preroller.h"
 #include "chrome/renderer/plugins/plugin_uma.h"
-#include "chrome/renderer/plugins/shadow_dom_plugin_placeholder.h"
 #include "chrome/renderer/prerender/prerender_dispatcher.h"
 #include "chrome/renderer/prerender/prerender_helper.h"
-#include "chrome/renderer/prerender/prerender_media_load_deferrer.h"
 #include "chrome/renderer/prerender/prerenderer_client.h"
 #include "chrome/renderer/safe_browsing/malware_dom_details.h"
 #include "chrome/renderer/safe_browsing/phishing_classifier_delegate.h"
@@ -93,7 +91,6 @@
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPluginContainer.h"
 #include "third_party/WebKit/public/web/WebPluginParams.h"
-#include "third_party/WebKit/public/web/WebPluginPlaceholder.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -126,6 +123,7 @@
 #include "extensions/renderer/guest_view/extensions_guest_view_container.h"
 #include "extensions/renderer/guest_view/extensions_guest_view_container_dispatcher.h"
 #include "extensions/renderer/guest_view/mime_handler_view/mime_handler_view_container.h"
+#include "extensions/renderer/renderer_extension_registry.h"
 #include "extensions/renderer/script_context.h"
 #endif
 
@@ -341,6 +339,29 @@ bool IsStandaloneExtensionProcess() {
       extensions::switches::kExtensionProcess);
 }
 #endif
+
+// Defers media player loading in background pages until they're visible.
+// TODO(dalecurtis): Include an idle listener too.  http://crbug.com/509135
+class MediaLoadDeferrer : public content::RenderFrameObserver {
+ public:
+  MediaLoadDeferrer(content::RenderFrame* render_frame,
+                    const base::Closure& continue_loading_cb)
+      : content::RenderFrameObserver(render_frame),
+        continue_loading_cb_(continue_loading_cb) {}
+  ~MediaLoadDeferrer() override {}
+
+ private:
+  // content::RenderFrameObserver implementation:
+  void WasShown() override {
+    continue_loading_cb_.Run();
+    delete this;
+  }
+
+  const base::Closure continue_loading_cb_;
+
+  DISALLOW_COPY_AND_ASSIGN(MediaLoadDeferrer);
+};
+
 }  // namespace
 
 ChromeContentRendererClient::ChromeContentRendererClient() {
@@ -474,28 +495,10 @@ void ChromeContentRendererClient::RenderThreadStarted() {
   WebSecurityPolicy::registerURLSchemeAsNotAllowingJavascriptURLs(
       chrome_search_scheme);
 
-  // chrome-search:, chrome-extension:, and chrome-extension-resource:
-  // resources shouldn't trigger insecure content warnings.
+  // chrome-search: resources shouldn't trigger insecure content warnings. Note
+  // that chrome-extension: and chrome-extension-resource: schemes are taken
+  // care of in extensions::Dispatcher.
   WebSecurityPolicy::registerURLSchemeAsSecure(chrome_search_scheme);
-
-  WebString extension_scheme(ASCIIToUTF16(extensions::kExtensionScheme));
-  WebSecurityPolicy::registerURLSchemeAsSecure(extension_scheme);
-
-  WebString extension_resource_scheme(
-      ASCIIToUTF16(extensions::kExtensionResourceScheme));
-  WebSecurityPolicy::registerURLSchemeAsSecure(extension_resource_scheme);
-
-  // chrome:, chrome-extension:, chrome-extension-resource: resources should be
-  // allowed to receive CORS requests.
-  WebSecurityPolicy::registerURLSchemeAsCORSEnabled(extension_scheme);
-  WebSecurityPolicy::registerURLSchemeAsCORSEnabled(extension_resource_scheme);
-
-  // chrome-extension: resources should bypass Content Security Policy checks
-  // when included in protected resources.
-  WebSecurityPolicy::registerURLSchemeAsBypassingContentSecurityPolicy(
-      extension_scheme);
-  WebSecurityPolicy::registerURLSchemeAsBypassingContentSecurityPolicy(
-      extension_resource_scheme);
 
 #if defined(ENABLE_PRINT_PREVIEW)
   pdf_print_client_.reset(new ChromePDFPrintClient());
@@ -616,18 +619,9 @@ const Extension* ChromeContentRendererClient::GetExtensionByOrigin(
     return NULL;
 
   const std::string extension_id = origin.host().utf8().data();
-  return extension_dispatcher_->extensions()->GetByID(extension_id);
+  return extensions::RendererExtensionRegistry::Get()->GetByID(extension_id);
 }
 #endif
-
-scoped_ptr<blink::WebPluginPlaceholder>
-ChromeContentRendererClient::CreatePluginPlaceholder(
-    content::RenderFrame* render_frame,
-    blink::WebLocalFrame* frame,
-    const blink::WebPluginParams& orig_params) {
-  return CreateShadowDOMPlaceholderForPluginInfo(
-      render_frame, frame, orig_params);
-}
 
 bool ChromeContentRendererClient::OverrideCreatePlugin(
     content::RenderFrame* render_frame,
@@ -649,9 +643,10 @@ bool ChromeContentRendererClient::OverrideCreatePlugin(
   GURL url(params.url);
 #if defined(ENABLE_PLUGINS)
   ChromeViewHostMsg_GetPluginInfo_Output output;
+  WebString top_origin = frame->top()->securityOrigin().toString();
   render_frame->Send(new ChromeViewHostMsg_GetPluginInfo(
-      render_frame->GetRoutingID(), url, frame->top()->document().url(),
-      orig_mime_type, &output));
+      render_frame->GetRoutingID(), url, GURL(top_origin), orig_mime_type,
+      &output));
   *plugin = CreatePlugin(render_frame, frame, params, output);
 #else  // !defined(ENABLE_PLUGINS)
 
@@ -683,20 +678,22 @@ WebPlugin* ChromeContentRendererClient::CreatePluginReplacement(
 
 void ChromeContentRendererClient::DeferMediaLoad(
     content::RenderFrame* render_frame,
+    bool has_played_media_before,
     const base::Closure& closure) {
-#if defined(OS_ANDROID)
-  // Chromium for Android doesn't support prerender yet.
-  closure.Run();
-  return;
-#else
-  if (!prerender::PrerenderHelper::IsPrerendering(render_frame)) {
-    closure.Run();
+  // Don't allow autoplay/autoload of media resources in a RenderFrame that is
+  // hidden and has never played any media before.  We want to allow future
+  // loads even when hidden to allow playlist-like functionality.
+  //
+  // NOTE: This is also used to defer media loading for prerender.
+  //
+  // TODO(dalecurtis): Include an idle check too.  http://crbug.com/509135
+  if (render_frame->IsHidden() && !has_played_media_before) {
+    // Lifetime is tied to |render_frame| via content::RenderFrameObserver.
+    new MediaLoadDeferrer(render_frame, closure);
     return;
   }
 
-  // Lifetime is tied to |render_frame| via content::RenderFrameObserver.
-  new prerender::PrerenderMediaLoadDeferrer(render_frame, closure);
-#endif
+  closure.Run();
 }
 
 #if defined(ENABLE_PLUGINS)
@@ -811,8 +808,8 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
             app_url = manifest_url;
           }
           const Extension* extension =
-              g_current_client->extension_dispatcher_->extensions()->
-                  GetExtensionOrAppByURL(manifest_url);
+              extensions::RendererExtensionRegistry::Get()
+                  ->GetExtensionOrAppByURL(manifest_url);
           if (!IsNaClAllowed(manifest_url,
                              app_url,
                              is_nacl_unrestricted,
@@ -877,6 +874,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
               blocked_for_background_tab);
           placeholder->set_blocked_for_prerendering(is_prerendering);
           placeholder->set_power_saver_enabled(power_saver_enabled);
+          placeholder->AllowLoading();
           break;
         }
 
@@ -916,6 +914,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         placeholder = create_blocked_plugin(
             IDR_BLOCKED_PLUGIN_HTML,
             l10n_util::GetStringFUTF16(IDS_PLUGIN_OUTDATED, group_name));
+        placeholder->AllowLoading();
         render_frame->Send(new ChromeViewHostMsg_BlockedOutdatedPlugin(
             render_frame->GetRoutingID(), placeholder->CreateRoutingId(),
             identifier));
@@ -934,6 +933,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         placeholder = create_blocked_plugin(
             IDR_BLOCKED_PLUGIN_HTML,
             l10n_util::GetStringFUTF16(IDS_PLUGIN_NOT_AUTHORIZED, group_name));
+        placeholder->AllowLoading();
         if (info.type != content::WebPluginInfo::PLUGIN_TYPE_NPAPI) {
           render_frame->Send(new ChromeViewHostMsg_BlockedUnauthorizedPlugin(
               render_frame->GetRoutingID(),
@@ -947,6 +947,7 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
         placeholder = create_blocked_plugin(
             IDR_BLOCKED_PLUGIN_HTML,
             l10n_util::GetStringFUTF16(IDS_PLUGIN_BLOCKED, group_name));
+        placeholder->AllowLoading();
         RenderThread::Get()->RecordAction(UserMetricsAction("Plugin_Blocked"));
         observer->DidBlockContentType(content_type, group_name);
         break;
@@ -956,7 +957,6 @@ WebPlugin* ChromeContentRendererClient::CreatePlugin(
             IDR_BLOCKED_PLUGIN_HTML,
             l10n_util::GetStringFUTF16(IDS_PLUGIN_BLOCKED_BY_POLICY,
                                        group_name));
-        placeholder->DisallowLoading();
         RenderThread::Get()->RecordAction(
             UserMetricsAction("Plugin_BlockedByPolicy"));
         observer->DidBlockContentType(content_type, group_name);
@@ -1181,6 +1181,7 @@ bool ChromeContentRendererClient::AllowPopup() {
     case extensions::Feature::WEB_PAGE_CONTEXT:
     case extensions::Feature::UNBLESSED_EXTENSION_CONTEXT:
     case extensions::Feature::WEBUI_CONTEXT:
+    case extensions::Feature::SERVICE_WORKER_CONTEXT:
       return false;
     case extensions::Feature::BLESSED_EXTENSION_CONTEXT:
     case extensions::Feature::CONTENT_SCRIPT_CONTEXT:
@@ -1231,12 +1232,12 @@ bool ChromeContentRendererClient::ShouldFork(blink::WebLocalFrame* frame,
   }
 
 #if defined(ENABLE_EXTENSIONS)
-  const extensions::ExtensionSet* extensions =
-      extension_dispatcher_->extensions();
+  const extensions::RendererExtensionRegistry* extension_registry =
+      extensions::RendererExtensionRegistry::Get();
 
   // Determine if the new URL is an extension (excluding bookmark apps).
   const Extension* new_url_extension = extensions::GetNonBookmarkAppExtension(
-      *extensions, url);
+      *extension_registry->GetMainThreadExtensionSet(), url);
   bool is_extension_url = !!new_url_extension;
 
   // If the navigation would cross an app extent boundary, we also need
@@ -1245,15 +1246,15 @@ bool ChromeContentRendererClient::ShouldFork(blink::WebLocalFrame* frame,
   // browser process when they are ready to commit.  It is necessary for client
   // redirects, which won't be transferred in the same way.
   if (!is_server_redirect &&
-      CrossesExtensionExtents(frame, url, *extensions, is_extension_url,
-          is_initial_navigation)) {
+      CrossesExtensionExtents(frame, url, is_extension_url,
+                              is_initial_navigation)) {
     // Include the referrer in this case since we're going from a hosted web
     // page. (the packaged case is handled previously by the extension
     // navigation test)
     *send_referrer = true;
 
     const Extension* extension =
-        extension_dispatcher_->extensions()->GetExtensionOrAppByURL(url);
+        extension_registry->GetExtensionOrAppByURL(url);
     if (extension && extension->is_app()) {
       extensions::RecordAppLaunchType(
           extension_misc::APP_LAUNCH_CONTENT_NAVIGATION, extension->GetType());
@@ -1287,11 +1288,8 @@ bool ChromeContentRendererClient::WillSendRequest(
   // URL to something invalid to prevent the request and cause an error.
 #if defined(ENABLE_EXTENSIONS)
   if (url.SchemeIs(extensions::kExtensionScheme) &&
-      !extensions::ResourceRequestPolicy::CanRequestResource(
-          url,
-          frame,
-          transition_type,
-          extension_dispatcher_->extensions())) {
+      !extensions::ResourceRequestPolicy::CanRequestResource(url, frame,
+                                                             transition_type)) {
     *new_url = GURL(chrome::kExtensionInvalidRequestURL);
     return true;
   }
@@ -1368,11 +1366,13 @@ ChromeContentRendererClient::GetExtensionDispatcherForTest() {
 bool ChromeContentRendererClient::CrossesExtensionExtents(
     blink::WebLocalFrame* frame,
     const GURL& new_url,
-    const extensions::ExtensionSet& extensions,
     bool is_extension_url,
     bool is_initial_navigation) {
   DCHECK(!frame->parent());
   GURL old_url(frame->document().url());
+
+  extensions::RendererExtensionRegistry* extension_registry =
+      extensions::RendererExtensionRegistry::Get();
 
   // If old_url is still empty and this is an initial navigation, then this is
   // a window.open operation.  We should look at the opener URL.  Note that the
@@ -1385,9 +1385,9 @@ bool ChromeContentRendererClient::CrossesExtensionExtents(
     // opener to script it.
     WebDocument opener_document = opener_frame->document();
     WebSecurityOrigin opener_origin = opener_document.securityOrigin();
-    bool opener_is_extension_url =
-        !opener_origin.isUnique() && extensions.GetExtensionOrAppByURL(
-            opener_document.url()) != NULL;
+    bool opener_is_extension_url = !opener_origin.isUnique() &&
+                                   extension_registry->GetExtensionOrAppByURL(
+                                       opener_document.url()) != NULL;
     if (!is_extension_url &&
         !opener_is_extension_url &&
         IsStandaloneExtensionProcess() &&
@@ -1413,7 +1413,8 @@ bool ChromeContentRendererClient::CrossesExtensionExtents(
   bool should_consider_workaround = !!frame->opener();
 
   return extensions::CrossesExtensionProcessBoundary(
-      extensions, old_url, new_url, should_consider_workaround);
+      *extension_registry->GetMainThreadExtensionSet(), old_url, new_url,
+      should_consider_workaround);
 }
 #endif  // defined(ENABLE_EXTENSIONS)
 
@@ -1461,7 +1462,7 @@ bool ChromeContentRendererClient::IsExternalPepperPlugin(
 bool ChromeContentRendererClient::IsExtensionOrSharedModuleWhitelisted(
     const GURL& url, const std::set<std::string>& whitelist) {
   const extensions::ExtensionSet* extension_set =
-      g_current_client->extension_dispatcher_->extensions();
+      extensions::RendererExtensionRegistry::Get()->GetMainThreadExtensionSet();
   return chrome::IsExtensionOrSharedModuleWhitelisted(url, extension_set,
       whitelist);
 }
@@ -1630,4 +1631,21 @@ void ChromeContentRendererClient::AddImageContextMenuProperties(
     (*properties)[data_reduction_proxy::chrome_proxy_header()] =
         data_reduction_proxy::chrome_proxy_lo_fi_directive();
   }
+}
+
+void
+ChromeContentRendererClient::DidInitializeServiceWorkerContextOnWorkerThread(
+    v8::Local<v8::Context> context,
+    const GURL& url) {
+#if defined(ENABLE_EXTENSIONS)
+  extensions::Dispatcher::DidInitializeServiceWorkerContextOnWorkerThread(
+      context, url);
+#endif
+}
+
+void ChromeContentRendererClient::WillDestroyServiceWorkerContextOnWorkerThread(
+    const GURL& url) {
+#if defined(ENABLE_EXTENSIONS)
+  extensions::Dispatcher::WillDestroyServiceWorkerContextOnWorkerThread(url);
+#endif
 }

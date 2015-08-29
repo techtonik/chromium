@@ -136,15 +136,20 @@ LatencyInfo::InputCoordinate::InputCoordinate(float x, float y) : x(x), y(y) {
 }
 
 LatencyInfo::LatencyInfo()
-    : input_coordinates_size_(0), trace_id_(-1), terminated_(false) {
+    : input_coordinates_size_(0),
+      coalesced_events_size_(0),
+      trace_id_(-1),
+      terminated_(false) {
 }
 
 LatencyInfo::~LatencyInfo() {
 }
 
 LatencyInfo::LatencyInfo(int64 trace_id, bool terminated)
-    : input_coordinates_size_(0), trace_id_(trace_id), terminated_(terminated) {
-}
+    : input_coordinates_size_(0),
+      coalesced_events_size_(0),
+      trace_id_(trace_id),
+      terminated_(terminated) {}
 
 bool LatencyInfo::Verify(const std::vector<LatencyInfo>& latency_info,
                          const char* referring_msg) {
@@ -263,9 +268,11 @@ void LatencyInfo::AddLatencyNumberWithTimestampImpl(
           ts);
     }
 
-    TRACE_EVENT_FLOW_BEGIN1(
-        "input,benchmark", "LatencyInfo.Flow", TRACE_ID_DONT_MANGLE(trace_id_),
-        "trace_id", trace_id_);
+    TRACE_EVENT_WITH_FLOW1("input,benchmark",
+                           "LatencyInfo.Flow",
+                           TRACE_ID_DONT_MANGLE(trace_id_),
+                           TRACE_EVENT_FLAG_FLOW_OUT,
+                           "trace_id", trace_id_);
   }
 
   LatencyMap::key_type key = std::make_pair(component, id);
@@ -299,8 +306,10 @@ void LatencyInfo::AddLatencyNumberWithTimestampImpl(
                                   "data", AsTraceableData());
     }
 
-    TRACE_EVENT_FLOW_END_BIND_TO_ENCLOSING0(
-        "input,benchmark", "LatencyInfo.Flow", TRACE_ID_DONT_MANGLE(trace_id_));
+    TRACE_EVENT_WITH_FLOW0("input,benchmark",
+                           "LatencyInfo.Flow",
+                           TRACE_ID_DONT_MANGLE(trace_id_),
+                           TRACE_EVENT_FLAG_FLOW_IN);
   }
 }
 
@@ -362,6 +371,13 @@ bool LatencyInfo::AddInputCoordinate(const InputCoordinate& input_coordinate) {
   if (input_coordinates_size_ >= kMaxInputCoordinates)
     return false;
   input_coordinates_[input_coordinates_size_++] = input_coordinate;
+  return true;
+}
+
+bool LatencyInfo::AddCoalescedEventTimestamp(double timestamp) {
+  if (coalesced_events_size_ >= kMaxCoalescedEventTimestamps)
+    return false;
+  timestamps_of_coalesced_events_[coalesced_events_size_++] = timestamp;
   return true;
 }
 

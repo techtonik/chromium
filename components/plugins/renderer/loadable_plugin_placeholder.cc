@@ -69,7 +69,7 @@ LoadablePluginPlaceholder::LoadablePluginPlaceholder(
       is_blocked_for_power_saver_poster_(false),
       power_saver_enabled_(false),
       premade_throttler_(nullptr),
-      allow_loading_(true),
+      allow_loading_(false),
       finished_loading_(false),
       in_size_recheck_(false),
       weak_factory_(this) {
@@ -286,13 +286,14 @@ void LoadablePluginPlaceholder::DidFinishLoadingCallback() {
 
     blink::WebDOMEvent event = element.document().createEvent("MessageEvent");
     blink::WebDOMMessageEvent msg_event = event.to<blink::WebDOMMessageEvent>();
-    msg_event.initMessageEvent("message",     // type
-                               false,         // canBubble
-                               false,         // cancelable
-                               message_data,  // data
-                               "",            // origin [*]
-                               NULL,          // source [*]
-                               "");           // lastEventId
+    msg_event.initMessageEvent("message",           // type
+                               false,               // canBubble
+                               false,               // cancelable
+                               message_data,        // data
+                               "",                  // origin [*]
+                               NULL,                // source [*]
+                               element.document(),  // target document
+                               "");                 // lastEventId
     element.dispatchEvent(msg_event);
   }
 }

@@ -19,9 +19,7 @@ from telemetry.internal.platform import device_finder
 from telemetry.internal.platform.profiler import profiler_finder
 from telemetry.util import wpr_modes
 
-util.AddDirToPythonPath(
-    util.GetChromiumSrcDir(), 'third_party', 'webpagereplay')
-import net_configs  # pylint: disable=F0401
+import net_configs
 
 
 class BrowserFinderOptions(optparse.Values):
@@ -49,6 +47,7 @@ class BrowserFinderOptions(optparse.Values):
     self.browser_options = BrowserOptions()
     self.output_file = None
 
+    self.android_blacklist_file = None
     self.android_rndis = False
     self.no_performance_mode = False
 
@@ -98,8 +97,7 @@ class BrowserFinderOptions(optparse.Values):
         help='The SSH port of the remote ChromeOS device (requires --remote).')
     identity = None
     testing_rsa = os.path.join(
-        util.GetChromiumSrcDir(),
-        'third_party', 'chromite', 'ssh_keys', 'testing_rsa')
+        util.GetTelemetryThirdPartyDir(), 'chromite', 'ssh_keys', 'testing_rsa')
     if os.path.exists(testing_rsa):
       identity = testing_rsa
     group.add_option('--identity',
@@ -136,6 +134,8 @@ class BrowserFinderOptions(optparse.Values):
     group.add_option('--no-android-rndis', dest='android_rndis',
         action='store_false', help='Do not use RNDIS forwarding on Android.'
         ' [default]')
+    group.add_option('--android-blacklist-file',
+                     help='Device blacklist JSON file.')
     parser.add_option_group(group)
 
     # Browser options.
@@ -156,8 +156,6 @@ class BrowserFinderOptions(optparse.Values):
         logging.getLogger().setLevel(logging.INFO)
       else:
         logging.getLogger().setLevel(logging.WARNING)
-      logging.basicConfig(
-          format='%(levelname)s:%(name)s:%(asctime)s:%(message)s')
 
       if self.device == 'list':
         devices = device_finder.GetDevicesMatchingOptions(self)

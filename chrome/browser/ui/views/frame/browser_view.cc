@@ -77,7 +77,6 @@
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 #include "chrome/browser/ui/views/location_bar/zoom_bubble_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
-#include "chrome/browser/ui/views/profiles/avatar_menu_bubble_view.h"
 #include "chrome/browser/ui/views/profiles/avatar_menu_button.h"
 #include "chrome/browser/ui/views/profiles/profile_chooser_view.h"
 #include "chrome/browser/ui/views/profiles/profile_reset_bubble_view.h"
@@ -87,6 +86,7 @@
 #include "chrome/browser/ui/views/tabs/browser_tab_strip_controller.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
 #include "chrome/browser/ui/views/tabs/tab_strip.h"
+#include "chrome/browser/ui/views/toolbar/browser_actions_container.h"
 #include "chrome/browser/ui/views/toolbar/reload_button.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/browser/ui/views/toolbar/wrench_toolbar_button.h"
@@ -124,6 +124,7 @@
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/hit_test.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/resource/material_design/material_design_controller.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/theme_provider.h"
 #include "ui/content_accelerators/accelerator_util.h"
@@ -247,8 +248,10 @@ void PaintBackgroundAttachedMode(gfx::Canvas* canvas,
                        bounds.width(),
                        bounds.height());
 
-  if (host_desktop_type == chrome::HOST_DESKTOP_TYPE_ASH) {
-    // Ash provides additional lightening at the edges of the toolbar.
+  if (host_desktop_type == chrome::HOST_DESKTOP_TYPE_ASH &&
+      !ui::MaterialDesignController::IsModeMaterial()) {
+    // The pre-material design version of Ash provides additional lightening
+    // at the edges of the toolbar.
     gfx::ImageSkia* toolbar_left =
         theme_provider->GetImageSkiaNamed(IDR_TOOLBAR_SHADE_LEFT);
     canvas->TileImageInt(*toolbar_left,
@@ -1104,6 +1107,11 @@ void BrowserView::FocusToolbar() {
   toolbar_->SetPaneFocus(nullptr);
 }
 
+ToolbarActionsBar* BrowserView::GetToolbarActionsBar() {
+  return toolbar_ ?
+      toolbar_->browser_actions()->toolbar_actions_bar() : nullptr;
+}
+
 void BrowserView::ToolbarSizeChanged(bool is_animating) {
   // The call to SetMaxTopArrowHeight() below can result in reentrancy;
   // |call_state| tracks whether we're reentrant.  We can't just early-return in
@@ -1239,11 +1247,9 @@ void BrowserView::ShowBookmarkBubble(const GURL& url, bool already_bookmarked) {
   delegate.reset(new BookmarkBubbleSignInDelegate(browser_.get()));
 
   BookmarkBubbleView::ShowBubble(GetToolbarView()->GetBookmarkBubbleAnchor(),
-                                 bookmark_bar_view_.get(),
-                                 delegate.Pass(),
-                                 browser_->profile(),
-                                 url,
-                                 !already_bookmarked);
+                                 gfx::Rect(), nullptr, bookmark_bar_view_.get(),
+                                 delegate.Pass(), browser_->profile(), url,
+                                 already_bookmarked);
 }
 
 void BrowserView::ShowBookmarkAppBubble(
@@ -1368,8 +1374,8 @@ void BrowserView::ShowWebsiteSettings(Profile* profile,
   if (!popup_anchor)
     popup_anchor = GetLocationBarView()->location_icon_view();
 
-  WebsiteSettingsPopupView::ShowPopup(popup_anchor, profile, web_contents, url,
-                                      ssl);
+  WebsiteSettingsPopupView::ShowPopup(popup_anchor, gfx::Rect(), profile,
+                                      web_contents, url, ssl);
 }
 
 void BrowserView::ShowAppMenu() {
@@ -2482,41 +2488,19 @@ void BrowserView::UpdateAcceleratorMetrics(const ui::Accelerator& accelerator,
 void BrowserView::ShowAvatarBubbleFromAvatarButton(
     AvatarBubbleMode mode,
     const signin::ManageAccountsParams& manage_accounts_params) {
-  views::BubbleBorder::Arrow arrow = views::BubbleBorder::TOP_RIGHT;
-  views::BubbleBorder::BubbleAlignment alignment =
-      views::BubbleBorder::ALIGN_ARROW_TO_MID_ANCHOR;
-  views::View* anchor_view = frame_->GetAvatarMenuButton();
-  if (!anchor_view)
-    anchor_view = toolbar_->app_menu();
-  else if (!frame_->GetAvatarMenuButton()->button_on_right())
-    arrow = views::BubbleBorder::TOP_LEFT;
-
-  if (switches::IsNewAvatarMenu()) {
-    NewAvatarButton* button = frame_->GetNewAvatarMenuButton();
-    if (button) {
-      anchor_view = button;
-      arrow = views::BubbleBorder::TOP_RIGHT;
-      alignment = views::BubbleBorder::ALIGN_EDGE_TO_ANCHOR_EDGE;
-    }
-
-    profiles::BubbleViewMode bubble_view_mode;
-    profiles::TutorialMode tutorial_mode;
-    profiles::BubbleViewModeFromAvatarBubbleMode(
-        mode, &bubble_view_mode, &tutorial_mode);
-    ProfileChooserView::ShowBubble(
-        bubble_view_mode, tutorial_mode,
-        manage_accounts_params, anchor_view, arrow, alignment, browser());
-  } else {
-    gfx::Point origin;
-    views::View::ConvertPointToScreen(anchor_view, &origin);
-    gfx::Rect bounds(origin, anchor_view->size());
-    views::BubbleBorder::ArrowPaintType arrow_paint_type =
-        ShouldHideUIForFullscreen() ? views::BubbleBorder::PAINT_TRANSPARENT :
-                                      views::BubbleBorder::PAINT_NORMAL;
-    AvatarMenuBubbleView::ShowBubble(anchor_view, arrow, arrow_paint_type,
-                                     alignment, bounds, browser());
-  }
+#if defined(FRAME_AVATAR_BUTTON)
+  profiles::BubbleViewMode bubble_view_mode;
+  profiles::TutorialMode tutorial_mode;
+  profiles::BubbleViewModeFromAvatarBubbleMode(mode, &bubble_view_mode,
+                                               &tutorial_mode);
+  ProfileChooserView::ShowBubble(
+      bubble_view_mode, tutorial_mode, manage_accounts_params,
+      frame_->GetNewAvatarMenuButton(), views::BubbleBorder::TOP_RIGHT,
+      views::BubbleBorder::ALIGN_EDGE_TO_ANCHOR_EDGE, browser());
   ProfileMetrics::LogProfileOpenMethod(ProfileMetrics::ICON_AVATAR_BUBBLE);
+#else
+  NOTREACHED();
+#endif
 }
 
 int BrowserView::GetRenderViewHeightInsetWithDetachedBookmarkBar() {

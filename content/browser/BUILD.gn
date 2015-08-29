@@ -108,7 +108,6 @@ source_set("browser") {
     deps += [
       "//cc",
       "//cc/surfaces",
-      "//components/scheduler:common",
       "//content/app/resources",
       "//content/app/strings",
       "//content/browser/devtools:gen_devtools_protocol_handler",
@@ -504,6 +503,15 @@ source_set("browser") {
       "vr/vr_device_manager.cc",
       "vr/vr_device_manager.h",
       "vr/vr_device_provider.h",
+    ]
+  }
+
+  if (enable_webvr && is_android) {
+    sources += [
+      "vr/android/cardboard/cardboard_vr_device.cc",
+      "vr/android/cardboard/cardboard_vr_device.h",
+      "vr/android/cardboard/cardboard_vr_device_provider.cc",
+      "vr/android/cardboard/cardboard_vr_device_provider.h",
     ]
   }
 }

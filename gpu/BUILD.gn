@@ -171,10 +171,6 @@ test("gpu_unittests") {
     "command_buffer/common/id_allocator_test.cc",
     "command_buffer/common/trace_event.h",
     "command_buffer/common/unittest_main.cc",
-    "command_buffer/service/async_pixel_transfer_delegate_mock.cc",
-    "command_buffer/service/async_pixel_transfer_delegate_mock.h",
-    "command_buffer/service/async_pixel_transfer_manager_mock.cc",
-    "command_buffer/service/async_pixel_transfer_manager_mock.h",
     "command_buffer/service/buffer_manager_unittest.cc",
     "command_buffer/service/cmd_parser_test.cc",
     "command_buffer/service/command_buffer_service_unittest.cc",
@@ -196,7 +192,6 @@ test("gpu_unittests") {
     "command_buffer/service/gles2_cmd_decoder_unittest_2_autogen.h",
     "command_buffer/service/gles2_cmd_decoder_unittest_3.cc",
     "command_buffer/service/gles2_cmd_decoder_unittest_3_autogen.h",
-    "command_buffer/service/gles2_cmd_decoder_unittest_async_pixel.cc",
     "command_buffer/service/gles2_cmd_decoder_unittest_attribs.cc",
     "command_buffer/service/gles2_cmd_decoder_unittest_base.cc",
     "command_buffer/service/gles2_cmd_decoder_unittest_base.h",
@@ -315,5 +310,34 @@ test("angle_unittests") {
     "//testing/gmock",
     "//testing/gtest",
     "//third_party/angle:translator_static",
+  ]
+}
+
+#
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("angle_end2end_tests_run") {
+  testonly = true
+  deps = [
+    ":angle_end2end_tests",
+  ]
+}
+
+test("angle_end2end_tests") {
+  sources = [
+    # TODO(crbug.com/519778): Use this instead when angle actually works.
+    # For now, this creates an empty stub binary that will at least
+    # run properly on the bots.
+    # "angle_end2end_tests_main.cc",
+    "//base/test/run_all_unittests.cc",
+  ]
+
+  deps = [
+    "//base/test:test_support",
+    "//testing/gmock",
+    "//testing/gtest",
+
+    # TODO(crbug.com/519778): This needs to be implemented.
+    # "//third_party/angle:end_to_end_tests",
   ]
 }

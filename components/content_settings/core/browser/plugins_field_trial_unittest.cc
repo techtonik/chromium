@@ -80,6 +80,9 @@ TEST_F(PluginsFieldTrialTest, SwitchOverridesFieldTrial2) {
 
 TEST_F(PluginsFieldTrialTest, NoPrefLeftBehind) {
   ASSERT_TRUE(FieldTrialList::CreateFieldTrial(kEnableFieldTrial, "Enabled"));
+  // We need to reset the WebsiteSettingsRegistry as its construction depends on
+  // the field trial created above.
+  WebsiteSettingsRegistry::GetInstance()->ResetForTest();
   user_prefs::TestingPrefServiceSyncable prefs;
   {
     DefaultProvider::RegisterProfilePrefs(prefs.registry());

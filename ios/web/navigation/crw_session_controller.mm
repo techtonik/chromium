@@ -275,7 +275,8 @@ NSString* const kXCallbackParametersKey = @"xCallbackParameters";
   copy->_currentNavigationIndex = _currentNavigationIndex;
   copy->_previousNavigationIndex = _previousNavigationIndex;
   copy->_lastVisitedTimestamp = _lastVisitedTimestamp;
-  copy->_entries = [_entries copy];
+  copy->_entries =
+      [[NSMutableArray alloc] initWithArray:_entries copyItems:YES];
   copy->_sessionCertificatePolicyManager =
       [_sessionCertificatePolicyManager copy];
   copy->_xCallbackParameters = [_xCallbackParameters copy];
@@ -500,7 +501,8 @@ NSString* const kXCallbackParametersKey = @"xCallbackParameters";
   // TODO(stuartmorgan): Don't do this; this is here only to preserve the old
   // behavior from when transient entries were faked with pending entries, so
   // any actual pending entry had to be committed. This shouldn't be necessary
-  // now, but things may rely on the old behavior and need to be fixed.
+  // now, but things may rely on the old behavior and need to be fixed
+  // (crbug.com/524491).
   [self commitPendingEntry];
 
   _transientEntry.reset(

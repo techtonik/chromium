@@ -488,8 +488,9 @@ TEST_F(UDPSocketTest, ClientGetLocalPeerAddresses) {
   } tests[] = {
     { "127.0.00.1", "127.0.0.1", false },
     { "::1", "::1", true },
-#if !defined(OS_ANDROID)
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
     // Addresses below are disabled on Android. See crbug.com/161248
+    // They are also disabled on iOS. See https://crbug.com/523225
     { "192.168.1.1", "127.0.0.1", false },
     { "2001:db8:0::42", "::1", true },
 #endif

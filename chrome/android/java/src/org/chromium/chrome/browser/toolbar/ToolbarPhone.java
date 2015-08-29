@@ -32,6 +32,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
+import android.view.ViewDebug;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.LinearInterpolator;
@@ -45,13 +46,13 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.Invalidator;
-import org.chromium.chrome.browser.document.BrandColorUtils;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.omnibox.LocationBar;
 import org.chromium.chrome.browser.omnibox.LocationBarPhone;
 import org.chromium.chrome.browser.omnibox.UrlContainer;
 import org.chromium.chrome.browser.partnercustomizations.HomepageManager;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.util.ColorUtils;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.MathUtils;
 import org.chromium.chrome.browser.widget.TintedImageButton;
@@ -104,12 +105,18 @@ public class ToolbarPhone extends ToolbarLayout
 
     private final List<View> mTabSwitcherModeViews = new ArrayList<View>();
     private final Set<View> mBrowsingModeViews = new HashSet<View>();
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mInTabSwitcherMode;
+
     // This determines whether or not the toolbar draws as expected (false) or whether it always
     // draws as if it's showing the non-tabswitcher, non-animating toolbar. This is used in grabbing
     // a bitmap to use as a texture representation of this view.
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mTextureCaptureMode;
+
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mAnimateNormalToolbar;
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mDelayingTabSwitcherAnimation;
 
     private ColorDrawable mTabSwitcherAnimationBgOverlay;
@@ -118,20 +125,28 @@ public class ToolbarPhone extends ToolbarLayout
     // Value that determines the amount of transition from the normal toolbar mode to TabSwitcher
     // mode.  0 = entirely in normal mode and 1.0 = entirely in TabSwitcher mode.  In between values
     // can be used for animating between the two view modes.
+    @ViewDebug.ExportedProperty(category = "chrome")
     private float mTabSwitcherModePercent = 0;
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mUIAnimatingTabSwitcherTransition;
 
     // Used to clip the toolbar during the fade transition into and out of TabSwitcher mode.  Only
     // used when |mAnimateNormalToolbar| is false.
+    @ViewDebug.ExportedProperty(category = "chrome")
     private Rect mClipRect;
 
     private OnClickListener mTabSwitcherListener;
     private OnClickListener mNewTabListener;
 
+    @ViewDebug.ExportedProperty(category = "chrome")
     private boolean mUrlFocusChangeInProgress;
+
     /** 1.0 is 100% focused, 0 is completely unfocused */
+    @ViewDebug.ExportedProperty(category = "chrome")
     private float mUrlFocusChangePercent;
+
     /** 1.0 is 100% expanded to full width, 0 is original collapsed size. */
+    @ViewDebug.ExportedProperty(category = "chrome")
     private float mUrlExpansionPercent;
     private AnimatorSet mUrlFocusLayoutAnimator;
     private boolean mDisableLocationBarRelayout;
@@ -805,7 +820,7 @@ public class ToolbarPhone extends ToolbarLayout
 
         // The transparency of the location bar is dependent on how different its size is
         // from the final value.  This is based on how much growth is applied between the
-        // desired size of the location bar to it's drawn size.  The location bar then only
+        // desired size of the location bar to its drawn size.  The location bar then only
         // starts becoming opaque once the growth is at least half done.
         if (growthPercent >= 0.5f) {
             mPhoneLocationBar.setAlpha(0);
@@ -920,6 +935,9 @@ public class ToolbarPhone extends ToolbarLayout
                     mMenuButton.getHeight() - mMenuButton.getPaddingBottom());
             translateCanvasToView(mToolbarButtonsContainer, mMenuButton, canvas);
             mTabSwitcherAnimationMenuDrawable.setAlpha(rgbAlpha);
+            int color = mUseLightToolbarDrawables ? getResources().getColor(R.color.light_mode_tint)
+                    : getResources().getColor(R.color.dark_mode_tint);
+            mTabSwitcherAnimationMenuDrawable.setColorFilter(color, PorterDuff.Mode.SRC_IN);
             mTabSwitcherAnimationMenuDrawable.draw(canvas);
         }
 
@@ -1282,6 +1300,11 @@ public class ToolbarPhone extends ToolbarLayout
             if (mUrlFocusLayoutAnimator != null && mUrlFocusLayoutAnimator.isRunning()) {
                 mUrlFocusLayoutAnimator.end();
                 mUrlFocusLayoutAnimator = null;
+                // After finishing the animation, force a re-layout of the location bar,
+                // so that the final translation position is correct (since onMeasure updates
+                // won't happen in tab switcher mode). crbug.com/518795.
+                layoutLocationBar(getMeasuredWidth());
+                updateUrlExpansionAnimation();
             }
             mNewTabButton.setEnabled(true);
             updateViewsForTabSwitcherMode(true);
@@ -1639,8 +1662,6 @@ public class ToolbarPhone extends ToolbarLayout
 
     @Override
     protected void onPrimaryColorChanged() {
-        if (!FeatureUtilities.isDocumentMode(getContext())) return;
-
         super.onPrimaryColorChanged();
         if (mBrandColorTransitionActive) mBrandColorTransitionAnimation.cancel();
         if (!isVisualStateValidForBrandColorTransition(mVisualState)) {
@@ -1649,7 +1670,7 @@ public class ToolbarPhone extends ToolbarLayout
         final int initialColor = mToolbarBackground.getColor();
         final int finalColor = getToolbarDataProvider().getPrimaryColor();
         if (initialColor == finalColor) return;
-        boolean shouldUseOpaque = BrandColorUtils.shouldUseOpaqueTextboxBackground(finalColor);
+        boolean shouldUseOpaque = ColorUtils.shouldUseOpaqueTextboxBackground(finalColor);
         final int initialAlpha = mUrlBackgroundAlpha;
         final int finalAlpha =
                 shouldUseOpaque ? 255 : LOCATION_BAR_TRANSPARENT_BACKGROUND_ALPHA;
@@ -1720,7 +1741,7 @@ public class ToolbarPhone extends ToolbarLayout
         // world for a UI update.
         // TODO(tedchoc): Move away from updating based on the search engine change and instead
         //                add the toolbar as a listener to the NewTabPage and udpate only when
-        //                it notifies the listeners that it has changed it's state.
+        //                it notifies the listeners that it has changed its state.
         post(new Runnable() {
             @Override
             public void run() {
@@ -1788,9 +1809,9 @@ public class ToolbarPhone extends ToolbarLayout
         int currentPrimaryColor = getToolbarDataProvider().getPrimaryColor();
         if (mVisualState == VisualState.BRAND_COLOR && !visualStateChanged) {
             boolean useLightToolbarDrawables =
-                    BrandColorUtils.shouldUseLightDrawablesForToolbar(currentPrimaryColor);
+                    ColorUtils.shoudUseLightForegroundOnBackground(currentPrimaryColor);
             boolean unfocusedLocationBarUsesTransparentBg =
-                    !BrandColorUtils.shouldUseOpaqueTextboxBackground(currentPrimaryColor);
+                    !ColorUtils.shouldUseOpaqueTextboxBackground(currentPrimaryColor);
             if (useLightToolbarDrawables != mUseLightToolbarDrawables
                     || unfocusedLocationBarUsesTransparentBg
                             != mUnfocusedLocationBarUsesTransparentBg) {
@@ -1827,9 +1848,9 @@ public class ToolbarPhone extends ToolbarLayout
             progressBarBackgroundColorResource = R.color.progress_bar_background_white;
         } else if (mVisualState == VisualState.BRAND_COLOR) {
             mUseLightToolbarDrawables =
-                    BrandColorUtils.shouldUseLightDrawablesForToolbar(currentPrimaryColor);
+                    ColorUtils.shoudUseLightForegroundOnBackground(currentPrimaryColor);
             mUnfocusedLocationBarUsesTransparentBg =
-                    !BrandColorUtils.shouldUseOpaqueTextboxBackground(currentPrimaryColor);
+                    !ColorUtils.shouldUseOpaqueTextboxBackground(currentPrimaryColor);
             mUrlBackgroundAlpha = mUnfocusedLocationBarUsesTransparentBg
                     ? LOCATION_BAR_TRANSPARENT_BACKGROUND_ALPHA : 255;
             progressBarBackgroundColorResource = mUseLightToolbarDrawables
@@ -1838,14 +1859,18 @@ public class ToolbarPhone extends ToolbarLayout
 
         getProgressBar().setBackgroundColor(
                 getResources().getColor(progressBarBackgroundColorResource));
+        ColorStateList dark = getResources().getColorStateList(R.color.dark_mode_tint);
+        ColorStateList white = getResources().getColorStateList(R.color.light_mode_tint);
 
         if (mToggleTabStackButton != null) {
             mToggleTabStackButton.setImageDrawable(mUseLightToolbarDrawables
                     ? mTabSwitcherButtonDrawableLight : mTabSwitcherButtonDrawable);
+            if (mTabSwitcherAnimationTabStackDrawable != null) {
+                mTabSwitcherAnimationTabStackDrawable.setTint(
+                        mUseLightToolbarDrawables ? white : dark);
+            }
         }
 
-        ColorStateList dark = getResources().getColorStateList(R.color.dark_mode_tint);
-        ColorStateList white = getResources().getColorStateList(R.color.light_mode_tint);
         if (shouldShowMenuButton()) {
             mMenuButton.setTint(mUseLightToolbarDrawables ? white : dark);
         }
@@ -1856,7 +1881,7 @@ public class ToolbarPhone extends ToolbarLayout
         mPhoneLocationBar.updateVisualsForState();
 
         // We update the alpha before comparing the visual state as we need to change
-        // it's value when entering and exiting TabSwitcher mode.
+        // its value when entering and exiting TabSwitcher mode.
         if (isLocationBarShownInNTP() && !isInTabSwitcherMode) {
             updateNtpTransitionAnimation(
                     getToolbarDataProvider().getNewTabPageForCurrentTab());

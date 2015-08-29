@@ -49,7 +49,9 @@
         '../../components/components.gyp:autofill_ios_browser',
         '../../components/components.gyp:bookmarks_browser',
         '../../components/components.gyp:bookmarks_managed',
+        '../../components/components.gyp:component_updater',
         '../../components/components.gyp:content_settings_core_browser',
+        '../../components/components.gyp:crash_keys',
         '../../components/components.gyp:data_reduction_proxy_core_common',
         '../../components/components.gyp:dom_distiller_core',
         '../../components/components.gyp:dom_distiller_ios',
@@ -74,12 +76,15 @@
         '../../components/components.gyp:search_engines',
         '../../components/components.gyp:signin_core_browser',
         '../../components/components.gyp:signin_core_common',
+        '../../components/components.gyp:signin_ios_browser',
         '../../components/components.gyp:suggestions',
         '../../components/components.gyp:sync_driver',
         '../../components/components.gyp:translate_core_browser',
         '../../components/components.gyp:translate_ios_browser',
         '../../components/components.gyp:undo_component',
+        '../../components/components.gyp:update_client',
         '../../components/components.gyp:upload_list',
+        '../../components/components.gyp:variations',
         '../../components/components.gyp:version_info',
         '../../components/components.gyp:web_resource',
         '../../components/components.gyp:webdata_services',
@@ -166,12 +171,16 @@
         'browser/chrome_url_constants.h',
         'browser/chrome_url_util.h',
         'browser/chrome_url_util.mm',
+        'browser/component_updater/ios_component_updater_configurator.cc',
+        'browser/component_updater/ios_component_updater_configurator.h',
         'browser/content_settings/cookie_settings_factory.cc',
         'browser/content_settings/cookie_settings_factory.h',
         'browser/crash_loop_detection_util.h',
         'browser/crash_loop_detection_util.mm',
         'browser/crash_report/breakpad_helper.h',
         'browser/crash_report/breakpad_helper.mm',
+        'browser/crash_report/crash_keys.cc',
+        'browser/crash_report/crash_keys.h',
         'browser/crash_report/crash_report_background_uploader.h',
         'browser/crash_report/crash_report_background_uploader.mm',
         'browser/crash_report/crash_report_multi_parameter.h',
@@ -261,6 +270,8 @@
         'browser/memory/memory_debugger_manager.mm',
         'browser/memory/memory_metrics.cc',
         'browser/memory/memory_metrics.h',
+        'browser/metrics/field_trial_synchronizer.cc',
+        'browser/metrics/field_trial_synchronizer.h',
         'browser/metrics/ios_stability_metrics_provider.h',
         'browser/metrics/ios_stability_metrics_provider.mm',
         'browser/metrics/previous_session_info.h',
@@ -283,6 +294,8 @@
         'browser/passwords/password_generation_utils.mm',
         'browser/pref_names.cc',
         'browser/pref_names.h',
+        'browser/prefs/browser_prefs.cc',
+        'browser/prefs/browser_prefs.h',
         'browser/prefs/pref_observer_bridge.h',
         'browser/prefs/pref_observer_bridge.mm',
         'browser/procedural_block_types.h',
@@ -298,6 +311,8 @@
         'browser/search_engines/ui_thread_search_terms_data.h',
         'browser/signin/about_signin_internals_factory.cc',
         'browser/signin/about_signin_internals_factory.h',
+        'browser/signin/account_consistency_service_factory.h',
+        'browser/signin/account_consistency_service_factory.mm',
         'browser/signin/account_fetcher_service_factory.cc',
         'browser/signin/account_fetcher_service_factory.h',
         'browser/signin/account_reconcilor_factory.cc',
@@ -400,6 +415,8 @@
         'browser/ui/orientation_limiting_navigation_controller.mm',
         'browser/ui/reversed_animation.h',
         'browser/ui/reversed_animation.mm',
+        'browser/ui/rtl_geometry.h',
+        'browser/ui/rtl_geometry.mm',
         'browser/ui/show_mail_composer_util.h',
         'browser/ui/show_mail_composer_util.mm',
         'browser/ui/show_privacy_settings_util.h',
@@ -427,8 +444,6 @@
         'browser/web/web_view_type_util.mm',
         'browser/web_data_service_factory.cc',
         'browser/web_data_service_factory.h',
-        'browser/web_resource/ios_web_resource_service.cc',
-        'browser/web_resource/ios_web_resource_service.h',
         'browser/xcallback_parameters.h',
         'browser/xcallback_parameters.mm',
       ],
@@ -480,7 +495,7 @@
         ],
       },
     },
-    {   
+    {
       'target_name': 'app_group_common',
       'type': 'static_library',
       'sources': [
@@ -488,47 +503,47 @@
         'common/app_group/app_group_constants.mm',
         'common/app_group/app_group_metrics.h',
         'common/app_group/app_group_metrics.mm',
-      ],  
+      ],
       'dependencies': [
         # This target will be included into application extensions and the list
         # of its dependencies must be kept as short as possible.
         '../../base/base.gyp:base',
         '../../components/components.gyp:version_info',
-      ],  
+      ],
       'include_dirs': [
         '../..',
-      ],  
-    },  
-    {   
+      ],
+    },
+    {
       'target_name': 'app_group_client',
       'type': 'static_library',
       'sources': [
         'common/app_group/app_group_metrics_client.h',
         'common/app_group/app_group_metrics_client.mm',
-      ],  
+      ],
       'dependencies': [
         # This target will be included into application extensions and the list
         # of its dependencies must be kept as short as possible.
         'app_group_common',
-      ],  
+      ],
       'include_dirs': [
         '../..',
-      ],  
-    },  
-    {   
+      ],
+    },
+    {
       'target_name': 'app_group_mainapp',
       'type': 'static_library',
       'sources': [
         'common/app_group/app_group_metrics_mainapp.h',
         'common/app_group/app_group_metrics_mainapp.mm',
-      ],  
+      ],
       'dependencies': [
         'app_group_common',
-      ],  
+      ],
       'include_dirs': [
         '../..',
-      ],  
-    },  
+      ],
+    },
   ],
   'conditions': [
     ['enable_rlz_support==1', {

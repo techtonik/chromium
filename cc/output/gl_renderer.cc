@@ -759,21 +759,13 @@ void GLRenderer::RestoreBlendFuncToDefault(SkXfermode::Mode blend_mode) {
   }
 }
 
-bool GLRenderer::ShouldApplyBackgroundFilters(DrawingFrame* frame,
-                                              const RenderPassDrawQuad* quad) {
+bool GLRenderer::ShouldApplyBackgroundFilters(const RenderPassDrawQuad* quad) {
   if (quad->background_filters.IsEmpty())
     return false;
 
-  // TODO(danakj): We only allow background filters on an opaque render surface
-  // because other surfaces may contain translucent pixels, and the contents
-  // behind those translucent pixels wouldn't have the filter applied.
-  if (frame->current_render_pass->has_transparent_background)
-    return false;
+  // TODO(hendrikw): Look into allowing background filters to see pixels from
+  // other render targets.  See crbug.com/314867.
 
-  // TODO(ajuma): Add support for reference filters once
-  // FilterOperations::GetOutsets supports reference filters.
-  if (quad->background_filters.HasReferenceFilter())
-    return false;
   return true;
 }
 
@@ -828,7 +820,7 @@ gfx::Rect GLRenderer::GetBackdropBoundingBoxForRenderPassQuad(
   gfx::Rect backdrop_rect = gfx::ToEnclosingRect(MathUtil::MapClippedRect(
       contents_device_transform, scaled_region.BoundingBox()));
 
-  if (ShouldApplyBackgroundFilters(frame, quad)) {
+  if (ShouldApplyBackgroundFilters(quad)) {
     int top, right, bottom, left;
     quad->background_filters.GetOutsets(&top, &right, &bottom, &left);
     backdrop_rect.Inset(-left, -top, -right, -bottom);
@@ -864,7 +856,7 @@ skia::RefPtr<SkImage> GLRenderer::ApplyBackgroundFilters(
     DrawingFrame* frame,
     const RenderPassDrawQuad* quad,
     ScopedResource* background_texture) {
-  DCHECK(ShouldApplyBackgroundFilters(frame, quad));
+  DCHECK(ShouldApplyBackgroundFilters(quad));
   skia::RefPtr<SkImageFilter> filter = RenderSurfaceFilters::BuildImageFilter(
       quad->background_filters, background_texture->size());
 
@@ -914,7 +906,7 @@ void GLRenderer::DrawRenderPassQuad(DrawingFrame* frame,
   SkXfermode::Mode blend_mode = quad->shared_quad_state->blend_mode;
   bool use_shaders_for_blending =
       !CanApplyBlendModeUsingBlendFunc(blend_mode) ||
-      ShouldApplyBackgroundFilters(frame, quad) ||
+      ShouldApplyBackgroundFilters(quad) ||
       settings_->force_blending_with_shaders;
 
   scoped_ptr<ScopedResource> background_texture;
@@ -939,7 +931,7 @@ void GLRenderer::DrawRenderPassQuad(DrawingFrame* frame,
       // LayerTreeHost::CalculateMemoryForRenderSurfaces.
       background_texture = GetBackdropTexture(background_rect);
 
-      if (ShouldApplyBackgroundFilters(frame, quad) && background_texture) {
+      if (ShouldApplyBackgroundFilters(quad) && background_texture) {
         // Apply the background filters to R, so that it is applied in the
         // pixels' coordinate space.
         background_image =
@@ -959,7 +951,7 @@ void GLRenderer::DrawRenderPassQuad(DrawingFrame* frame,
       if (!quad->mask_resource_id())
         background_texture.reset();
     } else if (CanApplyBlendModeUsingBlendFunc(blend_mode) &&
-               ShouldApplyBackgroundFilters(frame, quad)) {
+               ShouldApplyBackgroundFilters(quad)) {
       // Something went wrong with applying background filters to the backdrop.
       use_shaders_for_blending = false;
       background_texture.reset();
@@ -3522,16 +3514,20 @@ void GLRenderer::ScheduleOverlays(DrawingFrame* frame) {
     if (overlay.plane_z_order == 0)
       continue;
 
-    pending_overlay_resources_.push_back(
-        make_scoped_ptr(new ResourceProvider::ScopedReadLockGL(
-            resource_provider_, overlay.resource_id)));
+    unsigned texture_id = 0;
+    if (overlay.use_output_surface_for_resource) {
+      texture_id = output_surface_->GetOverlayTextureId();
+      DCHECK(texture_id);
+    } else {
+      pending_overlay_resources_.push_back(
+          make_scoped_ptr(new ResourceProvider::ScopedReadLockGL(
+              resource_provider_, overlay.resource_id)));
+      texture_id = pending_overlay_resources_.back()->texture_id();
+    }
 
     context_support_->ScheduleOverlayPlane(
-        overlay.plane_z_order,
-        overlay.transform,
-        pending_overlay_resources_.back()->texture_id(),
-        ToNearestRect(overlay.display_rect),
-        overlay.uv_rect);
+        overlay.plane_z_order, overlay.transform, texture_id,
+        ToNearestRect(overlay.display_rect), overlay.uv_rect);
   }
 }
 

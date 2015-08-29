@@ -289,6 +289,9 @@ Press any key to continue exploring.
   <message name="IDS_FILE_BROWSER_GALLERY_SHARE" desc="In the Gallery, the title on the button that lets the user share a photo.">
     Share
   </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_EXIT" desc="In the Gallery, the title on the button that exits edit mode.">
+    Exit
+  </message>
   <message name="IDS_FILE_BROWSER_GALLERY_ENTER_WHEN_DONE" desc="In the Gallery, the text in a floating panel that prompts the user to press enter when they are done with the changes to a photo.">
     Press Enter when done
   </message>
@@ -2032,10 +2035,10 @@ Press any key to continue exploring.
     Battery - <ph name="status">$1<ex>56% - 2:03 left</ex></ph>
   </message>
   <message name="IDS_OPTIONS_BATTERY_STATUS" desc="The battery status in the device section and 'Power' overlay while the battery is discharging, showing the battery power as a percentage and the time left until the battery is empty.">
-    <ph name="percentage">$1<ex>56</ex></ph>% - <ph name="hour">$2<ex>2</ex></ph>:<ph name="minute">$3<ex>03</ex></ph> left
+    <ph name="percentage">$1<ex>56</ex></ph>% - <ph name="time">$2<ex>2 hours and 20 minutes</ex></ph> left
   </message>
   <message name="IDS_OPTIONS_BATTERY_STATUS_CHARGING" desc="The battery status in the device section and 'Power' overlay while the battery is charging, showing the battery power as a percentage and the time left until the battery is full.">
-    <ph name="percentage">$1<ex>56</ex></ph>% - <ph name="hour">$2<ex>2</ex></ph>:<ph name="minute">$3<ex>03</ex></ph> until full
+    <ph name="percentage">$1<ex>56</ex></ph>% - <ph name="time">$2<ex>2 hours and 20 minutes</ex></ph> until full
   </message>
   <message name="IDS_OPTIONS_BATTERY_STATUS_SHORT" desc="The battery status in the device section and 'Power' overlay when the time left cannot be shown.">
     <ph name="percentage">$1<ex>56</ex></ph>%
@@ -2045,9 +2048,6 @@ Press any key to continue exploring.
   </message>
   <message name="IDS_OPTIONS_POWER_OVERLAY_TITLE" desc="The title for the 'Power' overlay.">
     Power
-  </message>
-  <message name="IDS_OPTIONS_POWER_OVERLAY_CHARGING_DEVICES" desc="The description in the 'Power' overlay when the device is charging connected devices.">
-    All connected devices will be charged.
   </message>
   <message name="IDS_OPTIONS_POWER_OVERLAY_CALCULATING" desc="The description in the 'Power' overlay when the power status is being determined.">
     Checking...
@@ -2065,37 +2065,37 @@ Press any key to continue exploring.
     Low-power charger
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT" desc="The text referring to the USB Type-C port on the left side of the device.">
-    Left port
+    USB-C device (left port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT" desc="The text referring to the USB Type-C port on the right side of the device.">
-    Right port
+    USB-C device (right port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK" desc="The text referring to the USB Type-C port on the back of the device.">
-    Rear port
+    USB-C device (rear port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_FRONT" desc="The text referring to the USB Type-C port on the front of the device.">
-    Front port
+    USB-C device (front port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_FRONT" desc="The text referring to the furthest front USB Type-C port on the left side of the device.">
-    Left port (front)
+    USB-C device (left-front port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_BACK" desc="The text referring to the furthest back USB Type-C port on the left side of the device.">
-    Left port (back)
+    USB-C device (left-back port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_FRONT" desc="The text referring to the furthest front USB Type-C port on the right side of the device.">
-    Right port (front)
+    USB-C device (right-front port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_BACK" desc="The text referring to the furthest back USB Type-C port on the right side of the device.">
-    Right port (back)
+    USB-C device (right-back port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_LEFT" desc="The text referring to the furthest left USB Type-C port on the back of the device.">
-    Rear port (left)
+    USB-C device (rear-left port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_RIGHT" desc="The text referring to the furthest right USB Type-C port on the back of the device.">
-    Rear port (right)
+    USB-C device (rear-right port)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_UNKNOWN" desc="The text referring to the device to charge from, when its port location cannot be determined.">
-    Connected device
+    USB-C device
   </message>
   <message name="IDS_OPTIONS_BATTERY_STATUS_LABEL" desc="The label for the battery information in the 'Power' overlay.">
     Battery:
@@ -2340,17 +2340,17 @@ Press any key to continue exploring.
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_COLOR_PROFILE" desc="The section title for color calibration profile selection.">
     Color profile:
   </message>
-  <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_START_MIRRORING" desc="Button label to start display mirroring.">
-    Start mirroring
+  <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_EXTENDED_MODE_LABEL" desc="The text for the option for extended desktop mode.">
+    Extended Desktop
   </message>
-  <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_STOP_MIRRORING" desc="Button label to stop display mirroring.">
-    Stop mirroring
+  <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_MIRRORING_MODE_LABEL" desc="The text for the option for mirroring desktop mode.">
+    Mirrored
   </message>
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_MIRRORING_DISPLAY_NAME" desc="The text shown at display name field when mirroring.">
     Mirroring
   </message>
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_ENABLE_UNIFIED_DESKTOP" desc="The section title for the option to enable unified desktop mode.">
-    Enable Unified Desktop
+    Windows can span displays.
   </message>
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_SET_PRIMARY" desc="Button label to set a display primary.">
     Make primary
@@ -4910,6 +4910,9 @@ Battery full
   <message name="IDS_STATUSBAR_LAYOUT_TURKEY" desc="In the language menu button, this shows the input mode [Turkish keyboard].">
     Turkish
   </message>
+  <message name="IDS_STATUSBAR_LAYOUT_TURKEY_F" desc="In the language menu button, this shows the input mode [Turkish-F keyboard].">
+    Turkish-F
+  </message>
   <message name="IDS_STATUSBAR_LAYOUT_PORTUGAL" desc="In the language menu button, this shows the input mode [Portuguese keyboard].">
     Portuguese
   </message>
@@ -5132,6 +5135,9 @@ Battery full
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_TURKISH" desc="The input method name shows in system tray menu, this shows [Turkish keyboard].">
     Turkish keyboard
+  </message>
+  <message name="IDS_IME_NAME_KEYBOARD_TURKISH_F" desc="The input method name shows in system tray menu, this shows [Turkish-F keyboard].">
+    Turkish-F keyboard
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_UK_DVORAK" desc="The input method name shows in system tray menu, this shows [UK Dvorak keyboard].">
     UK Dvorak keyboard

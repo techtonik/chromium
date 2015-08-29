@@ -8,6 +8,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -281,8 +282,8 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
      * @param webContents The WebContents for which to show Website information. This information is
      *                    retrieved for the visible entry.
      */
-    private WebsiteSettingsPopup(Context context, Profile profile, WebContents webContents) {
-        mContext = context;
+    private WebsiteSettingsPopup(Activity activity, Profile profile, WebContents webContents) {
+        mContext = activity;
         mProfile = profile;
         mWebContents = webContents;
         mIsReadOnlyDialog = enableReadOnlyPopup();
@@ -543,18 +544,8 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
                 originToDisplay = mFullUrl;
             }
 
-            String leadingText = mContext.getResources().getString(
-                    R.string.page_info_connection_broken_leading_text);
-            String followingText = mContext.getResources().getString(
-                    R.string.page_info_connection_broken_following_text, originToDisplay);
-            messageBuilder.append(leadingText + " " + followingText);
-            final ForegroundColorSpan redSpan = new ForegroundColorSpan(mContext.getResources()
-                    .getColor(R.color.website_settings_connection_broken_leading_text));
-            final StyleSpan boldSpan = new StyleSpan(android.graphics.Typeface.BOLD);
-            messageBuilder.setSpan(redSpan, 0, leadingText.length(),
-                    Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
-            messageBuilder.setSpan(boldSpan, 0, leadingText.length(),
-                    Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+            messageBuilder.append(mContext.getResources().getString(
+                    R.string.page_info_connection_broken, originToDisplay));
         }
 
         if (isConnectionDetailsLinkVisible()) {
@@ -965,13 +956,13 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
      * Shows a WebsiteSettings dialog for the provided WebContents. The popup adds itself to the
      * view hierarchy which owns the reference while it's visible.
      *
-     * @param context Context which is used for launching a dialog.
+     * @param activity Activity which is used for launching a dialog.
      * @param webContents The WebContents for which to show Website information. This information is
      *                    retrieved for the visible entry.
      */
     @SuppressWarnings("unused")
-    public static void show(Context context, Profile profile, WebContents webContents) {
-        new WebsiteSettingsPopup(context, profile, webContents);
+    public static void show(Activity activity, Profile profile, WebContents webContents) {
+        new WebsiteSettingsPopup(activity, profile, webContents);
     }
 
     private static native long nativeInit(WebsiteSettingsPopup popup, WebContents webContents);

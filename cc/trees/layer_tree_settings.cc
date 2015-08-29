@@ -46,7 +46,6 @@ LayerTreeSettings::LayerTreeSettings()
       top_controls_show_threshold(0.5f),
       top_controls_hide_threshold(0.5f),
       background_animation_rate(1.0),
-      max_partial_texture_updates(std::numeric_limits<size_t>::max()),
       default_tile_size(gfx::Size(256, 256)),
       max_untiled_layer_size(gfx::Size(512, 512)),
       default_tile_grid_size(gfx::Size(256, 256)),
@@ -55,10 +54,8 @@ LayerTreeSettings::LayerTreeSettings()
       tiling_interest_area_padding(3000),
       skewport_target_time_in_seconds(1.0f),
       skewport_extrapolation_limit_in_content_pixels(2000),
-      max_unused_resource_memory_percentage(100),
       max_memory_for_prepaint_percentage(100),
       strict_layer_property_change_checking(false),
-      use_one_copy(true),
       use_zero_copy(false),
       use_persistent_map_for_gpu_memory_buffers(false),
       enable_elastic_overscroll(false),
@@ -74,7 +71,8 @@ LayerTreeSettings::LayerTreeSettings()
       gather_pixel_refs(false),
       use_compositor_animation_timelines(false),
       invert_viewport_scroll_order(false),
-      wait_for_beginframe_interval(true) {}
+      wait_for_beginframe_interval(true),
+      max_staging_buffers(32) {}
 
 LayerTreeSettings::~LayerTreeSettings() {}
 

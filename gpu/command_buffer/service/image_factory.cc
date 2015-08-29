@@ -16,13 +16,13 @@ ImageFactory::~ImageFactory() {
 }
 
 // static
-gfx::BufferFormat ImageFactory::ImageFormatToGpuMemoryBufferFormat(
+gfx::BufferFormat ImageFactory::DefaultBufferFormatForImageFormat(
     unsigned internalformat) {
   switch (internalformat) {
     case GL_R8:
       return gfx::BufferFormat::R_8;
     case GL_RGB:
-      return gfx::BufferFormat::RGBX_8888;
+      return gfx::BufferFormat::BGRX_8888;
     case GL_RGBA:
       return gfx::BufferFormat::RGBA_8888;
     case GL_BGRA_EXT:
@@ -39,6 +39,8 @@ gfx::BufferFormat ImageFactory::ImageFormatToGpuMemoryBufferFormat(
       return gfx::BufferFormat::ETC1;
     case GL_RGB_YUV_420_CHROMIUM:
       return gfx::BufferFormat::YUV_420;
+    case GL_RGB_YCBCR_422_CHROMIUM:
+      return gfx::BufferFormat::UYVY_422;
     default:
       NOTREACHED();
       return gfx::BufferFormat::RGBA_8888;
@@ -63,7 +65,25 @@ gfx::BufferUsage ImageFactory::ImageUsageToGpuMemoryBufferUsage(
 bool ImageFactory::IsImageFormatCompatibleWithGpuMemoryBufferFormat(
     unsigned internalformat,
     gfx::BufferFormat format) {
-  return ImageFormatToGpuMemoryBufferFormat(internalformat) == format;
+  switch (format) {
+    case gfx::BufferFormat::ATC:
+    case gfx::BufferFormat::ATCIA:
+    case gfx::BufferFormat::BGRA_8888:
+    case gfx::BufferFormat::BGRX_8888:
+    case gfx::BufferFormat::DXT1:
+    case gfx::BufferFormat::DXT5:
+    case gfx::BufferFormat::ETC1:
+    case gfx::BufferFormat::R_8:
+    case gfx::BufferFormat::RGBA_8888:
+    case gfx::BufferFormat::YUV_420:
+    case gfx::BufferFormat::UYVY_422:
+      return format == DefaultBufferFormatForImageFormat(internalformat);
+    case gfx::BufferFormat::RGBA_4444:
+      return internalformat == GL_RGBA;
+  }
+
+  NOTREACHED();
+  return false;
 }
 
 // static
@@ -84,11 +104,12 @@ bool ImageFactory::IsGpuMemoryBufferFormatSupported(
       return capabilities.texture_format_etc1;
     case gfx::BufferFormat::R_8:
       return capabilities.texture_rg;
+    case gfx::BufferFormat::UYVY_422:
+      return capabilities.image_ycbcr_422;
     case gfx::BufferFormat::RGBA_4444:
     case gfx::BufferFormat::RGBA_8888:
-    case gfx::BufferFormat::RGBX_8888:
+    case gfx::BufferFormat::BGRX_8888:
     case gfx::BufferFormat::YUV_420:
-    case gfx::BufferFormat::YUV_420_BIPLANAR:
       return true;
   }
 
@@ -113,12 +134,13 @@ bool ImageFactory::IsImageSizeValidForGpuMemoryBufferFormat(
     case gfx::BufferFormat::RGBA_4444:
     case gfx::BufferFormat::RGBA_8888:
     case gfx::BufferFormat::BGRA_8888:
-    case gfx::BufferFormat::RGBX_8888:
+    case gfx::BufferFormat::BGRX_8888:
       return true;
     case gfx::BufferFormat::YUV_420:
-    case gfx::BufferFormat::YUV_420_BIPLANAR:
       // U and V planes are subsampled by a factor of 2.
       return size.width() % 2 == 0 && size.height() % 2 == 0;
+    case gfx::BufferFormat::UYVY_422:
+      return size.width() % 2 == 0;
   }
 
   NOTREACHED();

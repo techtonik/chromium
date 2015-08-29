@@ -86,6 +86,13 @@ void CalculateVisibleRects(const std::vector<LayerType*>& visible_layer_list,
             MathUtil::MapClippedRect(clip_to_target, clip_node->data.clip));
       }
 
+      if (clip_node->data.requires_tight_clip_rect)
+        layer->set_clip_rect_in_target_space_from_property_trees(
+            combined_clip_rect_in_target_space);
+      else
+        layer->set_clip_rect_in_target_space_from_property_trees(
+            clip_rect_in_target_space);
+
       gfx::Rect layer_content_rect = gfx::Rect(layer_bounds);
       gfx::Rect layer_content_bounds_in_target_space =
           MathUtil::MapEnclosingClippedRect(content_to_target,
@@ -93,13 +100,6 @@ void CalculateVisibleRects(const std::vector<LayerType*>& visible_layer_list,
       combined_clip_rect_in_target_space.Intersect(
           layer_content_bounds_in_target_space);
       clip_rect_in_target_space.Intersect(layer_content_bounds_in_target_space);
-      if (clip_node->data.requires_tight_clip_rect) {
-        layer->set_clip_rect_in_target_space_from_property_trees(
-            combined_clip_rect_in_target_space);
-      } else {
-        layer->set_clip_rect_in_target_space_from_property_trees(
-            clip_rect_in_target_space);
-      }
       if (combined_clip_rect_in_target_space.IsEmpty()) {
         layer->set_visible_rect_from_property_trees(gfx::Rect());
         continue;
@@ -255,11 +255,6 @@ static inline bool SubtreeShouldBeSkipped(LayerImpl* layer,
   if (layer->draw_properties().layer_or_descendant_has_copy_request)
     return false;
 
-  // We cannot skip the the subtree if a descendant has a wheel or touch handler
-  // or the hit testing code will break (it requires fresh transforms, etc).
-  if (layer->draw_properties().layer_or_descendant_has_input_handler)
-    return false;
-
   // If the layer is not drawn, then skip it and its subtree.
   if (!layer_is_drawn)
     return true;
@@ -273,6 +268,11 @@ static inline bool SubtreeShouldBeSkipped(LayerImpl* layer,
   // include tiles for this layer when deciding if tree can be activated.
   if (layer->layer_tree_impl()->IsPendingTree() &&
       layer->HasPotentiallyRunningOpacityAnimation())
+    return false;
+
+  // If layer has a background filter, don't skip the layer, even it the
+  // opacity is 0.
+  if (!layer->background_filters().IsEmpty())
     return false;
 
   // The opacity of a layer always applies to its children (either implicitly
@@ -291,22 +291,22 @@ static inline bool SubtreeShouldBeSkipped(Layer* layer,
 
   // When we need to do a readback/copy of a layer's output, we can not skip
   // it or any of its ancestors.
-  if (layer->draw_properties().layer_or_descendant_has_copy_request)
-    return false;
-
-  // We cannot skip the the subtree if a descendant has a wheel or touch handler
-  // or the hit testing code will break (it requires fresh transforms, etc).
-  if (layer->draw_properties().layer_or_descendant_has_input_handler)
+  if (layer->num_layer_or_descendants_with_copy_request() > 0)
     return false;
 
   // If the layer is not drawn, then skip it and its subtree.
   if (!layer_is_drawn)
     return true;
 
-  if (layer->render_surface() && !layer->double_sided() &&
+  if (layer->has_render_surface() && !layer->double_sided() &&
       !layer->HasPotentiallyRunningTransformAnimation() &&
       IsSurfaceBackFaceVisible(layer, tree))
     return true;
+
+  // If layer has a background filter, don't skip the layer, even it the
+  // opacity is 0.
+  if (!layer->background_filters().IsEmpty())
+    return false;
 
   // If the opacity is being animated then the opacity on the main thread is
   // unreliable (since the impl thread may be using a different opacity), so it
@@ -403,6 +403,8 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
     return;
   for (int i = 0; i < static_cast<int>(clip_tree->size()); ++i) {
     ClipNode* clip_node = clip_tree->Node(i);
+    const TransformNode* transform_node =
+        transform_tree.Node(clip_node->data.transform_id);
 
     // Only descendants of a real clipping layer (i.e., not 0) may have their
     // clip adjusted due to intersecting with an ancestor clip.
@@ -410,14 +412,17 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
     if (!is_clipped) {
       DCHECK(!clip_node->data.inherit_parent_target_space_clip);
       clip_node->data.combined_clip = clip_node->data.clip;
+      if (clip_node->id > 0) {
+        gfx::Transform to_target = transform_node->data.to_target;
+        clip_node->data.clip_in_target_space =
+            MathUtil::MapClippedRect(to_target, clip_node->data.combined_clip);
+      }
       continue;
     }
 
     ClipNode* parent_clip_node = clip_tree->parent(clip_node);
     const TransformNode* parent_transform_node =
         transform_tree.Node(parent_clip_node->data.transform_id);
-    const TransformNode* transform_node =
-        transform_tree.Node(clip_node->data.transform_id);
 
     // Clips must be combined in target space. We cannot, for example, combine
     // clips in the space of the child clip. The reason is non-affine
@@ -429,6 +434,7 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
     // must combine clips.
     gfx::Transform parent_to_target;
     gfx::Transform clip_to_target;
+
     gfx::Transform target_to_clip;
     gfx::Transform parent_to_transform_target;
     gfx::Transform transform_target_to_target;
@@ -512,11 +518,15 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
     if (!clip_node->data.inherit_parent_target_space_clip) {
       gfx::RectF clip_in_target_space =
           MathUtil::MapClippedRect(clip_to_target, clip_node->data.clip);
-
       intersected_in_target_space = gfx::IntersectRects(
           inherited_clip_in_target_space, clip_in_target_space);
+      if (!clip_node->data.requires_tight_clip_rect)
+        clip_node->data.clip_in_target_space = clip_in_target_space;
+      else
+        clip_node->data.clip_in_target_space = intersected_in_target_space;
     } else {
       intersected_in_target_space = inherited_clip_in_target_space;
+      clip_node->data.clip_in_target_space = intersected_in_target_space;
     }
 
     clip_node->data.combined_clip = MathUtil::ProjectClippedRect(
@@ -536,12 +546,12 @@ void ComputeTransforms(TransformTree* transform_tree) {
   transform_tree->set_needs_update(false);
 }
 
-void ComputeOpacities(OpacityTree* opacity_tree) {
-  if (!opacity_tree->needs_update())
+void ComputeOpacities(EffectTree* effect_tree) {
+  if (!effect_tree->needs_update())
     return;
-  for (int i = 1; i < static_cast<int>(opacity_tree->size()); ++i)
-    opacity_tree->UpdateOpacities(i);
-  opacity_tree->set_needs_update(false);
+  for (int i = 1; i < static_cast<int>(effect_tree->size()); ++i)
+    effect_tree->UpdateOpacities(i);
+  effect_tree->set_needs_update(false);
 }
 
 template <typename LayerType>
@@ -553,7 +563,7 @@ void ComputeVisibleRectsUsingPropertyTreesInternal(
     property_trees->clip_tree.set_needs_update(true);
   ComputeTransforms(&property_trees->transform_tree);
   ComputeClips(&property_trees->clip_tree, property_trees->transform_tree);
-  ComputeOpacities(&property_trees->opacity_tree);
+  ComputeOpacities(&property_trees->effect_tree);
 
   const bool subtree_is_visible_from_ancestor = true;
   std::vector<LayerType*> visible_layer_list;
@@ -624,7 +634,8 @@ gfx::Transform DrawTransformFromPropertyTreesInternal(
   const TransformNode* node = tree.Node(layer->transform_tree_index());
 
   gfx::Transform xform;
-  const bool owns_non_root_surface = layer->parent() && layer->render_surface();
+  const bool owns_non_root_surface =
+      layer->parent() && layer->has_render_surface();
   if (!owns_non_root_surface) {
     // If you're not the root, or you don't own a surface, you need to apply
     // your local offset.
@@ -663,9 +674,48 @@ gfx::Transform DrawTransformOfRenderSurfaceFromPropertyTrees(
     target_node = tree.Node(0);
   tree.ComputeTransformWithDestinationSublayerScale(node->id, target_node->id,
                                                     &render_surface_transform);
-  render_surface_transform.Scale(1.0 / node->data.sublayer_scale.x(),
-                                 1.0 / node->data.sublayer_scale.y());
+  if (node->data.sublayer_scale.x() != 0.0 &&
+      node->data.sublayer_scale.y() != 0.0)
+    render_surface_transform.Scale(1.0 / node->data.sublayer_scale.x(),
+                                   1.0 / node->data.sublayer_scale.y());
   return render_surface_transform;
+}
+
+bool RenderSurfaceIsClippedFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const ClipTree& tree) {
+  const ClipNode* node = tree.Node(render_surface->ClipTreeIndex());
+  // If the render surface's owning layer doesn't form a clip node, it is not
+  // clipped.
+  if (render_surface->OwningLayerId() != node->owner_id)
+    return false;
+  return node->data.render_surface_is_clipped;
+}
+
+gfx::Rect ClipRectOfRenderSurfaceFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const ClipTree& clip_tree) {
+  if (!RenderSurfaceIsClippedFromPropertyTrees(render_surface, clip_tree))
+    return gfx::Rect();
+  const ClipNode* clip_node = clip_tree.Node(render_surface->ClipTreeIndex());
+  const ClipNode* parent_clip_node = clip_tree.parent(clip_node);
+  return gfx::ToEnclosingRect(parent_clip_node->data.clip_in_target_space);
+}
+
+gfx::Transform ScreenSpaceTransformOfRenderSurfaceFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const TransformTree& tree) {
+  const TransformNode* node = tree.Node(render_surface->TransformTreeIndex());
+  gfx::Transform screen_space_transform;
+  // The screen space transform of root render surface is identity tranform.
+  if (node->id == 1)
+    return screen_space_transform;
+  screen_space_transform = node->data.to_screen;
+  if (node->data.sublayer_scale.x() != 0.0 &&
+      node->data.sublayer_scale.y() != 0.0)
+    screen_space_transform.Scale(1.0 / node->data.sublayer_scale.x(),
+                                 1.0 / node->data.sublayer_scale.y());
+  return screen_space_transform;
 }
 
 template <typename LayerType>
@@ -715,15 +765,36 @@ bool ScreenSpaceTransformIsAnimatingFromPropertyTrees(
   return ScreenSpaceTransformIsAnimatingFromPropertyTreesInternal(layer, tree);
 }
 
-template <typename LayerType>
-float DrawOpacityFromPropertyTreesInternal(LayerType layer,
-                                           const OpacityTree& tree) {
+float MaximumAnimationTargetScaleFromPropertyTrees(const LayerImpl* layer,
+                                                   const TransformTree& tree) {
+  if (!layer->layer_tree_impl()
+           ->settings()
+           .layer_transforms_should_scale_layer_contents)
+    return 0.f;
+
+  return tree.Node(layer->transform_tree_index())
+      ->data.combined_maximum_animation_target_scale;
+}
+
+float StartingAnimationScaleFromPropertyTrees(const LayerImpl* layer,
+                                              const TransformTree& tree) {
+  if (!layer->layer_tree_impl()
+           ->settings()
+           .layer_transforms_should_scale_layer_contents)
+    return 0.f;
+
+  return tree.Node(layer->transform_tree_index())
+      ->data.combined_starting_animation_scale;
+}
+
+float DrawOpacityFromPropertyTrees(const LayerImpl* layer,
+                                   const EffectTree& tree) {
   if (!layer->render_target())
     return 0.f;
 
-  const OpacityNode* target_node =
-      tree.Node(layer->render_target()->opacity_tree_index());
-  const OpacityNode* node = tree.Node(layer->opacity_tree_index());
+  const EffectNode* target_node =
+      tree.Node(layer->render_target()->effect_tree_index());
+  const EffectNode* node = tree.Node(layer->effect_tree_index());
   if (node == target_node)
     return 1.f;
 
@@ -735,14 +806,20 @@ float DrawOpacityFromPropertyTreesInternal(LayerType layer,
   return draw_opacity;
 }
 
-float DrawOpacityFromPropertyTrees(const Layer* layer,
-                                   const OpacityTree& tree) {
-  return DrawOpacityFromPropertyTreesInternal(layer, tree);
-}
-
-float DrawOpacityFromPropertyTrees(const LayerImpl* layer,
-                                   const OpacityTree& tree) {
-  return DrawOpacityFromPropertyTreesInternal(layer, tree);
+float DrawOpacityOfRenderSurfaceFromPropertyTrees(
+    RenderSurfaceImpl* render_surface,
+    const EffectTree& tree) {
+  const EffectNode* node = tree.Node(render_surface->EffectTreeIndex());
+  float target_opacity_tree_index = render_surface->TargetEffectTreeIndex();
+  if (target_opacity_tree_index < 0)
+    return node->data.screen_space_opacity;
+  const EffectNode* target_node = tree.Node(target_opacity_tree_index);
+  float draw_opacity = 1.f;
+  while (node != target_node) {
+    draw_opacity *= node->data.opacity;
+    node = tree.parent(node);
+  }
+  return draw_opacity;
 }
 
 bool CanUseLcdTextFromPropertyTrees(const LayerImpl* layer,
@@ -756,10 +833,10 @@ bool CanUseLcdTextFromPropertyTrees(const LayerImpl* layer,
   if (!layer->contents_opaque())
     return false;
   DCHECK(!property_trees->transform_tree.needs_update());
-  DCHECK(!property_trees->opacity_tree.needs_update());
+  DCHECK(!property_trees->effect_tree.needs_update());
 
-  const OpacityNode* opacity_node =
-      property_trees->opacity_tree.Node(layer->opacity_tree_index());
+  const EffectNode* opacity_node =
+      property_trees->effect_tree.Node(layer->effect_tree_index());
   if (opacity_node->data.screen_space_opacity != 1.f)
     return false;
   const TransformNode* transform_node =
@@ -775,6 +852,23 @@ bool CanUseLcdTextFromPropertyTrees(const LayerImpl* layer,
   return true;
 }
 
+gfx::Rect DrawableContentRectOfSurfaceFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const TransformTree& transform_tree) {
+  gfx::Rect drawable_content_rect =
+      gfx::ToEnclosingRect(MathUtil::MapClippedRect(
+          DrawTransformOfRenderSurfaceFromPropertyTrees(render_surface,
+                                                        transform_tree),
+          render_surface->content_rect_from_property_trees()));
+  if (render_surface->HasReplica()) {
+    drawable_content_rect.Union(gfx::ToEnclosingRect(MathUtil::MapClippedRect(
+        DrawTransformOfRenderSurfaceReplicaFromPropertyTrees(render_surface,
+                                                             transform_tree),
+        render_surface->content_rect_from_property_trees())));
+  }
+  return drawable_content_rect;
+}
+
 gfx::Rect DrawableContentRectFromPropertyTrees(
     const LayerImpl* layer,
     const TransformTree& transform_tree) {
@@ -786,6 +880,61 @@ gfx::Rect DrawableContentRectFromPropertyTrees(
         layer->clip_rect_in_target_space_from_property_trees());
   }
   return drawable_content_rect;
+}
+
+gfx::Rect ClipRectFromPropertyTrees(const LayerImpl* layer,
+                                    const TransformTree& transform_tree) {
+  if (layer->is_clipped() && layer->clip_tree_index() > 0)
+    return layer->clip_rect_in_target_space_from_property_trees();
+  return MathUtil::MapEnclosingClippedRect(
+      DrawTransformFromPropertyTrees(layer, transform_tree),
+      gfx::Rect(layer->bounds()));
+}
+
+gfx::Transform ReplicaToSurfaceTransform(
+    const RenderSurfaceImpl* render_surface,
+    const TransformTree& tree) {
+  gfx::Transform replica_to_surface;
+  if (!render_surface->HasReplica())
+    return replica_to_surface;
+  const LayerImpl* replica_layer = render_surface->ReplicaLayer();
+  const TransformNode* surface_transform_node =
+      tree.Node(render_surface->TransformTreeIndex());
+  replica_to_surface.Scale(surface_transform_node->data.sublayer_scale.x(),
+                           surface_transform_node->data.sublayer_scale.y());
+  replica_to_surface.Translate(replica_layer->offset_to_transform_parent().x(),
+                               replica_layer->offset_to_transform_parent().y());
+  gfx::Transform replica_transform_node_to_surface;
+  tree.ComputeTransform(replica_layer->transform_tree_index(),
+                        render_surface->TransformTreeIndex(),
+                        &replica_transform_node_to_surface);
+  replica_to_surface.PreconcatTransform(replica_transform_node_to_surface);
+  if (surface_transform_node->data.sublayer_scale.x() != 0 &&
+      surface_transform_node->data.sublayer_scale.y() != 0) {
+    replica_to_surface.Scale(
+        1.0 / surface_transform_node->data.sublayer_scale.x(),
+        1.0 / surface_transform_node->data.sublayer_scale.y());
+  }
+  return replica_to_surface;
+}
+
+gfx::Transform DrawTransformOfRenderSurfaceReplicaFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const TransformTree& tree) {
+  if (!render_surface->HasReplica())
+    return gfx::Transform();
+  return DrawTransformOfRenderSurfaceFromPropertyTrees(render_surface, tree) *
+         ReplicaToSurfaceTransform(render_surface, tree);
+}
+
+gfx::Transform ScreenSpaceTransformOfRenderSurfaceReplicaFromPropertyTrees(
+    const RenderSurfaceImpl* render_surface,
+    const TransformTree& tree) {
+  if (!render_surface->HasReplica())
+    return gfx::Transform();
+  return ScreenSpaceTransformOfRenderSurfaceFromPropertyTrees(render_surface,
+                                                              tree) *
+         ReplicaToSurfaceTransform(render_surface, tree);
 }
 
 }  // namespace cc

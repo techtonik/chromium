@@ -15,7 +15,9 @@
 #include "base/path_service.h"
 #include "base/process/memory.h"
 #include "base/process/process_handle.h"
+#include "base/process/process_info.h"
 #include "base/strings/string_util.h"
+#include "base/time/time.h"
 #include "base/trace_event/trace_event_impl.h"
 #include "build/build_config.h"
 #include "chrome/browser/chrome_content_browser_client.h"
@@ -389,14 +391,19 @@ void InitializeUserDataDir() {
 }  // namespace
 
 ChromeMainDelegate::ChromeMainDelegate() {
-#if defined(OS_ANDROID)
+#if defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
+  // Record the startup process creation time on supported platforms.
+  startup_metric_utils::RecordStartupProcessCreationTime(
+      base::CurrentProcessInfo::CreationTime());
+#endif
+
 // On Android the main entry point time is the time when the Java code starts.
 // This happens before the shared library containing this code is even loaded.
 // The Java startup code has recorded that time, but the C++ code can't fetch it
 // from the Java side until it has initialized the JNI. See
 // ChromeMainDelegateAndroid.
-#else
-  startup_metric_utils::RecordMainEntryPointTime();
+#if !defined(OS_ANDROID)
+  startup_metric_utils::RecordMainEntryPointTime(base::Time::Now());
 #endif
 }
 
@@ -620,24 +627,10 @@ void ChromeMainDelegate::InitMacCrashReporter(
             << "Executable-heap process requires --type="
             << switches::kPluginProcess << " or "
             << switches::kUtilityProcess << ", saw " << process_type;
-      } else if (last_three == " NP") {
-#if !defined(DISABLE_NACL)
-        CHECK_EQ(switches::kNaClLoaderProcess, process_type)
-            << "Non-PIE process requires --type="
-            << switches::kNaClLoaderProcess << ", saw " << process_type;
-#endif
       } else {
-#if defined(DISABLE_NACL)
         CHECK(process_type != switches::kPluginProcess)
             << "Non-executable-heap PIE process is intolerant of --type="
             << switches::kPluginProcess;
-#else
-        CHECK(process_type != switches::kPluginProcess &&
-              process_type != switches::kNaClLoaderProcess)
-            << "Non-executable-heap PIE process is intolerant of --type="
-            << switches::kPluginProcess << " and "
-            << switches::kNaClLoaderProcess << ", saw " << process_type;
-#endif
       }
     }
   } else {
@@ -817,7 +810,7 @@ void ChromeMainDelegate::SandboxInitialized(const std::string& process_type) {
       nacl_plugin::PPP_InitializeModule,
       nacl_plugin::PPP_ShutdownModule);
 #endif
-#if defined(ENABLE_PLUGINS)
+#if defined(ENABLE_PLUGINS) && defined(ENABLE_PDF)
   ChromeContentClient::SetPDFEntryFunctions(
       chrome_pdf::PPP_GetInterface,
       chrome_pdf::PPP_InitializeModule,

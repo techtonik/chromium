@@ -18,6 +18,7 @@
 #include "net/http/http_request_headers.h"
 #include "net/http/http_request_info.h"
 #include "net/http/http_response_headers.h"
+#include "net/http/http_status_line_validator.h"
 #include "net/http/http_util.h"
 #include "net/socket/client_socket_handle.h"
 #include "net/socket/ssl_client_socket.h"
@@ -940,8 +941,11 @@ int HttpStreamParser::ParseResponseHeaders(int end_offset) {
 
   if (response_header_start_offset_ >= 0) {
     received_bytes_ += end_offset;
-    headers = new HttpResponseHeaders(HttpUtil::AssembleRawHeaders(
-        read_buf_->StartOfBuffer(), end_offset));
+    std::string raw_headers =
+        HttpUtil::AssembleRawHeaders(read_buf_->StartOfBuffer(), end_offset);
+    ValidateStatusLine(
+        std::string(read_buf_->StartOfBuffer(), raw_headers.find('\0')));
+    headers = new HttpResponseHeaders(raw_headers);
   } else {
     // Enough data was read -- there is no status line.
     headers = new HttpResponseHeaders(std::string("HTTP/0.9 200 OK"));
@@ -955,30 +959,29 @@ int HttpStreamParser::ParseResponseHeaders(int end_offset) {
       RecordHeaderParserEvent(HEADER_HTTP_09_ON_REUSED_SOCKET);
   }
 
-  // Check for multiple Content-Length headers with no Transfer-Encoding header.
-  // If they exist, and have distinct values, it's a potential response
-  // smuggling attack.
-  if (!headers->HasHeader("Transfer-Encoding")) {
-    if (HeadersContainMultipleCopiesOfField(*headers.get(), "Content-Length"))
+  // Check for multiple Content-Length headers when the response is not
+  // chunked-encoded.  If they exist, and have distinct values, it's a potential
+  // response smuggling attack.
+  if (!headers->IsChunkEncoded()) {
+    if (HeadersContainMultipleCopiesOfField(*headers, "Content-Length"))
       return ERR_RESPONSE_HEADERS_MULTIPLE_CONTENT_LENGTH;
   }
 
   // Check for multiple Content-Disposition or Location headers.  If they exist,
   // it's also a potential response smuggling attack.
-  if (HeadersContainMultipleCopiesOfField(*headers.get(),
-                                          "Content-Disposition"))
+  if (HeadersContainMultipleCopiesOfField(*headers, "Content-Disposition"))
     return ERR_RESPONSE_HEADERS_MULTIPLE_CONTENT_DISPOSITION;
-  if (HeadersContainMultipleCopiesOfField(*headers.get(), "Location"))
+  if (HeadersContainMultipleCopiesOfField(*headers, "Location"))
     return ERR_RESPONSE_HEADERS_MULTIPLE_LOCATION;
 
   response_->headers = headers;
   response_->connection_info = HttpResponseInfo::CONNECTION_INFO_HTTP1;
-  response_->vary_data.Init(*request_, *response_->headers.get());
+  response_->vary_data.Init(*request_, *response_->headers);
   DVLOG(1) << __FUNCTION__ << "()"
            << " content_length = \"" << response_->headers->GetContentLength()
            << "\n\""
-           << " headers = \""
-           << GetResponseHeaderLines(*response_->headers.get()) << "\"";
+           << " headers = \"" << GetResponseHeaderLines(*response_->headers)
+           << "\"";
   return OK;
 }
 
@@ -1124,6 +1127,13 @@ bool HttpStreamParser::ShouldMergeRequestHeadersAndBody(
       return true;
   }
   return false;
+}
+
+void HttpStreamParser::ValidateStatusLine(const std::string& status_line) {
+  HttpStatusLineValidator::StatusLineStatus status =
+      HttpStatusLineValidator::ValidateStatusLine(status_line);
+  UMA_HISTOGRAM_ENUMERATION("Net.HttpStatusLineStatus", status,
+                            HttpStatusLineValidator::STATUS_LINE_MAX);
 }
 
 }  // namespace net

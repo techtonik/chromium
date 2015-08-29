@@ -197,6 +197,7 @@ URLRequestHttpJob::URLRequestHttpJob(
       awaiting_callback_(false),
       http_user_agent_settings_(http_user_agent_settings),
       backoff_manager_(request->context()->backoff_manager()),
+      total_received_bytes_from_previous_transactions_(0),
       weak_factory_(this) {
   URLRequestThrottlerManager* manager = request->context()->throttler_manager();
   if (manager)
@@ -344,13 +345,10 @@ void URLRequestHttpJob::NotifyHeadersComplete() {
   if (sdch_manager) {
     SdchProblemCode rv = sdch_manager->IsInSupportedDomain(request()->url());
     if (rv != SDCH_OK) {
-      // If SDCH is just disabled, it is not a real error.
-      if (rv != SDCH_DISABLED) {
-        SdchManager::SdchErrorRecovery(rv);
-        request()->net_log().AddEvent(
-            NetLog::TYPE_SDCH_DECODING_ERROR,
-            base::Bind(&NetLogSdchResourceProblemCallback, rv));
-      }
+      SdchManager::SdchErrorRecovery(rv);
+      request()->net_log().AddEvent(
+          NetLog::TYPE_SDCH_DECODING_ERROR,
+          base::Bind(&NetLogSdchResourceProblemCallback, rv));
     } else {
       const std::string name = "Get-Dictionary";
       std::string url_text;
@@ -424,6 +422,9 @@ void URLRequestHttpJob::DestroyTransaction() {
   DCHECK(transaction_.get());
 
   DoneWithRequest(ABORTED);
+
+  total_received_bytes_from_previous_transactions_ +=
+      transaction_->GetTotalReceivedBytes();
   transaction_.reset();
   response_info_ = NULL;
   receive_headers_end_ = base::TimeTicks();
@@ -559,13 +560,10 @@ void URLRequestHttpJob::AddExtraHeaders() {
       SdchProblemCode rv = sdch_manager->IsInSupportedDomain(request()->url());
       if (rv != SDCH_OK) {
         advertise_sdch = false;
-        // If SDCH is just disabled, it is not a real error.
-        if (rv != SDCH_DISABLED) {
-          SdchManager::SdchErrorRecovery(rv);
-          request()->net_log().AddEvent(
-              NetLog::TYPE_SDCH_DECODING_ERROR,
-              base::Bind(&NetLogSdchResourceProblemCallback, rv));
-        }
+        SdchManager::SdchErrorRecovery(rv);
+        request()->net_log().AddEvent(
+            NetLog::TYPE_SDCH_DECODING_ERROR,
+            base::Bind(&NetLogSdchResourceProblemCallback, rv));
       }
     }
     if (advertise_sdch) {
@@ -1365,10 +1363,11 @@ bool URLRequestHttpJob::GetFullRequestHeaders(
 }
 
 int64 URLRequestHttpJob::GetTotalReceivedBytes() const {
-  if (!transaction_)
-    return 0;
-
-  return transaction_->GetTotalReceivedBytes();
+  int64_t total_received_bytes =
+      total_received_bytes_from_previous_transactions_;
+  if (transaction_)
+    total_received_bytes += transaction_->GetTotalReceivedBytes();
+  return total_received_bytes;
 }
 
 void URLRequestHttpJob::DoneReading() {

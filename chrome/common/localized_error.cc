@@ -49,7 +49,6 @@ static const char kWeakDHKeyLearnMoreUrl[] =
 static const char kCachedCopyButtonFieldTrial[] =
     "EnableGoogleCachedCopyTextExperiment";
 static const char kCachedCopyButtonExpTypeControl[] = "control";
-static const char kCachedCopyButtonExpTypeCopy[] = "copy";
 static const int kGoogleCachedCopySuggestionType = 0;
 
 enum NAV_SUGGESTIONS {
@@ -328,6 +327,13 @@ const LocalizedErrorMap net_error_options[] = {
    IDS_ERRORPAGES_DETAILS_TEMPORARY_BACKOFF,
    SUGGEST_NONE,
   },
+  {net::ERR_SSL_SERVER_CERT_BAD_FORMAT,
+   IDS_ERRORPAGES_TITLE_LOAD_FAILED,
+   IDS_ERRORPAGES_HEADING_SSL_PROTOCOL_ERROR,
+   IDS_ERRORPAGES_SUMMARY_SSL_PROTOCOL_ERROR,
+   IDS_ERRORPAGES_DETAILS_SSL_PROTOCOL_ERROR,
+   SUGGEST_NONE,
+  },
 };
 
 // Special error page to be used in the case of navigating back to a page
@@ -403,7 +409,7 @@ const LocalizedErrorMap http_error_options[] = {
 };
 
 const LocalizedErrorMap dns_probe_error_options[] = {
-  {chrome_common_net::DNS_PROBE_POSSIBLE,
+  {error_page::DNS_PROBE_POSSIBLE,
    IDS_ERRORPAGES_TITLE_NOT_AVAILABLE,
    IDS_ERRORPAGES_HEADING_NOT_AVAILABLE,
    IDS_ERRORPAGES_SUMMARY_DNS_PROBE_RUNNING,
@@ -414,7 +420,7 @@ const LocalizedErrorMap dns_probe_error_options[] = {
   // DNS_PROBE_NOT_RUN is not here; NetErrorHelper will restore the original
   // error, which might be one of several DNS-related errors.
 
-  {chrome_common_net::DNS_PROBE_STARTED,
+  {error_page::DNS_PROBE_STARTED,
    IDS_ERRORPAGES_TITLE_NOT_AVAILABLE,
    IDS_ERRORPAGES_HEADING_NOT_AVAILABLE,
    IDS_ERRORPAGES_SUMMARY_DNS_PROBE_RUNNING,
@@ -426,21 +432,21 @@ const LocalizedErrorMap dns_probe_error_options[] = {
   // DNS_PROBE_FINISHED_UNKNOWN is not here; NetErrorHelper will restore the
   // original error, which might be one of several DNS-related errors.
 
-  {chrome_common_net::DNS_PROBE_FINISHED_NO_INTERNET,
+  {error_page::DNS_PROBE_FINISHED_NO_INTERNET,
    IDS_ERRORPAGES_TITLE_NOT_AVAILABLE,
    IDS_ERRORPAGES_HEADING_INTERNET_DISCONNECTED,
    IDS_ERRORPAGES_SUMMARY_INTERNET_DISCONNECTED,
    IDS_ERRORPAGES_DETAILS_INTERNET_DISCONNECTED,
    SUGGEST_RELOAD | SUGGEST_CHECK_CONNECTION | SUGGEST_FIREWALL_CONFIG,
   },
-  {chrome_common_net::DNS_PROBE_FINISHED_BAD_CONFIG,
+  {error_page::DNS_PROBE_FINISHED_BAD_CONFIG,
    IDS_ERRORPAGES_TITLE_NOT_AVAILABLE,
    IDS_ERRORPAGES_HEADING_NOT_AVAILABLE,
    IDS_ERRORPAGES_SUMMARY_NAME_NOT_RESOLVED,
    IDS_ERRORPAGES_DETAILS_NAME_NOT_RESOLVED,
    SUGGEST_RELOAD | SUGGEST_DNS_CONFIG | SUGGEST_FIREWALL_CONFIG,
   },
-  {chrome_common_net::DNS_PROBE_FINISHED_NXDOMAIN,
+  {error_page::DNS_PROBE_FINISHED_NXDOMAIN,
    IDS_ERRORPAGES_TITLE_NOT_AVAILABLE,
    IDS_ERRORPAGES_HEADING_NOT_AVAILABLE,
    IDS_ERRORPAGES_SUMMARY_NAME_NOT_RESOLVED,
@@ -502,7 +508,7 @@ const char* GetIconClassForError(const std::string& error_domain,
                                  int error_code) {
   if ((error_code == net::ERR_INTERNET_DISCONNECTED &&
        error_domain == net::kErrorDomain) ||
-      (error_code == chrome_common_net::DNS_PROBE_FINISHED_NO_INTERNET &&
+      (error_code == error_page::DNS_PROBE_FINISHED_NO_INTERNET &&
        error_domain == error_page::kDnsProbeErrorDomain))
     return "icon-offline";
 
@@ -573,7 +579,7 @@ void LocalizedError::GetStrings(int error_code,
 
   // For offline show a summary message underneath the heading.
   if (error_code == net::ERR_INTERNET_DISCONNECTED ||
-      error_code == chrome_common_net::DNS_PROBE_FINISHED_NO_INTERNET) {
+      error_code == error_page::DNS_PROBE_FINISHED_NO_INTERNET) {
     error_strings->SetString("primaryParagraph",
         l10n_util::GetStringUTF16(options.summary_resource_id));
 
@@ -895,6 +901,7 @@ void LocalizedError::EnableGoogleCachedCopyButtonExperiment(
   std::string field_trial_exp_type_ =
       base::FieldTrialList::FindFullName(kCachedCopyButtonFieldTrial);
 
+  // Google cache copy button experiment.
   // If the first suggestion is for a Google cache copy. Promote the
   // suggestion to a separate set of strings for displaying as a button.
   if (!suggestions->empty() && !field_trial_exp_type_.empty() &&
@@ -909,22 +916,10 @@ void LocalizedError::EnableGoogleCachedCopyButtonExperiment(
       suggestion->GetString("urlCorrection", &cache_url);
       int cache_tracking_id = -1;
       suggestion->GetInteger("trackingId", &cache_tracking_id);
-
       scoped_ptr<base::DictionaryValue> cache_button(new base::DictionaryValue);
-
-      // Google cache copy button label experiment.
-      if (field_trial_exp_type_ == kCachedCopyButtonExpTypeCopy) {
-        cache_button->SetString(
+      cache_button->SetString(
             "msg",
-            l10n_util::GetStringUTF16(IDS_ERRORPAGES_BUTTON_SHOW_CACHED_COPY));
-        cache_button->SetBoolean("defaultLabel", false);
-      } else {
-        // Default to "Show cached page" button label.
-        cache_button->SetString(
-            "msg",
-            l10n_util::GetStringUTF16(IDS_ERRORPAGES_BUTTON_SHOW_CACHED_PAGE));
-        cache_button->SetBoolean("defaultLabel", true);
-      }
+            l10n_util::GetStringUTF16(IDS_ERRORPAGES_BUTTON_SHOW_SAVED_COPY));
       cache_button->SetString("cacheUrl", cache_url);
       cache_button->SetInteger("trackingId", cache_tracking_id);
       error_strings->Set("cacheButton", cache_button.release());

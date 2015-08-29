@@ -10,7 +10,6 @@
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/thread_task_runner_handle.h"
-#include "components/devtools_service/public/cpp/switches.h"
 #include "components/html_viewer/blink_url_request_type_converters.h"
 #include "components/html_viewer/devtools_agent_impl.h"
 #include "components/html_viewer/document_resource_waiter.h"
@@ -21,7 +20,7 @@
 #include "components/html_viewer/web_url_loader_impl.h"
 #include "components/view_manager/ids.h"
 #include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_manager.h"
+#include "components/view_manager/public/cpp/view_tree_connection.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/connect.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
@@ -44,11 +43,6 @@ bool IsTestInterfaceEnabled() {
       kEnableTestInterface);
 }
 
-bool EnableRemoteDebugging() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      devtools_service::kRemoteDebuggingPort);
-}
-
 }  // namespace
 
 HTMLDocumentOOPIF::BeforeLoadCache::BeforeLoadCache() {
@@ -63,26 +57,26 @@ HTMLDocumentOOPIF::HTMLDocumentOOPIF(mojo::ApplicationImpl* html_document_app,
                                      mojo::ApplicationConnection* connection,
                                      mojo::URLResponsePtr response,
                                      GlobalState* global_state,
-                                     const DeleteCallback& delete_callback)
+                                     const DeleteCallback& delete_callback,
+                                     HTMLFactory* factory)
     : app_refcount_(html_document_app->app_lifetime_helper()
                         ->CreateAppRefCount()),
       html_document_app_(html_document_app),
       connection_(connection),
-      view_manager_client_factory_(html_document_app->shell(), this),
       global_state_(global_state),
       frame_(nullptr),
-      delete_callback_(delete_callback) {
+      delete_callback_(delete_callback),
+      factory_(factory),
+      root_(nullptr) {
   // TODO(sky): nuke headless. We're not going to care about it anymore.
   DCHECK(!global_state_->is_headless());
 
-  connection->AddService(
-      static_cast<mojo::InterfaceFactory<mandoline::FrameTreeClient>*>(this));
-  connection->AddService(static_cast<InterfaceFactory<AxProvider>*>(this));
-  connection->AddService(&view_manager_client_factory_);
-  if (IsTestInterfaceEnabled()) {
-    connection->AddService(
-        static_cast<mojo::InterfaceFactory<TestHTMLViewer>*>(this));
-  }
+  connection->AddService<mandoline::FrameTreeClient>(this);
+  connection->AddService<AxProvider>(this);
+  connection->AddService<mojo::ViewTreeClient>(this);
+  connection->AddService<devtools_service::DevToolsAgent>(this);
+  if (IsTestInterfaceEnabled())
+    connection->AddService<TestHTMLViewer>(this);
 
   resource_waiter_.reset(
       new DocumentResourceWaiter(global_state_, response.Pass(), this));
@@ -95,14 +89,15 @@ void HTMLDocumentOOPIF::Destroy() {
     if (root) {
       root->RemoveObserver(this);
       resource_waiter_.reset();
-      delete root->view_manager();
+      delete root->connection();
     } else {
       delete this;
     }
   } else {
     // Closing the frame ends up destroying the ViewManager, which triggers
     // deleting this (OnViewManagerDestroyed()).
-    frame_->Close();
+    if (frame_)
+      frame_->Close();
   }
 }
 
@@ -125,22 +120,30 @@ void HTMLDocumentOOPIF::Load() {
       view->viewport_metrics().size_in_pixels.To<gfx::Size>(),
       view->viewport_metrics().device_pixel_ratio);
 
-  view->RemoveObserver(this);
-
-  WebURLRequestExtraData* extra_data = new WebURLRequestExtraData;
+  scoped_ptr<WebURLRequestExtraData> extra_data(new WebURLRequestExtraData);
   extra_data->synthetic_response =
       resource_waiter_->ReleaseURLResponse().Pass();
 
   frame_ = HTMLFrameTreeManager::CreateFrameAndAttachToTree(
-      global_state_, html_document_app_, view, resource_waiter_.Pass(), this);
+      global_state_, view, resource_waiter_.Pass(), this);
 
-  // TODO(yzshen): http://crbug.com/498986 Creating DevToolsAgentImpl instances
-  // causes html_viewer_apptests flakiness currently. Before we fix that we
-  // cannot enable remote debugging (which is required by Telemetry tests) on
-  // the bots.
-  if (EnableRemoteDebugging() && !frame_->parent()) {
-    devtools_agent_.reset(new DevToolsAgentImpl(
-        frame_->web_frame()->toWebLocalFrame(), html_document_app_->shell()));
+  // If the frame wasn't created we can destroy the connection.
+  if (!frame_) {
+    root_->RemoveObserver(this);
+    // This triggers deleting us.
+    delete root_->connection();
+    return;
+  }
+
+  view->RemoveObserver(this);
+
+  if (devtools_agent_request_.is_pending()) {
+    if (frame_->devtools_agent()) {
+      frame_->devtools_agent()->BindToRequest(devtools_agent_request_.Pass());
+    } else {
+      devtools_agent_request_ =
+          mojo::InterfaceRequest<devtools_service::DevToolsAgent>();
+    }
   }
 
   const GURL url(extra_data->synthetic_response->url);
@@ -148,7 +151,7 @@ void HTMLDocumentOOPIF::Load() {
   blink::WebURLRequest web_request;
   web_request.initialize();
   web_request.setURL(url);
-  web_request.setExtraData(extra_data);
+  web_request.setExtraData(extra_data.release());
 
   frame_->web_frame()->toWebLocalFrame()->loadRequest(web_request);
 }
@@ -161,6 +164,8 @@ HTMLDocumentOOPIF::BeforeLoadCache* HTMLDocumentOOPIF::GetBeforeLoadCache() {
 }
 
 void HTMLDocumentOOPIF::OnEmbed(View* root) {
+  root_ = root;
+
   // We're an observer until the document is loaded.
   root->AddObserver(this);
   resource_waiter_->set_root(root);
@@ -168,12 +173,7 @@ void HTMLDocumentOOPIF::OnEmbed(View* root) {
   LoadIfNecessary();
 }
 
-void HTMLDocumentOOPIF::OnUnembed() {
-  frame_->OnViewUnembed();
-}
-
-void HTMLDocumentOOPIF::OnViewManagerDestroyed(
-    mojo::ViewManager* view_manager) {
+void HTMLDocumentOOPIF::OnConnectionLost(mojo::ViewTreeConnection* connection) {
   delete this;
 }
 
@@ -185,12 +185,10 @@ void HTMLDocumentOOPIF::OnViewViewportMetricsChanged(
 }
 
 void HTMLDocumentOOPIF::OnViewDestroyed(View* view) {
-  resource_waiter_->root()->RemoveObserver(this);
-  resource_waiter_->set_root(nullptr);
-}
-
-bool HTMLDocumentOOPIF::ShouldNavigateLocallyInMainFrame() {
-  return devtools_agent_ && devtools_agent_->handling_page_navigate_request();
+  if (resource_waiter_) {
+    resource_waiter_->root()->RemoveObserver(this);
+    resource_waiter_->set_root(nullptr);
+  }
 }
 
 void HTMLDocumentOOPIF::OnFrameDidFinishLoad() {
@@ -213,6 +211,16 @@ void HTMLDocumentOOPIF::OnFrameDidFinishLoad() {
 
 mojo::ApplicationImpl* HTMLDocumentOOPIF::GetApp() {
   return html_document_app_;
+}
+
+HTMLFactory* HTMLDocumentOOPIF::GetHTMLFactory() {
+  return factory_;
+}
+
+void HTMLDocumentOOPIF::OnFrameSwappedToRemote() {
+  // When the frame becomes remote HTMLDocumentOOPIF is no longer needed.
+  // Deleting the ViewManager triggers deleting us.
+  delete root_->connection();
 }
 
 void HTMLDocumentOOPIF::Create(mojo::ApplicationConnection* connection,
@@ -249,6 +257,23 @@ void HTMLDocumentOOPIF::Create(
     return;
   }
   resource_waiter_->Bind(request.Pass());
+}
+
+void HTMLDocumentOOPIF::Create(
+    mojo::ApplicationConnection* connection,
+    mojo::InterfaceRequest<devtools_service::DevToolsAgent> request) {
+  if (frame_) {
+    if (frame_->devtools_agent())
+      frame_->devtools_agent()->BindToRequest(request.Pass());
+  } else {
+    devtools_agent_request_ = request.Pass();
+  }
+}
+
+void HTMLDocumentOOPIF::Create(
+    mojo::ApplicationConnection* connection,
+    mojo::InterfaceRequest<mojo::ViewTreeClient> request) {
+  mojo::ViewTreeConnection::Create(this, request.Pass());
 }
 
 }  // namespace html_viewer

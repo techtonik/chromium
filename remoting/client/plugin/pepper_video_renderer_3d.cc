@@ -10,13 +10,19 @@
 #include "base/stl_util.h"
 #include "ppapi/c/pp_codecs.h"
 #include "ppapi/c/ppb_opengles2.h"
+#include "ppapi/c/ppb_video_decoder.h"
 #include "ppapi/cpp/instance.h"
 #include "ppapi/lib/gl/include/GLES2/gl2.h"
 #include "ppapi/lib/gl/include/GLES2/gl2ext.h"
+#include "remoting/client/chromoting_stats.h"
 #include "remoting/proto/video.pb.h"
 #include "remoting/protocol/session_config.h"
 
 namespace remoting {
+
+// The implementation here requires this minimum number of pictures from the
+// video decoder interface to work.
+const uint32_t kMinimumPictureCount = 3;
 
 class PepperVideoRenderer3D::PendingPacket {
  public:
@@ -57,7 +63,6 @@ PepperVideoRenderer3D::FrameDecodeTimestamp::FrameDecodeTimestamp(
 
 PepperVideoRenderer3D::PepperVideoRenderer3D()
     : event_handler_(nullptr),
-      latest_input_event_timestamp_(0),
       initialization_finished_(false),
       decode_pending_(false),
       get_picture_pending_(false),
@@ -170,8 +175,13 @@ void PepperVideoRenderer3D::OnSessionConfig(
     default:
       NOTREACHED();
   }
+
+  bool supports_video_decoder_1_1 =
+      pp::Module::Get()->GetBrowserInterface(
+          PPB_VIDEODECODER_INTERFACE_1_1) != NULL;
   int32_t result = video_decoder_.Initialize(
       graphics_, video_profile, PP_HARDWAREACCELERATION_WITHFALLBACK,
+      supports_video_decoder_1_1 ? kMinimumPictureCount : 0,
       callback_factory_.NewCallback(&PepperVideoRenderer3D::OnInitialized));
   CHECK_EQ(result, PP_OK_COMPLETIONPENDING)
       << "video_decoder_.Initialize() returned " << result;
@@ -189,30 +199,12 @@ void PepperVideoRenderer3D::ProcessVideoPacket(scoped_ptr<VideoPacket> packet,
                                                const base::Closure& done) {
   base::ScopedClosureRunner done_runner(done);
 
-  // Record this received packet, even if it is empty.
-  stats_.video_packet_rate()->Record(1);
+  stats_.RecordVideoPacketStats(*packet);
 
   // Don't need to do anything if the packet is empty. Host sends empty video
   // packets when the screen is not changing.
   if (!packet->data().size())
     return;
-
-  // Update statistics.
-  // TODO(anandc): Move to ChromotingStats - see http://crbug/508602
-  stats_.video_frame_rate()->Record(1);
-  stats_.video_bandwidth()->Record(packet->data().size());
-  if (packet->has_capture_time_ms())
-    stats_.video_capture_ms()->Record(packet->capture_time_ms());
-  if (packet->has_encode_time_ms())
-    stats_.video_encode_ms()->Record(packet->encode_time_ms());
-  if (packet->has_latest_event_timestamp() &&
-      packet->latest_event_timestamp() > latest_input_event_timestamp_) {
-    latest_input_event_timestamp_ = packet->latest_event_timestamp();
-    base::TimeDelta round_trip_latency =
-        base::Time::Now() -
-        base::Time::FromInternalValue(packet->latest_event_timestamp());
-    stats_.round_trip_ms()->Record(round_trip_latency.InMilliseconds());
-  }
 
   bool resolution_changed = false;
 
@@ -352,7 +344,8 @@ void PepperVideoRenderer3D::OnPictureReady(int32_t result,
 
   base::TimeDelta decode_time =
       base::TimeTicks::Now() - frame_timer.decode_started_time;
-  stats_.video_decode_ms()->Record(decode_time.InMilliseconds());
+  stats_.RecordDecodeTime(decode_time.InMilliseconds());
+
   frame_decode_timestamps_.pop_front();
 
   next_picture_.reset(new Picture(&video_decoder_, picture));
@@ -433,8 +426,7 @@ void PepperVideoRenderer3D::OnPaintDone(int32_t result) {
   paint_pending_ = false;
   base::TimeDelta paint_time =
       base::TimeTicks::Now() - latest_paint_started_time_;
-  stats_.video_paint_ms()->Record(paint_time.InMilliseconds());
-
+  stats_.RecordPaintTime(paint_time.InMilliseconds());
   PaintIfNeeded();
 }
 

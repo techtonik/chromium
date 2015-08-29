@@ -40,15 +40,12 @@
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/glue/chrome_report_unrecoverable_error.h"
-#include "chrome/browser/sync/glue/favicon_cache.h"
 #include "chrome/browser/sync/glue/sync_backend_host.h"
 #include "chrome/browser/sync/glue/sync_backend_host_impl.h"
 #include "chrome/browser/sync/glue/sync_start_util.h"
 #include "chrome/browser/sync/glue/typed_url_data_type_controller.h"
-#include "chrome/browser/sync/profile_sync_components_factory_impl.h"
 #include "chrome/browser/sync/sessions/notification_service_sessions_router.h"
 #include "chrome/browser/sync/supervised_user_signin_manager_wrapper.h"
-#include "chrome/browser/sync/sync_stopped_reporter.h"
 #include "chrome/browser/sync/sync_type_preference_provider.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
@@ -73,10 +70,14 @@
 #include "components/sync_driver/change_processor.h"
 #include "components/sync_driver/data_type_controller.h"
 #include "components/sync_driver/device_info.h"
+#include "components/sync_driver/favicon_cache.h"
 #include "components/sync_driver/pref_names.h"
+#include "components/sync_driver/sync_api_component_factory.h"
 #include "components/sync_driver/sync_error_controller.h"
+#include "components/sync_driver/sync_stopped_reporter.h"
 #include "components/sync_driver/system_encryptor.h"
 #include "components/sync_driver/user_selectable_sync_type.h"
+#include "components/version_info/version_info_values.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
@@ -203,7 +204,7 @@ bool ShouldShowActionOnUI(
 }
 
 ProfileSyncService::ProfileSyncService(
-    scoped_ptr<ProfileSyncComponentsFactory> factory,
+    scoped_ptr<sync_driver::SyncApiComponentFactory> factory,
     Profile* profile,
     scoped_ptr<SupervisedUserSigninManagerWrapper> signin_wrapper,
     ProfileOAuth2TokenService* oauth2_token_service,
@@ -238,6 +239,8 @@ ProfileSyncService::ProfileSyncService(
       backup_finished_(false),
       clear_browsing_data_(base::Bind(&ClearBrowsingData)),
       browsing_data_remover_observer_(NULL),
+      catch_up_configure_in_progress_(false),
+      passphrase_prompt_triggered_by_version_(false),
       weak_factory_(this),
       startup_controller_weak_factory_(this) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -276,6 +279,17 @@ ProfileSyncService::ProfileSyncService(
       new SessionsSyncManager(profile, local_device_.get(), router.Pass()));
   device_info_sync_service_.reset(
       new DeviceInfoSyncService(local_device_.get()));
+
+  std::string last_version = sync_prefs_.GetLastRunVersion();
+  std::string current_version = PRODUCT_VERSION;
+  sync_prefs_.SetLastRunVersion(current_version);
+
+  // Check for a major version change. Note that the versions have format
+  // MAJOR.MINOR.BUILD.PATCH.
+  if (last_version.substr(0, last_version.find('.')) !=
+      current_version.substr(0, current_version.find('.'))) {
+    passphrase_prompt_triggered_by_version_ = true;
+  }
 }
 
 ProfileSyncService::~ProfileSyncService() {
@@ -392,6 +406,16 @@ void ProfileSyncService::TrySyncDatatypePrefRecovery() {
 }
 
 void ProfileSyncService::StartSyncingWithServer() {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSyncEnableClearDataOnPassphraseEncryption) &&
+      backend_mode_ == SYNC &&
+      sync_prefs_.GetPassphraseEncryptionTransitionInProgress()) {
+    BeginConfigureCatchUpBeforeClear();
+    return;
+  }
+
   if (backend_)
     backend_->StartSyncingWithServer();
 }
@@ -409,7 +433,7 @@ void ProfileSyncService::UnregisterAuthNotifications() {
 }
 
 void ProfileSyncService::RegisterDataTypeController(
-    DataTypeController* data_type_controller) {
+    sync_driver::DataTypeController* data_type_controller) {
   DCHECK_EQ(
       directory_data_type_controllers_.count(data_type_controller->type()),
       0U);
@@ -432,7 +456,7 @@ void ProfileSyncService::RegisterNonBlockingType(syncer::ModelType type) {
 void ProfileSyncService::InitializeNonBlockingType(
     syncer::ModelType type,
     const scoped_refptr<base::SequencedTaskRunner>& task_runner,
-    const base::WeakPtr<syncer::ModelTypeSyncProxyImpl>& type_sync_proxy) {
+    const base::WeakPtr<syncer_v2::ModelTypeSyncProxyImpl>& type_sync_proxy) {
   non_blocking_data_type_manager_.InitializeType(
       type, task_runner, type_sync_proxy);
 }
@@ -468,7 +492,7 @@ sync_driver::DeviceInfoTracker* ProfileSyncService::GetDeviceInfoTracker()
 }
 
 sync_driver::LocalDeviceInfoProvider*
-ProfileSyncService::GetLocalDeviceInfoProvider() {
+ProfileSyncService::GetLocalDeviceInfoProvider() const {
   return local_device_.get();
 }
 
@@ -581,17 +605,28 @@ void ProfileSyncService::OnDirectoryTypeStatusCounterUpdated(
 void ProfileSyncService::OnDataTypeRequestsSyncStartup(
     syncer::ModelType type) {
   DCHECK(syncer::UserTypes().Has(type));
-  if (backend_.get()) {
-    DVLOG(1) << "A data type requested sync startup, but it looks like "
-                "something else beat it to the punch.";
-    return;
-  }
 
   if (!GetPreferredDataTypes().Has(type)) {
     // We can get here as datatype SyncableServices are typically wired up
     // to the native datatype even if sync isn't enabled.
     DVLOG(1) << "Dropping sync startup request because type "
              << syncer::ModelTypeToString(type) << "not enabled.";
+    return;
+  }
+
+  // If this is a data type change after a major version update, reset the
+  // passphrase prompted state and notify observers.
+  if (IsPassphraseRequired() && passphrase_prompt_triggered_by_version_) {
+    // The major version has changed and a local syncable change was made.
+    // Reset the passphrase prompt state.
+    passphrase_prompt_triggered_by_version_ = false;
+    sync_prefs_.SetPassphrasePrompted(false);
+    NotifyObservers();
+  }
+
+  if (backend_.get()) {
+    DVLOG(1) << "A data type requested sync startup, but it looks like "
+                "something else beat it to the punch.";
     return;
   }
 
@@ -675,7 +710,6 @@ void ProfileSyncService::StartUpSlowBackendComponents(
   backend_.reset(
       factory_->CreateSyncBackendHost(
           profile_->GetDebugName(),
-          profile_,
           invalidator,
           sync_prefs_.AsWeakPtr(),
           sync_folder));
@@ -892,6 +926,7 @@ void ProfileSyncService::ShutdownImpl(syncer::ShutdownReason reason) {
   encrypt_everything_ = false;
   encrypted_types_ = syncer::SyncEncryptionHandler::SensitiveTypes();
   passphrase_required_reason_ = syncer::REASON_PASSPHRASE_NOT_REQUIRED;
+  catch_up_configure_in_progress_ = false;
   request_access_token_retry_timer_.Stop();
   // Revert to "no auth error".
   if (last_auth_error_.state() != GoogleServiceAuthError::NONE)
@@ -1414,15 +1449,44 @@ void ProfileSyncService::OnLocalSetPassphraseEncryption(
           switches::kSyncEnableClearDataOnPassphraseEncryption))
     return;
 
-  // At this point the user has set a custom passphrase and we
-  // have received the updated nigori state. Time to cache the nigori state,
-  // shutdown sync, then restart it and restore the cached nigori state.
+  // At this point the user has set a custom passphrase and we have received the
+  // updated nigori state. Time to cache the nigori state, and catch up the
+  // active data types.
+  sync_prefs_.SetSavedNigoriStateForPassphraseEncryptionTransition(
+      nigori_state);
+  sync_prefs_.SetPassphraseEncryptionTransitionInProgress(true);
+  BeginConfigureCatchUpBeforeClear();
+}
+
+void ProfileSyncService::BeginConfigureCatchUpBeforeClear() {
+  DCHECK_EQ(backend_mode_, SYNC);
+  DCHECK(directory_data_type_manager_);
+  DCHECK(!saved_nigori_state_);
+  saved_nigori_state_ =
+      sync_prefs_.GetSavedNigoriStateForPassphraseEncryptionTransition().Pass();
+  const syncer::ModelTypeSet types = GetActiveDataTypes();
+  catch_up_configure_in_progress_ = true;
+  directory_data_type_manager_->Configure(types,
+                                          syncer::CONFIGURE_REASON_CATCH_UP);
+}
+
+void ProfileSyncService::ClearAndRestartSyncForPassphraseEncryption() {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  backend_->ClearServerData(base::Bind(
+      &ProfileSyncService::OnClearServerDataDone, weak_factory_.GetWeakPtr()));
+}
+
+void ProfileSyncService::OnClearServerDataDone() {
+  DCHECK(sync_prefs_.GetPassphraseEncryptionTransitionInProgress());
+  sync_prefs_.SetPassphraseEncryptionTransitionInProgress(false);
+
+  // Call to ClearServerData generates new keystore key on the server. This
+  // makes keystore bootstrap token invalid. Let's clear it from preferences.
+  sync_prefs_.SetKeystoreEncryptionBootstrapToken(std::string());
+
+  // Shutdown sync, delete the Directory, then restart, restoring the cached
+  // nigori state.
   ShutdownImpl(syncer::DISABLE_SYNC);
-  saved_nigori_state_.reset(
-      new syncer::SyncEncryptionHandler::NigoriState(nigori_state));
-  // TODO(maniscalco): We should also clear the bootstrap keystore key from the
-  // pref before restarting sync to ensure we obtain a new, valid one when we
-  // perform the configuration sync cycle (crbug.com/490836).
   startup_controller_->TryStart();
 }
 
@@ -1513,6 +1577,8 @@ void ProfileSyncService::OnConfigureDone(
     return;
   }
 
+  DCHECK_EQ(DataTypeManager::OK, configure_status_);
+
   // We should never get in a state where we have no encrypted datatypes
   // enabled, and yet we still think we require a passphrase for decryption.
   DCHECK(!(IsPassphraseRequiredForDecryption() &&
@@ -1530,9 +1596,16 @@ void ProfileSyncService::OnConfigureDone(
     // configuring something.  It will be up to the migrator to call
     // StartSyncingWithServer() if migration is now finished.
     migrator_->OnConfigureDone(result);
-  } else {
-    StartSyncingWithServer();
+    return;
   }
+
+  if (catch_up_configure_in_progress_) {
+    catch_up_configure_in_progress_ = false;
+    ClearAndRestartSyncForPassphraseEncryption();
+    return;
+  }
+
+  StartSyncingWithServer();
 }
 
 void ProfileSyncService::OnConfigureStart() {

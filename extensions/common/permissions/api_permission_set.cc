@@ -182,17 +182,6 @@ bool APIPermissionSet::ParseFromJSON(
   return true;
 }
 
-void APIPermissionSet::AddImpliedPermissions() {
-  // The fileSystem.write and fileSystem.directory permissions imply
-  // fileSystem.writeDirectory.
-  // Has a corresponding rule in ChromePermissionMessageProvider.
-  // TODO(sammc): Remove this. See http://crbug.com/284849.
-  if (ContainsKey(map(), APIPermission::kFileSystemWrite) &&
-      ContainsKey(map(), APIPermission::kFileSystemDirectory)) {
-    insert(APIPermission::kFileSystemWriteDirectory);
-  }
-}
-
 PermissionID::PermissionID(APIPermission::ID id)
     : std::pair<APIPermission::ID, base::string16>(id, base::string16()) {
 }
@@ -212,7 +201,7 @@ PermissionIDSet::~PermissionIDSet() {
 }
 
 void PermissionIDSet::insert(APIPermission::ID permission_id) {
-  permissions_.insert(PermissionID(permission_id, base::string16()));
+  insert(permission_id, base::string16());
 }
 
 void PermissionIDSet::insert(APIPermission::ID permission_id,
@@ -254,6 +243,26 @@ bool PermissionIDSet::ContainsAllIDs(
                        });
 }
 
+bool PermissionIDSet::ContainsAnyID(
+    const std::set<APIPermission::ID>& permission_ids) const {
+  for (APIPermission::ID id : permission_ids) {
+    if (ContainsID(id))
+      return true;
+  }
+  return false;
+}
+
+PermissionIDSet PermissionIDSet::GetAllPermissionsWithID(
+    APIPermission::ID permission_id) const {
+  PermissionIDSet subset;
+  auto it = permissions_.lower_bound(PermissionID(permission_id));
+  while (it != permissions_.end() && it->id() == permission_id) {
+    subset.permissions_.insert(*it);
+    ++it;
+  }
+  return subset;
+}
+
 PermissionIDSet PermissionIDSet::GetAllPermissionsWithIDs(
     const std::set<APIPermission::ID>& permission_ids) const {
   PermissionIDSet subset;
@@ -277,20 +286,6 @@ bool PermissionIDSet::Equals(const PermissionIDSet& set) const {
 PermissionIDSet PermissionIDSet::Difference(const PermissionIDSet& set_1,
                                             const PermissionIDSet& set_2) {
   return PermissionIDSet(base::STLSetDifference<std::set<PermissionID>>(
-      set_1.permissions_, set_2.permissions_));
-}
-
-// static
-PermissionIDSet PermissionIDSet::Intersection(const PermissionIDSet& set_1,
-                                              const PermissionIDSet& set_2) {
-  return PermissionIDSet(base::STLSetIntersection<std::set<PermissionID>>(
-      set_1.permissions_, set_2.permissions_));
-}
-
-// static
-PermissionIDSet PermissionIDSet::Union(const PermissionIDSet& set_1,
-                                       const PermissionIDSet& set_2) {
-  return PermissionIDSet(base::STLSetUnion<std::set<PermissionID>>(
       set_1.permissions_, set_2.permissions_));
 }
 

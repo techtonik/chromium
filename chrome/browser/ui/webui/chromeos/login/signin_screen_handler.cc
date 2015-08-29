@@ -9,7 +9,6 @@
 
 #include "ash/shell.h"
 #include "ash/system/chromeos/devicetype_utils.h"
-#include "ash/system/tray/system_tray_delegate.h"
 #include "ash/wm/lock_state_controller.h"
 #include "base/bind.h"
 #include "base/location.h"
@@ -49,6 +48,7 @@
 #include "chrome/browser/chromeos/policy/device_local_account.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
+#include "chrome/browser/chromeos/system/system_clock.h"
 #include "chrome/browser/io_thread.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_metrics.h"
@@ -366,7 +366,8 @@ void SigninScreenHandler::DeclareLocalizedValues(
   builder->Add("addUser", IDS_ADD_USER_BUTTON);
   builder->Add("browseAsGuest", IDS_GO_INCOGNITO_BUTTON);
   builder->Add("moreOptions", IDS_MORE_OPTIONS_BUTTON);
-  builder->Add("addSupervisedUser", IDS_CREATE_SUPERVISED_USER_MENU_LABEL);
+  builder->Add("addSupervisedUser",
+               IDS_CREATE_LEGACY_SUPERVISED_USER_MENU_LABEL);
   builder->Add("cancel", IDS_CANCEL);
   builder->Add("signOutUser", IDS_SCREEN_LOCK_SIGN_OUT);
   builder->Add("offlineLogin", IDS_OFFLINE_LOGIN_HTML);
@@ -440,7 +441,8 @@ void SigninScreenHandler::DeclareLocalizedValues(
                base::string16());
   builder->AddF("removeLegacySupervisedUserWarningText",
                IDS_LOGIN_POD_LEGACY_SUPERVISED_USER_REMOVE_WARNING,
-               base::UTF8ToUTF16(chrome::kSupervisedUserManagementDisplayURL));
+               base::UTF8ToUTF16(
+                   chrome::kLegacySupervisedUserManagementDisplayURL));
   builder->Add("removeUserWarningButtonTitle",
                IDS_LOGIN_POD_USER_REMOVE_WARNING_BUTTON);
 
@@ -1285,8 +1287,8 @@ void SigninScreenHandler::HandleFocusPod(const std::string& user_id) {
   bool use_24hour_clock = false;
   if (user_manager::UserManager::Get()->GetKnownUserBooleanPref(
           user_id, prefs::kUse24HourClock, &use_24hour_clock)) {
-    ash::Shell::GetInstance()
-        ->system_tray_delegate()
+    g_browser_process->platform_part()
+        ->GetSystemClock()
         ->SetLastFocusedPodHourClockType(use_24hour_clock ? base::k24HourClock
                                                           : base::k12HourClock);
   }

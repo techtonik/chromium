@@ -16,7 +16,6 @@ import android.view.Menu;
 import android.view.MenuItem.OnMenuItemClickListener;
 import android.view.View;
 
-import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
@@ -159,10 +158,8 @@ public class NewTabPage
         }
     }
 
-    public static void launchRecentTabsDialog(Activity activity, Tab tab,
-            boolean finishActivityOnOpen) {
-        DocumentRecentTabsManager manager =
-                new DocumentRecentTabsManager(tab, activity, finishActivityOnOpen);
+    public static void launchRecentTabsDialog(Activity activity, Tab tab) {
+        DocumentRecentTabsManager manager = new DocumentRecentTabsManager(tab, activity);
         NativePage page = new RecentTabsPage(activity, manager);
         page.updateForUrl(UrlConstants.RECENT_TABS_URL);
         Dialog dialog = new NativePageDialog(activity, page);
@@ -192,8 +189,12 @@ public class NewTabPage
         private void recordOpenedMostVisitedItem(MostVisitedItem item) {
             if (mIsDestroyed) return;
             NewTabPageUma.recordAction(NewTabPageUma.ACTION_OPENED_MOST_VISITED_ENTRY);
+            NewTabPageUma.recordExplicitUserNavigation(
+                    item.getUrl(), NewTabPageUma.RAPPOR_ACTION_VISITED_SUGGESTED_TILE);
             RecordHistogram.recordEnumeratedHistogram("NewTabPage.MostVisited", item.getIndex(),
                     NewTabPageView.MAX_MOST_VISITED_SITES);
+            RecordHistogram.recordMediumTimesHistogram("NewTabPage.MostVisitedTime",
+                    System.nanoTime() - mConstructedTimeNs, TimeUnit.NANOSECONDS);
             mMostVisitedSites.recordOpenedMostVisitedItem(item.getIndex());
         }
 
@@ -236,7 +237,7 @@ public class NewTabPage
         public void open(MostVisitedItem item) {
             if (mIsDestroyed) return;
             recordOpenedMostVisitedItem(item);
-            mTab.loadUrl(new LoadUrlParams(item.getUrl()));
+            mTab.loadUrl(new LoadUrlParams(item.getUrl(), PageTransition.AUTO_BOOKMARK));
         }
 
         @Override
@@ -259,16 +260,15 @@ public class NewTabPage
             switch (menuId) {
                 case ID_OPEN_IN_NEW_TAB:
                     recordOpenedMostVisitedItem(item);
-                    mTabModelSelector.openNewTab(new LoadUrlParams(item.getUrl()),
-                            TabLaunchType.FROM_LONGPRESS_BACKGROUND, mTab, false);
+                    mTabModelSelector.openNewTab(new LoadUrlParams(item.getUrl(),
+                            PageTransition.AUTO_BOOKMARK), TabLaunchType.FROM_LONGPRESS_BACKGROUND,
+                            mTab, false);
                     return true;
                 case ID_OPEN_IN_INCOGNITO_TAB:
                     recordOpenedMostVisitedItem(item);
-                    if (FeatureUtilities.isDocumentMode(mActivity)) {
-                        ApiCompatibilityUtils.finishAndRemoveTask(mActivity);
-                    }
-                    mTabModelSelector.openNewTab(new LoadUrlParams(item.getUrl()),
-                            TabLaunchType.FROM_LONGPRESS_FOREGROUND, mTab, true);
+                    mTabModelSelector.openNewTab(new LoadUrlParams(item.getUrl(),
+                            PageTransition.AUTO_BOOKMARK), TabLaunchType.FROM_LONGPRESS_FOREGROUND,
+                            mTab, true);
                     return true;
                 case ID_REMOVE:
                     mMostVisitedSites.blacklistUrl(item.getUrl());
@@ -294,7 +294,7 @@ public class NewTabPage
             if (mIsDestroyed) return;
             RecordUserAction.record("MobileNTPSwitchToOpenTabs");
             if (FeatureUtilities.isDocumentMode(mActivity)) {
-                launchRecentTabsDialog(mActivity, mTab, true);
+                launchRecentTabsDialog(mActivity, mTab);
             } else {
                 mTab.loadUrl(new LoadUrlParams(UrlConstants.RECENT_TABS_URL));
             }
@@ -329,16 +329,14 @@ public class NewTabPage
                 String url, int size, FaviconImageCallback faviconCallback) {
             if (mIsDestroyed) return;
             if (mFaviconHelper == null) mFaviconHelper = new FaviconHelper();
-            mFaviconHelper.getLocalFaviconImageForURL(mProfile, url, FaviconHelper.FAVICON
-                    | FaviconHelper.TOUCH_ICON | FaviconHelper.TOUCH_PRECOMPOSED_ICON, size,
-                    faviconCallback);
+            mFaviconHelper.getLocalFaviconImageForURL(mProfile, url, size, faviconCallback);
         }
 
         @Override
         public void getLargeIconForUrl(String url, int size, LargeIconCallback callback) {
             if (mIsDestroyed) return;
-            if (mLargeIconBridge == null) mLargeIconBridge = new LargeIconBridge();
-            mLargeIconBridge.getLargeIconForUrl(mProfile, url, size, callback);
+            if (mLargeIconBridge == null) mLargeIconBridge = new LargeIconBridge(mProfile);
+            mLargeIconBridge.getLargeIconForUrl(url, size, callback);
         }
 
         @Override

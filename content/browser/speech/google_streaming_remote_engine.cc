@@ -344,10 +344,16 @@ GoogleStreamingRemoteEngine::ConnectBothStreams(const FSMEventArgs&) {
     upstream_args.push_back("maxAlternatives=" +
                             base::UintToString(max_alternatives));
   }
-  upstream_args.push_back("client=chromium");
+  upstream_args.push_back("app=chromium");
   if (!config_.hardware_info.empty()) {
     upstream_args.push_back(
         "xhw=" + net::EscapeQueryParamValue(config_.hardware_info, true));
+  }
+  for (const SpeechRecognitionGrammar& grammar : config_.grammars) {
+    std::string grammar_value(
+        base::DoubleToString(grammar.weight) + ":" + grammar.url);
+    upstream_args.push_back(
+        "grammar=" + net::EscapeQueryParamValue(grammar_value, true));
   }
   if (config_.continuous)
     upstream_args.push_back("continuous");

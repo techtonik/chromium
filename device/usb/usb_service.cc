@@ -4,18 +4,15 @@
 
 #include "device/usb/usb_service.h"
 
-#include "base/message_loop/message_loop.h"
+#include "base/at_exit.h"
+#include "base/bind.h"
 #include "components/device_event_log/device_event_log.h"
 #include "device/usb/usb_device.h"
 #include "device/usb/usb_service_impl.h"
 
 namespace device {
 
-namespace {
-
-UsbService* g_service;
-
-}  // namespace
+UsbService::Observer::~Observer() {}
 
 void UsbService::Observer::OnDeviceAdded(scoped_refptr<UsbDevice> device) {
 }
@@ -28,25 +25,14 @@ void UsbService::Observer::OnDeviceRemovedCleanup(
 }
 
 // static
-UsbService* UsbService::GetInstance(
+scoped_ptr<UsbService> UsbService::Create(
     scoped_refptr<base::SequencedTaskRunner> blocking_task_runner) {
-  if (!g_service) {
-    // The UsbService constructor saves this object and UsbServiceImpl will
-    // destroy itself when the current message loop exits.
-    new UsbServiceImpl(blocking_task_runner);
-  }
-  return g_service;
+  return make_scoped_ptr(new UsbServiceImpl(blocking_task_runner));
 }
 
-UsbService::UsbService() {
-  DCHECK(!g_service);
-  g_service = this;
-}
+UsbService::~UsbService() {}
 
-UsbService::~UsbService() {
-  DCHECK(g_service);
-  g_service = nullptr;
-}
+UsbService::UsbService() {}
 
 void UsbService::AddObserver(Observer* observer) {
   DCHECK(CalledOnValidThread());

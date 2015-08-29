@@ -5,7 +5,6 @@
 #include "components/password_manager/content/browser/credential_manager_dispatcher.h"
 
 #include "base/bind.h"
-#include "base/memory/scoped_vector.h"
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/core/common/password_form.h"
@@ -75,8 +74,7 @@ void CredentialManagerDispatcher::OnStore(
 
 void CredentialManagerDispatcher::OnProvisionalSaveComplete() {
   DCHECK(form_manager_);
-  if (client_->IsSavingEnabledForCurrentPage() &&
-      !form_manager_->IsBlacklisted()) {
+  if (client_->IsSavingEnabledForCurrentPage()) {
     client_->PromptUserToSaveOrUpdatePassword(
         form_manager_.Pass(), CredentialSourceType::CREDENTIAL_SOURCE_API,
         false);

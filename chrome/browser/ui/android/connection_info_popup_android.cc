@@ -30,13 +30,12 @@ using base::android::ScopedJavaLocalRef;
 using content::CertStore;
 using content::WebContents;
 
-static jobjectArray GetCertificateChain(JNIEnv* env,
-                                        jobject obj,
-                                        jobject java_web_contents) {
+static ScopedJavaLocalRef<jobjectArray>
+GetCertificateChain(JNIEnv* env, jobject obj, jobject java_web_contents) {
   content::WebContents* web_contents =
       content::WebContents::FromJavaWebContents(java_web_contents);
   if (!web_contents)
-    return NULL;
+    return ScopedJavaLocalRef<jobjectArray>();
 
   int cert_id =
       web_contents->GetController().GetVisibleEntry()->GetSSL().cert_id;
@@ -62,8 +61,7 @@ static jobjectArray GetCertificateChain(JNIEnv* env,
     cert_chain.push_back(cert_bytes);
   }
 
-  // OK to release, JNI binding.
-  return base::android::ToJavaArrayOfByteArray(env, cert_chain).Release();
+  return base::android::ToJavaArrayOfByteArray(env, cert_chain);
 }
 
 // static
@@ -94,7 +92,7 @@ ConnectionInfoPopupAndroid::ConnectionInfoPopupAndroid(
       this,
       Profile::FromBrowserContext(web_contents->GetBrowserContext()),
       TabSpecificContentSettings::FromWebContents(web_contents),
-      InfoBarService::FromWebContents(web_contents),
+      web_contents,
       nav_entry->GetURL(),
       nav_entry->GetSSL(),
       content::CertStore::GetInstance()));

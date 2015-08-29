@@ -37,10 +37,9 @@
 #include "chrome/installer/util/master_preferences.h"
 #include "chrome/installer/util/master_preferences_constants.h"
 #include "chrome/installer/util/set_reg_value_work_item.h"
-#include "chrome/installer/util/shell_util.h"
 #include "chrome/installer/util/util_constants.h"
+#include "chrome/installer/util/work_item.h"
 #include "chrome/installer/util/work_item_list.h"
-
 
 namespace {
 
@@ -251,19 +250,26 @@ installer::InstallStatus InstallNewVersion(
   return installer::INSTALL_FAILED;
 }
 
-// Deletes the old "Uninstall Google Chrome" shortcut in the Start menu which
-// was installed prior to Chrome 24.
-void CleanupLegacyShortcuts(const installer::InstallerState& installer_state,
-                            BrowserDistribution* dist,
-                            const base::FilePath& chrome_exe) {
-  ShellUtil::ShellChange shortcut_level = installer_state.system_install() ?
-      ShellUtil::SYSTEM_LEVEL : ShellUtil::CURRENT_USER;
-  base::FilePath uninstall_shortcut_path;
-  ShellUtil::GetShortcutPath(ShellUtil::SHORTCUT_LOCATION_START_MENU_CHROME_DIR,
-                             dist, shortcut_level, &uninstall_shortcut_path);
-  uninstall_shortcut_path = uninstall_shortcut_path.Append(
-      dist->GetUninstallLinkName() + installer::kLnkExt);
-  base::DeleteFile(uninstall_shortcut_path, false);
+bool CanResetDefaultBrowserIntentPicker() {
+  return base::win::GetVersion() >= base::win::VERSION_WIN10;
+}
+
+void ResetDefaultBrowserIntentPicker() {
+  static const wchar_t kUrlAssociationKeyFormat[] =
+      L"SOFTWARE\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\"
+      L"%ls\\UserChoice";
+
+  if (ShellUtil::GetChromeDefaultState() != ShellUtil::IS_DEFAULT) {
+    const base::string16 hash_value_name(L"Hash");
+    InstallUtil::DeleteRegistryValue(
+        HKEY_CURRENT_USER,
+        base::StringPrintf(kUrlAssociationKeyFormat, L"http"), 0,
+        hash_value_name);
+    InstallUtil::DeleteRegistryValue(
+        HKEY_CURRENT_USER,
+        base::StringPrintf(kUrlAssociationKeyFormat, L"https"), 0,
+        hash_value_name);
+  }
 }
 
 }  // end namespace
@@ -477,6 +483,8 @@ void RegisterChromeOnMachine(const installer::InstallerState& installer_state,
     ShellUtil::MakeChromeDefault(dist, level, chrome_exe, true);
   } else {
     ShellUtil::RegisterChromeBrowser(dist, chrome_exe, base::string16(), false);
+    if (make_chrome_default && CanResetDefaultBrowserIntentPicker())
+      ResetDefaultBrowserIntentPicker();
   }
 }
 
@@ -534,7 +542,6 @@ InstallStatus InstallOrUpdateProduct(
       BrowserDistribution* chrome_dist = chrome_product->distribution();
       const base::FilePath chrome_exe(
           installer_state.target_path().Append(kChromeExe));
-      CleanupLegacyShortcuts(installer_state, chrome_dist, chrome_exe);
 
       // Install per-user shortcuts on user-level installs and all-users
       // shortcuts on system-level installs. Note that Active Setup will take
@@ -617,62 +624,72 @@ InstallStatus InstallOrUpdateProduct(
 }
 
 void HandleOsUpgradeForBrowser(const installer::InstallerState& installer_state,
-                               const installer::Product& chrome) {
+                               const installer::Product& chrome,
+                               const base::Version& installed_version) {
   DCHECK(chrome.is_chrome());
-  // Upon upgrading to Windows 8, we need to fix Chrome shortcuts and register
-  // Chrome, so that Metro Chrome would work if Chrome is the default browser.
-  if (base::win::GetVersion() >= base::win::VERSION_WIN8) {
-    VLOG(1) << "Updating and registering shortcuts.";
-    // Read master_preferences copied beside chrome.exe at install.
-    MasterPreferences prefs(
-        installer_state.target_path().AppendASCII(kDefaultMasterPrefs));
 
-    // Unfortunately, if this is a system-level install, we can't update the
-    // shortcuts of each individual user (this only matters if this is an OS
-    // upgrade from XP/Vista to Win7+ as some properties are only set on
-    // shortcuts as of Win7).
-    // At least attempt to update potentially existing all-users shortcuts.
-    InstallShortcutLevel level = installer_state.system_install() ?
-        ALL_USERS : CURRENT_USER;
-    base::FilePath chrome_exe(installer_state.target_path().Append(kChromeExe));
-    CreateOrUpdateShortcuts(chrome_exe, chrome, prefs, level,
-                            INSTALL_SHORTCUT_CREATE_EACH_IF_NO_SYSTEM_LEVEL);
-    RegisterChromeOnMachine(installer_state, chrome, false);
+  VLOG(1) << "Updating and registering shortcuts for --on-os-upgrade.";
 
-    UpdateOsUpgradeBeacon(installer_state.system_install(),
-                          BrowserDistribution::GetDistribution());
+  // Read master_preferences copied beside chrome.exe at install.
+  const MasterPreferences prefs(
+      installer_state.target_path().AppendASCII(kDefaultMasterPrefs));
 
-    // Update the per-user default browser beacon. For user-level installs this
-    // can be done directly; whereas it requires triggering Active Setup for
-    // each user's subsequent login on system-level installs.
-    if (!installer_state.system_install()) {
-      UpdateDefaultBrowserBeaconForPath(chrome_exe);
-    } else {
-      UpdateActiveSetupVersionWorkItem active_setup_work_item(
-          InstallUtil::GetActiveSetupPath(chrome.distribution()),
-          UpdateActiveSetupVersionWorkItem::
-              UPDATE_AND_BUMP_OS_UPGRADES_COMPONENT);
-      if (active_setup_work_item.Do())
-        VLOG(1) << "Bumped Active Setup Version on-os-upgrade.";
-      else
-        LOG(ERROR) << "Failed to bump Active Setup Version on-os-upgrade.";
-    }
+  // Update shortcuts at this install level (per-user shortcuts on system-level
+  // installs will be updated through Active Setup).
+  const InstallShortcutLevel level =
+      installer_state.system_install() ? ALL_USERS : CURRENT_USER;
+  const base::FilePath chrome_exe(
+      installer_state.target_path().Append(kChromeExe));
+  CreateOrUpdateShortcuts(chrome_exe, chrome, prefs, level,
+                          INSTALL_SHORTCUT_REPLACE_EXISTING);
+
+  // Adapt Chrome registrations to this new OS.
+  RegisterChromeOnMachine(installer_state, chrome, false);
+
+  // Active Setup registrations are sometimes lost across OS update, make sure
+  // they're back in place. Note: when Active Setup registrations in HKLM are
+  // lost, the per-user values of performed Active Setups in HKCU are also lost,
+  // so it is fine to restart the dynamic components of the Active Setup version
+  // (ref. UpdateActiveSetupVersionWorkItem) from scratch.
+  // TODO(gab): This should really perform all registry only update steps (i.e.,
+  // something between InstallOrUpdateProduct and AddActiveSetupWorkItems, but
+  // this takes care of what is most required for now).
+  scoped_ptr<WorkItemList> work_item_list(WorkItem::CreateWorkItemList());
+  AddActiveSetupWorkItems(installer_state, installed_version, chrome,
+                          work_item_list.get());
+  if (!work_item_list->Do()) {
+    LOG(WARNING) << "Failed to reinstall Active Setup keys.";
+    work_item_list->Rollback();
+  }
+
+  UpdateOsUpgradeBeacon(installer_state.system_install(),
+                        BrowserDistribution::GetDistribution());
+
+  // Update the per-user default browser beacon. For user-level installs this
+  // can be done directly; whereas it requires triggering Active Setup for each
+  // user's subsequent login on system-level installs.
+  if (!installer_state.system_install()) {
+    UpdateDefaultBrowserBeaconForPath(chrome_exe);
+  } else {
+    UpdateActiveSetupVersionWorkItem active_setup_work_item(
+        InstallUtil::GetActiveSetupPath(chrome.distribution()),
+        UpdateActiveSetupVersionWorkItem::
+            UPDATE_AND_BUMP_OS_UPGRADES_COMPONENT);
+    if (active_setup_work_item.Do())
+      VLOG(1) << "Bumped Active Setup Version on-os-upgrade.";
+    else
+      LOG(ERROR) << "Failed to bump Active Setup Version on-os-upgrade.";
   }
 }
 
 // NOTE: Should the work done here, on Active Setup, change: kActiveSetupVersion
-// in install_worker.cc needs to be increased for Active Setup to invoke this
-// again for all users of this install.
+// in update_active_setup_version_work_item.cc needs to be increased for Active
+// Setup to invoke this again for all users of this install. It may also be
+// invoked again when a system-level chrome install goes through an OS upgrade.
 void HandleActiveSetupForBrowser(const base::FilePath& installation_root,
                                  const installer::Product& chrome,
                                  bool force) {
   DCHECK(chrome.is_chrome());
-
-  // If the shortcuts are not being forcefully created we may want to forcefully
-  // create them anyways if this Active Setup trigger is in response to an OS
-  // update.
-  force = force || installer::UpdateLastOSUpgradeHandledByActiveSetup(
-                       chrome.distribution());
 
   // Only create shortcuts on Active Setup if the first run sentinel is not
   // present for this user (as some shortcuts used to be installed on first
@@ -682,9 +699,9 @@ void HandleActiveSetupForBrowser(const base::FilePath& installation_root,
   // shortcuts; if the decision is to create them, only shortcuts whose matching
   // all-users shortcut isn't present on the system will be created.
   InstallShortcutOperation install_operation =
-      (!force && InstallUtil::IsFirstRunSentinelPresent() ?
-           INSTALL_SHORTCUT_REPLACE_EXISTING :
-           INSTALL_SHORTCUT_CREATE_EACH_IF_NO_SYSTEM_LEVEL);
+      (!force && InstallUtil::IsFirstRunSentinelPresent())
+          ? INSTALL_SHORTCUT_REPLACE_EXISTING
+          : INSTALL_SHORTCUT_CREATE_EACH_IF_NO_SYSTEM_LEVEL;
 
   // Read master_preferences copied beside chrome.exe at install.
   MasterPreferences prefs(installation_root.AppendASCII(kDefaultMasterPrefs));

@@ -4,8 +4,11 @@
 
 #include "chrome/browser/android/offline_pages/offline_page_bridge.h"
 
+#include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
+#include "base/basictypes.h"
 #include "base/files/file_path.h"
+#include "base/strings/string_util.h"
 #include "chrome/browser/android/offline_pages/offline_page_mhtml_archiver.h"
 #include "chrome/browser/android/offline_pages/offline_page_model_factory.h"
 #include "chrome/browser/download/download_prefs.h"
@@ -18,6 +21,7 @@
 #include "content/public/browser/download_manager.h"
 #include "content/public/browser/web_contents.h"
 #include "jni/OfflinePageBridge_jni.h"
+#include "net/base/filename_util.h"
 
 using base::android::ConvertJavaStringToUTF8;
 using base::android::ConvertUTF16ToJavaString;
@@ -30,26 +34,35 @@ namespace android {
 
 namespace {
 
-void SavePageCallback(ScopedJavaGlobalRef<jobject>* j_callback_obj,
+void SavePageCallback(const ScopedJavaGlobalRef<jobject>& j_callback_obj,
                       const GURL& url,
                       OfflinePageModel::SavePageResult result) {
   JNIEnv* env = base::android::AttachCurrentThread();
 
-  scoped_ptr<ScopedJavaGlobalRef<jobject>> j_callback_ptr(j_callback_obj);
-
-  Java_OfflinePageCallback_onSavePageDone(
-      env, j_callback_ptr->obj(), static_cast<int>(result),
+  Java_SavePageCallback_onSavePageDone(
+      env, j_callback_obj.obj(), static_cast<int>(result),
       ConvertUTF8ToJavaString(env, url.spec()).obj());
 }
 
-void DeletePageCallback(ScopedJavaGlobalRef<jobject>* j_callback_obj,
+void DeletePageCallback(const ScopedJavaGlobalRef<jobject>& j_callback_obj,
                         OfflinePageModel::DeletePageResult result) {
   JNIEnv* env = base::android::AttachCurrentThread();
 
-  scoped_ptr<ScopedJavaGlobalRef<jobject>> j_callback_ptr(j_callback_obj);
+  Java_DeletePageCallback_onDeletePageDone(
+      env, j_callback_obj.obj(), static_cast<int>(result));
+}
 
-  Java_OfflinePageCallback_onDeletePageDone(
-      env, j_callback_ptr->obj(), static_cast<int>(result));
+void ToJavaOfflinePageList(JNIEnv* env,
+                           jobject j_result_obj,
+                           const std::vector<OfflinePageItem>& offline_pages) {
+  for (const OfflinePageItem& offline_page : offline_pages) {
+    Java_OfflinePageBridge_createOfflinePageAndAddToList(
+        env, j_result_obj,
+        ConvertUTF8ToJavaString(env, offline_page.url.spec()).obj(),
+        offline_page.bookmark_id,
+        ConvertUTF8ToJavaString(env, offline_page.GetOfflineURL().spec()).obj(),
+        offline_page.file_size);
+  }
 }
 
 }  // namespace
@@ -86,15 +99,17 @@ void OfflinePageBridge::GetAllPages(JNIEnv* env,
   DCHECK(j_result_obj);
   const std::vector<OfflinePageItem>& offline_pages =
       offline_page_model_->GetAllPages();
+  ToJavaOfflinePageList(env, j_result_obj, offline_pages);
+}
 
-  for (const OfflinePageItem& offline_page : offline_pages) {
-    Java_OfflinePageBridge_createOfflinePageAndAddToList(
-        env, j_result_obj,
-        ConvertUTF8ToJavaString(env, offline_page.url.spec()).obj(),
-        offline_page.bookmark_id,
-        ConvertUTF8ToJavaString(env, offline_page.GetOfflineURL().spec()).obj(),
-        offline_page.file_size);
-  }
+void OfflinePageBridge::GetPagesToCleanUp(JNIEnv* env,
+                                          jobject obj,
+                                          jobject j_result_obj) {
+  DCHECK(offline_page_model_->is_loaded());
+  DCHECK(j_result_obj);
+  const std::vector<OfflinePageItem>& offline_pages =
+      offline_page_model_->GetPagesToCleanUp();
+  ToJavaOfflinePageList(env, j_result_obj, offline_pages);
 }
 
 ScopedJavaLocalRef<jobject> OfflinePageBridge::GetPageByBookmarkId(
@@ -120,20 +135,20 @@ void OfflinePageBridge::SavePage(JNIEnv* env,
   DCHECK(j_callback_obj);
   DCHECK(j_web_contents);
 
-  scoped_ptr<ScopedJavaGlobalRef<jobject>> j_callback_obj_ptr(
-      new ScopedJavaGlobalRef<jobject>());
-  j_callback_obj_ptr->Reset(env, j_callback_obj);
+  ScopedJavaGlobalRef<jobject> j_callback_ref;
+  j_callback_ref.Reset(env, j_callback_obj);
 
   content::WebContents* web_contents =
       content::WebContents::FromJavaWebContents(j_web_contents);
   GURL url(web_contents->GetLastCommittedURL());
 
   scoped_ptr<OfflinePageArchiver> archiver(
-      new OfflinePageMHTMLArchiver(web_contents, GetDownloadsPath()));
+      new OfflinePageMHTMLArchiver(
+          web_contents, GetDownloadsPath(browser_context_)));
 
   offline_page_model_->SavePage(
       url, bookmark_id, archiver.Pass(),
-      base::Bind(&SavePageCallback, j_callback_obj_ptr.release(), url));
+      base::Bind(&SavePageCallback, j_callback_ref, url));
 }
 
 void OfflinePageBridge::DeletePage(JNIEnv* env,
@@ -142,12 +157,29 @@ void OfflinePageBridge::DeletePage(JNIEnv* env,
                                    jlong bookmark_id) {
   DCHECK(j_callback_obj);
 
-  scoped_ptr<ScopedJavaGlobalRef<jobject>> j_callback_obj_ptr(
-      new ScopedJavaGlobalRef<jobject>());
-  j_callback_obj_ptr->Reset(env, j_callback_obj);
+  ScopedJavaGlobalRef<jobject> j_callback_ref;
+  j_callback_ref.Reset(env, j_callback_obj);
 
   offline_page_model_->DeletePageByBookmarkId(bookmark_id, base::Bind(
-      &DeletePageCallback, j_callback_obj_ptr.release()));
+      &DeletePageCallback, j_callback_ref));
+}
+
+void OfflinePageBridge::DeletePages(JNIEnv* env,
+                                    jobject obj,
+                                    jobject j_callback_obj,
+                                    jlongArray bookmark_ids_array) {
+  DCHECK(j_callback_obj);
+
+  ScopedJavaGlobalRef<jobject> j_callback_ref;
+  j_callback_ref.Reset(env, j_callback_obj);
+
+  std::vector<int64> bookmark_ids;
+  base::android::JavaLongArrayToInt64Vector(env, bookmark_ids_array,
+                                            &bookmark_ids);
+
+  offline_page_model_->DeletePagesByBookmarkId(
+      bookmark_ids,
+      base::Bind(&DeletePageCallback, j_callback_ref));
 }
 
 void OfflinePageBridge::NotifyIfDoneLoading() const {
@@ -160,9 +192,21 @@ void OfflinePageBridge::NotifyIfDoneLoading() const {
   Java_OfflinePageBridge_offlinePageModelLoaded(env, obj.obj());
 }
 
-base::FilePath OfflinePageBridge::GetDownloadsPath() const {
+// static
+bool OfflinePageBridge::MightBeOfflineURL(const GURL& url) {
+  // It has to be a file URL ending with .mhtml extension.
+  return url.is_valid() &&
+         url.SchemeIsFile() &&
+         base::EndsWith(url.spec(),
+                        OfflinePageMHTMLArchiver::GetFileNameExtension(),
+                        base::CompareCase::INSENSITIVE_ASCII);
+}
+
+// static
+base::FilePath OfflinePageBridge::GetDownloadsPath(
+    content::BrowserContext* browser_context) {
   content::DownloadManager* manager =
-      content::BrowserContext::GetDownloadManager(browser_context_);
+      content::BrowserContext::GetDownloadManager(browser_context);
   if (!manager) {
     DVLOG(1) << "No download manager available in offline page bridge";
     return base::FilePath();

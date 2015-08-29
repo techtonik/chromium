@@ -53,12 +53,18 @@ TaskQueueImpl::Task::Task(const tracked_objects::Location& posted_from,
   sequence_num = sequence_number;
 }
 
-void TaskQueueImpl::WillDeleteTaskQueueManager() {
-  base::AutoLock lock(lock_);
-  task_queue_manager_ = nullptr;
-  delayed_task_queue_ = std::priority_queue<Task>();
-  incoming_queue_ = std::queue<Task>();
-  work_queue_ = std::queue<Task>();
+void TaskQueueImpl::UnregisterTaskQueue() {
+  if (!task_queue_manager_)
+    return;
+  task_queue_manager_->UnregisterTaskQueue(make_scoped_refptr(this));
+
+  {
+    base::AutoLock lock(lock_);
+    task_queue_manager_ = nullptr;
+    delayed_task_queue_ = std::priority_queue<Task>();
+    incoming_queue_ = std::queue<Task>();
+    work_queue_ = std::queue<Task>();
+  }
 }
 
 bool TaskQueueImpl::RunsTasksOnCurrentThread() const {
@@ -135,7 +141,6 @@ bool TaskQueueImpl::PostDelayedTaskLocked(
 }
 
 void TaskQueueImpl::MoveReadyDelayedTasksToIncomingQueue(LazyNow* lazy_now) {
-  DCHECK(main_thread_checker_.CalledOnValidThread());
   base::AutoLock lock(lock_);
   if (!task_queue_manager_)
     return;
@@ -149,8 +154,6 @@ void TaskQueueImpl::MoveReadyDelayedTasksToIncomingQueueLocked(
   // Enqueue all delayed tasks that should be running now.
   while (!delayed_task_queue_.empty() &&
          delayed_task_queue_.top().delayed_run_time <= lazy_now->Now()) {
-    in_flight_kick_delayed_tasks_.erase(
-        delayed_task_queue_.top().delayed_run_time);
     // TODO(alexclarke): consider std::move() when allowed.
     EnqueueDelayedTaskLocked(delayed_task_queue_.top());
     delayed_task_queue_.pop();
@@ -432,6 +435,34 @@ void TaskQueueImpl::AsValueInto(base::trace_event::TracedValue* state) const {
   state->SetString("priority",
                    PriorityToString(static_cast<QueuePriority>(set_index_)));
   state->EndDictionary();
+}
+
+void TaskQueueImpl::AddTaskObserver(
+    base::MessageLoop::TaskObserver* task_observer) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+  task_observers_.AddObserver(task_observer);
+}
+
+void TaskQueueImpl::RemoveTaskObserver(
+    base::MessageLoop::TaskObserver* task_observer) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+  task_observers_.RemoveObserver(task_observer);
+}
+
+void TaskQueueImpl::NotifyWillProcessTask(
+    const base::PendingTask& pending_task) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+  DCHECK(should_notify_observers_);
+  FOR_EACH_OBSERVER(base::MessageLoop::TaskObserver, task_observers_,
+                    WillProcessTask(pending_task));
+}
+
+void TaskQueueImpl::NotifyDidProcessTask(
+    const base::PendingTask& pending_task) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+  DCHECK(should_notify_observers_);
+  FOR_EACH_OBSERVER(base::MessageLoop::TaskObserver, task_observers_,
+                    DidProcessTask(pending_task));
 }
 
 // static

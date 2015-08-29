@@ -20,19 +20,19 @@ var CrOnc = {};
 /** @typedef {chrome.networkingPrivate.NetworkStateProperties} */
 CrOnc.NetworkStateProperties;
 
-/** @typedef {string|number|boolean|Array<Object>} */
+/** @typedef {string|number|boolean|Object|Array<Object>} */
 CrOnc.NetworkStateProperty;
 
 /**
  * @typedef {{
- *    Active: CrOnc.NetworkStateProperty,
- *    Effective: CrOnc.NetworkStateProperty,
- *    UserPolicy: CrOnc.NetworkStateProperty,
- *    DevicePolicy: CrOnc.NetworkStateProperty,
- *    UserSetting: CrOnc.NetworkStateProperty,
- *    SharedSetting: CrOnc.NetworkStateProperty,
- *    UserEditable: boolean,
- *    DeviceEditable: boolean
+ *   Active: CrOnc.NetworkStateProperty,
+ *   Effective: CrOnc.NetworkStateProperty,
+ *   UserPolicy: CrOnc.NetworkStateProperty,
+ *   DevicePolicy: CrOnc.NetworkStateProperty,
+ *   UserSetting: CrOnc.NetworkStateProperty,
+ *   SharedSetting: CrOnc.NetworkStateProperty,
+ *   UserEditable: boolean,
+ *   DeviceEditable: boolean
  * }}
  */
 CrOnc.ManagedProperty;
@@ -40,113 +40,61 @@ CrOnc.ManagedProperty;
 /** @typedef {CrOnc.NetworkStateProperty|!CrOnc.ManagedProperty} */
 CrOnc.ManagedNetworkStateProperty;
 
-// TODO(stevenjb): Update chrome_extensions.js to include the following
-// in chrome.networkingPrivate and use those instead.
-
 /**
  * @typedef {{
- *    AccessPointName: string,
- *    Language: (string|undefined),
- *    LocalizedName: (string|undefined),
- *    Name: (string|undefined),
- *    Password: (string|undefined),
- *    Username: (string|undefined)
- * }}
- */
-CrOnc.APNProperties;
-
-/**
- * @typedef {{
- *    requirePin: boolean,
- *    currentPin: string,
- *    newPin: (string|undefined)
- * }}
- */
-CrOnc.CellularSimState;
-
-/**
- * @typedef {{
- *    Gateway: (string|undefined),
- *    IPAddress: (string|undefined),
- *    NameServers: ?Array<string>,
- *    RoutingPrefix: (number|undefined),
- *    Type: (string|undefined),
- *    WebProxyAutoDiscoveryUrl: (string|undefined)
- * }}
- */
-CrOnc.IPConfigProperties;
-
-/**
- * @typedef {{
- *    HTTPProxy: ?CrOnc.ProxyLocation,
- *    SecureHTTPProxy: ?CrOnc.ProxyLocation,
- *    FTPProxy: ?CrOnc.ProxyLocation,
- *    SOCKS: ?CrOnc.ProxyLocation
- * }}
- */
-CrOnc.ManualProxySettings;
-
-/**
- * @typedef {{
- *    Host: string,
- *    Port: number
- * }}
- */
-CrOnc.ProxyLocation;
-
-/**
- * @typedef {{
- *    Type: !CrOnc.ProxySettingsType,
- *    Manual: ?CrOnc.ManualProxySettings,
- *    ExcludeDomains: ?Array<string>,
- *    PAC: (string|undefined)
- * }}
- */
-CrOnc.ProxySettings;
-
-/**
- * @typedef {{
- *    LockType: !CrOnc.LockType,
- *    LockEnabled: boolean,
- *    RetriesLeft: (number|undefined)
+ *   LockType: !CrOnc.LockType,
+ *   LockEnabled: boolean,
+ *   RetriesLeft: (number|undefined)
  * }}
  */
 CrOnc.SIMLockStatus;
+
+/** @typedef {chrome.networkingPrivate.APNProperties} */
+CrOnc.APNProperties;
+
+/** @typedef {chrome.networkingPrivate.CellularSimState} */
+CrOnc.CellularSimState;
+
+/** @typedef {chrome.networkingPrivate.IPConfigProperties} */
+CrOnc.IPConfigProperties;
+
+/** @typedef {chrome.networkingPrivate.ManualProxySettings} */
+CrOnc.ManualProxySettings;
+
+/** @typedef {chrome.networkingPrivate.ProxyLocation} */
+CrOnc.ProxyLocation;
+
+/** @typedef {chrome.networkingPrivate.ProxySettings} */
+CrOnc.ProxySettings;
 
 // Modified version of IPConfigProperties to store RoutingPrefix as a
 // human-readable string instead of as a number.
 /**
  * @typedef {{
- *    Gateway: (string|undefined),
- *    IPAddress: (string|undefined),
- *    NameServers: ?Array<string>,
- *    RoutingPrefix: (string|undefined),
- *    Type: (string|undefined),
- *    WebProxyAutoDiscoveryUrl: (string|undefined)
+ *   Gateway: (string|undefined),
+ *   IPAddress: (string|undefined),
+ *   NameServers: (!Array<string>|undefined),
+ *   RoutingPrefix: (string|undefined),
+ *   Type: (string|undefined),
+ *   WebProxyAutoDiscoveryUrl: (string|undefined)
  * }}
  */
 CrOnc.IPConfigUIProperties;
 
-/** @enum {string} */
-CrOnc.ActivationState = {
-  ACTIVATED: 'Activated',
-  ACTIVATING: 'Activating',
-  NOT_ACTIVATED: 'NotActivated',
-  PARTIALLY_ACTIVATED: 'PartiallyActivated',
-};
+/**
+ * @typedef {{
+ *   Method: string,
+ *   PostData: (string|undefined),
+ *   Url: string
+ * }}
+ */
+CrOnc.PaymentPortal;
 
-/** @enum {string} */
-CrOnc.ConnectionState = {
-  CONNECTED: 'Connected',
-  CONNECTING: 'Connecting',
-  NOT_CONNECTED: 'NotConnected',
-};
-
-/** @enum {string} */
-CrOnc.IPConfigType = {
-  DHCP: 'DHCP',
-  STATIC: 'Static',
-};
+CrOnc.ActivationState = chrome.networkingPrivate.ActivationStateType;
+CrOnc.ConnectionState = chrome.networkingPrivate.ConnectionStateType;
+CrOnc.IPConfigType = chrome.networkingPrivate.IPConfigType;
+CrOnc.ProxySettingsType = chrome.networkingPrivate.ProxySettingsType;
+CrOnc.Type = chrome.networkingPrivate.NetworkType;
 
 /** @enum {string} */
 CrOnc.IPType = {
@@ -177,14 +125,6 @@ CrOnc.NetworkTechnology = {
 };
 
 /** @enum {string} */
-CrOnc.ProxySettingsType = {
-  DIRECT: 'Direct',
-  MANUAL: 'Manual',
-  PAC: 'PAC',
-  WPAD: 'WPAD',
-};
-
-/** @enum {string} */
 CrOnc.RoamingState = {
   HOME: 'Home',
   REQUIRED: 'Required',
@@ -202,12 +142,12 @@ CrOnc.Security = {
 };
 
 /** @enum {string} */
-CrOnc.Type = {
-  CELLULAR: 'Cellular',
-  ETHERNET: 'Ethernet',
-  VPN: 'VPN',
-  WIFI: 'WiFi',
-  WIMAX: 'WiMAX',
+CrOnc.Source = {
+  NONE: 'None',
+  DEVICE: 'Device',
+  DEVICE_POLICY: 'DevicePolicy',
+  USER: 'User',
+  USER_POLICY: 'UserPolicy',
 };
 
 /**
@@ -240,8 +180,11 @@ CrOnc.getActivePropertyValue = function(property) {
 
 /**
  * Returns either a managed property dictionary or an unmanaged value associated
- * with a key.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * with a key. TODO(stevenjb): Remove this. Properties should be accessed
+ * directly so that the closure compiler can do type checking. Removal is
+ * dependent on adding a NetworkProperties type to the networking_private.js
+ * externs file.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @param {string} key The property key which may be nested, e.g. 'Foo.Bar'.
  * @return {!CrOnc.ManagedNetworkStateProperty|undefined} The property value or
  *     dictionary if it exists, otherwise undefined.
@@ -266,20 +209,20 @@ CrOnc.getProperty = function(state, key) {
 
 /**
  * Calls getProperty with '{state.Type}.key', e.g. WiFi.AutoConnect.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @param {string} key The type property key, e.g. 'AutoConnect'.
  * @return {!CrOnc.ManagedNetworkStateProperty|undefined} The property value or
  *     dictionary if it exists, otherwise undefined.
  */
 CrOnc.getTypeProperty = function(state, key) {
-  var typeKey = state.Type + '.' + key;
+  var typeKey = state ? state.Type + '.' + key : '';
   return CrOnc.getProperty(state, typeKey);
 };
 
 /**
  * Returns either the active value of a managed property dictionary or the
  * unmanaged value associated with a key.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @param {string} key The property key which may be nested, e.g. 'Foo.Bar'.
  * @return {!CrOnc.ManagedNetworkStateProperty|undefined} The active property
  *     value if it exists, otherwise undefined.
@@ -293,30 +236,31 @@ CrOnc.getActiveValue = function(state, key) {
 
 /**
  * Calls getActiveValue with '{state.Type}.key', e.g. WiFi.AutoConnect.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @param {string} key The type property key, e.g. 'AutoConnect'.
  * @return {!CrOnc.ManagedNetworkStateProperty|undefined} The active property
  *     value if it exists, otherwise undefined.
  */
 CrOnc.getActiveTypeValue = function(state, key) {
-  var typeKey = state.Type + '.' + key;
+  var typeKey = state ? state.Type + '.' + key : '';
   return CrOnc.getActiveValue(state, typeKey);
 };
 
 /**
  * Returns an IPConfigProperties object for |type|. For IPV4, these will be the
  * static properties if IPAddressConfigType is Static and StaticIPConfig is set.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @param {!CrOnc.IPType} type The IP Config type.
  * @return {?CrOnc.IPConfigProperties} The IP Config object, or undefined if
  *     no properties for |type| are available.
  */
 CrOnc.getIPConfigForType = function(state, type) {
+  'use strict';
   var result;
   var ipConfigs = CrOnc.getActiveValue(state, 'IPConfigs');
   if (ipConfigs) {
-    for (var i = 0; i < ipConfigs.length; ++i) {
-      var ipConfig = ipConfigs[i];
+    for (let i = 0; i < ipConfigs.length; ++i) {
+      let ipConfig = ipConfigs[i];
       if (ipConfig.Type == type) {
         result = ipConfig;
         break;
@@ -326,7 +270,8 @@ CrOnc.getIPConfigForType = function(state, type) {
   if (type != CrOnc.IPType.IPV4)
     return result;
 
-  var staticIpConfig = state.StaticIPConfig;
+  var staticIpConfig = /** @type{CrOnc.IPConfigProperties} */(
+      CrOnc.getActiveValue(state, 'StaticIPConfig'));
   if (!staticIpConfig)
     return result;
 
@@ -350,11 +295,11 @@ CrOnc.getIPConfigForType = function(state, type) {
 };
 
 /**
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {?CrOnc.NetworkStateProperties} state The ONC network state.
  * @return {boolean} True if |state| is a Cellular network with a locked SIM.
  */
 CrOnc.isSimLocked = function(state) {
-  if (state.Type != CrOnc.Type.CELLULAR)
+  if (!state || state.Type != CrOnc.Type.CELLULAR)
     return false;
   var property = /** @type {!CrOnc.SIMLockStatus} */(
       CrOnc.getProperty(state, 'Cellular.SIMLockStatus'));
@@ -366,25 +311,32 @@ CrOnc.isSimLocked = function(state) {
  * Modifies |config| to include the correct set of properties for configuring
  * a network IP Address and NameServer configuration for |state|. Existing
  * properties in |config| will be preserved unless invalid.
- * @param {!CrOnc.NetworkStateProperties} config A partial ONC configuration.
+ * @param {!chrome.networkingPrivate.NetworkConfigProperties} config A partial
+ *     ONC configuration.
  * @param {!CrOnc.NetworkStateProperties} state The complete ONC network state.
  */
 CrOnc.setValidStaticIPConfig = function(config, state) {
-  config.IPAddressConfigType =
-      config.IPAddressConfigType || state.IPAddressConfigType || 'DHCP';
-  config.NameServersConfigType =
-      config.NameServersConfigType || state.NameServersConfigType || 'DHCP';
-
-  if (config.IPAddressConfigType != 'Static' &&
-      config.NameServersConfigType != 'Static') {
+  if (!config.IPAddressConfigType) {
+    var ipConfigType = /** @type {chrome.networkingPrivate.IPConfigType} */(
+        CrOnc.getActiveValue(state, 'IPAddressConfigType'));
+    config.IPAddressConfigType = ipConfigType || CrOnc.IPConfigType.DHCP;
+  }
+  if (!config.NameServersConfigType) {
+    var nsConfigType = /** @type {chrome.networkingPrivate.IPConfigType} */(
+        CrOnc.getActiveValue(state, 'NameServersConfigType'));
+    config.NameServersConfigType = nsConfigType || CrOnc.IPConfigType.DHCP;
+  }
+  if (config.IPAddressConfigType != CrOnc.IPConfigType.STATIC &&
+      config.NameServersConfigType != CrOnc.IPConfigType.STATIC) {
     if (config.hasOwnProperty('StaticIPConfig'))
       delete config.StaticIPConfig;
     return;
   }
 
-  if (!config.hasOwnProperty('StaticIPConfig'))
-    config.StaticIPConfig = {};
-
+  if (!config.hasOwnProperty('StaticIPConfig')) {
+    config.StaticIPConfig =
+        /** @type {chrome.networkingPrivate.IPConfigProperties} */({});
+  }
   var staticIP = config.StaticIPConfig;
   var stateIPConfig = CrOnc.getIPConfigForType(state, CrOnc.IPType.IPV4);
   if (config.IPAddressConfigType == 'Static') {
@@ -403,33 +355,38 @@ CrOnc.setValidStaticIPConfig = function(config, state) {
 
 /**
  * Sets the value of a property in an ONC dictionary.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state to modify.
+ * @param {!chrome.networkingPrivate.NetworkConfigProperties} properties
  * @param {string} key The property key which may be nested, e.g. 'Foo.Bar'.
  * @param {!CrOnc.NetworkStateProperty} value The property value to set.
  */
-CrOnc.setProperty = function(state, key, value) {
+CrOnc.setProperty = function(properties, key, value) {
   while (true) {
     var index = key.indexOf('.');
     if (index < 0)
       break;
     var keyComponent = key.substr(0, index);
-    if (!state.hasOwnProperty(keyComponent))
-      state[keyComponent] = {};
-    state = state[keyComponent];
+    if (!properties.hasOwnProperty(keyComponent))
+      properties[keyComponent] = {};
+    properties = properties[keyComponent];
     key = key.substr(index + 1);
   }
-  state[key] = value;
+  properties[key] = value;
 };
 
 /**
  * Calls setProperty with '{state.Type}.key', e.g. WiFi.AutoConnect.
- * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @param {!chrome.networkingPrivate.NetworkConfigProperties} properties The
+ *     ONC properties to set. properties.Type must be set already.
  * @param {string} key The type property key, e.g. 'AutoConnect'.
  * @param {!CrOnc.NetworkStateProperty} value The property value to set.
  */
-CrOnc.setTypeProperty = function(state, key, value) {
-  var typeKey = state.Type + '.' + key;
-  CrOnc.setProperty(state, typeKey, value);
+CrOnc.setTypeProperty = function(properties, key, value) {
+  if (properties.Type == undefined) {
+    console.error('Type not defined in properties: ', properties);
+    return;
+  }
+  var typeKey = properties.Type + '.' + key;
+  CrOnc.setProperty(properties, typeKey, value);
 };
 
 /**
@@ -438,12 +395,13 @@ CrOnc.setTypeProperty = function(state, key, value) {
  * @return {string} The corresponding netmask.
  */
 CrOnc.getRoutingPrefixAsNetmask = function(prefixLength) {
+  'use strict';
   // Return the empty string for invalid inputs.
   if (prefixLength < 0 || prefixLength > 32)
     return '';
   var netmask = '';
-  for (var i = 0; i < 4; ++i) {
-    var remainder = 8;
+  for (let i = 0; i < 4; ++i) {
+    let remainder = 8;
     if (prefixLength >= 8) {
       prefixLength -= 8;
     } else {
@@ -452,7 +410,7 @@ CrOnc.getRoutingPrefixAsNetmask = function(prefixLength) {
     }
     if (i > 0)
       netmask += '.';
-    var value = 0;
+    let value = 0;
     if (remainder != 0)
       value = ((2 << (remainder - 1)) - 1) << (8 - remainder);
     netmask += value.toString();
@@ -466,12 +424,13 @@ CrOnc.getRoutingPrefixAsNetmask = function(prefixLength) {
  * @return {number} The corresponding netmask or -1 if invalid.
  */
 CrOnc.getRoutingPrefixAsLength = function(netmask) {
+  'use strict';
   var prefixLength = 0;
   var tokens = netmask.split('.');
   if (tokens.length != 4)
     return -1;
-  for (var i = 0; i < tokens.length; ++i) {
-    var token = tokens[i];
+  for (let i = 0; i < tokens.length; ++i) {
+    let token = tokens[i];
     // If we already found the last mask and the current one is not
     // '0' then the netmask is invalid. For example, 255.224.255.0
     if (prefixLength / 8 != i) {

@@ -25,6 +25,15 @@ cr.define('downloads', function() {
         value: false,
       },
 
+      readyPromise: {
+        type: Object,
+        value: function() {
+          return new Promise(function(resolve, reject) {
+            this.resolveReadyPromise_ = resolve;
+          }.bind(this));
+        },
+      },
+
       scrollbarWidth: {
         type: Number,
         value: 0,
@@ -45,6 +54,11 @@ cr.define('downloads', function() {
       isMalware_: Boolean,
     },
 
+    ready: function() {
+      this.content = this.$.content;
+      this.resolveReadyPromise_();
+    },
+
     /** @param {!downloads.Data} data */
     update: function(data) {
       assert(!this.id_ || data.id == this.id_);
@@ -53,14 +67,16 @@ cr.define('downloads', function() {
       this.isIncognito_ = data.otr;
 
       // Danger-independent UI and controls.
-      this.ensureTextIs_(this.$.since, data.since_string);
-      this.ensureTextIs_(this.$.date, data.date_string);
+      var since = data.since_string;
+      this.ensureTextIs_(this.$.since, since);
+      this.ensureTextIs_(this.$.date, since ? '' : data.date_string);
 
-      /** @const */ var noFile =
-          data.state == downloads.States.CANCELLED ||
-          data.state == downloads.States.INTERRUPTED ||
-          data.file_externally_removed;
-      this.$.content.classList.toggle('no-file', noFile);
+      /** @const */ var isActive =
+          data.state != downloads.States.CANCELLED &&
+          data.state != downloads.States.INTERRUPTED &&
+          !data.file_externally_removed;
+      this.$.content.classList.toggle('is-active', isActive);
+      this.$.content.elevation = isActive ? 1 : 0;
 
       this.ensureTextIs_(this.$.name, data.file_name);
       this.ensureTextIs_(this.$.url, data.url);
@@ -74,19 +90,19 @@ cr.define('downloads', function() {
       var description = dangerText || this.getStatusText_(data);
 
       // Status goes in the "tag" (next to the file name) if there's no file.
-      this.ensureTextIs_(this.$.description, noFile ? '' : description);
-      this.ensureTextIs_(this.$.tag, noFile ? description : '');
+      this.ensureTextIs_(this.$.description, isActive ? description : '');
+      this.ensureTextIs_(this.$.tag, isActive ? '' : description);
 
       /** @const */ var showProgress =
           isFinite(data.percent) && !this.isDangerous_;
-      this.$.progress.hidden = !showProgress;
+      this.$.content.classList.toggle('show-progress', showProgress);
 
       if (showProgress) {
         this.$.progress.indeterminate = data.percent < 0;
         this.$.progress.value = data.percent;
       }
 
-      var disableRemove;
+      var hideRemove;
 
       if (this.isDangerous_) {
         this.isMalware_ =
@@ -94,7 +110,7 @@ cr.define('downloads', function() {
             data.danger_type == downloads.DangerType.DANGEROUS_HOST ||
             data.danger_type == downloads.DangerType.DANGEROUS_URL ||
             data.danger_type == downloads.DangerType.POTENTIALLY_UNWANTED;
-        disableRemove = true;
+        hideRemove = true;
       } else {
         /** @const */ var completelyOnDisk =
             data.state == downloads.States.COMPLETE &&
@@ -119,7 +135,7 @@ cr.define('downloads', function() {
         /** @const */ var showCancel = isPaused || isInProgress;
         this.$.cancel.hidden = !showCancel;
 
-        disableRemove = showCancel ||
+        hideRemove = showCancel ||
             !loadTimeData.getBoolean('allowDeletingHistory');
 
         /** @const */ var controlledByExtension = data.by_ext_id &&
@@ -128,7 +144,6 @@ cr.define('downloads', function() {
         if (controlledByExtension) {
           var link = this.$['controlled-by'].querySelector('a');
           link.href = 'chrome://extensions#' + data.by_ext_id;
-          link.setAttribute('focus-type', 'controlled-by');
           link.textContent = data.by_ext_name;
         }
 
@@ -136,11 +151,12 @@ cr.define('downloads', function() {
         this.iconLoader_.loadScaledIcon(this.$['file-icon'], icon);
       }
 
-      this.$.remove.disabled = disableRemove;
+      this.$.remove.style.visibility = hideRemove ? 'hidden' : '';
     },
 
     /**
-     * Overwrite |el|'s textContent if it differs from |text|.
+     * Overwrite |el|'s textContent if it differs from |text|. This is done
+     * generally so quickly updating text can be copied via text selection.
      * @param {!Element} el
      * @param {string} text
      * @private

@@ -131,16 +131,6 @@ Polymer({
     },
 
     /**
-     * The ID of the media route provider extension.
-     * @type {string}
-     */
-    routeProviderExtensionId: {
-      type: String,
-      value: '',
-      observer: 'propogateExtensionId_',
-    },
-
-    /**
      * The header text when the cast mode list is shown.
      * @private {string}
      */
@@ -273,6 +263,15 @@ Polymer({
     return view == this.CONTAINER_VIEW_.ROUTE_DETAILS ||
         (view == this.CONTAINER_VIEW_.SINK_LIST &&
          issue && issue.isBlocking);
+  },
+
+  /**
+   * @param {?media_router.Issue} issue The current issue.
+   * @return {string} The class for the issue banner.
+   * @private
+   */
+  computeIssueBannerClass_: function(issue) {
+    return issue && !issue.isBlocking ? 'non-blocking' : '';
   },
 
   /**
@@ -452,10 +451,9 @@ Polymer({
    */
   onCreateRouteResponseReceived: function(sinkId, route) {
     this.setLaunchState_(sinkId, false);
-    if (!route) {
-      // TODO(apacible) Show launch failure.
+    // TODO(apacible) Show launch failure.
+    if (!route)
       return;
-    }
 
     // Check if |route| already exists or if its associated sink
     // does not exist.
@@ -480,16 +478,6 @@ Polymer({
   },
 
   /**
-   * Propagates extension ID to the child elements that need it.
-   *
-   * @private
-   */
-  propogateExtensionId_: function() {
-    this.$['route-details'].routeProviderExtensionId =
-        this.routeProviderExtensionId;
-  },
-
-  /**
    * Called when |routeList| is updated. Rebuilds |routeMap_| and
    * |sinkToRouteMap_|.
    *
@@ -508,17 +496,27 @@ Polymer({
     // computed functions prematurely.
     var tempSinkToRouteMap = {};
 
-    this.routeList.forEach(function(route) {
+    for (var i = 0; i < this.routeList.length; i++) {
+      var route = this.routeList[i];
+      var existingRoute = tempSinkToRouteMap[route.sinkId];
       this.routeMap_[route.id] = route;
+
+      // If we've already accounted for locality of a route that maps to the
+      // same sink, we don't need to check again. However, some routes that are
+      // not local may have local counterparts, so we want to check those.
+      if (existingRoute && existingRoute.isLocal)
+        continue;
+
       tempSinkToRouteMap[route.sinkId] = route;
 
       if (route.isLocal) {
         this.localRouteCount_++;
+
         // It's OK if localRoute is updated multiple times; it is only used if
         // |localRouteCount_| == 1, which implies it was only set once.
         localRoute = route;
       }
-    }, this);
+    }
 
     this.sinkToRouteMap_ = tempSinkToRouteMap;
     this.maybeShowRouteDetailsOnOpen_(localRoute);
@@ -584,7 +582,6 @@ Polymer({
       });
     }
   },
-
 
   /**
    * Shows the route details.

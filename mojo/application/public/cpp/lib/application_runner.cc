@@ -6,9 +6,9 @@
 
 #include "base/at_exit.h"
 #include "base/command_line.h"
-#include "base/debug/stack_trace.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
+#include "base/process/launch.h"
 #include "base/threading/worker_pool.h"
 #include "mojo/application/public/cpp/application_delegate.h"
 #include "mojo/application/public/cpp/application_impl.h"
@@ -46,9 +46,6 @@ MojoResult ApplicationRunner::Run(MojoHandle application_request_handle,
   if (init_base) {
     InitBaseCommandLine();
     at_exit.reset(new base::AtExitManager);
-#ifndef NDEBUG
-    base::debug::EnableInProcessStackDumping();
-#endif
   }
 
   {

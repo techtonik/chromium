@@ -21,8 +21,9 @@
 #include "mojo/application/public/interfaces/service_provider.mojom.h"
 #include "third_party/WebKit/public/platform/WebGeofencingEventType.h"
 #include "third_party/WebKit/public/platform/WebMessagePortChannel.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerError.h"
-#include "third_party/WebKit/public/web/WebServiceWorkerContextClient.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerError.h"
+#include "third_party/WebKit/public/web/modules/serviceworker/WebServiceWorkerContextClient.h"
+#include "v8/include/v8.h"
 
 namespace base {
 class SingleThreadTaskRunner;
@@ -100,6 +101,8 @@ class ServiceWorkerContextClient
 
   virtual void workerContextStarted(blink::WebServiceWorkerContextProxy* proxy);
   virtual void didEvaluateWorkerScript(bool success);
+  virtual void didInitializeWorkerContext(v8::Local<v8::Context> context,
+                                          const blink::WebURL& url);
   virtual void willDestroyWorkerContext();
   virtual void workerContextDestroyed();
   virtual void reportException(const blink::WebString& error_message,

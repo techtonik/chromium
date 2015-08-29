@@ -26,7 +26,33 @@ if (!is_android) {
       "app/chrome_exe_resource.h",
     ]
     defines = []
+    public_deps = []
     deps = []
+
+    data = [
+      "$root_out_dir/resources.pak",
+    ]
+    if (is_linux || is_win) {
+      data += [
+        "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/locales/en-US.pak",
+        "$root_out_dir/locales/fr.pak",
+      ]
+    }
+    if (enable_nacl) {
+      if (is_win || (is_linux && target_cpu == "x64")) {
+        data += [
+          # TODO(GYP): Enable this when the IRT is in the right location.
+          # "$root_out_dir/nacl_irt_x86_64.nexe"
+        ]
+      } else if (is_linux && target_cpu == "arm") {
+        data += [
+          # TODO(GYP): same comment
+          # "$root_out_dir/nacl_irt_arm.nexe"
+        ]
+      }
+    }
+
     data_deps = []
 
     # TODO(GYP) mac_bundle_resources, xcode_settings
@@ -79,6 +105,7 @@ if (!is_android) {
         "//chrome_elf",
         "//components/browser_watcher:browser_watcher_client",
         "//components/crash/app",
+        "//components/crash_keys",
         "//content:startup_helper_win",
         "//crypto",
         "//sandbox",
@@ -117,6 +144,9 @@ if (!is_android) {
         "//chrome/installer/util",
         "//content/public/app:both",
       ]
+      public_deps = [
+        ":xdg_mime",  # Needs to be public for installer to consume files.
+      ]
 
       # Needed for chrome_main.cc initialization of libraries.
       configs += [ "//build/config/linux:pangocairo" ]
@@ -137,9 +167,12 @@ if (!is_android) {
       sources += [ "app/chrome_exe_main_mac.cc" ]
       # TODO(GYP) lots more stuff in the is_mac block.
     } else {  # Non-Mac.
-      deps += [
+      # These files are used by the installer so we need a public dep.
+      public_deps += [
         ":packed_extra_resources",
         ":packed_resources",
+      ]
+      deps += [
         "//components/startup_metric_utils",
 
         # Precompiled plugins that need to get copied to the output directory.
@@ -359,6 +392,7 @@ if (is_win) {
   }
 
   process_version("chrome_exe_version") {
+    template_file = chrome_version_rc_template
     sources = [
       "app/chrome_exe.ver",
     ]
@@ -366,6 +400,7 @@ if (is_win) {
   }
 
   process_version("chrome_dll_version") {
+    template_file = chrome_version_rc_template
     sources = [
       "app/chrome_dll.ver",
     ]
@@ -382,6 +417,7 @@ if (is_win) {
   }
 
   process_version("nacl64_exe_version") {
+    template_file = chrome_version_rc_template
     sources = [
       "app/nacl64_exe.ver",
     ]
@@ -389,6 +425,7 @@ if (is_win) {
   }
 
   process_version("other_version") {
+    template_file = chrome_version_rc_template
     sources = [
       "app/other.ver",
     ]
@@ -467,29 +504,32 @@ if (is_chrome_branded) {
     outputs = [
       "$root_out_dir/default_apps/{{source_file_part}}",
     ]
+
+    # Force anybody that depends on this to get the default apps as data files.
+    data = process_file_template(sources, outputs)
   }
 }
 
 group("packed_resources") {
-  deps = [
+  public_deps = [
     ":repack_locales_pack",
     ":repack_pseudo_locales_pack",
     ":repack_chrome_100_percent",
   ]
 
   if (is_chrome_branded) {
-    deps += [ ":default_apps" ]
+    public_deps += [ ":default_apps" ]
   }
 
   if (enable_hidpi) {
-    deps += [ ":repack_chrome_200_percent" ]
+    public_deps += [ ":repack_chrome_200_percent" ]
   }
 
   if (enable_topchrome_md) {
-    deps += [ ":repack_chrome_material_100_percent" ]
+    public_deps += [ ":repack_chrome_material_100_percent" ]
 
     if (enable_hidpi) {
-      deps += [ ":repack_chrome_material_200_percent" ]
+      public_deps += [ ":repack_chrome_material_200_percent" ]
     }
   }
 }
@@ -692,6 +732,10 @@ template("chrome_repack_percent") {
       sources += [ "$root_gen_dir/extensions/extensions_browser_resources_${percent}_percent.pak" ]
       deps += [ "//extensions:extensions_browser_resources" ]
     }
+    if (enable_app_list) {
+      sources += [ "$root_gen_dir/ui/app_list/resources/app_list_resources_${percent}_percent.pak" ]
+      deps += [ "//ui/app_list/resources" ]
+    }
 
     output = repack_output_file
   }
@@ -738,10 +782,12 @@ template("chrome_repack_material_percent") {
     # All sources should also have deps for completeness.
     sources = [
       "$root_gen_dir/chrome/theme_resources_material_${percent}_percent.pak",
+      "$root_gen_dir/components/components_resources_material_${percent}_percent.pak",
     ]
 
     deps = [
       "//chrome/app/theme:theme_resources",
+      "//components/resources",
     ]
 
     output = repack_output_file
@@ -912,6 +958,19 @@ if (is_linux) {
     deps = [
       ":chrome",
       dump_syms_label,
+    ]
+  }
+
+  # Copies some scripts and resources that are used for desktop integration.
+  copy("xdg_mime") {
+    sources = [
+      "//chrome/app/theme/$branding_path_component/product_logo_48.png",
+      "//chrome/tools/build/linux/chrome-wrapper",
+      "//third_party/xdg-utils/scripts/xdg-mime",
+      "//third_party/xdg-utils/scripts/xdg-settings",
+    ]
+    outputs = [
+      "$root_out_dir/{{source_file_part}}",
     ]
   }
 }

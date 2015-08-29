@@ -11319,6 +11319,48 @@ static_assert(sizeof(EndTransformFeedback) == 4,
 static_assert(offsetof(EndTransformFeedback, header) == 0,
               "offset of EndTransformFeedback header should be 0");
 
+struct SetDisjointValueSyncCHROMIUM {
+  typedef SetDisjointValueSyncCHROMIUM ValueType;
+  static const CommandId kCmdId = kSetDisjointValueSyncCHROMIUM;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(uint32_t _sync_data_shm_id, uint32_t _sync_data_shm_offset) {
+    SetHeader();
+    sync_data_shm_id = _sync_data_shm_id;
+    sync_data_shm_offset = _sync_data_shm_offset;
+  }
+
+  void* Set(void* cmd,
+            uint32_t _sync_data_shm_id,
+            uint32_t _sync_data_shm_offset) {
+    static_cast<ValueType*>(cmd)
+        ->Init(_sync_data_shm_id, _sync_data_shm_offset);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  uint32_t sync_data_shm_id;
+  uint32_t sync_data_shm_offset;
+};
+
+static_assert(sizeof(SetDisjointValueSyncCHROMIUM) == 12,
+              "size of SetDisjointValueSyncCHROMIUM should be 12");
+static_assert(offsetof(SetDisjointValueSyncCHROMIUM, header) == 0,
+              "offset of SetDisjointValueSyncCHROMIUM header should be 0");
+static_assert(
+    offsetof(SetDisjointValueSyncCHROMIUM, sync_data_shm_id) == 4,
+    "offset of SetDisjointValueSyncCHROMIUM sync_data_shm_id should be 4");
+static_assert(
+    offsetof(SetDisjointValueSyncCHROMIUM, sync_data_shm_offset) == 8,
+    "offset of SetDisjointValueSyncCHROMIUM sync_data_shm_offset should be 8");
+
 struct InsertEventMarkerEXT {
   typedef InsertEventMarkerEXT ValueType;
   static const CommandId kCmdId = kInsertEventMarkerEXT;
@@ -12481,6 +12523,93 @@ static_assert(offsetof(CompressedCopyTextureCHROMIUM, source_id) == 8,
 static_assert(offsetof(CompressedCopyTextureCHROMIUM, dest_id) == 12,
               "offset of CompressedCopyTextureCHROMIUM dest_id should be 12");
 
+struct CompressedCopySubTextureCHROMIUM {
+  typedef CompressedCopySubTextureCHROMIUM ValueType;
+  static const CommandId kCmdId = kCompressedCopySubTextureCHROMIUM;
+  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
+  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(3);
+
+  static uint32_t ComputeSize() {
+    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
+  }
+
+  void SetHeader() { header.SetCmd<ValueType>(); }
+
+  void Init(GLenum _target,
+            GLenum _source_id,
+            GLenum _dest_id,
+            GLint _xoffset,
+            GLint _yoffset,
+            GLint _x,
+            GLint _y,
+            GLsizei _width,
+            GLsizei _height) {
+    SetHeader();
+    target = _target;
+    source_id = _source_id;
+    dest_id = _dest_id;
+    xoffset = _xoffset;
+    yoffset = _yoffset;
+    x = _x;
+    y = _y;
+    width = _width;
+    height = _height;
+  }
+
+  void* Set(void* cmd,
+            GLenum _target,
+            GLenum _source_id,
+            GLenum _dest_id,
+            GLint _xoffset,
+            GLint _yoffset,
+            GLint _x,
+            GLint _y,
+            GLsizei _width,
+            GLsizei _height) {
+    static_cast<ValueType*>(cmd)->Init(_target, _source_id, _dest_id, _xoffset,
+                                       _yoffset, _x, _y, _width, _height);
+    return NextCmdAddress<ValueType>(cmd);
+  }
+
+  gpu::CommandHeader header;
+  uint32_t target;
+  uint32_t source_id;
+  uint32_t dest_id;
+  int32_t xoffset;
+  int32_t yoffset;
+  int32_t x;
+  int32_t y;
+  int32_t width;
+  int32_t height;
+};
+
+static_assert(sizeof(CompressedCopySubTextureCHROMIUM) == 40,
+              "size of CompressedCopySubTextureCHROMIUM should be 40");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, header) == 0,
+              "offset of CompressedCopySubTextureCHROMIUM header should be 0");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, target) == 4,
+              "offset of CompressedCopySubTextureCHROMIUM target should be 4");
+static_assert(
+    offsetof(CompressedCopySubTextureCHROMIUM, source_id) == 8,
+    "offset of CompressedCopySubTextureCHROMIUM source_id should be 8");
+static_assert(
+    offsetof(CompressedCopySubTextureCHROMIUM, dest_id) == 12,
+    "offset of CompressedCopySubTextureCHROMIUM dest_id should be 12");
+static_assert(
+    offsetof(CompressedCopySubTextureCHROMIUM, xoffset) == 16,
+    "offset of CompressedCopySubTextureCHROMIUM xoffset should be 16");
+static_assert(
+    offsetof(CompressedCopySubTextureCHROMIUM, yoffset) == 20,
+    "offset of CompressedCopySubTextureCHROMIUM yoffset should be 20");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, x) == 24,
+              "offset of CompressedCopySubTextureCHROMIUM x should be 24");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, y) == 28,
+              "offset of CompressedCopySubTextureCHROMIUM y should be 28");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, width) == 32,
+              "offset of CompressedCopySubTextureCHROMIUM width should be 32");
+static_assert(offsetof(CompressedCopySubTextureCHROMIUM, height) == 36,
+              "offset of CompressedCopySubTextureCHROMIUM height should be 36");
+
 struct DrawArraysInstancedANGLE {
   typedef DrawArraysInstancedANGLE ValueType;
   static const CommandId kCmdId = kDrawArraysInstancedANGLE;
@@ -13219,287 +13348,6 @@ static_assert(sizeof(TraceEndCHROMIUM) == 4,
               "size of TraceEndCHROMIUM should be 4");
 static_assert(offsetof(TraceEndCHROMIUM, header) == 0,
               "offset of TraceEndCHROMIUM header should be 0");
-
-struct AsyncTexSubImage2DCHROMIUM {
-  typedef AsyncTexSubImage2DCHROMIUM ValueType;
-  static const CommandId kCmdId = kAsyncTexSubImage2DCHROMIUM;
-  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
-  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(2);
-
-  static uint32_t ComputeSize() {
-    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
-  }
-
-  void SetHeader() { header.SetCmd<ValueType>(); }
-
-  void Init(GLenum _target,
-            GLint _level,
-            GLint _xoffset,
-            GLint _yoffset,
-            GLsizei _width,
-            GLsizei _height,
-            GLenum _format,
-            GLenum _type,
-            uint32_t _data_shm_id,
-            uint32_t _data_shm_offset,
-            uint32_t _async_upload_token,
-            uint32_t _sync_data_shm_id,
-            uint32_t _sync_data_shm_offset) {
-    SetHeader();
-    target = _target;
-    level = _level;
-    xoffset = _xoffset;
-    yoffset = _yoffset;
-    width = _width;
-    height = _height;
-    format = _format;
-    type = _type;
-    data_shm_id = _data_shm_id;
-    data_shm_offset = _data_shm_offset;
-    async_upload_token = _async_upload_token;
-    sync_data_shm_id = _sync_data_shm_id;
-    sync_data_shm_offset = _sync_data_shm_offset;
-  }
-
-  void* Set(void* cmd,
-            GLenum _target,
-            GLint _level,
-            GLint _xoffset,
-            GLint _yoffset,
-            GLsizei _width,
-            GLsizei _height,
-            GLenum _format,
-            GLenum _type,
-            uint32_t _data_shm_id,
-            uint32_t _data_shm_offset,
-            uint32_t _async_upload_token,
-            uint32_t _sync_data_shm_id,
-            uint32_t _sync_data_shm_offset) {
-    static_cast<ValueType*>(cmd)
-        ->Init(_target, _level, _xoffset, _yoffset, _width, _height, _format,
-               _type, _data_shm_id, _data_shm_offset, _async_upload_token,
-               _sync_data_shm_id, _sync_data_shm_offset);
-    return NextCmdAddress<ValueType>(cmd);
-  }
-
-  gpu::CommandHeader header;
-  uint32_t target;
-  int32_t level;
-  int32_t xoffset;
-  int32_t yoffset;
-  int32_t width;
-  int32_t height;
-  uint32_t format;
-  uint32_t type;
-  uint32_t data_shm_id;
-  uint32_t data_shm_offset;
-  uint32_t async_upload_token;
-  uint32_t sync_data_shm_id;
-  uint32_t sync_data_shm_offset;
-};
-
-static_assert(sizeof(AsyncTexSubImage2DCHROMIUM) == 56,
-              "size of AsyncTexSubImage2DCHROMIUM should be 56");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, header) == 0,
-              "offset of AsyncTexSubImage2DCHROMIUM header should be 0");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, target) == 4,
-              "offset of AsyncTexSubImage2DCHROMIUM target should be 4");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, level) == 8,
-              "offset of AsyncTexSubImage2DCHROMIUM level should be 8");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, xoffset) == 12,
-              "offset of AsyncTexSubImage2DCHROMIUM xoffset should be 12");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, yoffset) == 16,
-              "offset of AsyncTexSubImage2DCHROMIUM yoffset should be 16");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, width) == 20,
-              "offset of AsyncTexSubImage2DCHROMIUM width should be 20");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, height) == 24,
-              "offset of AsyncTexSubImage2DCHROMIUM height should be 24");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, format) == 28,
-              "offset of AsyncTexSubImage2DCHROMIUM format should be 28");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, type) == 32,
-              "offset of AsyncTexSubImage2DCHROMIUM type should be 32");
-static_assert(offsetof(AsyncTexSubImage2DCHROMIUM, data_shm_id) == 36,
-              "offset of AsyncTexSubImage2DCHROMIUM data_shm_id should be 36");
-static_assert(
-    offsetof(AsyncTexSubImage2DCHROMIUM, data_shm_offset) == 40,
-    "offset of AsyncTexSubImage2DCHROMIUM data_shm_offset should be 40");
-static_assert(
-    offsetof(AsyncTexSubImage2DCHROMIUM, async_upload_token) == 44,
-    "offset of AsyncTexSubImage2DCHROMIUM async_upload_token should be 44");
-static_assert(
-    offsetof(AsyncTexSubImage2DCHROMIUM, sync_data_shm_id) == 48,
-    "offset of AsyncTexSubImage2DCHROMIUM sync_data_shm_id should be 48");
-static_assert(
-    offsetof(AsyncTexSubImage2DCHROMIUM, sync_data_shm_offset) == 52,
-    "offset of AsyncTexSubImage2DCHROMIUM sync_data_shm_offset should be 52");
-
-struct AsyncTexImage2DCHROMIUM {
-  typedef AsyncTexImage2DCHROMIUM ValueType;
-  static const CommandId kCmdId = kAsyncTexImage2DCHROMIUM;
-  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
-  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(2);
-
-  static uint32_t ComputeSize() {
-    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
-  }
-
-  void SetHeader() { header.SetCmd<ValueType>(); }
-
-  void Init(GLenum _target,
-            GLint _level,
-            GLint _internalformat,
-            GLsizei _width,
-            GLsizei _height,
-            GLenum _format,
-            GLenum _type,
-            uint32_t _pixels_shm_id,
-            uint32_t _pixels_shm_offset,
-            uint32_t _async_upload_token,
-            uint32_t _sync_data_shm_id,
-            uint32_t _sync_data_shm_offset) {
-    SetHeader();
-    target = _target;
-    level = _level;
-    internalformat = _internalformat;
-    width = _width;
-    height = _height;
-    format = _format;
-    type = _type;
-    pixels_shm_id = _pixels_shm_id;
-    pixels_shm_offset = _pixels_shm_offset;
-    async_upload_token = _async_upload_token;
-    sync_data_shm_id = _sync_data_shm_id;
-    sync_data_shm_offset = _sync_data_shm_offset;
-  }
-
-  void* Set(void* cmd,
-            GLenum _target,
-            GLint _level,
-            GLint _internalformat,
-            GLsizei _width,
-            GLsizei _height,
-            GLenum _format,
-            GLenum _type,
-            uint32_t _pixels_shm_id,
-            uint32_t _pixels_shm_offset,
-            uint32_t _async_upload_token,
-            uint32_t _sync_data_shm_id,
-            uint32_t _sync_data_shm_offset) {
-    static_cast<ValueType*>(cmd)
-        ->Init(_target, _level, _internalformat, _width, _height, _format,
-               _type, _pixels_shm_id, _pixels_shm_offset, _async_upload_token,
-               _sync_data_shm_id, _sync_data_shm_offset);
-    return NextCmdAddress<ValueType>(cmd);
-  }
-
-  gpu::CommandHeader header;
-  uint32_t target;
-  int32_t level;
-  int32_t internalformat;
-  int32_t width;
-  int32_t height;
-  uint32_t format;
-  uint32_t type;
-  uint32_t pixels_shm_id;
-  uint32_t pixels_shm_offset;
-  uint32_t async_upload_token;
-  uint32_t sync_data_shm_id;
-  uint32_t sync_data_shm_offset;
-  static const int32_t border = 0;
-};
-
-static_assert(sizeof(AsyncTexImage2DCHROMIUM) == 52,
-              "size of AsyncTexImage2DCHROMIUM should be 52");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, header) == 0,
-              "offset of AsyncTexImage2DCHROMIUM header should be 0");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, target) == 4,
-              "offset of AsyncTexImage2DCHROMIUM target should be 4");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, level) == 8,
-              "offset of AsyncTexImage2DCHROMIUM level should be 8");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, internalformat) == 12,
-              "offset of AsyncTexImage2DCHROMIUM internalformat should be 12");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, width) == 16,
-              "offset of AsyncTexImage2DCHROMIUM width should be 16");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, height) == 20,
-              "offset of AsyncTexImage2DCHROMIUM height should be 20");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, format) == 24,
-              "offset of AsyncTexImage2DCHROMIUM format should be 24");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, type) == 28,
-              "offset of AsyncTexImage2DCHROMIUM type should be 28");
-static_assert(offsetof(AsyncTexImage2DCHROMIUM, pixels_shm_id) == 32,
-              "offset of AsyncTexImage2DCHROMIUM pixels_shm_id should be 32");
-static_assert(
-    offsetof(AsyncTexImage2DCHROMIUM, pixels_shm_offset) == 36,
-    "offset of AsyncTexImage2DCHROMIUM pixels_shm_offset should be 36");
-static_assert(
-    offsetof(AsyncTexImage2DCHROMIUM, async_upload_token) == 40,
-    "offset of AsyncTexImage2DCHROMIUM async_upload_token should be 40");
-static_assert(
-    offsetof(AsyncTexImage2DCHROMIUM, sync_data_shm_id) == 44,
-    "offset of AsyncTexImage2DCHROMIUM sync_data_shm_id should be 44");
-static_assert(
-    offsetof(AsyncTexImage2DCHROMIUM, sync_data_shm_offset) == 48,
-    "offset of AsyncTexImage2DCHROMIUM sync_data_shm_offset should be 48");
-
-struct WaitAsyncTexImage2DCHROMIUM {
-  typedef WaitAsyncTexImage2DCHROMIUM ValueType;
-  static const CommandId kCmdId = kWaitAsyncTexImage2DCHROMIUM;
-  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
-  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(1);
-
-  static uint32_t ComputeSize() {
-    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
-  }
-
-  void SetHeader() { header.SetCmd<ValueType>(); }
-
-  void Init(GLenum _target) {
-    SetHeader();
-    target = _target;
-  }
-
-  void* Set(void* cmd, GLenum _target) {
-    static_cast<ValueType*>(cmd)->Init(_target);
-    return NextCmdAddress<ValueType>(cmd);
-  }
-
-  gpu::CommandHeader header;
-  uint32_t target;
-};
-
-static_assert(sizeof(WaitAsyncTexImage2DCHROMIUM) == 8,
-              "size of WaitAsyncTexImage2DCHROMIUM should be 8");
-static_assert(offsetof(WaitAsyncTexImage2DCHROMIUM, header) == 0,
-              "offset of WaitAsyncTexImage2DCHROMIUM header should be 0");
-static_assert(offsetof(WaitAsyncTexImage2DCHROMIUM, target) == 4,
-              "offset of WaitAsyncTexImage2DCHROMIUM target should be 4");
-
-struct WaitAllAsyncTexImage2DCHROMIUM {
-  typedef WaitAllAsyncTexImage2DCHROMIUM ValueType;
-  static const CommandId kCmdId = kWaitAllAsyncTexImage2DCHROMIUM;
-  static const cmd::ArgFlags kArgFlags = cmd::kFixed;
-  static const uint8 cmd_flags = CMD_FLAG_SET_TRACE_LEVEL(1);
-
-  static uint32_t ComputeSize() {
-    return static_cast<uint32_t>(sizeof(ValueType));  // NOLINT
-  }
-
-  void SetHeader() { header.SetCmd<ValueType>(); }
-
-  void Init() { SetHeader(); }
-
-  void* Set(void* cmd) {
-    static_cast<ValueType*>(cmd)->Init();
-    return NextCmdAddress<ValueType>(cmd);
-  }
-
-  gpu::CommandHeader header;
-};
-
-static_assert(sizeof(WaitAllAsyncTexImage2DCHROMIUM) == 4,
-              "size of WaitAllAsyncTexImage2DCHROMIUM should be 4");
-static_assert(offsetof(WaitAllAsyncTexImage2DCHROMIUM, header) == 0,
-              "offset of WaitAllAsyncTexImage2DCHROMIUM header should be 0");
 
 struct DiscardFramebufferEXTImmediate {
   typedef DiscardFramebufferEXTImmediate ValueType;

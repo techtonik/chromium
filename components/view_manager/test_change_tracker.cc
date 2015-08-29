@@ -41,10 +41,6 @@ std::string ChangeToDescription1(const Change& change) {
       return base::StringPrintf("OnEmbeddedAppDisconnected view=%s",
                                 ViewIdToString(change.view_id).c_str());
 
-    case CHANGE_TYPE_EMBED_FOR_DESCENDANT:
-      return base::StringPrintf("OnEmbedForDescendant view=%s",
-                                ViewIdToString(change.view_id).c_str());
-
     case CHANGE_TYPE_UNEMBED:
       return "OnUnembed";
 
@@ -119,9 +115,13 @@ std::vector<std::string> ChangesToDescription1(
 }
 
 std::string SingleChangeToDescription(const std::vector<Change>& changes) {
-  if (changes.size() != 1u)
-    return std::string();
-  return ChangeToDescription1(changes[0]);
+  std::string result;
+  for (auto& change : changes) {
+    if (!result.empty())
+      result += "\n";
+    result += ChangeToDescription1(change);
+  }
+  return result;
 }
 
 std::string SingleViewDescription(const std::vector<TestView>& views) {
@@ -183,13 +183,6 @@ void TestChangeTracker::OnEmbed(mojo::ConnectionSpecificId connection_id,
   change.type = CHANGE_TYPE_EMBED;
   change.connection_id = connection_id;
   change.views.push_back(ViewDataToTestView(root));
-  AddChange(change);
-}
-
-void TestChangeTracker::OnEmbedForDescendant(mojo::Id view_id) {
-  Change change;
-  change.type = CHANGE_TYPE_EMBED_FOR_DESCENDANT;
-  change.view_id = view_id;
   AddChange(change);
 }
 

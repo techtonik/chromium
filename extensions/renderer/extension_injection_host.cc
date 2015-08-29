@@ -6,8 +6,8 @@
 
 #include "content/public/renderer/render_frame.h"
 #include "extensions/common/constants.h"
-#include "extensions/common/extension_set.h"
 #include "extensions/common/manifest_handlers/csp_info.h"
+#include "extensions/renderer/renderer_extension_registry.h"
 #include "third_party/WebKit/public/platform/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 
@@ -24,9 +24,9 @@ ExtensionInjectionHost::~ExtensionInjectionHost() {
 
 // static
 scoped_ptr<const InjectionHost> ExtensionInjectionHost::Create(
-    const std::string& extension_id,
-    const ExtensionSet* extensions) {
-  const Extension* extension = extensions->GetByID(extension_id);
+    const std::string& extension_id) {
+  const Extension* extension =
+      RendererExtensionRegistry::Get()->GetByID(extension_id);
   if (!extension)
     return scoped_ptr<const ExtensionInjectionHost>();
   return scoped_ptr<const ExtensionInjectionHost>(
@@ -57,8 +57,10 @@ PermissionsData::AccessType ExtensionInjectionHost::CanExecuteOnFrame(
 
   blink::WebSecurityOrigin top_frame_security_origin =
       render_frame->GetWebFrame()->top()->securityOrigin();
+  // Only whitelisted extensions may run scripts on another extension's page.
   if (top_frame_security_origin.protocol().utf8() == kExtensionScheme &&
-      top_frame_security_origin.host().utf8() != extension_->id())
+      top_frame_security_origin.host().utf8() != extension_->id() &&
+      !PermissionsData::CanExecuteScriptEverywhere(extension_))
     return PermissionsData::ACCESS_DENIED;
 
   // Declarative user scripts use "page access" (from "permissions" section in

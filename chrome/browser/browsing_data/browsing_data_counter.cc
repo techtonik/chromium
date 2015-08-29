@@ -6,11 +6,9 @@
 
 #include "base/prefs/pref_service.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/common/pref_names.h"
 
-BrowsingDataCounter::BrowsingDataCounter()
-    : counting_(false),
-      initialized_(false) {
-}
+BrowsingDataCounter::BrowsingDataCounter() {}
 
 BrowsingDataCounter::~BrowsingDataCounter() {
 }
@@ -24,37 +22,44 @@ void BrowsingDataCounter::Init(
   pref_.Init(
       GetPrefName(),
       profile_->GetPrefs(),
-      base::Bind(&BrowsingDataCounter::OnPrefChanged,
+      base::Bind(&BrowsingDataCounter::RestartCounting,
+                 base::Unretained(this)));
+  period_.Init(
+      prefs::kDeleteTimePeriod,
+      profile_->GetPrefs(),
+      base::Bind(&BrowsingDataCounter::RestartCounting,
                  base::Unretained(this)));
 
   initialized_ = true;
-  OnPrefChanged();
+  OnInitialized();
+  RestartCounting();
 }
 
-void BrowsingDataCounter::OnPrefChanged() {
+Profile* BrowsingDataCounter::GetProfile() const {
+  return profile_;
+}
+
+void BrowsingDataCounter::OnInitialized() {
+}
+
+base::Time BrowsingDataCounter::GetPeriodStart() {
+  return BrowsingDataRemover::CalculateBeginDeleteTime(
+      static_cast<BrowsingDataRemover::TimePeriod>(*period_));
+}
+
+void BrowsingDataCounter::RestartCounting() {
   DCHECK(initialized_);
 
   // If this data type was unchecked for deletion, we do not need to count it.
   if (!profile_->GetPrefs()->GetBoolean(GetPrefName()))
     return;
 
-  // If counting is already in progress, do not restart it.
-  if (counting_)
-    return;
-
   callback_.Run(false, 0u);
 
-  counting_ = true;
   Count();
-}
-
-// virtual
-void BrowsingDataCounter::Count() {
 }
 
 void BrowsingDataCounter::ReportResult(uint32 value) {
   DCHECK(initialized_);
-  DCHECK(counting_);
-  counting_ = false;
   callback_.Run(true, value);
 }

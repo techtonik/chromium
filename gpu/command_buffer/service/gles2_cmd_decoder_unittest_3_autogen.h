@@ -371,6 +371,8 @@ TEST_P(GLES2DecoderTest3, EndTransformFeedbackValidArgs) {
   decoder_->set_unsafe_es3_apis_enabled(false);
   EXPECT_EQ(error::kUnknownCommand, ExecuteCmd(cmd));
 }
+// TODO(gman): SetDisjointValueSyncCHROMIUM
+
 // TODO(gman): InsertEventMarkerEXT
 
 // TODO(gman): PushGroupMarkerEXT
@@ -413,6 +415,7 @@ TEST_P(GLES2DecoderTest3, PopGroupMarkerEXTValidArgs) {
 // TODO(gman): CopyTextureCHROMIUM
 // TODO(gman): CopySubTextureCHROMIUM
 // TODO(gman): CompressedCopyTextureCHROMIUM
+// TODO(gman): CompressedCopySubTextureCHROMIUM
 // TODO(gman): DrawArraysInstancedANGLE
 // TODO(gman): DrawElementsInstancedANGLE
 // TODO(gman): VertexAttribDivisorANGLE
@@ -453,14 +456,6 @@ TEST_P(GLES2DecoderTest3, IsValuebufferCHROMIUMInvalidArgsBadSharedMemoryId) {
 // TODO(gman): TraceBeginCHROMIUM
 
 // TODO(gman): TraceEndCHROMIUM
-// TODO(gman): AsyncTexSubImage2DCHROMIUM
-
-// TODO(gman): AsyncTexImage2DCHROMIUM
-
-// TODO(gman): WaitAsyncTexImage2DCHROMIUM
-
-// TODO(gman): WaitAllAsyncTexImage2DCHROMIUM
-
 // TODO(gman): LoseContextCHROMIUM
 // TODO(gman): InsertSyncPointCHROMIUM
 

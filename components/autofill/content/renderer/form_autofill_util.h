@@ -18,8 +18,8 @@ class GURL;
 namespace blink {
 class WebDocument;
 class WebElement;
-class WebFormElement;
 class WebFormControlElement;
+class WebFormElement;
 class WebFrame;
 class WebInputElement;
 class WebNode;
@@ -32,6 +32,7 @@ struct FormFieldData;
 struct WebElementDescriptor;
 
 // A bit field mask to extract data from WebFormControlElement.
+// Copied to components/autofill/ios/browser/resources/autofill_controller.js.
 enum ExtractMask {
   EXTRACT_NONE        = 0,
   EXTRACT_VALUE       = 1 << 0,  // Extract value from WebFormControlElement.
@@ -49,6 +50,7 @@ enum ExtractMask {
 // not relevant to Autofill: (1) the Netflix queue; (2) the Amazon wishlist;
 // (3) router configuration pages; and (4) other configuration pages, e.g. for
 // Google code project settings.
+// Copied to components/autofill/ios/browser/resources/autofill_controller.js.
 extern const size_t kMaxParseableFields;
 
 // Returns true if |element| is a month input element.
@@ -118,7 +120,20 @@ GetUnownedAutofillableFormFieldElements(
 // representation for |element|.
 // |extract_mask| usage and the return value are the same as
 // WebFormElementToFormData() above.
-bool UnownedFormElementsAndFieldSetsToFormData(
+// This function will return false and not perform any extraction if
+// |document| does not pertain to checkout.
+bool UnownedCheckoutFormElementsAndFieldSetsToFormData(
+    const std::vector<blink::WebElement>& fieldsets,
+    const std::vector<blink::WebFormControlElement>& control_elements,
+    const blink::WebFormControlElement* element,
+    const blink::WebDocument& document,
+    ExtractMask extract_mask,
+    FormData* form,
+    FormFieldData* field);
+
+// Same as above, but without the requirement that the elements only be
+// related to checkout.
+bool UnownedPasswordFormElementsAndFieldSetsToFormData(
     const std::vector<blink::WebElement>& fieldsets,
     const std::vector<blink::WebFormControlElement>& control_elements,
     const blink::WebFormControlElement* element,

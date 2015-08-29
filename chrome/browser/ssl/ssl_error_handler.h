@@ -11,6 +11,8 @@
 #include "base/macros.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/chrome_notification_types.h"
+#include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ssl/common_name_mismatch_handler.h"
 #include "chrome/browser/ssl/ssl_cert_reporter.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
@@ -19,34 +21,35 @@
 #include "net/ssl/ssl_info.h"
 #include "url/gurl.h"
 
+class Profile;
+class CommonNameMismatchHandler;
+
 namespace content {
 class RenderViewHost;
 class WebContents;
 }
 
-// This class is responsible for deciding whether to show an SSL warning or a
-// captive portal error page. It makes this decision by delaying the display of
-// SSL interstitial for a few seconds (2 by default), and waiting for a captive
-// portal result to arrive during this window. If a captive portal detected
-// result arrives in this window, a captive portal error page is shown.
-// Otherwise, an SSL interstitial is shown.
+// Decides between showing an SSL warning, showing a captive portal interstitial
+// or redirecting to a name-mismatch suggested URL. This is done by delaying the
+// display of the interstitial for a few seconds (2 by default), and waiting for
+// name-mismatch suggested URL or a captive portal result to arrive during this
+// window. If there is a name mismatch error and a corresponding suggested URL
+// available result arrives in this window, the user is redirected to the
+// suggested URL. Failing that, if a captive portal detected result arrives in
+// the same time window, a captive portal error page is shown. Otherwise, an
+// SSL interstitial is shown.
 //
-// An SSLErrorHandler is associated with a particular WebContents, and is
-// deleted if the WebContents is destroyed, or an interstitial is displayed.
-// It should only be used on the UI thread because its implementation uses
-// captive_portal::CaptivePortalService which can only be accessed on the UI
-// thread.
+// This class should only be used on the UI thread because its implementation
+// uses captive_portal::CaptivePortalService which can only be accessed on the
+// UI thread.
 class SSLErrorHandler : public content::WebContentsUserData<SSLErrorHandler>,
                         public content::WebContentsObserver,
                         public content::NotificationObserver {
  public:
-  // Type of the delay to display the SSL interstitial.
-  enum InterstitialDelayType {
-    NORMAL,  // Default interstitial timer delay used in production.
-    NONE,    // No interstitial timer delay (i.e. zero), used in tests.
-    LONG     // Very long interstitial timer delay (ie. an hour), used in tests.
-  };
+  typedef base::Callback<void(content::WebContents*)> TimerStartedCallback;
 
+  // Entry point for the class. The parameters are the same as SSLBlockingPage
+  // constructor.
   static void HandleSSLError(content::WebContents* web_contents,
                              int cert_error,
                              const net::SSLInfo& ssl_info,
@@ -55,13 +58,14 @@ class SSLErrorHandler : public content::WebContentsUserData<SSLErrorHandler>,
                              scoped_ptr<SSLCertReporter> ssl_cert_reporter,
                              const base::Callback<void(bool)>& callback);
 
-  static void SetInterstitialDelayTypeForTest(InterstitialDelayType delay);
+  static void SetInterstitialDelayForTest(base::TimeDelta delay);
 
-  typedef base::Callback<void(content::WebContents*)> TimerStartedCallback;
+  // The callback pointer must remain valid for the duration of error handling.
   static void SetInterstitialTimerStartedCallbackForTest(
       TimerStartedCallback* callback);
 
  protected:
+  // The parameters are the same as SSLBlockingPage's constructor.
   SSLErrorHandler(content::WebContents* web_contents,
                   int cert_error,
                   const net::SSLInfo& ssl_info,
@@ -80,16 +84,23 @@ class SSLErrorHandler : public content::WebContentsUserData<SSLErrorHandler>,
     return timer_;
   }
 
- private:
-  // Callback for the one-shot timer. When the timer expires, an SSL error is
-  // immediately displayed.
-  void OnTimerExpired();
-
   // These are virtual for tests:
   virtual void CheckForCaptivePortal();
+  virtual bool GetSuggestedUrl(const std::vector<std::string>& dns_names,
+                               GURL* suggested_url) const;
+  virtual void CheckSuggestedUrl(const GURL& suggested_url);
+  virtual void NavigateToSuggestedURL(const GURL& suggested_url);
+  virtual bool IsErrorOverridable() const;
   virtual void ShowCaptivePortalInterstitial(const GURL& landing_url);
   virtual void ShowSSLInterstitial();
 
+  // Gets the result of whether the suggested URL is valid. Displays
+  // common name mismatch interstitial or ssl interstitial accordingly.
+  void CommonNameMismatchHandlerCallback(
+      const CommonNameMismatchHandler::SuggestedUrlCheckResult& result,
+      const GURL& suggested_url);
+
+ private:
   // content::NotificationObserver:
   void Observe(
       int type,
@@ -114,9 +125,12 @@ class SSLErrorHandler : public content::WebContentsUserData<SSLErrorHandler>,
   const GURL request_url_;
   const int options_mask_;
   base::Callback<void(bool)> callback_;
+  Profile* const profile_;
 
   content::NotificationRegistrar registrar_;
   base::OneShotTimer<SSLErrorHandler> timer_;
+
+  scoped_ptr<CommonNameMismatchHandler> common_name_mismatch_handler_;
 
   scoped_ptr<SSLCertReporter> ssl_cert_reporter_;
 

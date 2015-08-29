@@ -356,6 +356,9 @@ class CC_EXPORT LayerTreeHost : public MutatorHostClient {
   bool HasPotentiallyRunningFilterAnimation(const Layer* layer) const;
   bool HasPotentiallyRunningOpacityAnimation(const Layer* layer) const;
   bool HasPotentiallyRunningTransformAnimation(const Layer* layer) const;
+  bool HasOnlyTranslationTransforms(const Layer* layer) const;
+  bool MaximumTargetScale(const Layer* layer, float* max_scale) const;
+  bool AnimationStartScale(const Layer* layer, float* start_scale) const;
   bool HasAnyAnimationTargetingProperty(
       const Layer* layer,
       Animation::TargetProperty property) const;
@@ -398,8 +401,6 @@ class CC_EXPORT LayerTreeHost : public MutatorHostClient {
 
   bool DoUpdateLayers(Layer* root_layer);
   void UpdateHudLayer();
-
-  void ReduceMemoryUsage();
 
   bool AnimateLayersRecursive(Layer* current, base::TimeTicks time);
 

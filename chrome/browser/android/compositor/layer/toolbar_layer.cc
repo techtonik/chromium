@@ -11,9 +11,6 @@
 #include "ui/android/resources/resource_manager.h"
 #include "ui/android/resources/ui_resource_android.h"
 
-const SkColor kNormalAnonymizeContentColor = SK_ColorWHITE;
-const SkColor kIncognitoAnonymizeContentColor = 0xFF737373;
-
 namespace chrome {
 namespace android {
 
@@ -29,8 +26,9 @@ scoped_refptr<cc::Layer> ToolbarLayer::layer() {
 void ToolbarLayer::PushResource(
     ui::ResourceManager::Resource* resource,
     bool anonymize,
-    bool anonymize_component_is_incognito,
-    bool show_debug) {
+    int toolbar_textbox_background_color,
+    bool show_debug,
+    float brightness) {
   DCHECK(resource);
 
   // This layer effectively draws over the space it takes for shadows.  Set the
@@ -44,9 +42,7 @@ void ToolbarLayer::PushResource(
   if (anonymize) {
     anonymize_layer_->SetPosition(resource->aperture.origin());
     anonymize_layer_->SetBounds(resource->aperture.size());
-    anonymize_layer_->SetBackgroundColor(anonymize_component_is_incognito
-                                             ? kIncognitoAnonymizeContentColor
-                                             : kNormalAnonymizeContentColor);
+    anonymize_layer_->SetBackgroundColor(toolbar_textbox_background_color);
   }
 
   debug_layer_->SetBounds(resource->size);
@@ -54,6 +50,14 @@ void ToolbarLayer::PushResource(
     layer_->AddChild(debug_layer_);
   else if (!show_debug && debug_layer_->parent())
     debug_layer_->RemoveFromParent();
+
+  if (brightness != brightness_) {
+    brightness_ = brightness;
+    cc::FilterOperations filters;
+    if (brightness_ < 1.f)
+      filters.Append(cc::FilterOperation::CreateBrightnessFilter(brightness_));
+    layer_->SetFilters(filters);
+  }
 }
 
 void ToolbarLayer::UpdateProgressBar(int progress_bar_x,
@@ -102,7 +106,8 @@ ToolbarLayer::ToolbarLayer()
       anonymize_layer_(
           cc::SolidColorLayer::Create(content::Compositor::LayerSettings())),
       debug_layer_(
-          cc::SolidColorLayer::Create(content::Compositor::LayerSettings())) {
+          cc::SolidColorLayer::Create(content::Compositor::LayerSettings())),
+      brightness_(1.f) {
   bitmap_layer_->SetIsDrawable(true);
   layer_->AddChild(bitmap_layer_);
 
@@ -115,7 +120,7 @@ ToolbarLayer::ToolbarLayer()
   layer_->AddChild(progress_bar_layer_);
 
   anonymize_layer_->SetIsDrawable(true);
-  anonymize_layer_->SetBackgroundColor(kNormalAnonymizeContentColor);
+  anonymize_layer_->SetBackgroundColor(SK_ColorWHITE);
   layer_->AddChild(anonymize_layer_);
 
   debug_layer_->SetIsDrawable(true);

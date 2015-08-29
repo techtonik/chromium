@@ -15,20 +15,16 @@
 #include "base/timer/elapsed_timer.h"
 #include "base/values.h"
 #include "base/version.h"
-#include "chrome/browser/browser_process.h"
-#include "chrome/browser/metrics/variations/generated_resources_map.h"
-#include "chrome/common/channel_info.h"
-#include "chrome/common/chrome_switches.h"
-#include "chrome/common/pref_names.h"
 #include "components/metrics/metrics_state_manager.h"
 #include "components/network_time/network_time_tracker.h"
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "components/variations/pref_names.h"
 #include "components/variations/proto/variations_seed.pb.h"
 #include "components/variations/variations_seed_processor.h"
 #include "components/variations/variations_seed_simulator.h"
+#include "components/variations/variations_switches.h"
 #include "components/variations/variations_url_constants.h"
 #include "components/version_info/version_info.h"
-#include "content/public/browser/browser_thread.h"
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
 #include "net/base/network_change_notifier.h"
@@ -39,12 +35,7 @@
 #include "net/url_request/url_fetcher.h"
 #include "net/url_request/url_request_status.h"
 #include "ui/base/device_form_factor.h"
-#include "ui/base/resource/resource_bundle.h"
 #include "url/gurl.h"
-
-#if !defined(OS_ANDROID) && !defined(OS_IOS) && !defined(OS_CHROMEOS)
-#include "chrome/browser/upgrade_detector_impl.h"
-#endif
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/settings/cros_settings.h"
@@ -65,8 +56,9 @@ const int64 kServerTimeResolutionMs = 1000;
 // that channel value. Otherwise, if the fake channel flag is provided, this
 // will return the fake channel. Failing that, this will return the UNKNOWN
 // channel.
-variations::Study_Channel GetChannelForVariations() {
-  switch (chrome::GetChannel()) {
+variations::Study_Channel GetChannelForVariations(
+    version_info::Channel product_channel) {
+  switch (product_channel) {
     case version_info::Channel::CANARY:
       return variations::Study_Channel_CANARY;
     case version_info::Channel::DEV:
@@ -113,21 +105,6 @@ std::string GetPlatformString() {
 #else
 #error Unknown platform
 #endif
-}
-
-// Gets the version number to use for variations seed simulation. Must be called
-// on a thread where IO is allowed.
-base::Version GetVersionForSimulation() {
-#if !defined(OS_ANDROID) && !defined(OS_IOS) && !defined(OS_CHROMEOS)
-  const base::Version installed_version =
-      UpgradeDetectorImpl::GetCurrentlyInstalledVersion();
-  if (installed_version.IsValid())
-    return installed_version;
-#endif  // !defined(OS_ANDROID) && !defined(OS_IOS) && !defined(OS_CHROMEOS)
-
-  // TODO(asvitkine): Get the version that will be used on restart instead of
-  // the current version on Android, iOS and ChromeOS.
-  return base::Version(version_info::GetVersionNumber());
 }
 
 // Gets the restrict parameter from |policy_pref_service| or from Chrome OS
@@ -229,24 +206,15 @@ std::string GetHeaderValue(const net::HttpResponseHeaders* headers,
   return value;
 }
 
-// Overrides the string resource sepecified by |hash| with |string| in the
-// resource bundle. Used as a callback passed to the variations seed processor.
-void OverrideUIString(uint32_t hash, const base::string16& string) {
-  int resource_id = GetResourceIndex(hash);
-  if (resource_id == -1)
-    return;
-
-  ui::ResourceBundle::GetSharedInstance().OverrideLocaleStringResource(
-      resource_id, string);
-}
-
 }  // namespace
 
 VariationsService::VariationsService(
+    scoped_ptr<VariationsServiceClient> client,
     web_resource::ResourceRequestAllowedNotifier* notifier,
     PrefService* local_state,
     metrics::MetricsStateManager* state_manager)
-    : local_state_(local_state),
+    : client_(client.Pass()),
+      local_state_(local_state),
       state_manager_(state_manager),
       policy_pref_service_(local_state),
       seed_store_(local_state),
@@ -275,17 +243,21 @@ bool VariationsService::CreateTrialsFromSeed() {
   if (!current_version.IsValid())
     return false;
 
-  variations::Study_Channel channel = GetChannelForVariations();
+  variations::Study_Channel channel =
+      GetChannelForVariations(client_->GetChannel());
   UMA_HISTOGRAM_SPARSE_SLOWLY("Variations.UserChannel", channel);
 
   const std::string latest_country =
       local_state_->GetString(prefs::kVariationsCountry);
+  // Note that passing |client_| via base::Unretained below is safe because
+  // the callback is executed synchronously.
   variations::VariationsSeedProcessor().CreateTrialsFromSeed(
-      seed, g_browser_process->GetApplicationLocale(),
+      seed, client_->GetApplicationLocale(),
       GetReferenceDateForExpiryChecks(local_state_), current_version, channel,
       GetCurrentFormFactor(), GetHardwareClass(), latest_country,
       LoadPermanentConsistencyCountry(current_version, latest_country),
-      base::Bind(&OverrideUIString));
+      base::Bind(&VariationsServiceClient::OverrideUIString,
+                 base::Unretained(client_.get())));
 
   const base::Time now = base::Time::Now();
 
@@ -332,6 +304,13 @@ bool VariationsService::CreateTrialsFromSeed() {
   return true;
 }
 
+void VariationsService::PerformPreMainMessageLoopStartup() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+  StartRepeatedVariationsSeedFetch();
+  client_->OnInitialStartup();
+}
+
 void VariationsService::StartRepeatedVariationsSeedFetch() {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -372,13 +351,6 @@ void VariationsService::OnAppEnterForeground() {
     StartRepeatedVariationsSeedFetch();
   request_scheduler_->OnAppEnterForeground();
 }
-
-#if defined(OS_WIN)
-void VariationsService::StartGoogleUpdateRegistrySync() {
-  DCHECK(thread_checker_.CalledOnValidThread());
-  registry_syncer_.RequestRegistrySync();
-}
-#endif
 
 void VariationsService::SetRestrictMode(const std::string& restrict_mode) {
   DCHECK(thread_checker_.CalledOnValidThread());
@@ -448,8 +420,10 @@ void VariationsService::RegisterProfilePrefs(
 
 // static
 scoped_ptr<VariationsService> VariationsService::Create(
+    scoped_ptr<VariationsServiceClient> client,
     PrefService* local_state,
-    metrics::MetricsStateManager* state_manager) {
+    metrics::MetricsStateManager* state_manager,
+    const char* disable_network_switch) {
   scoped_ptr<VariationsService> result;
 #if !defined(GOOGLE_CHROME_BUILD)
   // Unless the URL was provided, unsupported builds should return NULL to
@@ -462,8 +436,8 @@ scoped_ptr<VariationsService> VariationsService::Create(
   }
 #endif
   result.reset(new VariationsService(
-      new web_resource::ResourceRequestAllowedNotifier(
-          local_state, switches::kDisableBackgroundNetworking),
+      client.Pass(), new web_resource::ResourceRequestAllowedNotifier(
+                         local_state, disable_network_switch),
       local_state, state_manager));
   return result.Pass();
 }
@@ -476,8 +450,7 @@ void VariationsService::DoActualFetch() {
                                                   net::URLFetcher::GET, this);
   pending_seed_request_->SetLoadFlags(net::LOAD_DO_NOT_SEND_COOKIES |
                                       net::LOAD_DO_NOT_SAVE_COOKIES);
-  pending_seed_request_->SetRequestContext(
-      g_browser_process->system_request_context());
+  pending_seed_request_->SetRequestContext(client_->GetURLRequestContext());
   pending_seed_request_->SetMaxRetriesOn5xx(kMaxRetrySeedFetch);
   if (!seed_store_.variations_serial_number().empty() &&
       !disable_deltas_for_next_request_) {
@@ -532,9 +505,8 @@ bool VariationsService::StoreSeed(const std::string& seed_data,
     return true;
 
   base::PostTaskAndReplyWithResult(
-      content::BrowserThread::GetBlockingPool(),
-      FROM_HERE,
-      base::Bind(&GetVersionForSimulation),
+      client_->GetBlockingPool(), FROM_HERE,
+      client_->GetVersionForSimulationCallback(),
       base::Bind(&VariationsService::PerformSimulationWithVersion,
                  weak_ptr_factory_.GetWeakPtr(), base::Passed(&seed)));
   return true;
@@ -606,10 +578,9 @@ void VariationsService::OnURLFetchComplete(const net::URLFetcher* source) {
     DCHECK(success || response_date.is_null());
 
     if (!response_date.is_null()) {
-      g_browser_process->network_time_tracker()->UpdateNetworkTime(
+      client_->GetNetworkTimeTracker()->UpdateNetworkTime(
           response_date,
-          base::TimeDelta::FromMilliseconds(kServerTimeResolutionMs),
-          latency,
+          base::TimeDelta::FromMilliseconds(kServerTimeResolutionMs), latency,
           base::TimeTicks::Now());
     }
   }
@@ -678,10 +649,10 @@ void VariationsService::PerformSimulationWithVersion(
       local_state_->GetString(prefs::kVariationsCountry);
   const variations::VariationsSeedSimulator::Result result =
       seed_simulator.SimulateSeedStudies(
-          *seed, g_browser_process->GetApplicationLocale(),
+          *seed, client_->GetApplicationLocale(),
           GetReferenceDateForExpiryChecks(local_state_), version,
-          GetChannelForVariations(), GetCurrentFormFactor(), GetHardwareClass(),
-          latest_country,
+          GetChannelForVariations(client_->GetChannel()),
+          GetCurrentFormFactor(), GetHardwareClass(), latest_country,
           LoadPermanentConsistencyCountry(version, latest_country));
 
   UMA_HISTOGRAM_COUNTS_100("Variations.SimulateSeed.NormalChanges",

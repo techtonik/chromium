@@ -136,7 +136,6 @@ extern const char kWebKitPluginsEnabled[];
 extern const char kWebKitDomPasteEnabled[];
 extern const char kWebKitUsesUniversalDetector[];
 extern const char kWebKitTextAreasAreResizable[];
-extern const char kWebKitJavaEnabled[];
 extern const char kWebkitTabsToLinks[];
 extern const char kWebKitAllowDisplayingInsecureContent[];
 extern const char kWebKitAllowRunningInsecureContent[];
@@ -313,7 +312,7 @@ extern const char kPluginsDisabledPlugins[];
 extern const char kPluginsDisabledPluginsExceptions[];
 extern const char kPluginsEnabledPlugins[];
 extern const char kNpapiFlashMigratedToPepperFlash[];
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_PLUGINS)
 extern const char kPluginsShowDetails[];
 #endif
 extern const char kPluginsAllowOutdated[];
@@ -328,14 +327,11 @@ extern const char kDefaultBrowserSettingEnabled[];
 extern const char kShowUpdatePromotionInfoBar[];
 #endif
 extern const char kUseCustomChromeFrame[];
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_PLUGINS)
 extern const char kContentSettingsPluginWhitelist[];
 #endif
-extern const char kClearSiteDataOnExit[];
 extern const char kPartitionDefaultZoomLevel[];
-extern const char kDefaultZoomLevelDeprecated[];
 extern const char kPartitionPerHostZoomLevels[];
-extern const char kPerHostZoomLevelsDeprecated[];
 extern const char kAutofillDialogAutofillDefault[];
 extern const char kAutofillDialogPayWithoutWallet[];
 extern const char kAutofillDialogWalletLocationAcceptance[];
@@ -416,6 +412,7 @@ extern const char kToolbarIconSurfacingBubbleLastShowTime[];
 
 #if defined(ENABLE_WEBRTC)
 extern const char kWebRTCMultipleRoutesEnabled[];
+extern const char kWebRTCNonProxiedUdpTransportEnabled[];
 #endif
 
 // Local state prefs. Please add Profile prefs above instead.
@@ -439,15 +436,6 @@ extern const char kMetricsReportingEnabled[];
 #if defined(OS_ANDROID)
 extern const char kCrashReportingEnabled[];
 #endif
-
-extern const char kVariationsCompressedSeed[];
-extern const char kVariationsLastFetchTime[];
-extern const char kVariationsPermanentConsistencyCountry[];
-extern const char kVariationsCountry[];
-extern const char kVariationsRestrictParameter[];
-extern const char kVariationsSeed[];
-extern const char kVariationsSeedDate[];
-extern const char kVariationsSeedSignature[];
 
 extern const char kDeviceOpenNetworkConfiguration[];
 

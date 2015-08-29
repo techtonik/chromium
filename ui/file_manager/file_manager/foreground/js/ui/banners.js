@@ -171,7 +171,7 @@ Banners.prototype.prepareAndShowWelcomeBanner_ = function(type, messageId) {
   this.showWelcomeBanner_(type);
 
   var container = queryRequiredElement(
-      this.document_, '.drive-welcome.' + type);
+      '.drive-welcome.' + type, this.document_);
   if (container.firstElementChild)
     return;  // Do not re-create.
 
@@ -201,7 +201,7 @@ Banners.prototype.prepareAndShowWelcomeBanner_ = function(type, messageId) {
   var text = util.createChild(message, 'drive-welcome-text');
   text.innerHTML = str(messageId);
 
-  var links = util.createChild(wrapper, 'drive-welcome-links');
+  var links = util.createChild(message, 'drive-welcome-links');
 
   var more;
   if (this.usePromoWelcomeBanner_) {

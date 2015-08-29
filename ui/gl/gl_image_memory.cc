@@ -45,9 +45,9 @@ bool ValidFormat(BufferFormat format) {
     case BufferFormat::RGBA_8888:
     case BufferFormat::BGRA_8888:
       return true;
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       return false;
   }
 
@@ -67,9 +67,9 @@ bool IsCompressedFormat(BufferFormat format) {
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
     case BufferFormat::BGRA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       return false;
   }
 
@@ -96,9 +96,9 @@ GLenum TextureFormat(BufferFormat format) {
       return GL_RGBA;
     case BufferFormat::BGRA_8888:
       return GL_BGRA_EXT;
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       NOTREACHED();
       return 0;
   }
@@ -124,9 +124,9 @@ GLenum DataType(BufferFormat format) {
     case BufferFormat::DXT1:
     case BufferFormat::DXT5:
     case BufferFormat::ETC1:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       NOTREACHED();
       return 0;
   }
@@ -205,9 +205,9 @@ bool GLImageMemory::StrideInBytes(size_t width,
         return false;
       *stride_in_bytes = checked_stride.ValueOrDie();
       return true;
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       NOTREACHED();
       return false;
   }
@@ -441,6 +441,19 @@ void GLImageMemory::DoBindTexImage(unsigned target) {
                  DataType(format_),
                  memory_);
   }
+}
+
+void GLImageMemory::OnMemoryDump(base::trace_event::ProcessMemoryDump* pmd,
+                                 uint64_t process_tracing_id,
+                                 const std::string& dump_name) {
+  // Log size 0 if |ref_counted_memory_| has been released.
+  size_t size_in_bytes = memory_ ? SizeInBytes(size_, format_) : 0;
+
+  base::trace_event::MemoryAllocatorDump* dump =
+      pmd->CreateAllocatorDump(dump_name);
+  dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
+                  base::trace_event::MemoryAllocatorDump::kUnitsBytes,
+                  static_cast<uint64_t>(size_in_bytes));
 }
 
 }  // namespace gfx

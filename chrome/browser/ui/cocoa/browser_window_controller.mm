@@ -35,11 +35,13 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_command_controller.h"
 #include "chrome/browser/ui/browser_commands.h"
+#include "chrome/browser/ui/browser_dialogs.h"
 #include "chrome/browser/ui/browser_instant_controller.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window_state.h"
 #import "chrome/browser/ui/cocoa/background_gradient_view.h"
 #import "chrome/browser/ui/cocoa/bookmarks/bookmark_bar_controller.h"
+#import "chrome/browser/ui/cocoa/bookmarks/bookmark_bubble_observer_cocoa.h"
 #import "chrome/browser/ui/cocoa/bookmarks/bookmark_editor_controller.h"
 #import "chrome/browser/ui/cocoa/browser_window_cocoa.h"
 #import "chrome/browser/ui/cocoa/browser_window_controller_private.h"
@@ -95,6 +97,7 @@
 #import "ui/base/cocoa/nsview_additions.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
+#import "ui/gfx/mac/coordinate_conversion.h"
 #include "ui/gfx/mac/scoped_cocoa_disable_screen_updates.h"
 
 using bookmarks::BookmarkModel;
@@ -603,7 +606,8 @@ using content::WebContents;
     [self saveWindowPositionIfNeeded];
   }
 
-  [[[self window] contentView] cr_recursivelyInvokeBlock:^(id view) {
+  NSView* rootView = [[[self window] contentView] superview];
+  [rootView cr_recursivelyInvokeBlock:^(id view) {
       if ([view conformsToProtocol:@protocol(ThemedWindowDrawing)])
         [view windowDidChangeActive];
   }];
@@ -613,7 +617,8 @@ using content::WebContents;
 }
 
 - (void)windowDidResignMain:(NSNotification*)notification {
-  [[[self window] contentView] cr_recursivelyInvokeBlock:^(id view) {
+  NSView* rootView = [[[self window] contentView] superview];
+  [rootView cr_recursivelyInvokeBlock:^(id view) {
       if ([view conformsToProtocol:@protocol(ThemedWindowDrawing)])
         [view windowDidChangeActive];
   }];
@@ -1766,36 +1771,39 @@ using content::WebContents;
 // Show the bookmark bubble (e.g. user just clicked on the STAR).
 - (void)showBookmarkBubbleForURL:(const GURL&)url
                alreadyBookmarked:(BOOL)alreadyMarked {
-  if (!bookmarkBubbleController_) {
+  if (bookmarkBubbleObserver_.get())
+    return;
+
+  bookmarkBubbleObserver_.reset(new BookmarkBubbleObserverCocoa(self));
+
+  if (chrome::ToolkitViewsDialogsEnabled()) {
+    chrome::ShowBookmarkBubbleViewsAtPoint(
+        gfx::ScreenPointFromNSPoint(
+            [[self window] convertBaseToScreen:[self bookmarkBubblePoint]]),
+        [[self window] contentView], bookmarkBubbleObserver_.get(),
+        browser_.get(), url, alreadyMarked);
+  } else {
     BookmarkModel* model =
         BookmarkModelFactory::GetForProfile(browser_->profile());
     bookmarks::ManagedBookmarkService* managed =
         ManagedBookmarkServiceFactory::GetForProfile(browser_->profile());
     const BookmarkNode* node = model->GetMostRecentlyAddedUserNodeForURL(url);
-    bookmarkBubbleController_ =
-        [[BookmarkBubbleController alloc] initWithParentWindow:[self window]
-                                                       managed:managed
-                                                         model:model
-                                                          node:node
-                                             alreadyBookmarked:alreadyMarked];
+    bookmarkBubbleController_ = [[BookmarkBubbleController alloc]
+        initWithParentWindow:[self window]
+              bubbleObserver:bookmarkBubbleObserver_.get()
+                     managed:managed
+                       model:model
+                        node:node
+           alreadyBookmarked:alreadyMarked];
     [bookmarkBubbleController_ showWindow:self];
-    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
-    [center addObserver:self
-               selector:@selector(bookmarkBubbleWindowWillClose:)
-                   name:NSWindowWillCloseNotification
-                 object:[bookmarkBubbleController_ window]];
   }
+  DCHECK(bookmarkBubbleObserver_);
 }
 
-// Nil out the weak bookmark bubble controller reference.
-- (void)bookmarkBubbleWindowWillClose:(NSNotification*)notification {
-  DCHECK_EQ([notification object], [bookmarkBubbleController_ window]);
-
-  NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
-  [center removeObserver:self
-                    name:NSWindowWillCloseNotification
-                  object:[bookmarkBubbleController_ window]];
+- (void)bookmarkBubbleClosed {
+  // Nil out the weak bookmark bubble controller reference.
   bookmarkBubbleController_ = nil;
+  bookmarkBubbleObserver_.reset();
 }
 
 // Handle the editBookmarkNode: action sent from bookmark bubble controllers.
@@ -2151,9 +2159,10 @@ willAnimateFromState:(BookmarkBar::State)oldState
 }
 
 - (BOOL)isInAppKitFullscreen {
-  return ([[self window] styleMask] & NSFullScreenWindowMask) ==
-             NSFullScreenWindowMask ||
-         enteringAppKitFullscreen_;
+  return !exitingAppKitFullscreen_ &&
+         (([[self window] styleMask] & NSFullScreenWindowMask) ==
+              NSFullScreenWindowMask ||
+          enteringAppKitFullscreen_);
 }
 
 - (void)enterExtensionFullscreenForURL:(const GURL&)url

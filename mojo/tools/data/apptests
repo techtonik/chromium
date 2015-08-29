@@ -56,28 +56,23 @@ if config.target_os != config.OS_ANDROID:
       'test': 'mojo:html_viewer_apptests',
       'name': 'mojo:html_viewer_apptests',
       'type': 'gtest_isolated',
-      'args': ['--use-test-config']
+      'args': ['--enable-html-viewer-test-interface',
+               '--override-use-gl-with-osmesa-for-tests']
     },
     {
       'test': 'mojo:html_viewer_apptests',
-      'name': 'mojo:html_viewer_apptests OOPIFS',
+      'name': 'mojo:html_viewer_apptests new frame',
       'type': 'gtest_isolated',
-      'args': ['--use-test-config', '--oopifs',
-               '--enable-html-viewer-test-interface']
+      'args': ['--oopif-always-create-new-frame-tree',
+               '--enable-html-viewer-test-interface',
+               '--override-use-gl-with-osmesa-for-tests']
     },
-    {
-      'test': 'mojo:html_viewer_apptests',
-      'name': 'mojo:html_viewer_apptests OOPIFS new frame',
-      'type': 'gtest_isolated',
-      'args': ['--use-test-config', '--oopifs',
-               '--oopif-always-create-new-frame-tree',
-               '--enable-html-viewer-test-interface']
-    },
-    {
-      'test': 'mojo:mandoline_browser_apptests',
-      'type': 'gtest_isolated',
-      'args': ['--use-headless-config']
-    },
+    # TODO(ben): These tests are disabled pending mandoline:browser refactoring.
+    #{
+    #  'test': 'mojo:mandoline_browser_apptests',
+    #  'type': 'gtest_isolated',
+    #  'args': ['--use-headless-config']
+    #},
     {
       'test': 'mojo:mandoline_frame_apptests',
       'type': 'gtest_isolated',

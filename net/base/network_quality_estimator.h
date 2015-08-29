@@ -16,6 +16,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/threading/thread_checker.h"
 #include "base/time/time.h"
+#include "net/base/external_estimate_provider.h"
 #include "net/base/net_export.h"
 #include "net/base/network_change_notifier.h"
 
@@ -32,23 +33,26 @@ class URLRequest;
 // thereby increasing the single NQE instance's accuracy by providing more
 // observed traffic characteristics.
 class NET_EXPORT_PRIVATE NetworkQualityEstimator
-    : public NetworkChangeNotifier::ConnectionTypeObserver {
+    : public NetworkChangeNotifier::ConnectionTypeObserver,
+      public ExternalEstimateProvider::UpdatedEstimateDelegate {
  public:
   // Creates a new NetworkQualityEstimator.
   // |variation_params| is the map containing all field trial parameters
   // related to NetworkQualityEstimator field trial.
-  explicit NetworkQualityEstimator(
+  // |external_estimates_provider| may be NULL.
+  NetworkQualityEstimator(
+      scoped_ptr<ExternalEstimateProvider> external_estimates_provider,
       const std::map<std::string, std::string>& variation_params);
 
   ~NetworkQualityEstimator() override;
 
   // Returns true if RTT is available and sets |rtt| to estimated RTT.
-  // Virtualized for testing.
+  // Virtualized for testing. |rtt| should not be null.
   virtual bool GetRTTEstimate(base::TimeDelta* rtt) const;
 
   // Returns true if downlink throughput is available and sets |kbps| to
   // estimated downlink throughput (in Kilobits per second).
-  // Virtualized for testing.
+  // Virtualized for testing. |kbps| should not be null.
   virtual bool GetDownlinkThroughputKbpsEstimate(int32_t* kbps) const;
 
   // Notifies NetworkQualityEstimator that the response header of |request| has
@@ -61,8 +65,16 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
 
   // Returns true if median RTT is available and sets |rtt| to the median of
   // RTT observations since |begin_timestamp|.
-  bool GetMedianRTTSince(const base::TimeTicks& begin_timestamp,
-                         base::TimeDelta* rtt) const;
+  // Virtualized for testing. |rtt| should not be null.
+  virtual bool GetRecentMedianRTT(const base::TimeTicks& begin_timestamp,
+                                  base::TimeDelta* rtt) const;
+
+  // Returns true if median downstream throughput is available and sets |kbps|
+  // to the median of downstream Kbps observations since |begin_timestamp|.
+  // Virtualized for testing. |kbps| should not be null.
+  virtual bool GetRecentMedianDownlinkThroughputKbps(
+      const base::TimeTicks& begin_timestamp,
+      int32_t* kbps) const;
 
  protected:
   // NetworkID is used to uniquely identify a network.
@@ -105,6 +117,7 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // Construct a NetworkQualityEstimator instance allowing for test
   // configuration. Registers for network type change notifications so estimates
   // can be kept network specific.
+  // |external_estimates_provider| may be NULL.
   // |variation_params| is the map containing all field trial parameters for the
   // network quality estimator field trial.
   // |allow_local_host_requests_for_tests| should only be true when testing
@@ -115,6 +128,7 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // |kMinRequestDurationMicroseconds| to be used for network quality
   // estimation.
   NetworkQualityEstimator(
+      scoped_ptr<ExternalEstimateProvider> external_estimates_provider,
       const std::map<std::string, std::string>& variation_params,
       bool allow_local_host_requests_for_tests,
       bool allow_smaller_responses_for_tests);
@@ -333,6 +347,9 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // should discard RTT if it is set to the value returned by |InvalidRTT()|.
   static const base::TimeDelta InvalidRTT();
 
+  // ExternalEstimateProvider::UpdatedEstimateObserver implementation.
+  void OnUpdatedEstimateAvailable() override;
+
   // Obtains operating parameters from the field trial parameters.
   void ObtainOperatingParams(
       const std::map<std::string, std::string>& variation_params);
@@ -410,6 +427,10 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
 
   // Estimated network quality. Updated on mainframe requests.
   NetworkQuality estimated_median_network_quality_;
+
+  // ExternalEstimateProvider that provides network quality using operating
+  // system APIs. May be NULL.
+  const scoped_ptr<ExternalEstimateProvider> external_estimates_provider_;
 
   base::ThreadChecker thread_checker_;
 

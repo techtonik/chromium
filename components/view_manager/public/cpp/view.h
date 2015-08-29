@@ -11,8 +11,8 @@
 #include "base/observer_list.h"
 #include "components/view_manager/public/cpp/types.h"
 #include "components/view_manager/public/interfaces/surface_id.mojom.h"
-#include "components/view_manager/public/interfaces/view_manager.mojom.h"
 #include "components/view_manager/public/interfaces/view_manager_constants.mojom.h"
+#include "components/view_manager/public/interfaces/view_tree.mojom.h"
 #include "mojo/application/public/interfaces/service_provider.mojom.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/array.h"
 #include "third_party/mojo/src/mojo/public/cpp/system/macros.h"
@@ -22,15 +22,16 @@ namespace mojo {
 
 class ServiceProviderImpl;
 class View;
-class ViewManager;
 class ViewObserver;
+class ViewSurface;
+class ViewTreeConnection;
 
 // Defined in view_property.h (which we do not include)
 template <typename T>
 struct ViewProperty;
 
-// Views are owned by the ViewManager. See ViewManagerDelegate for details on
-// ownership.
+// Views are owned by the ViewTreeConnection. See ViewTreeDelegate for details
+// on ownership.
 //
 // TODO(beng): Right now, you'll have to implement a ViewObserver to track
 //             destruction and NULL any pointers you have.
@@ -46,7 +47,7 @@ class View {
   // observers are notified and the View is immediately deleted.
   void Destroy();
 
-  ViewManager* view_manager() { return manager_; }
+  ViewTreeConnection* connection() { return connection_; }
 
   // Configuration.
   Id id() const { return id_; }
@@ -60,6 +61,8 @@ class View {
   void SetVisible(bool value);
 
   const ViewportMetrics& viewport_metrics() { return *viewport_metrics_; }
+
+  scoped_ptr<ViewSurface> RequestSurface();
 
   // Returns the set of string to bag of byte properties. These properties are
   // shared with the view manager.
@@ -123,8 +126,6 @@ class View {
 
   View* GetChildById(Id id);
 
-  void SetSurfaceId(SurfaceIdPtr id);
-
   void SetTextInputState(TextInputStatePtr state);
   void SetImeVisibility(bool visible, TextInputStatePtr state);
 
@@ -132,9 +133,8 @@ class View {
   void SetFocus();
   bool HasFocus() const;
 
-  // Embedding. See view_manager.mojom for details.
-  void Embed(ViewManagerClientPtr client);
-  void EmbedAllowingReembed(mojo::URLRequestPtr request);
+  // Embedding. See view_tree.mojom for details.
+  void Embed(ViewTreeClientPtr client);
 
  protected:
   // This class is subclassed only by test classes that provide a public ctor.
@@ -143,9 +143,9 @@ class View {
 
  private:
   friend class ViewPrivate;
-  friend class ViewManagerClientImpl;
+  friend class ViewTreeClientImpl;
 
-  View(ViewManager* manager, Id id);
+  View(ViewTreeConnection* connection, Id id);
 
   // Called by the public {Set,Get,Clear}Property functions.
   int64_t SetLocalPropertyInternal(const void* key,
@@ -183,7 +183,7 @@ class View {
   // the children are removed.
   bool PrepareForEmbed();
 
-  ViewManager* manager_;
+  ViewTreeConnection* connection_;
   Id id_;
   View* parent_;
   Children children_;

@@ -4,7 +4,7 @@
 
 #include "mandoline/ui/aura/window_tree_host_mojo.h"
 
-#include "components/view_manager/public/cpp/view_manager.h"
+#include "components/view_manager/public/cpp/view_tree_connection.h"
 #include "mandoline/ui/aura/input_method_mandoline.h"
 #include "mandoline/ui/aura/surface_context_factory.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
@@ -31,11 +31,12 @@ WindowTreeHostMojo::WindowTreeHostMojo(mojo::Shell* shell, mojo::View* view)
   ui::ContextFactory* default_context_factory =
       aura::Env::GetInstance()->context_factory();
   aura::Env::GetInstance()->set_context_factory(context_factory_.get());
-  CreateCompositor(GetAcceleratedWidget());
+  CreateCompositor();
+  OnAcceleratedWidgetAvailable();
   aura::Env::GetInstance()->set_context_factory(default_context_factory);
   DCHECK_EQ(context_factory_.get(), compositor()->context_factory());
 
-  input_method_.reset(new InputMethodMandoline(this));
+  input_method_.reset(new InputMethodMandoline(this, view_));
   SetSharedInputMethod(input_method_.get());
 }
 

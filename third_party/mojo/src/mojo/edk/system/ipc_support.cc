@@ -140,9 +140,11 @@ embedder::ScopedPlatformHandle IPCSupport::ConnectToSlaveInternal(
                                  connection_id);
 
   system::ProcessIdentifier peer_id = system::kInvalidProcessIdentifier;
+  bool is_first;
   embedder::ScopedPlatformHandle platform_connection_handle;
-  CHECK(connection_manager()->Connect(connection_id, &peer_id,
-                                      &platform_connection_handle));
+  CHECK_EQ(connection_manager()->Connect(connection_id, &peer_id, &is_first,
+                                         &platform_connection_handle),
+           ConnectionManager::Result::SUCCESS_CONNECT_NEW_CONNECTION);
   DCHECK_EQ(peer_id, *slave_process_identifier);
   DCHECK(platform_connection_handle.is_valid());
   return platform_connection_handle;
@@ -152,10 +154,12 @@ embedder::ScopedPlatformHandle IPCSupport::ConnectToMasterInternal(
     const ConnectionIdentifier& connection_id) {
   DCHECK_EQ(process_type_, embedder::ProcessType::SLAVE);
 
-  system::ProcessIdentifier peer_id;
+  system::ProcessIdentifier peer_id = system::kInvalidProcessIdentifier;
+  bool is_first;
   embedder::ScopedPlatformHandle platform_connection_handle;
-  CHECK(connection_manager()->Connect(connection_id, &peer_id,
-                                      &platform_connection_handle));
+  CHECK_EQ(connection_manager()->Connect(connection_id, &peer_id, &is_first,
+                                         &platform_connection_handle),
+           ConnectionManager::Result::SUCCESS_CONNECT_NEW_CONNECTION);
   DCHECK_EQ(peer_id, system::kMasterProcessIdentifier);
   DCHECK(platform_connection_handle.is_valid());
   return platform_connection_handle;

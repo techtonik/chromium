@@ -8,8 +8,6 @@ import unittest
 
 from telemetry.core import util
 from telemetry.internal.platform import linux_based_platform_backend
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
 import mock
 
 

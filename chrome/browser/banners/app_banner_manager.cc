@@ -31,6 +31,7 @@ AppBannerManager::AppBannerManager(int icon_size)
     : ideal_icon_size_(icon_size),
       data_fetcher_(nullptr),
       weak_factory_(this) {
+  AppBannerSettingsHelper::UpdateFromFieldTrial();
 }
 
 AppBannerManager::AppBannerManager(content::WebContents* web_contents,
@@ -39,6 +40,7 @@ AppBannerManager::AppBannerManager(content::WebContents* web_contents,
       ideal_icon_size_(icon_size),
       data_fetcher_(nullptr),
       weak_factory_(this) {
+  AppBannerSettingsHelper::UpdateFromFieldTrial();
 }
 
 AppBannerManager::~AppBannerManager() {
@@ -104,9 +106,8 @@ void AppBannerManager::DisableSecureSchemeCheckForTesting() {
   gDisableSecureCheckForTesting = true;
 }
 
-void AppBannerManager::ForceEngagementWeightsForTesting(
-    double direct_engagement,
-    double indirect_engagement) {
+void AppBannerManager::SetEngagementWeights(double direct_engagement,
+                                            double indirect_engagement) {
   AppBannerSettingsHelper::SetEngagementWeights(direct_engagement,
                                                 indirect_engagement);
 }

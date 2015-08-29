@@ -48,7 +48,6 @@ static_library("common") {
 
   public_deps = [
     "//chrome/common:constants",
-    "//chrome/common/net",
     "//chrome/common/safe_browsing:proto",
   ]
   deps = [
@@ -64,6 +63,7 @@ static_library("common") {
     "//components/cloud_devices/common",
     "//components/component_updater",
     "//components/content_settings/core/common",
+    "//components/crash_keys",
     "//components/favicon_base",
     "//components/gcm_driver/common",
     "//components/json_schema",
@@ -109,7 +109,10 @@ static_library("common") {
       "//third_party/re2",
       "//third_party/widevine/cdm:version_h",
     ]
-    public_deps += [ "//third_party/mojo/src/mojo/public/cpp/bindings" ]
+    public_deps += [
+      "//chrome/common/net",
+      "//third_party/mojo/src/mojo/public/cpp/bindings",
+    ]
   }
 
   if (enable_extensions) {
@@ -167,7 +170,7 @@ static_library("common") {
   # Printing.
   if (enable_basic_printing || enable_print_preview) {
     deps += [
-      "//components/printing/common:printing_common",
+      "//components/printing/common",
       "//printing",
     ]
     if (enable_print_preview) {
@@ -287,8 +290,6 @@ static_library("constants") {
     "chrome_switches.h",
     "env_vars.cc",
     "env_vars.h",
-    "net/test_server_locations.cc",
-    "net/test_server_locations.h",
     "pref_font_script_names-inl.h",
     "pref_font_webkit_names.h",
     "pref_names.cc",

@@ -5,7 +5,11 @@
 #ifndef EXTENSIONS_COMMON_PERMISSIONS_API_PERMISSION_SET_H_
 #define EXTENSIONS_COMMON_PERMISSIONS_API_PERMISSION_SET_H_
 
+#include <set>
+#include <string>
+#include <vector>
 
+#include "base/strings/string16.h"
 #include "extensions/common/permissions/api_permission.h"
 #include "extensions/common/permissions/base_set_operators.h"
 
@@ -56,8 +60,6 @@ class APIPermissionSet : public BaseSetOperators<APIPermissionSet> {
       APIPermissionSet* api_permissions,
       base::string16* error,
       std::vector<std::string>* unhandled_permissions);
-
-  void AddImpliedPermissions();
 };
 
 // An ID representing a single permission that belongs to an app or extension.
@@ -132,19 +134,22 @@ class PermissionIDSet {
   // Check if the set contains permissions with all the given IDs.
   bool ContainsAllIDs(const std::set<APIPermission::ID>& permission_ids) const;
 
+  // Check if the set contains any permission with one of the given IDs.
+  bool ContainsAnyID(const std::set<APIPermission::ID>& permission_ids) const;
+
+  // Returns all the permissions in this set with the given ID.
+  PermissionIDSet GetAllPermissionsWithID(
+      APIPermission::ID permission_id) const;
+
   // Returns all the permissions in this set with one of the given IDs.
   PermissionIDSet GetAllPermissionsWithIDs(
       const std::set<APIPermission::ID>& permission_ids) const;
 
-  // Convenience functions that call their stl_util counterparts.
+  // Convenience functions for common set operations.
   bool Includes(const PermissionIDSet& subset) const;
   bool Equals(const PermissionIDSet& set) const;
   static PermissionIDSet Difference(const PermissionIDSet& set_1,
                                     const PermissionIDSet& set_2);
-  static PermissionIDSet Intersection(const PermissionIDSet& set_1,
-                                      const PermissionIDSet& set_2);
-  static PermissionIDSet Union(const PermissionIDSet& set_1,
-                               const PermissionIDSet& set_2);
 
   size_t size() const;
   bool empty() const;

@@ -31,6 +31,7 @@
 #include "content/common/service_worker/embedded_worker_messages.h"
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/public/common/referrer.h"
+#include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/document_state.h"
 #include "content/renderer/background_sync/background_sync_client_impl.h"
 #include "content/renderer/devtools/devtools_agent.h"
@@ -43,16 +44,16 @@
 #include "third_party/WebKit/public/platform/WebMessagePortChannel.h"
 #include "third_party/WebKit/public/platform/WebPassOwnPtr.h"
 #include "third_party/WebKit/public/platform/WebReferrerPolicy.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerClientQueryOptions.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerRequest.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerResponse.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/modules/background_sync/WebSyncRegistration.h"
 #include "third_party/WebKit/public/platform/modules/notifications/WebNotificationData.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerClientQueryOptions.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerRequest.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerResponse.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
-#include "third_party/WebKit/public/web/WebServiceWorkerContextClient.h"
-#include "third_party/WebKit/public/web/WebServiceWorkerContextProxy.h"
-#include "third_party/WebKit/public/web/WebServiceWorkerNetworkProvider.h"
+#include "third_party/WebKit/public/web/modules/serviceworker/WebServiceWorkerContextClient.h"
+#include "third_party/WebKit/public/web/modules/serviceworker/WebServiceWorkerContextProxy.h"
+#include "third_party/WebKit/public/web/modules/serviceworker/WebServiceWorkerNetworkProvider.h"
 
 namespace content {
 
@@ -129,6 +130,11 @@ blink::WebURLRequest::FetchCredentialsMode GetBlinkFetchCredentialsMode(
     FetchCredentialsMode credentials_mode) {
   return static_cast<blink::WebURLRequest::FetchCredentialsMode>(
       credentials_mode);
+}
+
+blink::WebURLRequest::FetchRedirectMode GetBlinkFetchRedirectMode(
+    FetchRedirectMode redirect_mode) {
+  return static_cast<blink::WebURLRequest::FetchRedirectMode>(redirect_mode);
 }
 
 blink::WebURLRequest::RequestContext GetBlinkRequestContext(
@@ -380,6 +386,17 @@ void ServiceWorkerContextClient::didEvaluateWorkerScript(bool success) {
                             GetWeakPtr()));
 }
 
+void ServiceWorkerContextClient::didInitializeWorkerContext(
+    v8::Local<v8::Context> context,
+    const blink::WebURL& url) {
+  // TODO(annekao): Remove WebURL parameter from Blink (since url and script_url
+  // are equal). Also remove m_documentURL from ServiceWorkerGlobalScopeProxy.
+  DCHECK_EQ(script_url_, GURL(url));
+  GetContentClient()
+      ->renderer()
+      ->DidInitializeServiceWorkerContextOnWorkerThread(context, script_url_);
+}
+
 void ServiceWorkerContextClient::willDestroyWorkerContext() {
   // At this point OnWorkerRunLoopStopped is already called, so
   // worker_task_runner_->RunsTasksOnCurrentThread() returns false
@@ -393,6 +410,9 @@ void ServiceWorkerContextClient::willDestroyWorkerContext() {
   // This also lets the message filter stop dispatching messages to
   // this client.
   g_worker_client_tls.Pointer()->Set(NULL);
+
+  GetContentClient()->renderer()->WillDestroyServiceWorkerContextOnWorkerThread(
+      script_url_);
 }
 
 void ServiceWorkerContextClient::workerContextDestroyed() {
@@ -657,14 +677,7 @@ void ServiceWorkerContextClient::SetRegistrationInServiceWorkerGlobalScope() {
   // Register a registration and its version attributes with the dispatcher
   // living on the worker thread.
   scoped_ptr<WebServiceWorkerRegistrationImpl> registration(
-      dispatcher->CreateServiceWorkerRegistration(info, false));
-  registration->SetInstalling(
-      dispatcher->GetServiceWorker(attrs.installing, false));
-  registration->SetWaiting(
-      dispatcher->GetServiceWorker(attrs.waiting, false));
-  registration->SetActive(
-      dispatcher->GetServiceWorker(attrs.active, false));
-
+      dispatcher->CreateRegistration(info, attrs));
   proxy_->setRegistration(registration.release());
 }
 
@@ -704,6 +717,7 @@ void ServiceWorkerContextClient::OnFetchEvent(
   webRequest.setMode(GetBlinkFetchRequestMode(request.mode));
   webRequest.setCredentialsMode(
       GetBlinkFetchCredentialsMode(request.credentials_mode));
+  webRequest.setRedirectMode(GetBlinkFetchRedirectMode(request.redirect_mode));
   webRequest.setRequestContext(
       GetBlinkRequestContext(request.request_context_type));
   webRequest.setFrameType(GetBlinkFrameType(request.frame_type));

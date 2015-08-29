@@ -22,8 +22,10 @@ namespace {
 // Default colors.
 #if defined(OS_CHROMEOS)
 // Used for theme fallback colors.
-const SkColor kDefaultColorFrame = SkColorSetRGB(109, 109, 109);
-const SkColor kDefaultColorFrameInactive = SkColorSetRGB(176, 176, 176);
+const SkColor kDefaultColorFrame[] = {
+    SkColorSetRGB(109, 109, 109), SkColorSetRGB(217, 217, 217)};
+const SkColor kDefaultColorFrameInactive[] = {
+    SkColorSetRGB(176, 176, 176), SkColorSetRGB(230, 230, 230)};
 #elif defined(OS_MACOSX)
 const SkColor kDefaultColorFrame = SkColorSetRGB(224, 224, 224);
 const SkColor kDefaultColorFrameInactive = SkColorSetRGB(246, 246, 246);
@@ -31,21 +33,28 @@ const SkColor kDefaultColorFrameInactive = SkColorSetRGB(246, 246, 246);
 const SkColor kDefaultColorFrame = SkColorSetRGB(66, 116, 201);
 const SkColor kDefaultColorFrameInactive = SkColorSetRGB(161, 182, 228);
 #endif  // OS_CHROMEOS
+
 const SkColor kDefaultColorFrameIncognito = SkColorSetRGB(83, 106, 139);
 const SkColor kDefaultColorFrameIncognitoInactive =
     SkColorSetRGB(126, 139, 156);
+
 #if defined(OS_MACOSX)
 const SkColor kDefaultColorToolbar = SkColorSetRGB(230, 230, 230);
 #else
-const SkColor kDefaultColorToolbar = SkColorSetRGB(223, 223, 223);
-#endif
+const SkColor kDefaultColorToolbar[] = {
+    SkColorSetRGB(223, 223, 223), SkColorSetRGB(242, 242, 242)};
+#endif  // OS_MACOSX
+
 const SkColor kDefaultColorTabText = SK_ColorBLACK;
+
 #if defined(OS_MACOSX)
 const SkColor kDefaultColorBackgroundTabText = SK_ColorBLACK;
 #else
 const SkColor kDefaultColorBackgroundTabText = SkColorSetRGB(64, 64, 64);
-#endif
+#endif  // OS_MACOSX
+
 const SkColor kDefaultColorBookmarkText = SK_ColorBLACK;
+
 #if defined(OS_WIN)
 const SkColor kDefaultColorNTPBackground =
     color_utils::GetSysSkColor(COLOR_WINDOW);
@@ -58,7 +67,8 @@ const SkColor kDefaultColorNTPLink =
 const SkColor kDefaultColorNTPBackground = SK_ColorWHITE;
 const SkColor kDefaultColorNTPText = SK_ColorBLACK;
 const SkColor kDefaultColorNTPLink = SkColorSetRGB(6, 55, 116);
-#endif
+#endif  // OS_WIN
+
 const SkColor kDefaultColorNTPHeader = SkColorSetRGB(150, 150, 150);
 const SkColor kDefaultColorNTPSection = SkColorSetRGB(229, 229, 229);
 const SkColor kDefaultColorNTPSectionText = SK_ColorBLACK;
@@ -85,7 +95,8 @@ const int kDefaultDisplayPropertyNTPAlternateLogo = 0;
 // Defaults for properties which are not stored in the browser theme pack.
 
 const SkColor kDefaultColorControlBackground = SK_ColorWHITE;
-const SkColor kDefaultColorToolbarSeparator = SkColorSetRGB(170, 170, 171);
+const SkColor kDefaultColorToolbarSeparator[] = {
+    SkColorSetRGB(170, 170, 171), SkColorSetRGB(182, 180, 182)};
 
 #if defined(OS_MACOSX)
 const SkColor kDefaultColorToolbarButtonStroke = SkColorSetARGB(75, 81, 81, 81);
@@ -94,7 +105,7 @@ const SkColor kDefaultColorToolbarButtonStrokeInactive =
 const SkColor kDefaultColorToolbarBezel = SkColorSetRGB(204, 204, 204);
 const SkColor kDefaultColorToolbarStroke = SkColorSetRGB(103, 103, 103);
 const SkColor kDefaultColorToolbarStrokeInactive = SkColorSetRGB(163, 163, 163);
-#endif
+#endif  // OS_MACOSX
 
 // ----------------------------------------------------------------------------
 // Defaults for layout properties which are not stored in the browser theme
@@ -123,6 +134,18 @@ const int kLocationBarHorizontalPadding[] = {3, 6, 6};
 
 // The Vertical padding of items in the location bar.
 const int kLocationBarVerticalPadding[] = {2, 6, 6};
+
+// The number of pixels in the omnibox dropdown border image interior to
+// the actual border.
+const int kOmniboxDropdownBorderInterior[] = {6, 0, 0};
+
+// In an omnibox dropdown row, the minimum distance between the top and
+// bottom of the row's icon and the top or bottom of the row edge.
+const int kOmniboxDropdownMinIconVerticalPadding[] = {2, 4, 8};
+
+// In an omnibox dropdown row, the minimum distance between the top and
+// bottom of the row's text and the top or bottom of the row edge.
+const int kOmniboxDropdownMinTextVerticalPadding[] = {3, 4, 8};
 
 // The spacing between a ToolbarButton's image and its border.
 const int kToolbarButtonBorderInset[] = {2, 6, 6};
@@ -288,18 +311,31 @@ color_utils::HSL ThemeProperties::GetDefaultTint(int id) {
 
 // static
 SkColor ThemeProperties::GetDefaultColor(int id) {
+  int mode = ui::MaterialDesignController::IsModeMaterial();
   switch (id) {
     // Properties stored in theme pack.
     case COLOR_FRAME:
+#if defined(OS_CHROMEOS)
+      return kDefaultColorFrame[mode];
+#else
       return kDefaultColorFrame;
+#endif  // OS_CHROMEOS
     case COLOR_FRAME_INACTIVE:
+#if defined(OS_CHROMEOS)
+      return kDefaultColorFrameInactive[mode];
+#else
       return kDefaultColorFrameInactive;
+#endif  // OS_CHROMEOS
     case COLOR_FRAME_INCOGNITO:
       return kDefaultColorFrameIncognito;
     case COLOR_FRAME_INCOGNITO_INACTIVE:
       return kDefaultColorFrameIncognitoInactive;
     case COLOR_TOOLBAR:
+#if defined(OS_MACOSX)
       return kDefaultColorToolbar;
+#else
+      return kDefaultColorToolbar[mode];
+#endif  // OS_MACOSX
     case COLOR_TAB_TEXT:
       return kDefaultColorTabText;
     case COLOR_BACKGROUND_TAB_TEXT:
@@ -331,7 +367,7 @@ SkColor ThemeProperties::GetDefaultColor(int id) {
     case COLOR_CONTROL_BACKGROUND:
       return kDefaultColorControlBackground;
     case COLOR_TOOLBAR_SEPARATOR:
-      return kDefaultColorToolbarSeparator;
+      return kDefaultColorToolbarSeparator[mode];
 #if defined(OS_MACOSX)
     case COLOR_TOOLBAR_BUTTON_STROKE:
       return kDefaultColorToolbarButtonStroke;
@@ -372,6 +408,12 @@ int ThemeProperties::GetDefaultDisplayProperty(int id) {
       return kLocationBarHorizontalPadding[mode];
     case ThemeProperties::PROPERTY_LOCATION_BAR_VERTICAL_PADDING:
       return kLocationBarVerticalPadding[mode];
+    case ThemeProperties::PROPERTY_OMNIBOX_DROPDOWN_BORDER_INTERIOR:
+      return kOmniboxDropdownBorderInterior[mode];
+    case ThemeProperties::PROPERTY_OMNIBOX_DROPDOWN_MIN_ICON_VERTICAL_PADDING:
+      return kOmniboxDropdownMinIconVerticalPadding[mode];
+    case ThemeProperties::PROPERTY_OMNIBOX_DROPDOWN_MIN_TEXT_VERTICAL_PADDING:
+      return kOmniboxDropdownMinTextVerticalPadding[mode];
     case ThemeProperties::PROPERTY_TOOLBAR_BUTTON_BORDER_INSET:
       return kToolbarButtonBorderInset[mode];
     case ThemeProperties::PROPERTY_TOOLBAR_VIEW_CONTENT_SHADOW_HEIGHT:

@@ -252,8 +252,12 @@
 #define glEndQueryEXT GLES2_GET_FUN(EndQueryEXT)
 #define glEndTransformFeedback GLES2_GET_FUN(EndTransformFeedback)
 #define glGetQueryivEXT GLES2_GET_FUN(GetQueryivEXT)
+#define glGetQueryObjectivEXT GLES2_GET_FUN(GetQueryObjectivEXT)
 #define glGetQueryObjectuivEXT GLES2_GET_FUN(GetQueryObjectuivEXT)
+#define glGetQueryObjecti64vEXT GLES2_GET_FUN(GetQueryObjecti64vEXT)
 #define glGetQueryObjectui64vEXT GLES2_GET_FUN(GetQueryObjectui64vEXT)
+#define glSetDisjointValueSyncCHROMIUM \
+  GLES2_GET_FUN(SetDisjointValueSyncCHROMIUM)
 #define glInsertEventMarkerEXT GLES2_GET_FUN(InsertEventMarkerEXT)
 #define glPushGroupMarkerEXT GLES2_GET_FUN(PushGroupMarkerEXT)
 #define glPopGroupMarkerEXT GLES2_GET_FUN(PopGroupMarkerEXT)
@@ -296,6 +300,8 @@
 #define glCopySubTextureCHROMIUM GLES2_GET_FUN(CopySubTextureCHROMIUM)
 #define glCompressedCopyTextureCHROMIUM \
   GLES2_GET_FUN(CompressedCopyTextureCHROMIUM)
+#define glCompressedCopySubTextureCHROMIUM \
+  GLES2_GET_FUN(CompressedCopySubTextureCHROMIUM)
 #define glDrawArraysInstancedANGLE GLES2_GET_FUN(DrawArraysInstancedANGLE)
 #define glDrawElementsInstancedANGLE GLES2_GET_FUN(DrawElementsInstancedANGLE)
 #define glVertexAttribDivisorANGLE GLES2_GET_FUN(VertexAttribDivisorANGLE)
@@ -319,11 +325,6 @@
 #define glReleaseTexImage2DCHROMIUM GLES2_GET_FUN(ReleaseTexImage2DCHROMIUM)
 #define glTraceBeginCHROMIUM GLES2_GET_FUN(TraceBeginCHROMIUM)
 #define glTraceEndCHROMIUM GLES2_GET_FUN(TraceEndCHROMIUM)
-#define glAsyncTexSubImage2DCHROMIUM GLES2_GET_FUN(AsyncTexSubImage2DCHROMIUM)
-#define glAsyncTexImage2DCHROMIUM GLES2_GET_FUN(AsyncTexImage2DCHROMIUM)
-#define glWaitAsyncTexImage2DCHROMIUM GLES2_GET_FUN(WaitAsyncTexImage2DCHROMIUM)
-#define glWaitAllAsyncTexImage2DCHROMIUM \
-  GLES2_GET_FUN(WaitAllAsyncTexImage2DCHROMIUM)
 #define glDiscardFramebufferEXT GLES2_GET_FUN(DiscardFramebufferEXT)
 #define glLoseContextCHROMIUM GLES2_GET_FUN(LoseContextCHROMIUM)
 #define glInsertSyncPointCHROMIUM GLES2_GET_FUN(InsertSyncPointCHROMIUM)

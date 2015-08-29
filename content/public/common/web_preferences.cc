@@ -84,7 +84,6 @@ WebPreferences::WebPreferences()
       shrinks_standalone_images_to_fit(true),
       uses_universal_detector(false),  // Disabled: page cycler regression
       text_areas_are_resizable(true),
-      java_enabled(true),
       allow_scripts_to_close_windows(false),
       remote_fonts_enabled(true),
       javascript_can_access_clipboard(false),
@@ -121,7 +120,6 @@ WebPreferences::WebPreferences()
       accelerated_filters_enabled(false),
       deferred_filters_enabled(false),
       container_culling_enabled(false),
-      text_blobs_enabled(false),
       allow_displaying_insecure_content(true),
       allow_running_insecure_content(false),
       disable_reading_from_canvas(false),
@@ -159,7 +157,11 @@ WebPreferences::WebPreferences()
 #endif
       supports_multiple_windows(true),
       viewport_enabled(false),
+#if defined(OS_ANDROID)
+      viewport_meta_enabled(true),
+#else
       viewport_meta_enabled(false),
+#endif
       main_frame_resizes_are_orientation_changes(false),
       initialize_at_minimum_page_scale(true),
 #if defined(OS_MACOSX)

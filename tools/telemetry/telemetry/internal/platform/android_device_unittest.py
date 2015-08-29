@@ -4,16 +4,12 @@
 
 import unittest
 
-from telemetry.core import util
 from telemetry.internal.browser import browser_options
 from telemetry.internal.platform import android_device
 from telemetry.testing import system_stub
-
-util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
-from pylib.device import device_utils
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
 import mock
+
+from pylib.device import device_utils
 
 
 class _BaseAndroidDeviceTest(unittest.TestCase):
@@ -44,7 +40,7 @@ class AndroidDeviceTest(_BaseAndroidDeviceTest):
     self.assertEquals(
         set(['01', '02']),
         set(device.device_id for device in
-            android_device.AndroidDevice.GetAllConnectedDevices()))
+            android_device.AndroidDevice.GetAllConnectedDevices(None)))
 
   def testNoAdbReturnsNone(self):
     finder_options = browser_options.BrowserFinderOptions()

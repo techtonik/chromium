@@ -27,6 +27,17 @@ Polymer({
     },
 
     /**
+     * Determines how the list item will be displayed:
+     *  'visible' - displays the network icon (with strength) and name
+     *  'known' - displays the visible info along with a toggle icon for the
+     *      preferred status and a remove button.
+     */
+    listType: {
+      type: String,
+      value: 'visible'
+    },
+
+    /**
      * The list of network state properties for the items to display.
      *
      * @type {!Array<!CrOnc.NetworkStateProperties>}
@@ -53,17 +64,8 @@ Polymer({
   },
 
   /**
-   * Called when the cr-collapse element changes size (i.e. is opened).
-   * @private
-   */
-  onResized_: function() {
-    if (this.opened)
-      this.$.networkList.updateSize();
-  },
-
-  /**
    * Event triggered when a list item is selected.
-   * @param {!{target: !NetworkListItem}} event
+   * @param {!{model: {item: !CrOnc.NetworkStateProperties}}} event
    * @private
    */
   onSelected_: function(event) {

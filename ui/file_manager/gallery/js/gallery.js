@@ -27,7 +27,7 @@ function Gallery(volumeManager) {
     displayStringFunction: function() { return ''; },
     loadTimeData: {},
   };
-  this.container_ = queryRequiredElement(document, '.gallery');
+  this.container_ = queryRequiredElement('.gallery');
   this.document_ = document;
   this.volumeManager_ = volumeManager;
   /**
@@ -74,21 +74,21 @@ function Gallery(volumeManager) {
   cr.ui.dialogs.BaseDialog.OK_LABEL = str('GALLERY_OK_LABEL');
   cr.ui.dialogs.BaseDialog.CANCEL_LABEL = str('GALLERY_CANCEL_LABEL');
 
-  var content = queryRequiredElement(document, '#content');
+  var content = getRequiredElement('content');
   content.addEventListener('click', this.onContentClick_.bind(this));
 
-  this.topToolbar_ = queryRequiredElement(document, '#top-toolbar');
-  this.bottomToolbar_ = queryRequiredElement(document, '#bottom-toolbar');
+  this.topToolbar_ = getRequiredElement('top-toolbar');
+  this.bottomToolbar_ = getRequiredElement('bottom-toolbar');
 
-  this.filenameSpacer_ = queryRequiredElement(this.topToolbar_,
-      '.filename-spacer');
+  this.filenameSpacer_ = queryRequiredElement('.filename-spacer',
+      this.topToolbar_);
 
   /**
    * @private {HTMLInputElement}
    * @const
    */
   this.filenameEdit_ = /** @type {HTMLInputElement} */
-      (queryRequiredElement(this.filenameSpacer_, 'input'));
+      (queryRequiredElement('input', this.filenameSpacer_));
 
   this.filenameCanvas_ = document.createElement('canvas');
   this.filenameCanvasContext_ = this.filenameCanvas_.getContext('2d');
@@ -106,21 +106,33 @@ function Gallery(volumeManager) {
   this.filenameEdit_.addEventListener('keydown',
       this.onFilenameEditKeydown_.bind(this));
 
-  var buttonSpacer = queryRequiredElement(this.topToolbar_, '.button-spacer');
+  var buttonSpacer = queryRequiredElement('.button-spacer', this.topToolbar_);
 
   this.prompt_ = new ImageEditor.Prompt(this.container_, strf);
 
   this.errorBanner_ = new ErrorBanner(this.container_);
 
-  var modeSwitchButton = queryRequiredElement(this.topToolbar_, 'button.mode');
-  modeSwitchButton.addEventListener('click',
+  /**
+   * @private {!HTMLElement}
+   * @const
+   */
+  this.modeSwitchButton_ = queryRequiredElement('button.mode',
+      this.topToolbar_);
+  GalleryUtil.decorateMouseFocusHandling(this.modeSwitchButton_);
+  this.modeSwitchButton_.addEventListener('click',
       this.onModeSwitchButtonClicked_.bind(this));
 
   /**
    * @private {!PaperRipple}
    */
   this.modeSwitchButtonRipple_ = /** @type {!PaperRipple} */
-      (queryRequiredElement(modeSwitchButton, 'paper-ripple'));
+      (queryRequiredElement('paper-ripple', this.modeSwitchButton_));
+
+  /**
+   * @private {!DimmableUIController}
+   * @const
+   */
+  this.dimmableUIController_ = new DimmableUIController(this.container_);
 
   this.thumbnailMode_ = new ThumbnailMode(
       assertInstanceof(document.querySelector('.thumbnail-view'), HTMLElement),
@@ -143,18 +155,33 @@ function Gallery(volumeManager) {
                                   this.context_,
                                   this.volumeManager_,
                                   this.toggleMode_.bind(this),
-                                  str);
-
+                                  str,
+                                  this.dimmableUIController_);
   this.slideMode_.addEventListener('image-displayed', function() {
     cr.dispatchSimpleEvent(this, 'image-displayed');
   }.bind(this));
 
+  /**
+   * @private {!HTMLElement}
+   * @const
+   */
   this.deleteButton_ = queryRequiredElement(
-      this.topToolbar_, 'paper-button.delete');
+      'paper-button.delete', this.topToolbar_);
   this.deleteButton_.addEventListener('click', this.delete_.bind(this));
 
+  /**
+   * @private {!HTMLElement}
+   * @const
+   */
+  this.slideshowButton_ = queryRequiredElement('paper-button.slideshow',
+      this.topToolbar_);
+
+  /**
+   * @private {!HTMLElement}
+   * @const
+   */
   this.shareButton_ = queryRequiredElement(
-      this.topToolbar_, 'paper-button.share');
+      'paper-button.share', this.topToolbar_);
   this.shareButton_.addEventListener(
       'click', this.onShareButtonClick_.bind(this));
 
@@ -172,9 +199,6 @@ function Gallery(volumeManager) {
   this.keyDownBound_ = this.onKeyDown_.bind(this);
   this.document_.body.addEventListener('keydown', this.keyDownBound_);
 
-  this.inactivityWatcher_ = new MouseInactivityWatcher(
-      this.container_, Gallery.FADE_TIMEOUT, this.hasActiveTool.bind(this));
-
   // TODO(hirono): Add observer to handle thumbnail update.
   this.volumeManager_.addEventListener(
       'externally-unmounted', this.onExternallyUnmountedBound_);
@@ -182,6 +206,10 @@ function Gallery(volumeManager) {
   window.addEventListener('pagehide', this.onPageHide_.bind(this));
 
   window.addEventListener('resize', this.resizeRenameField_.bind(this));
+
+  // We must call this method after elements of all tools have been attached to
+  // the DOM.
+  this.dimmableUIController_.setTools(document.querySelectorAll('.tool'));
 }
 
 /**
@@ -353,7 +381,6 @@ Gallery.prototype.loadInternal_ = function(entries, selectedEntries) {
 
         // Do the initialization for each mode.
         if (shouldShowThumbnail) {
-          self.inactivityWatcher_.check();  // Show the toolbar.
           self.thumbnailMode_.show();
           cr.dispatchSimpleEvent(self, 'loaded');
         } else {
@@ -361,7 +388,7 @@ Gallery.prototype.loadInternal_ = function(entries, selectedEntries) {
               null,
               function() {
                 // Flash the toolbar briefly to show it is there.
-                self.inactivityWatcher_.kick(Gallery.FIRST_FADE_TIMEOUT);
+                self.dimmableUIController_.kick(Gallery.FIRST_FADE_TIMEOUT);
               },
               function() {
                 cr.dispatchSimpleEvent(self, 'loaded');
@@ -393,7 +420,7 @@ Gallery.prototype.hasActiveTool = function() {
 */
 Gallery.prototype.onUserAction_ = function() {
   // Show the toolbar and hide it after the default timeout.
-  this.inactivityWatcher_.kick();
+  this.dimmableUIController_.kick();
 };
 
 /**
@@ -410,6 +437,7 @@ Gallery.prototype.setCurrentMode_ = function(mode) {
 
   this.currentMode_ = mode;
   this.container_.setAttribute('mode', this.currentMode_.getName());
+  this.dimmableUIController_.setDisabled(this.currentMode_ !== this.slideMode_);
   this.updateSelectionAndState_();
 };
 
@@ -463,6 +491,7 @@ Gallery.prototype.changeCurrentMode_ = function(mode, opt_event) {
               this.thumbnailMode_.performEnterAnimation(
                   thumbnailIndex, fromRect);
             }
+            this.thumbnailMode_.focus();
 
             onModeChanged();
           }.bind(this));
@@ -607,6 +636,9 @@ Gallery.prototype.onSplice_ = function() {
       this.selectionModel_.selectedIndexes.filter(function(index) {
     return 0 <= index && index < this.dataModel_.length;
   }.bind(this));
+
+  // Disable mode switch button if there is no image.
+  this.modeSwitchButton_.disabled = this.dataModel_.length === 0;
 };
 
 /**
@@ -621,7 +653,7 @@ Gallery.prototype.onContentChange_ = function(event) {
 /**
  * Keydown handler.
  *
- * @param {!Event} event Event.
+ * @param {!Event} event
  * @private
  */
 Gallery.prototype.onKeyDown_ = function(event) {
@@ -648,7 +680,7 @@ Gallery.prototype.onKeyDown_ = function(event) {
     return;
 
   // Show UIs when user types any key.
-  this.inactivityWatcher_.kick();
+  this.dimmableUIController_.kick();
 
   // Handle mode specific shortcut keys.
   if (this.currentMode_.onKeyDown(event)) {
@@ -697,6 +729,9 @@ Gallery.prototype.updateSelectionAndState_ = function() {
 
   // If it's selecting something, update the variable values.
   if (numSelectedItems) {
+    // Enable slideshow button.
+    this.slideshowButton_.disabled = false;
+
     // Delete button is available when all images are NOT readOnly.
     this.deleteButton_.disabled = !this.selectionModel_.selectedIndexes
         .every(function(i) {
@@ -720,6 +755,7 @@ Gallery.prototype.updateSelectionAndState_ = function() {
       this.filenameEdit_.value =
           ImageUtil.getDisplayNameFromName(this.selectedEntry_.name);
       this.resizeRenameField_();
+
       this.shareButton_.hidden = !selectedItem.getLocationInfo().isDriveBased;
     } else {
       if (this.context_.curDirEntry) {
@@ -734,14 +770,17 @@ Gallery.prototype.updateSelectionAndState_ = function() {
       this.filenameEdit_.value =
           strf('GALLERY_ITEMS_SELECTED', numSelectedItems);
       this.resizeRenameField_();
+
       this.shareButton_.hidden = true;
     }
   } else {
     document.title = '';
     this.filenameEdit_.disabled = true;
-    this.deleteButton_.disabled = true;
     this.filenameEdit_.value = '';
     this.resizeRenameField_();
+
+    this.deleteButton_.disabled = true;
+    this.slideshowButton_.disabled = true;
     this.shareButton_.hidden = true;
   }
 

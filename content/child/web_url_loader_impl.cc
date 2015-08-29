@@ -195,6 +195,17 @@ FetchCredentialsMode GetFetchCredentialsMode(const WebURLRequest& request) {
   return static_cast<FetchCredentialsMode>(request.fetchCredentialsMode());
 }
 
+STATIC_ASSERT_MATCHING_ENUMS(FetchRedirectMode::FOLLOW_MODE,
+                             WebURLRequest::FetchRedirectModeFollow);
+STATIC_ASSERT_MATCHING_ENUMS(FetchRedirectMode::ERROR_MODE,
+                             WebURLRequest::FetchRedirectModeError);
+STATIC_ASSERT_MATCHING_ENUMS(FetchRedirectMode::MANUAL_MODE,
+                             WebURLRequest::FetchRedirectModeManual);
+
+FetchRedirectMode GetFetchRedirectMode(const WebURLRequest& request) {
+  return static_cast<FetchRedirectMode>(request.fetchRedirectMode());
+}
+
 STATIC_ASSERT_MATCHING_ENUMS(REQUEST_CONTEXT_FRAME_TYPE_AUXILIARY,
                              WebURLRequest::FrameTypeAuxiliary);
 STATIC_ASSERT_MATCHING_ENUMS(REQUEST_CONTEXT_FRAME_TYPE_NESTED,
@@ -355,8 +366,8 @@ void SetSecurityStyleAndDetails(const GURL& url,
   blink::WebString key_exchange_string =
       blink::WebString::fromUTF8(key_exchange);
   blink::WebString mac_string = blink::WebString::fromUTF8(mac);
-  response->setSecurityDetails(protocol_string, cipher_string,
-                               key_exchange_string, mac_string,
+  response->setSecurityDetails(protocol_string, key_exchange_string,
+                               cipher_string, mac_string,
                                ssl_status.cert_id);
 }
 
@@ -590,9 +601,11 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
   request_info.should_reset_appcache = request.shouldResetAppCache();
   request_info.fetch_request_mode = GetFetchRequestMode(request);
   request_info.fetch_credentials_mode = GetFetchCredentialsMode(request);
+  request_info.fetch_redirect_mode = GetFetchRedirectMode(request);
   request_info.fetch_request_context_type = GetRequestContextType(request);
   request_info.fetch_frame_type = GetRequestContextFrameType(request);
   request_info.extra_data = request.extraData();
+  request_info.report_raw_headers = request.reportRawHeaders();
 
   scoped_refptr<ResourceRequestBody> request_body =
       GetRequestBodyForWebURLRequest(request).get();

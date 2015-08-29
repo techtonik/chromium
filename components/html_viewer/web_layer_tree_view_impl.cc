@@ -22,9 +22,7 @@ namespace html_viewer {
 WebLayerTreeViewImpl::WebLayerTreeViewImpl(
     scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner,
     gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
-    cc::TaskGraphRunner* task_graph_runner,
-    mojo::SurfacePtr surface,
-    mojo::GpuPtr gpu_service)
+    cc::TaskGraphRunner* task_graph_runner)
     : widget_(NULL),
       view_(NULL),
       main_thread_compositor_task_runner_(base::ThreadTaskRunnerHandle::Get()),
@@ -39,7 +37,6 @@ WebLayerTreeViewImpl::WebLayerTreeViewImpl(
 
   settings.use_image_texture_targets = std::vector<unsigned>(
       static_cast<size_t>(gfx::BufferFormat::LAST) + 1, GL_TEXTURE_2D);
-  settings.use_one_copy = true;
   // TODO(jam): use multiple compositor raster threads and set gather_pixel_refs
   // accordingly (see content).
 
@@ -47,6 +44,8 @@ WebLayerTreeViewImpl::WebLayerTreeViewImpl(
   // to keep content always crisp when possible.
   settings.layer_transforms_should_scale_layer_contents = true;
 
+  // TODO(rjkroege): Not having a shared tile transport breaks
+  // software compositing. Add bitmap transport support.
   cc::SharedBitmapManager* shared_bitmap_manager = nullptr;
 
   cc::LayerTreeHost::InitParams params;
@@ -60,15 +59,20 @@ WebLayerTreeViewImpl::WebLayerTreeViewImpl(
   layer_tree_host_ =
       cc::LayerTreeHost::CreateThreaded(compositor_task_runner, &params);
   DCHECK(layer_tree_host_);
+}
 
-  if (surface && gpu_service) {
+void WebLayerTreeViewImpl::Initialize(mojo::GpuPtr gpu_service,
+                                      mojo::View* view,
+                                      blink::WebWidget* widget) {
+  view_ = view;
+  widget_ = widget;
+  if (gpu_service) {
     mojo::CommandBufferPtr cb;
     gpu_service->CreateOffscreenGLES2Context(GetProxy(&cb));
     scoped_refptr<cc::ContextProvider> context_provider(
         new mojo::ContextProviderMojo(cb.PassInterface().PassHandle()));
     output_surface_.reset(
-        new mojo::OutputSurfaceMojo(this, context_provider,
-                                    surface.PassInterface().PassHandle()));
+        new mojo::OutputSurfaceMojo(context_provider, view_->RequestSurface()));
   }
   layer_tree_host_->SetLayerTreeHostClientReady();
 }
@@ -137,6 +141,8 @@ void WebLayerTreeViewImpl::DidCommit() {
 void WebLayerTreeViewImpl::DidCommitAndDrawFrame() {
 }
 
+// TODO(rjkroege): Wire this up to the SubmitFrame callback to improve
+// synchronization.
 void WebLayerTreeViewImpl::DidCompleteSwapBuffers() {
 }
 
@@ -241,18 +247,6 @@ void WebLayerTreeViewImpl::setNeedsAnimate() {
 
 void WebLayerTreeViewImpl::finishAllRendering() {
   layer_tree_host_->FinishAllRendering();
-}
-
-void WebLayerTreeViewImpl::DidCreateSurface(cc::SurfaceId id) {
-  main_thread_compositor_task_runner_->PostTask(
-      FROM_HERE,
-      base::Bind(&WebLayerTreeViewImpl::DidCreateSurfaceOnMainThread,
-                 main_thread_bound_weak_ptr_,
-                 id));
-}
-
-void WebLayerTreeViewImpl::DidCreateSurfaceOnMainThread(cc::SurfaceId id) {
-  view_->SetSurfaceId(mojo::SurfaceId::From(id));
 }
 
 }  // namespace html_viewer

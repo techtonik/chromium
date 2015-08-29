@@ -90,6 +90,11 @@ class MEDIA_EXPORT SourceBufferStream {
   void Remove(base::TimeDelta start, base::TimeDelta end,
               base::TimeDelta duration);
 
+  // Frees up space if the SourceBufferStream is taking up too much memory.
+  // |media_time| is current playback position.
+  bool GarbageCollectIfNeeded(DecodeTimestamp media_time,
+                              size_t newDataSize);
+
   // Changes the SourceBufferStream's state so that it will start returning
   // buffers starting from the closest keyframe before |timestamp|.
   void Seek(base::TimeDelta timestamp);
@@ -119,6 +124,9 @@ class MEDIA_EXPORT SourceBufferStream {
   // to the end timestamp of the last buffered range. If no data is buffered
   // then base::TimeDelta() is returned.
   base::TimeDelta GetBufferedDuration() const;
+
+  // Returns the size of the buffered data in bytes.
+  size_t GetBufferedSize() const;
 
   // Notifies this object that end of stream has been signalled.
   void MarkEndOfStream();
@@ -150,19 +158,20 @@ class MEDIA_EXPORT SourceBufferStream {
  private:
   friend class SourceBufferStreamTest;
 
-  // Frees up space if the SourceBufferStream is taking up too much memory.
-  void GarbageCollectIfNeeded();
-
   // Attempts to delete approximately |total_bytes_to_free| amount of data
   // |ranges_|, starting at the front of |ranges_| and moving linearly forward
   // through the buffers. Deletes starting from the back if |reverse_direction|
-  // is true. Returns the number of bytes freed.
-  size_t FreeBuffers(size_t total_bytes_to_free, bool reverse_direction);
+  // is true. |media_time| is current playback position.
+  // Returns the number of bytes freed.
+  size_t FreeBuffers(size_t total_bytes_to_free,
+                     DecodeTimestamp media_time,
+                     bool reverse_direction);
 
   // Attempts to delete approximately |total_bytes_to_free| amount of data from
   // |ranges_|, starting after the last appended buffer before the current
-  // playback position.
-  size_t FreeBuffersAfterLastAppended(size_t total_bytes_to_free);
+  // playback position |media_time|.
+  size_t FreeBuffersAfterLastAppended(size_t total_bytes_to_free,
+                                      DecodeTimestamp media_time);
 
   // Gets the removal range to secure |byte_to_free| from
   // [|start_timestamp|, |end_timestamp|).
@@ -348,12 +357,12 @@ class MEDIA_EXPORT SourceBufferStream {
   // GetNextBuffer() is only allows to return buffers that have a
   // config ID that matches this index. If there is a mismatch then
   // it must signal that a config change is needed.
-  int current_config_index_;
+  int current_config_index_ = 0;
 
   // Indicates which decoder config to associate with new buffers
   // being appended. Each new buffer appended has its config ID set
   // to the value of this field.
-  int append_config_index_;
+  int append_config_index_ = 0;
 
   // Holds the audio/video configs for this stream. |current_config_index_|
   // and |append_config_index_| represent indexes into one of these vectors.
@@ -365,10 +374,10 @@ class MEDIA_EXPORT SourceBufferStream {
 
   // True if more data needs to be appended before the Seek() can complete,
   // false if no Seek() has been requested or the Seek() is completed.
-  bool seek_pending_;
+  bool seek_pending_ = false;
 
   // True if the end of the stream has been signalled.
-  bool end_of_stream_;
+  bool end_of_stream_ = false;
 
   // Timestamp of the last request to Seek().
   base::TimeDelta seek_buffer_timestamp_;
@@ -376,7 +385,7 @@ class MEDIA_EXPORT SourceBufferStream {
   // Pointer to the seeked-to Range. This is the range from which
   // GetNextBuffer() calls are fulfilled after the |track_buffer_| has been
   // emptied.
-  SourceBufferRange* selected_range_;
+  SourceBufferRange* selected_range_ = nullptr;
 
   // Queue of the next buffers to be returned from calls to GetNextBuffer(). If
   // |track_buffer_| is empty, return buffers from |selected_range_|.
@@ -384,7 +393,7 @@ class MEDIA_EXPORT SourceBufferStream {
 
   // If there has been no intervening Seek, this will be true if the last
   // emitted buffer emptied |track_buffer_|.
-  bool just_exhausted_track_buffer_;
+  bool just_exhausted_track_buffer_ = false;
 
   // The start time of the current media segment being appended.
   DecodeTimestamp media_segment_start_time_;
@@ -393,12 +402,12 @@ class MEDIA_EXPORT SourceBufferStream {
   RangeList::iterator range_for_next_append_;
 
   // True when the next call to Append() begins a new media segment.
-  bool new_media_segment_;
+  bool new_media_segment_ = false;
 
   // The timestamp of the last buffer appended to the media segment, set to
   // kNoDecodeTimestamp() if the beginning of the segment.
   DecodeTimestamp last_appended_buffer_timestamp_;
-  bool last_appended_buffer_is_keyframe_;
+  bool last_appended_buffer_is_keyframe_ = false;
 
   // The decode timestamp on the last buffer returned by the most recent
   // GetNextBuffer() call. Set to kNoDecodeTimestamp() if GetNextBuffer() hasn't
@@ -415,7 +424,7 @@ class MEDIA_EXPORT SourceBufferStream {
   // and GetCurrentXXXDecoderConfig() must be called to update the current
   // config. GetNextBuffer() must not be called again until
   // GetCurrentXXXDecoderConfig() has been called.
-  bool config_change_pending_;
+  bool config_change_pending_ = false;
 
   // Used by HandleNextBufferWithSplice() or HandleNextBufferWithPreroll() when
   // a splice frame buffer or buffer with preroll is returned from
@@ -424,18 +433,18 @@ class MEDIA_EXPORT SourceBufferStream {
 
   // Indicates which of the splice buffers in |splice_buffer_| should be
   // handled out next.
-  size_t splice_buffers_index_;
+  size_t splice_buffers_index_ = 0;
 
   // Indicates that all buffers before |pending_buffer_| have been handed out.
-  bool pending_buffers_complete_;
+  bool pending_buffers_complete_ = false;
 
   // Indicates that splice frame generation is enabled.
   const bool splice_frames_enabled_;
 
   // To prevent log spam, count the number of warnings and successes logged.
-  int num_splice_generation_warning_logs_;
-  int num_splice_generation_success_logs_;
-  int num_track_buffer_gap_warning_logs_;
+  int num_splice_generation_warning_logs_ = 0;
+  int num_splice_generation_success_logs_ = 0;
+  int num_track_buffer_gap_warning_logs_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(SourceBufferStream);
 };

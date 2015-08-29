@@ -4,6 +4,7 @@
 
 #include "content/browser/service_worker/service_worker_version.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 
@@ -377,10 +378,11 @@ void AddNonWindowClient(ServiceWorkerProviderHost* host,
       options.client_type != host_client_type)
     return;
 
-  ServiceWorkerClientInfo client_info(
-      blink::WebPageVisibilityStateHidden,
-      false,  // is_focused
-      host->document_url(), REQUEST_CONTEXT_FRAME_TYPE_NONE, host_client_type);
+  ServiceWorkerClientInfo client_info(blink::WebPageVisibilityStateHidden,
+                                      false,  // is_focused
+                                      host->document_url(),
+                                      REQUEST_CONTEXT_FRAME_TYPE_NONE,
+                                      base::TimeTicks(), host_client_type);
   client_info.client_uuid = host->client_uuid();
   clients->push_back(client_info);
 }
@@ -400,6 +402,13 @@ bool IsInstalled(ServiceWorkerVersion::Status status) {
   return false;
 }
 
+struct ServiceWorkerClientInfoSortMRU {
+  bool operator()(const ServiceWorkerClientInfo& a,
+                  const ServiceWorkerClientInfo& b) const {
+    return a.last_focus_time > b.last_focus_time;
+  }
+};
+
 }  // namespace
 
 const int ServiceWorkerVersion::kStartWorkerTimeoutMinutes = 5;
@@ -410,10 +419,11 @@ class ServiceWorkerVersion::Metrics {
   using EventType = ServiceWorkerMetrics::EventType;
   explicit Metrics(ServiceWorkerVersion* owner) : owner_(owner) {}
   ~Metrics() {
+    if (owner_->should_exclude_from_uma_)
+      return;
     for (const auto& ev : event_stats_) {
-      ServiceWorkerMetrics::RecordEventHandledRatio(owner_->scope(), ev.first,
-                                                    ev.second.handled_events,
-                                                    ev.second.fired_events);
+      ServiceWorkerMetrics::RecordEventHandledRatio(
+          ev.first, ev.second.handled_events, ev.second.fired_events);
     }
   }
 
@@ -537,6 +547,8 @@ ServiceWorkerVersion::ServiceWorkerVersion(
       context_(context),
       script_cache_map_(this, context),
       ping_controller_(new PingController(this)),
+      should_exclude_from_uma_(
+          ServiceWorkerMetrics::ShouldExcludeURLFromHistogram(scope_)),
       weak_factory_(this) {
   DCHECK(context_);
   DCHECK(registration);
@@ -705,6 +717,7 @@ void ServiceWorkerVersion::DispatchMessageEventInternal(
     const base::string16& message,
     const std::vector<TransferredMessagePort>& sent_message_ports,
     const StatusCallback& callback) {
+  OnBeginEvent();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
     StartWorker(base::Bind(
@@ -732,6 +745,7 @@ void ServiceWorkerVersion::DispatchMessageEventInternal(
 
 void ServiceWorkerVersion::DispatchInstallEvent(
     const StatusCallback& callback) {
+  OnBeginEvent();
   DCHECK_EQ(INSTALLING, status()) << status();
 
   if (running_status() != RUNNING) {
@@ -750,6 +764,7 @@ void ServiceWorkerVersion::DispatchInstallEvent(
 
 void ServiceWorkerVersion::DispatchActivateEvent(
     const StatusCallback& callback) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATING, status()) << status();
 
   if (running_status() != RUNNING) {
@@ -770,6 +785,7 @@ void ServiceWorkerVersion::DispatchFetchEvent(
     const ServiceWorkerFetchRequest& request,
     const base::Closure& prepare_callback,
     const FetchCallback& fetch_callback) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (running_status() != RUNNING) {
@@ -800,6 +816,7 @@ void ServiceWorkerVersion::DispatchFetchEvent(
 
 void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
                                              const StatusCallback& callback) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -829,6 +846,7 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
     int64_t persistent_notification_id,
     const PlatformNotificationData& notification_data,
     int action_index) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -855,6 +873,7 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
 
 void ServiceWorkerVersion::DispatchPushEvent(const StatusCallback& callback,
                                              const std::string& data) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -880,6 +899,7 @@ void ServiceWorkerVersion::DispatchGeofencingEvent(
     blink::WebGeofencingEventType event_type,
     const std::string& region_id,
     const blink::WebCircularGeofencingRegion& region) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -918,6 +938,7 @@ void ServiceWorkerVersion::DispatchServicePortConnectEvent(
     const GURL& target_url,
     const GURL& origin,
     int port_id) {
+  OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -958,6 +979,7 @@ void ServiceWorkerVersion::DispatchCrossOriginMessageEvent(
     const base::string16& message,
     const std::vector<TransferredMessagePort>& sent_message_ports,
     const StatusCallback& callback) {
+  OnBeginEvent();
   // Unlike in the case of DispatchMessageEvent, here the caller is assumed to
   // have already put all the sent message ports on hold. So no need to do that
   // here again.
@@ -1273,8 +1295,9 @@ void ServiceWorkerVersion::OnGetClients(
       "client_type", options.client_type, "include_uncontrolled",
       options.include_uncontrolled);
 
+  ServiceWorkerClients clients;
   if (controllee_map_.empty() && !options.include_uncontrolled) {
-    OnGetClientsFinished(request_id, std::vector<ServiceWorkerClientInfo>());
+    OnGetClientsFinished(request_id, &clients);
     return;
   }
 
@@ -1285,22 +1308,22 @@ void ServiceWorkerVersion::OnGetClients(
     return;
   }
 
-  ServiceWorkerClients clients;
   GetNonWindowClients(request_id, options, &clients);
-  OnGetClientsFinished(request_id, clients);
+  OnGetClientsFinished(request_id, &clients);
 }
 
-void ServiceWorkerVersion::OnGetClientsFinished(
-    int request_id,
-    const ServiceWorkerClients& clients) {
+void ServiceWorkerVersion::OnGetClientsFinished(int request_id,
+                                                ServiceWorkerClients* clients) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   TRACE_EVENT_ASYNC_END1("ServiceWorker", "ServiceWorkerVersion::OnGetClients",
-                         request_id, "The number of clients", clients.size());
+                         request_id, "The number of clients", clients->size());
 
   if (running_status() != RUNNING)
     return;
+  // Sort clients so that the most recently active tab is in the front.
+  std::sort(clients->begin(), clients->end(), ServiceWorkerClientInfoSortMRU());
   embedded_worker_->SendMessage(
-      ServiceWorkerMsg_DidGetClients(request_id, clients));
+      ServiceWorkerMsg_DidGetClients(request_id, *clients));
 }
 
 void ServiceWorkerVersion::OnActivateEventFinished(
@@ -1919,7 +1942,7 @@ void ServiceWorkerVersion::DidGetWindowClients(
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (options.client_type == blink::WebServiceWorkerClientTypeAll)
     GetNonWindowClients(request_id, options, clients.get());
-  OnGetClientsFinished(request_id, *clients);
+  OnGetClientsFinished(request_id, clients.get());
 }
 
 void ServiceWorkerVersion::GetNonWindowClients(
@@ -1951,6 +1974,7 @@ void ServiceWorkerVersion::StartTimeoutTimer() {
     skip_recording_startup_time_ = false;
   }
 
+  // The worker is starting up and not yet idle.
   ClearTick(&idle_time_);
 
   // Ping will be activated in OnScriptLoaded.
@@ -1963,6 +1987,7 @@ void ServiceWorkerVersion::StartTimeoutTimer() {
 
 void ServiceWorkerVersion::StopTimeoutTimer() {
   timeout_timer_.Stop();
+  ClearTick(&idle_time_);
 
   // Trigger update if worker is stale.
   if (!in_dtor_ && !stale_time_.is_null()) {
@@ -2134,6 +2159,8 @@ int ServiceWorkerVersion::AddRequest(
 }
 
 bool ServiceWorkerVersion::OnRequestTimeout(const RequestInfo& info) {
+  UMA_HISTOGRAM_ENUMERATION("ServiceWorker.RequestTimeouts.Count", info.type,
+                            NUM_REQUEST_TYPES);
   switch (info.type) {
     case REQUEST_ACTIVATE:
       return RunIDMapCallback(&activate_requests_, info.id,
@@ -2163,6 +2190,8 @@ bool ServiceWorkerVersion::OnRequestTimeout(const RequestInfo& info) {
                               SERVICE_WORKER_ERROR_TIMEOUT,
                               false /* accept_connection */, base::string16(),
                               base::string16());
+    case NUM_REQUEST_TYPES:
+      break;
   }
   NOTREACHED() << "Got unexpected request type: " << info.type;
   return false;
@@ -2304,6 +2333,15 @@ void ServiceWorkerVersion::OnServicePortDispatcherConnectionError() {
 void ServiceWorkerVersion::OnBackgroundSyncDispatcherConnectionError() {
   RunIDMapCallbacks(&sync_requests_, SERVICE_WORKER_ERROR_FAILED);
   background_sync_dispatcher_.reset();
+}
+
+void ServiceWorkerVersion::OnBeginEvent() {
+  if (should_exclude_from_uma_ || running_status() != RUNNING ||
+      idle_time_.is_null()) {
+    return;
+  }
+  ServiceWorkerMetrics::RecordTimeBetweenEvents(base::TimeTicks::Now() -
+                                                idle_time_);
 }
 
 }  // namespace content

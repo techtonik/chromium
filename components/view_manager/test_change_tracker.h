@@ -10,7 +10,7 @@
 
 #include "base/basictypes.h"
 #include "components/view_manager/public/cpp/types.h"
-#include "components/view_manager/public/interfaces/view_manager.mojom.h"
+#include "components/view_manager/public/interfaces/view_tree.mojom.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/array.h"
 #include "ui/mojo/geometry/geometry.mojom.h"
 
@@ -19,7 +19,6 @@ namespace view_manager {
 enum ChangeType {
   CHANGE_TYPE_EMBED,
   CHANGE_TYPE_EMBEDDED_APP_DISCONNECTED,
-  CHANGE_TYPE_EMBED_FOR_DESCENDANT,
   CHANGE_TYPE_UNEMBED,
   // TODO(sky): nuke NODE.
   CHANGE_TYPE_NODE_BOUNDS_CHANGED,
@@ -53,8 +52,8 @@ struct TestView {
   std::map<std::string, std::vector<uint8_t>> properties;
 };
 
-// Tracks a call to ViewManagerClient. See the individual functions for the
-// fields that are used.
+// Tracks a call to ViewTreeClient. See the individual functions for the fields
+// that are used.
 struct Change {
   Change();
   ~Change();
@@ -95,12 +94,12 @@ std::string ChangeViewDescription(const std::vector<Change>& changes);
 void ViewDatasToTestViews(const mojo::Array<mojo::ViewDataPtr>& data,
                           std::vector<TestView>* test_views);
 
-// TestChangeTracker is used to record ViewManagerClient functions. It notifies
+// TestChangeTracker is used to record ViewTreeClient functions. It notifies
 // a delegate any time a change is added.
 class TestChangeTracker {
  public:
   // Used to notify the delegate when a change is added. A change corresponds to
-  // a single ViewManagerClient function.
+  // a single ViewTreeClient function.
   class Delegate {
    public:
     virtual void OnChangeAdded() = 0;
@@ -119,10 +118,9 @@ class TestChangeTracker {
   std::vector<Change>* changes() { return &changes_; }
 
   // Each of these functions generate a Change. There is one per
-  // ViewManagerClient function.
+  // ViewTreeClient function.
   void OnEmbed(mojo::ConnectionSpecificId connection_id,
                mojo::ViewDataPtr root);
-  void OnEmbedForDescendant(mojo::Id view_id);
   void OnEmbeddedAppDisconnected(mojo::Id view_id);
   void OnUnembed();
   void OnViewBoundsChanged(mojo::Id view_id,

@@ -161,6 +161,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void EndFrameSubscription() override;
   bool HasAcceleratedSurface(const gfx::Size& desired_size) override;
   void GetScreenInfo(blink::WebScreenInfo* results) override;
+  bool GetScreenColorProfile(std::vector<char>* color_profile) override;
   gfx::Rect GetBoundsInRootWindow() override;
   void WheelEventAck(const blink::WebMouseWheelEvent& event,
                      InputEventAckState ack_result) override;
@@ -496,7 +497,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void HandleGestureForTouchSelection(ui::GestureEvent* event);
 
   // The model object.
-  RenderWidgetHostImpl* host_;
+  RenderWidgetHostImpl* const host_;
 
   aura::Window* window_;
 
@@ -659,7 +660,12 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
 
   BeginFrameObserverProxy begin_frame_observer_proxy_;
 
+  // This flag when set ensures that we send over a notification to blink that
+  // the current view has focus. Defaults to false.
+  bool set_focus_on_mouse_down_;
+
   base::WeakPtrFactory<RenderWidgetHostViewAura> weak_ptr_factory_;
+
   DISALLOW_COPY_AND_ASSIGN(RenderWidgetHostViewAura);
 };
 

@@ -12,8 +12,9 @@
 
 namespace {
 
-const std::string kDummyFrameUrl =
-    "data:text/html,<!--chromedriver dummy frame-->";
+const std::string kDummyFrameName = "chromedriver dummy frame";
+const std::string kDummyFrameUrl = "about:blank";
+const std::string kUnreachableWebDataURL = "data:text/html,chromewebdata";
 
 }  // namespace
 
@@ -22,7 +23,9 @@ NavigationTracker::NavigationTracker(DevToolsClient* client,
     : client_(client),
       loading_state_(kUnknown),
       browser_info_(browser_info),
-      dummy_execution_context_id_(0) {
+      dummy_execution_context_id_(0),
+      load_event_fired_(true),
+      timed_out_(false) {
   client_->AddListener(this);
 }
 
@@ -32,7 +35,9 @@ NavigationTracker::NavigationTracker(DevToolsClient* client,
     : client_(client),
       loading_state_(known_state),
       browser_info_(browser_info),
-      dummy_execution_context_id_(0) {
+      dummy_execution_context_id_(0),
+      load_event_fired_(true),
+      timed_out_(false) {
   client_->AddListener(this);
 }
 
@@ -40,6 +45,31 @@ NavigationTracker::~NavigationTracker() {}
 
 Status NavigationTracker::IsPendingNavigation(const std::string& frame_id,
                                               bool* is_pending) {
+  if (!IsExpectingFrameLoadingEvents()) {
+    // Some DevTools commands (e.g. Input.dispatchMouseEvent) are handled in the
+    // browser process, and may cause the renderer process to start a new
+    // navigation. We need to call Runtime.evaluate to force a roundtrip to the
+    // renderer process, and make sure that we notice any pending navigations
+    // (see crbug.com/524079).
+    base::DictionaryValue params;
+    params.SetString("expression", "1");
+    scoped_ptr<base::DictionaryValue> result;
+    Status status = client_->SendCommandAndGetResult(
+        "Runtime.evaluate", params, &result);
+    int value = 0;
+    if (status.code() == kDisconnected) {
+      // If we receive a kDisconnected status code from Runtime.evaluate, don't
+      // wait for pending navigations to complete, since we won't see any more
+      // events from it until we reconnect.
+      *is_pending = false;
+      return Status(kOk);
+    } else if (status.IsError() ||
+               !result->GetInteger("result.value", &value) ||
+               value != 1) {
+      return Status(kUnknownError, "cannot determine loading status", status);
+    }
+  }
+
   if (loading_state_ == kUnknown) {
     // In the case that a http request is sent to server to fetch the page
     // content and the server hasn't responded at all, a dummy page is created
@@ -68,6 +98,7 @@ Status NavigationTracker::IsPendingNavigation(const std::string& frame_id,
        "    document.readyState == 'interactive';"
        "if (isLoaded) {"
        "  var frame = document.createElement('iframe');"
+       "  frame.name = '" + kDummyFrameName + "';"
        "  frame.src = '" + kDummyFrameUrl + "';"
        "  document.body.appendChild(frame);"
        "  window.setTimeout(function() {"
@@ -98,6 +129,10 @@ Status NavigationTracker::IsPendingNavigation(const std::string& frame_id,
     *is_pending |= pending_frame_set_.count(frame_id) > 0;
   }
   return Status(kOk);
+}
+
+void NavigationTracker::set_timed_out(bool timed_out) {
+  timed_out_ = timed_out;
 }
 
 Status NavigationTracker::OnConnected(DevToolsClient* client) {
@@ -144,11 +179,11 @@ Status NavigationTracker::OnEvent(DevToolsClient* client,
       return Status(kUnknownError, "missing or invalid 'frameId'");
 
     pending_frame_set_.erase(frame_id);
-
-    if (pending_frame_set_.empty() || expecting_single_stop_event) {
+    if (expecting_single_stop_event)
       pending_frame_set_.clear();
+    if (pending_frame_set_.empty() &&
+        (load_event_fired_ || timed_out_ || execution_context_set_.empty()))
       loading_state_ = kNotLoading;
-    }
   } else if (method == "Page.frameScheduledNavigation") {
     double delay;
     if (!params.GetDouble("delay", &delay))
@@ -174,26 +209,42 @@ Status NavigationTracker::OnEvent(DevToolsClient* client,
 
     const base::Value* unused_value;
     if (!params.Get("frame.parentId", &unused_value)) {
-      // If the main frame just navigated, discard any pending scheduled
-      // navigations. For some reasons at times the cleared event is not
-      // received when navigating.
-      // See crbug.com/180742.
-      pending_frame_set_.clear();
-      scheduled_frame_set_.clear();
+      if (IsExpectingFrameLoadingEvents()) {
+        // If the main frame just navigated, discard any pending scheduled
+        // navigations. For some reasons at times the cleared event is not
+        // received when navigating.
+        // See crbug.com/180742.
+        pending_frame_set_.clear();
+        scheduled_frame_set_.clear();
+      } else {
+        // If the URL indicates that the web page is unreachable (the sad tab
+        // page) then discard any pending or scheduled navigations.
+        std::string frame_url;
+        if (!params.GetString("frame.url", &frame_url))
+          return Status(kUnknownError, "missing or invalid 'frame.url'");
+        if (frame_url == kUnreachableWebDataURL) {
+          pending_frame_set_.clear();
+          scheduled_frame_set_.clear();
+        }
+      }
     } else {
       // If a child frame just navigated, check if it is the dummy frame that
       // was attached by IsPendingNavigation(). We don't want to track execution
       // contexts created and destroyed for this dummy frame.
+      std::string name;
+      if (!params.GetString("frame.name", &name))
+        return Status(kUnknownError, "missing or invalid 'frame.name'");
       std::string url;
       if (!params.GetString("frame.url", &url))
         return Status(kUnknownError, "missing or invalid 'frame.url'");
-      if (url == kDummyFrameUrl)
+      if (name == kDummyFrameName && url == kDummyFrameUrl)
         params.GetString("frame.id", &dummy_frame_id_);
     }
   } else if (method == "Runtime.executionContextsCleared") {
     if (!IsExpectingFrameLoadingEvents()) {
       execution_context_set_.clear();
       ResetLoadingState(kLoading);
+      load_event_fired_ = false;
     }
   } else if (method == "Runtime.executionContextCreated") {
     if (!IsExpectingFrameLoadingEvents()) {
@@ -217,6 +268,7 @@ Status NavigationTracker::OnEvent(DevToolsClient* client,
       if (execution_context_id != dummy_execution_context_id_) {
         if (execution_context_set_.empty()) {
           loading_state_ = kLoading;
+          load_event_fired_ = false;
           dummy_frame_id_ = std::string();
           dummy_execution_context_id_ = 0;
         }
@@ -224,7 +276,7 @@ Status NavigationTracker::OnEvent(DevToolsClient* client,
     }
   } else if (method == "Page.loadEventFired") {
     if (!IsExpectingFrameLoadingEvents())
-      ResetLoadingState(kNotLoading);
+      load_event_fired_ = true;
   } else if (method == "Inspector.targetCrashed") {
     ResetLoadingState(kNotLoading);
   }

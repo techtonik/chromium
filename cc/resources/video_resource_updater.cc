@@ -382,6 +382,7 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForHardwarePlanes(
   switch (video_frame->format()) {
     case media::PIXEL_FORMAT_ARGB:
     case media::PIXEL_FORMAT_XRGB:
+    case media::PIXEL_FORMAT_UYVY:
       DCHECK_EQ(1u, textures);
       switch (video_frame->mailbox_holder(0).texture_target) {
         case GL_TEXTURE_2D:
@@ -405,9 +406,7 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForHardwarePlanes(
     case media::PIXEL_FORMAT_I420:
       external_resources.type = VideoFrameExternalResources::YUV_RESOURCE;
       break;
-#if defined(OS_MACOSX) || defined(OS_CHROMEOS)
     case media::PIXEL_FORMAT_NV12:
-#endif
     case media::PIXEL_FORMAT_YV12:
     case media::PIXEL_FORMAT_YV16:
     case media::PIXEL_FORMAT_YV24:

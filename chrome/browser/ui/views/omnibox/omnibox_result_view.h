@@ -47,10 +47,6 @@ class OmniboxResultView : public views::View,
     NUM_KINDS
   };
 
-  // The minimum distance between the top and bottom of the text and the
-  // top or bottom of the row.
-  static const int kMinimumTextVerticalPadding = 3;
-
   OmniboxResultView(OmniboxPopupContentsView* model,
                     int model_index,
                     LocationBarView* location_bar_view,
@@ -175,6 +171,13 @@ class OmniboxResultView : public views::View,
                               const base::string16& text,
                               int text_type,
                               bool is_bold);
+
+  // Returns the necessary margin, if any, at the start and end of the view.
+  // This allows us to keep the icon and text in the view aligned with the
+  // location bar contents. For a left-to-right language, StartMargin()
+  // and EndMargin() correspond to the left and right margins, respectively.
+  int StartMargin() const;
+  int EndMargin() const;
 
   static int default_icon_size_;
 

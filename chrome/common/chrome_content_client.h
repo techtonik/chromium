@@ -16,6 +16,8 @@
 #include "content/public/common/pepper_plugin_info.h"
 #endif
 
+#include "url/url_util.h"
+
 // Returns the user agent of Chrome.
 std::string GetUserAgent();
 
@@ -41,13 +43,20 @@ class ChromeContentClient : public content::ContentClient {
       content::PepperPluginInfo::GetInterfaceFunc get_interface,
       content::PepperPluginInfo::PPP_InitializeModuleFunc initialize_module,
       content::PepperPluginInfo::PPP_ShutdownModuleFunc shutdown_module);
+
+  // This returns the most recent plugin based on the plugin versions.
+  // It does not make sense to call this on a vector that contains more than one
+  // plugin type. This function may return a nullptr if given an empty vector.
+  // The method is only visible for testing purposes.
+  static content::PepperPluginInfo* FindMostRecentPlugin(
+      const std::vector<content::PepperPluginInfo*>& plugins);
 #endif
 
   void SetActiveURL(const GURL& url) override;
   void SetGpuInfo(const gpu::GPUInfo& gpu_info) override;
   void AddPepperPlugins(
       std::vector<content::PepperPluginInfo>* plugins) override;
-  void AddAdditionalSchemes(std::vector<std::string>* standard_schemes,
+  void AddAdditionalSchemes(std::vector<url::SchemeWithType>* standard_schemes,
                             std::vector<std::string>* saveable_shemes) override;
   std::string GetProduct() const override;
   std::string GetUserAgent() const override;

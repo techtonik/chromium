@@ -15,15 +15,12 @@ namespace base {
 class SequencedTaskRunner;
 }  // namespace base
 
-namespace syncer {
-class ModelTypeSyncProxyImpl;
-}  //namespace syncer
-
 namespace syncer_v2 {
+class ModelTypeSyncProxyImpl;
 class SyncContextProxy;
 }  // namespace syncer_v2
 
-namespace sync_driver {
+namespace sync_driver_v2 {
 
 class NonBlockingDataTypeController;
 
@@ -48,7 +45,7 @@ class NonBlockingDataTypeManager {
   void InitializeType(
       syncer::ModelType type,
       const scoped_refptr<base::SequencedTaskRunner>& task_runner,
-      const base::WeakPtr<syncer::ModelTypeSyncProxyImpl>& type_sync_proxy);
+      const base::WeakPtr<syncer_v2::ModelTypeSyncProxyImpl>& type_sync_proxy);
 
   // Connects the sync backend, as represented by a SyncContextProxy, to the
   // NonBlockingDataTypeController on the UI thread.
@@ -75,6 +72,6 @@ class NonBlockingDataTypeManager {
   NonBlockingDataTypeControllerMap non_blocking_data_type_controllers_;
 };
 
-}  // namespace sync_driver
+}  // namespace sync_driver_v2
 
 #endif  // COMPONENTS_SYNC_DRIVER_NON_BLOCKING_DATA_TYPE_MANAGER_H_

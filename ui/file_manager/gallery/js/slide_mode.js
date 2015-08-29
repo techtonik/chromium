@@ -21,14 +21,15 @@
  * @param {function(function())} toggleMode Function to toggle the Gallery mode.
  * @param {function(string):string} displayStringFunction String formatting
  *     function.
+ * @param {!DimmableUIController} dimmableUIController Dimmable UI controller.
  * @constructor
  * @struct
- * @suppress {checkStructDictInheritance}
  * @extends {cr.EventTarget}
  */
 function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
     errorBanner, dataModel, selectionModel, metadataModel, thumbnailModel,
-    context, volumeManager, toggleMode, displayStringFunction) {
+    context, volumeManager, toggleMode, displayStringFunction,
+    dimmableUIController) {
   /**
    * @type {!HTMLElement}
    * @private
@@ -118,6 +119,12 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   this.displayStringFunction_ = displayStringFunction;
+
+  /**
+   * @private {!DimmableUIController}
+   * @const
+   */
+  this.dimmableUIController_ = dimmableUIController;
 
   /**
    * @type {function(this:SlideMode)}
@@ -215,8 +222,7 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   this.imageContainer_ = util.createChild(queryRequiredElement(
-      this.document_, '.content'), 'image-container');
-  this.imageContainer_.addEventListener('click', this.onClick_.bind(this));
+      '.content', this.document_), 'image-container');
 
   this.document_.addEventListener('click', this.onDocumentClick_.bind(this));
 
@@ -226,21 +232,21 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.options_ = queryRequiredElement(this.bottomToolbar_, '.options');
+  this.options_ = queryRequiredElement('.options', this.bottomToolbar_);
 
   /**
    * @type {!HTMLElement}
    * @private
    * @const
    */
-  this.savedLabel_ = queryRequiredElement(this.options_, '.saved');
+  this.savedLabel_ = queryRequiredElement('.saved', this.options_);
 
   /**
    * @private {!PaperCheckboxElement}
    * @const
    */
   this.overwriteOriginalCheckbox_ = /** @type {!PaperCheckboxElement} */
-      (queryRequiredElement(this.options_, '.overwrite-original'));
+      (queryRequiredElement('.overwrite-original', this.options_));
   this.overwriteOriginalCheckbox_.addEventListener('change',
       this.onOverwriteOriginalCheckboxChanged_.bind(this));
 
@@ -249,31 +255,19 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   this.filesToast_ = /** @type {!FilesToast} */
-      (queryRequiredElement(document, 'files-toast'));
+      (queryRequiredElement('files-toast'));
 
   /**
-   * @type {!HTMLElement}
-   * @private
+   * @private {!HTMLElement}
    * @const
    */
-  this.bubble_ = util.createChild(this.bottomToolbar_, 'bubble');
-  this.bubble_.hidden = true;
+  this.bubble_ = queryRequiredElement('.bubble', this.bottomToolbar_);
 
-  /**
-   * @type {!HTMLElement}
-   * @const
-   */
-  var bubbleContent = util.createChild(this.bubble_);
-  bubbleContent.innerHTML = this.displayStringFunction_(
-      'GALLERY_OVERWRITE_BUBBLE');
+  var bubbleContent = queryRequiredElement('.content', this.bubble_);
+  // GALLERY_OVERWRITE_BUBBLE contains <br> tag inside message.
+  bubbleContent.innerHTML = strf('GALLERY_OVERWRITE_BUBBLE');
 
-  util.createChild(this.bubble_, 'pointer bottom', 'span');
-
-  /**
-   * @type {!HTMLElement}
-   * @const
-   */
-  var bubbleClose = util.createChild(this.bubble_, 'close-x');
+  var bubbleClose = queryRequiredElement('.close-x', this.bubble_);
   bubbleClose.addEventListener('click', this.onCloseBubble_.bind(this));
 
   /**
@@ -311,8 +305,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.ribbonSpacer_ = queryRequiredElement(this.bottomToolbar_,
-      '.ribbon-spacer');
+  this.ribbonSpacer_ = queryRequiredElement('.ribbon-spacer',
+      this.bottomToolbar_);
 
   /**
    * @type {!Ribbon}
@@ -329,8 +323,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @type {!HTMLElement}
    * @const
    */
-  var slideShowButton = queryRequiredElement(this.topToolbar_,
-      'paper-button.slideshow');
+  var slideShowButton = queryRequiredElement('paper-button.slideshow',
+      this.topToolbar_);
   slideShowButton.addEventListener('click',
       this.startSlideshow.bind(this, SlideMode.SLIDESHOW_INTERVAL_FIRST));
 
@@ -351,7 +345,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.editButton_ = queryRequiredElement(this.topToolbar_, 'button.edit');
+  this.editButton_ = queryRequiredElement('button.edit', this.topToolbar_);
+  GalleryUtil.decorateMouseFocusHandling(this.editButton_);
   this.editButton_.addEventListener('click', this.toggleEditor.bind(this));
 
   /**
@@ -366,8 +361,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.printButton_ = queryRequiredElement(
-      this.topToolbar_, 'paper-button.print');
+  this.printButton_ = queryRequiredElement('paper-button.print',
+      this.topToolbar_);
   this.printButton_.addEventListener('click', this.print_.bind(this));
 
   /**
@@ -375,8 +370,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.editBarSpacer_ = queryRequiredElement(this.bottomToolbar_,
-      '.edit-bar-spacer');
+  this.editBarSpacer_ = queryRequiredElement('.edit-bar-spacer',
+      this.bottomToolbar_);
 
   /**
    * @type {!HTMLElement}
@@ -437,6 +432,7 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
       },
       SlideMode.EDITOR_MODES,
       this.displayStringFunction_);
+  this.editor_.addEventListener('exit-clicked', this.onExitClicked_.bind(this));
 
   /**
    * @type {!TouchHandler}
@@ -444,6 +440,16 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   this.touchHandlers_ = new TouchHandler(this.imageContainer_, this);
+
+  /**
+   * @private {!ChromeVoxStateWatcher}
+   * @const
+   */
+  this.chromeVoxStateWatcher_ = new ChromeVoxStateWatcher();
+  this.chromeVoxStateWatcher_.addEventListener('chromevox-navigation-begin',
+      this.onChromeVoxNavigationBegin_.bind(this));
+  this.chromeVoxStateWatcher_.addEventListener('chromevox-navigation-end',
+      this.onChromeVoxNavigationEnd_.bind(this));
 }
 
 /**
@@ -477,6 +483,32 @@ SlideMode.KEY_OFFSET_MAP = {
  * SlideMode extends cr.EventTarget.
  */
 SlideMode.prototype.__proto__ = cr.EventTarget.prototype;
+
+/**
+ * Handles chromevox-navigation-begin event. While user is navigating with
+ * ChromeVox, we should not hide the tools.
+ * @private
+ */
+SlideMode.prototype.onChromeVoxNavigationBegin_ = function() {
+  this.dimmableUIController_.setDisabled(true);
+};
+
+/**
+ * Handles chromevox-navigation-end event.
+ * @private
+ */
+SlideMode.prototype.onChromeVoxNavigationEnd_ = function() {
+  this.dimmableUIController_.setDisabled(false);
+};
+
+/**
+ * Handles exit-clicked event.
+ * @private
+ */
+SlideMode.prototype.onExitClicked_ = function() {
+  if (this.isEditing())
+    this.toggleEditor();
+};
 
 /**
  * @return {string} Mode name.
@@ -717,6 +749,9 @@ SlideMode.prototype.loadSelectedItem_ = function() {
     return;  // Do not reselect.
 
   var index = this.getSelectedIndex();
+  if (index < 0)
+    return;
+
   var displayedIndex = this.dataModel_.indexOf(this.displayedItem_);
   var step =
       slideHint || (displayedIndex > 0 ? index - displayedIndex : 1);
@@ -799,23 +834,7 @@ SlideMode.prototype.onSplice_ = function(event) {
 
   // Delay the selection to let the ribbon splice handler work first.
   setTimeout(function() {
-    var displayedItemNotRemvoed = event.removed.every(function(item) {
-      return item !== this.displayedItem_;
-    }.bind(this));
-    if (displayedItemNotRemvoed)
-      return;
-    var nextIndex;
-    if (event.index < this.dataModel_.length) {
-      // There is the next item, select it.
-      // The next item is now at the same index as the removed one, so we need
-      // to correct displayIndex_ so that loadSelectedItem_ does not think
-      // we are re-selecting the same item (and does right-to-left slide-in
-      // animation).
-      nextIndex = event.index;
-    } else if (this.dataModel_.length) {
-      // Removed item is the rightmost, but there are more items.
-      nextIndex = event.index - 1;  // Select the new last index.
-    } else {
+    if (this.dataModel_.length === 0) {
       // No items left. Unload the image, disable edit and print button, and
       // show the banner.
       this.commitItem_(function() {
@@ -826,9 +845,17 @@ SlideMode.prototype.onSplice_ = function(event) {
       }.bind(this));
       return;
     }
-    // To force to dispatch a selection change event, clear selection before.
-    this.selectionModel_.clear();
-    this.select(nextIndex);
+
+    var displayedItemNotRemvoed = event.removed.every(function(item) {
+      return item !== this.displayedItem_;
+    }.bind(this));
+    if (!displayedItemNotRemvoed) {
+      // There is the next item, select it. Otherwise, select the last item.
+      var nextIndex = Math.min(event.index, this.dataModel_.length - 1);
+      // To force to dispatch a selection change event, clear selection before.
+      this.selectionModel_.clear();
+      this.select(nextIndex);
+    }
   }.bind(this), 0);
 };
 
@@ -1003,20 +1030,9 @@ SlideMode.prototype.itemLoaded_ = function(
   this.overwriteOriginalCheckbox_.checked = false;
 
   var keys = {};
-  keys[SlideMode.OVERWRITE_BUBBLE_KEY] = 0;
   keys[SlideMode.OVERWRITE_ORIGINAL_KEY] = true;
   chrome.storage.local.get(keys,
       function(values) {
-        var times = values[SlideMode.OVERWRITE_BUBBLE_KEY];
-        if (times < SlideMode.OVERWRITE_BUBBLE_MAX_TIMES) {
-          this.bubble_.hidden = false;
-          if (this.isEditing()) {
-            var items = {};
-            items[SlideMode.OVERWRITE_BUBBLE_KEY] = times + 1;
-            chrome.storage.local.set(items);
-          }
-        }
-
         // Users can overwrite original file only if loaded image is original
         // and writable.
         if (item.isOriginal() &&
@@ -1058,15 +1074,6 @@ SlideMode.prototype.requestPrefetch = function(direction, delay) {
 };
 
 // Event handlers.
-
-/**
- * Click handler for the image container.
- *
- * @param {!Event} event Mouse click event.
- * @private
- */
-SlideMode.prototype.onClick_ = function(event) {
-};
 
 /**
  * Click handler for the entire document.
@@ -1329,10 +1336,7 @@ SlideMode.prototype.onOverwriteOriginalCheckboxChanged_ = function() {
  */
 SlideMode.prototype.onCloseBubble_ = function() {
   this.bubble_.hidden = true;
-  var items = {};
-  items[SlideMode.OVERWRITE_BUBBLE_KEY] =
-      SlideMode.OVERWRITE_BUBBLE_MAX_TIMES;
-  chrome.storage.local.set(items);
+  this.setOverwriteBubbleCount_(SlideMode.OVERWRITE_BUBBLE_MAX_TIMES);
 };
 
 // Slideshow
@@ -1403,6 +1407,11 @@ SlideMode.prototype.startSlideshow = function(opt_interval, opt_event) {
     opt_interval = (opt_interval || SlideMode.SLIDESHOW_INTERVAL) +
         SlideMode.FULLSCREEN_TOGGLE_DELAY;
   }
+
+  // This is a workaround. Mouseout event is not dispatched when window becomes
+  // fullscreen and cursor gets out of the element
+  // TODO(yawano): Find better implementation.
+  this.dimmableUIController_.setCursorOutOfTools();
 
   this.resumeSlideshow_(opt_interval);
 };
@@ -1534,6 +1543,11 @@ SlideMode.prototype.toggleEditor = function(opt_event) {
   if (this.isEditing()) { // isEditing has just been flipped to a new value.
     // Reset zoom.
     this.viewport_.resetView();
+
+    // Scale the screen so that it doesn't overlap the toolbars.
+    this.viewport_.setScreenTop(ImageEditor.Toolbar.HEIGHT);
+    this.viewport_.setScreenBottom(ImageEditor.Toolbar.HEIGHT);
+
     this.imageView_.applyViewportChange();
 
     // TODO(yawano): Integarate this warning message to the non writable format
@@ -1554,11 +1568,61 @@ SlideMode.prototype.toggleEditor = function(opt_event) {
     }
 
     this.touchHandlers_.enabled = false;
+    this.dimmableUIController_.setDisabled(true);
+
+    // Show overwrite original bubble if it hasn't been shown for max times.
+    this.getOverwriteBubbleCount_().then(function(count) {
+      if (count >= SlideMode.OVERWRITE_BUBBLE_MAX_TIMES)
+        return;
+
+      this.setOverwriteBubbleCount_(count + 1);
+      this.bubble_.hidden = false;
+    }.bind(this));
   } else {
     this.editor_.getPrompt().hide();
     this.editor_.leaveModeGently();
+
+    this.viewport_.setScreenTop(0);
+    this.viewport_.setScreenBottom(0);
+    this.imageView_.applyViewportChange();
+
+    this.bubble_.hidden = true;
+
     this.touchHandlers_.enabled = true;
+    this.dimmableUIController_.setDisabled(false);
   }
+};
+
+/**
+ * Gets count of overwrite bubble.
+ * @return {!Promise<number>}
+ * @private
+ */
+SlideMode.prototype.getOverwriteBubbleCount_ = function() {
+  return new Promise(function(resolve, reject) {
+    var requests = {};
+    requests[SlideMode.OVERWRITE_BUBBLE_KEY] = 0;
+
+    chrome.storage.local.get(requests, function(results) {
+      if (!!chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+
+      resolve(results[SlideMode.OVERWRITE_BUBBLE_KEY]);
+    });
+  });
+};
+
+/**
+ * Sets count of overwrite bubble.
+ * @param {number} value
+ * @private
+ */
+SlideMode.prototype.setOverwriteBubbleCount_ = function(value) {
+  var requests = {};
+  requests[SlideMode.OVERWRITE_BUBBLE_KEY] = value;
+  chrome.storage.local.set(requests);
 };
 
 /**

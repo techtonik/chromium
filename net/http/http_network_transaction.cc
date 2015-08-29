@@ -70,7 +70,8 @@ namespace {
 void ProcessAlternativeServices(HttpNetworkSession* session,
                                 const HttpResponseHeaders& headers,
                                 const HostPortPair& http_host_port_pair) {
-  if (headers.HasHeader(kAlternativeServiceHeader)) {
+  if (session->params().use_alternative_services &&
+      headers.HasHeader(kAlternativeServiceHeader)) {
     std::string alternative_service_str;
     headers.GetNormalizedHeader(kAlternativeServiceHeader,
                                 &alternative_service_str);
@@ -900,12 +901,13 @@ void HttpNetworkTransaction::BuildRequestHeaders(
           HttpRequestHeaders::kContentLength,
           base::Uint64ToString(request_->upload_data_stream->size()));
     }
-  } else if (request_->method == "POST" || request_->method == "PUT" ||
-             request_->method == "HEAD") {
+  } else if (request_->method == "POST" || request_->method == "PUT") {
     // An empty POST/PUT request still needs a content length.  As for HEAD,
     // IE and Safari also add a content length header.  Presumably it is to
     // support sending a HEAD request to an URL that only expects to be sent a
     // POST or some other method that normally would have a message body.
+    // Firefox (40.0) does not send the header, and RFC 7230 & 7231
+    // specify that it should not be sent due to undefined behavior.
     request_headers_.SetHeader(HttpRequestHeaders::kContentLength, "0");
   }
 

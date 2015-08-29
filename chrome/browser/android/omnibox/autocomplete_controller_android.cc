@@ -17,7 +17,8 @@
 #include "chrome/browser/autocomplete/shortcuts_backend_factory.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/chrome_notification_types.h"
+#include "chrome/browser/predictors/autocomplete_action_predictor.h"
+#include "chrome/browser/predictors/autocomplete_action_predictor_factory.h"
 #include "chrome/browser/profiles/incognito_helpers.h"
 #include "chrome/browser/profiles/profile_android.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -44,9 +45,6 @@
 #include "components/search_engines/template_url_service.h"
 #include "components/toolbar/toolbar_model.h"
 #include "components/url_formatter/url_formatter.h"
-#include "content/public/browser/notification_details.h"
-#include "content/public/browser/notification_service.h"
-#include "content/public/browser/notification_source.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "jni/AutocompleteController_jni.h"
@@ -239,10 +237,9 @@ void AutocompleteControllerAndroid::OnSuggestionSelected(
   autocomplete_controller_->AddProvidersInfo(&log.providers_info);
 
   OmniboxEventGlobalTracker::GetInstance()->OnURLOpened(&log);
-  content::NotificationService::current()->Notify(
-      chrome::NOTIFICATION_OMNIBOX_OPENED_URL,
-      content::Source<Profile>(profile_),
-      content::Details<OmniboxLog>(&log));
+
+  predictors::AutocompleteActionPredictorFactory::GetForProfile(profile_)
+      ->OnOmniboxOpenedUrl(log);
 }
 
 void AutocompleteControllerAndroid::DeleteSuggestion(JNIEnv* env,
@@ -521,11 +518,12 @@ static jlong Init(JNIEnv* env, jobject obj, jobject jprofile) {
   return reinterpret_cast<intptr_t>(native_bridge);
 }
 
-static jstring QualifyPartialURLQuery(
-    JNIEnv* env, jclass clazz, jstring jquery) {
+static ScopedJavaLocalRef<jstring> QualifyPartialURLQuery(JNIEnv* env,
+                                                          jclass clazz,
+                                                          jstring jquery) {
   Profile* profile = ProfileManager::GetActiveUserProfile();
   if (!profile)
-    return NULL;
+    return ScopedJavaLocalRef<jstring>();
   AutocompleteMatch match;
   base::string16 query_string(ConvertJavaStringToUTF16(env, jquery));
   AutocompleteClassifierFactory::GetForProfile(profile)->Classify(
@@ -536,16 +534,16 @@ static jstring QualifyPartialURLQuery(
       &match,
       NULL);
   if (!match.destination_url.is_valid())
-    return NULL;
+    return ScopedJavaLocalRef<jstring>();
 
   // Only return a URL if the match is a URL type.
   if (match.type != AutocompleteMatchType::URL_WHAT_YOU_TYPED &&
       match.type != AutocompleteMatchType::HISTORY_URL &&
       match.type != AutocompleteMatchType::NAVSUGGEST)
-    return NULL;
+    return ScopedJavaLocalRef<jstring>();
 
   // As we are returning to Java, it is fine to call Release().
-  return ConvertUTF8ToJavaString(env, match.destination_url.spec()).Release();
+  return ConvertUTF8ToJavaString(env, match.destination_url.spec());
 }
 
 static void PrefetchZeroSuggestResults(JNIEnv* env, jclass clazz) {

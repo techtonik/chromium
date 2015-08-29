@@ -27,7 +27,7 @@ import android.util.Log;
 
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ApplicationStatus;
-import org.chromium.chrome.browser.BookmarkUtils;
+import org.chromium.base.TraceEvent;
 import org.chromium.chrome.browser.ChromeApplication;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.IntentHandler;
@@ -56,6 +56,7 @@ import org.chromium.chrome.browser.tabmodel.document.DocumentTabModel;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.IntentUtils;
+import org.chromium.chrome.browser.webapps.WebappLauncherActivity;
 import org.chromium.content.browser.crypto.CipherFactory;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.ui.base.PageTransition;
@@ -132,7 +133,11 @@ public class ChromeLauncherActivity extends Activity
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        // This Activity is only transient. It launches another activity and
+        // terminates itself. However, some of the work is performed outside of
+        // {@link Activity#onCreate()}. To capture this, the TraceEvent starts
+        // in onCreate(), and ends in onPause().
+        TraceEvent.begin("ChromeLauncherActivity");
         // Needs to be called as early as possible, to accurately capture the
         // time at which the intent was received.
         IntentHandler.addTimestampToIntent(getIntent());
@@ -151,6 +156,26 @@ public class ChromeLauncherActivity extends Activity
 
         mIsCustomTabIntent = isCustomTabIntent();
 
+        // Check if a LIVE WebappActivity has to be brought back to the foreground.  We can't
+        // check for a dead WebappActivity because we don't have that information without a global
+        // TabManager.  If that ever lands, code to bring back any Tab could be consolidated
+        // here instead of being spread between ChromeTabbedActivity and ChromeLauncherActivity.
+        // https://crbug.com/443772, https://crbug.com/522918
+        int tabId = IntentUtils.safeGetIntExtra(getIntent(),
+                TabOpenType.BRING_TAB_TO_FRONT.name(), Tab.INVALID_TAB_ID);
+        if (WebappLauncherActivity.bringWebappToFront(tabId)) {
+            ApiCompatibilityUtils.finishAndRemoveTask(this);
+            return;
+        }
+
+        // The notification settings cog on the flipped side of Notifications and in the Android
+        // Settings "App Notifications" view will open us with a specific category.
+        if (getIntent().hasCategory(Notification.INTENT_CATEGORY_NOTIFICATION_PREFERENCES)) {
+            NotificationUIManager.launchNotificationPreferences(this, getIntent());
+            finish();
+            return;
+        }
+
         // Check if we should launch the ChromeTabbedActivity.
         if (!mIsCustomTabIntent && !FeatureUtilities.isDocumentMode(this)) {
             launchTabbedMode();
@@ -162,13 +187,6 @@ public class ChromeLauncherActivity extends Activity
         if (TextUtils.equals(getIntent().getAction(), ACTION_CLOSE_ALL_INCOGNITO)) {
             ChromeApplication.getDocumentTabModelSelector().getModel(true).closeAllTabs();
             ApiCompatibilityUtils.finishAndRemoveTask(this);
-            return;
-        }
-
-        // The notification settings cog on the flipped side of Notifications and in the Android
-        // Settings "App Notifications" view will open us with a specific category.
-        if (getIntent().hasCategory(Notification.INTENT_CATEGORY_NOTIFICATION_PREFERENCES)) {
-            NotificationUIManager.launchNotificationPreferences(this, getIntent());
             return;
         }
 
@@ -185,6 +203,12 @@ public class ChromeLauncherActivity extends Activity
         // Launch a DocumentActivity to handle the Intent.
         handleDocumentActivityIntent();
         if (!mIsFinishNeeded) ApiCompatibilityUtils.finishAndRemoveTask(this);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        TraceEvent.end("ChromeLauncherActivity");
     }
 
     @Override
@@ -308,7 +332,7 @@ public class ChromeLauncherActivity extends Activity
         boolean append = IntentUtils.safeGetBooleanExtra(
                 getIntent(), IntentHandler.EXTRA_APPEND_TASK, false);
         boolean reuse = IntentUtils.safeGetBooleanExtra(
-                getIntent(), BookmarkUtils.REUSE_URL_MATCHING_TAB_ELSE_NEW_TAB, false);
+                getIntent(), ShortcutHelper.REUSE_URL_MATCHING_TAB_ELSE_NEW_TAB, false);
         boolean affiliated = IntentUtils.safeGetBooleanExtra(
                 getIntent(), IntentHandler.EXTRA_OPEN_IN_BG, false);
 
@@ -405,8 +429,7 @@ public class ChromeLauncherActivity extends Activity
         int tabId = ChromeApplication.getDocumentTabModelSelector().getCurrentTabId();
         DocumentTabModel model =
                 ChromeApplication.getDocumentTabModelSelector().getModelForTabId(tabId);
-        if (tabId != Tab.INVALID_TAB_ID && model != null && !model.isCoveredByChildActivity(tabId)
-                && relaunchTask(tabId)) {
+        if (tabId != Tab.INVALID_TAB_ID && model != null && relaunchTask(tabId)) {
             return true;
         }
 
@@ -416,11 +439,6 @@ public class ChromeLauncherActivity extends Activity
         for (AppTask task : am.getAppTasks()) {
             String className = DocumentUtils.getTaskClassName(task, pm);
             if (className == null || !DocumentActivity.isDocumentActivity(className)) continue;
-
-            int id = ActivityDelegate.getTabIdFromIntent(task.getTaskInfo().baseIntent);
-            model = ChromeApplication.getDocumentTabModelSelector().getModelForTabId(id);
-            if (model != null && model.isCoveredByChildActivity(id)) continue;
-
             if (!moveToFront(task)) continue;
             return true;
         }

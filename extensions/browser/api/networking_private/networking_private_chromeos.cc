@@ -120,6 +120,11 @@ void AppendDeviceState(
   properties->state = state;
   if (device && state == private_api::DEVICE_STATE_TYPE_ENABLED)
     properties->scanning.reset(new bool(device->scanning()));
+  if (device && type == ::onc::network_config::kCellular) {
+    properties->sim_present.reset(new bool(!device->IsSimAbsent()));
+    if (!device->sim_lock_type().empty())
+      properties->sim_lock_type.reset(new std::string(device->sim_lock_type()));
+  }
   device_state_list->push_back(properties.Pass());
 }
 
@@ -182,8 +187,14 @@ void NetworkingPrivateChromeOS::GetProperties(
     return;
   }
 
+  std::string user_id_hash;
+  if (!GetUserIdHash(browser_context_, &user_id_hash, &error)) {
+    failure_callback.Run(error);
+    return;
+  }
+
   GetManagedConfigurationHandler()->GetProperties(
-      service_path,
+      user_id_hash, service_path,
       base::Bind(&NetworkHandlerDictionaryCallback, success_callback),
       base::Bind(&NetworkHandlerFailureCallback, failure_callback));
 }
@@ -293,7 +304,7 @@ void NetworkingPrivateChromeOS::GetNetworks(
       chromeos::onc::NetworkTypePatternFromOncType(network_type);
   scoped_ptr<base::ListValue> network_properties_list =
       chromeos::network_util::TranslateNetworkListToONC(
-          pattern, configured_only, visible_only, limit, false /* debugging */);
+          pattern, configured_only, visible_only, limit);
   success_callback.Run(network_properties_list.Pass());
 }
 

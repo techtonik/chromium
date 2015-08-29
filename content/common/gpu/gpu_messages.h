@@ -77,13 +77,14 @@ IPC_ENUM_TRAITS_MIN_MAX_VALUE(gpu::VideoCodecProfile,
 
 IPC_STRUCT_BEGIN(GPUCreateCommandBufferConfig)
   IPC_STRUCT_MEMBER(int32, share_group_id)
+  IPC_STRUCT_MEMBER(int32, stream_id)
   IPC_STRUCT_MEMBER(std::vector<int>, attribs)
   IPC_STRUCT_MEMBER(GURL, active_url)
   IPC_STRUCT_MEMBER(gfx::GpuPreference, gpu_preference)
 IPC_STRUCT_END()
 
 IPC_STRUCT_BEGIN(GpuMsg_CreateGpuMemoryBuffer_Params)
-  IPC_STRUCT_MEMBER(int32, id)
+  IPC_STRUCT_MEMBER(gfx::GpuMemoryBufferId, id)
   IPC_STRUCT_MEMBER(gfx::Size, size)
   IPC_STRUCT_MEMBER(gfx::BufferFormat, format)
   IPC_STRUCT_MEMBER(gfx::BufferUsage, usage)
@@ -110,9 +111,9 @@ IPC_STRUCT_BEGIN(AcceleratedSurfaceMsg_BufferPresented_Params)
   // If the browser is drawing to the screen, this is the CGL renderer ID of
   // the GL context that the brower is using.
   IPC_STRUCT_MEMBER(int32, renderer_id)
-  // The CGDirectDisplayID on which the content was displayed, to be used for
-  // computing vsync. If vsync is not enabled, this is zero.
-  IPC_STRUCT_MEMBER(uint32, display_id_for_vsync)
+  // The vsync parameters, to synchronize presentation with the display.
+  IPC_STRUCT_MEMBER(base::TimeTicks, vsync_timebase)
+  IPC_STRUCT_MEMBER(base::TimeDelta, vsync_interval)
 IPC_STRUCT_END()
 #endif
 

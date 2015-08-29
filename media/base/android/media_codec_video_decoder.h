@@ -30,6 +30,7 @@ class MediaCodecVideoDecoder : public MediaCodecDecoder {
       const scoped_refptr<base::SingleThreadTaskRunner>& media_runner,
       const base::Closure& request_data_cb,
       const base::Closure& starvation_cb,
+      const base::Closure& drained_requested_cb,
       const base::Closure& stop_done_cb,
       const base::Closure& error_cb,
       const SetTimeCallback& update_current_time_cb,
@@ -42,6 +43,7 @@ class MediaCodecVideoDecoder : public MediaCodecDecoder {
   bool HasStream() const override;
   void SetDemuxerConfigs(const DemuxerConfigs& configs) override;
   void ReleaseDecoderResources() override;
+  void ReleaseMediaCodec() override;
 
   // Stores the video surface to use with upcoming Configure()
   void SetVideoSurface(gfx::ScopedJavaSurface surface);
@@ -50,19 +52,20 @@ class MediaCodecVideoDecoder : public MediaCodecDecoder {
   bool HasVideoSurface() const;
 
  protected:
-  bool IsCodecReconfigureNeeded(const DemuxerConfigs& curr,
-                                const DemuxerConfigs& next) const override;
+  bool IsCodecReconfigureNeeded(const DemuxerConfigs& next) const override;
   ConfigStatus ConfigureInternal() override;
-  void SynchronizePTSWithTime(base::TimeDelta current_time) override;
+  void AssociateCurrentTimeWithPTS(base::TimeDelta pts) override;
+  void DissociatePTSFromTime() override;
   void OnOutputFormatChanged() override;
   void Render(int buffer_index,
+              size_t offset,
               size_t size,
-              bool render_output,
+              RenderMode render_mode,
               base::TimeDelta pts,
               bool eos_encountered) override;
 
   int NumDelayedRenderTasks() const override;
-  void ClearDelayedBuffers(bool release) override;
+  void ReleaseDelayedBuffers() override;
 
 #ifndef NDEBUG
   void VerifyUnitIsKeyFrame(const AccessUnit* unit) const override;
@@ -74,8 +77,8 @@ class MediaCodecVideoDecoder : public MediaCodecDecoder {
   // for later execution.
   void ReleaseOutputBuffer(int buffer_index,
                            base::TimeDelta pts,
-                           size_t size,
                            bool render,
+                           bool update_time,
                            bool eos_encountered);
 
   // Data.

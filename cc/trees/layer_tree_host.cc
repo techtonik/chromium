@@ -35,7 +35,6 @@
 #include "cc/layers/layer.h"
 #include "cc/layers/layer_iterator.h"
 #include "cc/layers/painted_scrollbar_layer.h"
-#include "cc/layers/render_surface.h"
 #include "cc/resources/ui_resource_request.h"
 #include "cc/scheduler/begin_frame_source.h"
 #include "cc/trees/draw_property_utils.h"
@@ -403,10 +402,6 @@ void LayerTreeHost::RequestNewOutputSurface() {
 
 void LayerTreeHost::DidInitializeOutputSurface() {
   output_surface_lost_ = false;
-  if (root_layer()) {
-    LayerTreeHostCommon::CallFunctionForSubtree(
-        root_layer(), [](Layer* layer) { layer->OnOutputSurfaceCreated(); });
-  }
   client_->DidInitializeOutputSurface();
 }
 
@@ -643,8 +638,6 @@ void LayerTreeHost::SetVisible(bool visible) {
   if (visible_ == visible)
     return;
   visible_ = visible;
-  if (!visible)
-    ReduceMemoryUsage();
   proxy_->SetVisible(visible);
 }
 
@@ -795,9 +788,6 @@ bool LayerTreeHost::DoUpdateLayers(Layer* root_layer) {
   base::AutoReset<bool> painting(&in_paint_layer_contents_, true);
   bool did_paint_content = false;
   for (const auto& layer : update_layer_list) {
-    // TODO(enne): temporarily clobber draw properties visible rect.
-    layer->draw_properties().visible_layer_rect =
-        layer->visible_rect_from_property_trees();
     did_paint_content |= layer->Update();
     content_is_suitable_for_gpu_rasterization_ &=
         layer->IsSuitableForGpuRasterization();
@@ -805,22 +795,15 @@ bool LayerTreeHost::DoUpdateLayers(Layer* root_layer) {
   return did_paint_content;
 }
 
-void LayerTreeHost::ReduceMemoryUsage() {
-  if (!root_layer())
-    return;
-
-  LayerTreeHostCommon::CallFunctionForSubtree(
-      root_layer(), [](Layer* layer) { layer->ReduceMemoryUsage(); });
-}
-
 void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
   ScopedPtrVector<SwapPromise>::iterator it = info->swap_promises.begin();
   for (; it != info->swap_promises.end(); ++it) {
     scoped_ptr<SwapPromise> swap_promise(info->swap_promises.take(it));
-    TRACE_EVENT_FLOW_STEP0("input",
+    TRACE_EVENT_WITH_FLOW1("input,benchmark",
                            "LatencyInfo.Flow",
                            TRACE_ID_DONT_MANGLE(swap_promise->TraceId()),
-                           "Main thread scroll update");
+                           TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT,
+                           "step", "Main thread scroll update");
     QueueSwapPromise(swap_promise.Pass());
   }
 
@@ -842,6 +825,7 @@ void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
             gfx::ScrollOffsetWithDelta(layer->scroll_offset(),
                                        info->scrolls[i].scroll_delta));
       }
+      SetNeedsUpdateLayers();
     }
   }
 
@@ -873,6 +857,7 @@ void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
         inner_viewport_scroll_delta, outer_viewport_scroll_delta,
         info->elastic_overscroll_delta, info->page_scale_delta,
         info->top_controls_delta);
+    SetNeedsUpdateLayers();
   }
 }
 
@@ -1107,7 +1092,7 @@ void LayerTreeHost::UnregisterLayer(Layer* layer) {
 }
 
 bool LayerTreeHost::IsLayerInTree(int layer_id, LayerTreeType tree_type) const {
-  return tree_type == LayerTreeType::ACTIVE;
+  return tree_type == LayerTreeType::ACTIVE && LayerById(layer_id);
 }
 
 void LayerTreeHost::SetMutatorsNeedCommit() {
@@ -1212,6 +1197,29 @@ bool LayerTreeHost::HasPotentiallyRunningTransformAnimation(
   return animation_host_
              ? animation_host_->HasPotentiallyRunningTransformAnimation(
                    layer->id(), LayerTreeType::ACTIVE)
+             : false;
+}
+
+bool LayerTreeHost::HasOnlyTranslationTransforms(const Layer* layer) const {
+  return animation_host_
+             ? animation_host_->HasOnlyTranslationTransforms(
+                   layer->id(), LayerTreeType::ACTIVE)
+             : false;
+}
+
+bool LayerTreeHost::MaximumTargetScale(const Layer* layer,
+                                       float* max_scale) const {
+  return animation_host_
+             ? animation_host_->MaximumTargetScale(
+                   layer->id(), LayerTreeType::ACTIVE, max_scale)
+             : false;
+}
+
+bool LayerTreeHost::AnimationStartScale(const Layer* layer,
+                                        float* start_scale) const {
+  return animation_host_
+             ? animation_host_->AnimationStartScale(
+                   layer->id(), LayerTreeType::ACTIVE, start_scale)
              : false;
 }
 

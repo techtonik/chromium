@@ -76,7 +76,6 @@ const char* kPrefsToObserve[] = {
 #endif
   prefs::kWebKitJavascriptCanOpenWindowsAutomatically,
   prefs::kWebKitJavascriptEnabled,
-  prefs::kWebKitJavaEnabled,
   prefs::kWebKitLoadsImagesAutomatically,
   prefs::kWebKitMinimumFontSize,
   prefs::kWebKitMinimumLogicalFontSize,
@@ -352,6 +351,8 @@ class PrefWatcher : public KeyedService {
 #if defined(ENABLE_WEBRTC)
     pref_change_registrar_.Add(prefs::kWebRTCMultipleRoutesEnabled,
                                renderer_callback);
+    pref_change_registrar_.Add(prefs::kWebRTCNonProxiedUdpTransportEnabled,
+                               renderer_callback);
 #endif
 
 #if !defined(OS_MACOSX)
@@ -534,8 +535,6 @@ void PrefsTabHelper::RegisterProfilePrefs(
                                 pref_defaults.dom_paste_enabled);
   registry->RegisterBooleanPref(prefs::kWebKitTextAreasAreResizable,
                                 pref_defaults.text_areas_are_resizable);
-  registry->RegisterBooleanPref(prefs::kWebKitJavaEnabled,
-                                pref_defaults.java_enabled);
   registry->RegisterBooleanPref(prefs::kWebkitTabsToLinks,
                                 pref_defaults.tabs_to_links);
   registry->RegisterBooleanPref(prefs::kWebKitAllowRunningInsecureContent,

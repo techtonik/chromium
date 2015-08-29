@@ -23,6 +23,7 @@ import android.util.Log;
 
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.metrics.RecordUserAction;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.preferences.Preferences;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
@@ -70,6 +71,8 @@ public class NotificationUIManager {
     private final NotificationManagerProxy mNotificationManager;
 
     private RoundedIconGenerator mIconGenerator;
+
+    private long mLastNotificationClickMs = 0L;
 
     /**
      * Creates a new instance of the NotificationUIManager.
@@ -181,6 +184,9 @@ public class NotificationUIManager {
 
         Bundle fragmentArguments;
         if (launchSingleWebsitePreferences) {
+            // Record that the user has clicked on the [Site Settings] button.
+            RecordUserAction.record("Notifications.ShowSiteSettings");
+
             // All preferences for a specific origin.
             fragmentArguments = SingleWebsitePreferences.createFragmentArgsForSite(origin);
         } else {
@@ -383,7 +389,7 @@ public class NotificationUIManager {
                 .setContentText(body)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
                 .setLargeIcon(icon)
-                .setSmallIcon(R.drawable.notification_badge)
+                .setSmallIcon(R.drawable.ic_chrome)
                 .setContentIntent(getPendingIntent(
                         NotificationConstants.ACTION_CLICK_NOTIFICATION,
                         persistentNotificationId, origin, tag, intentData))
@@ -465,6 +471,16 @@ public class NotificationUIManager {
     }
 
     /**
+     * Returns whether a notification has been clicked in the last 5 seconds.
+     * Used for Startup.BringToForegroundReason UMA histogram.
+     */
+    public static boolean wasNotificationRecentlyClicked() {
+        if (sInstance == null) return false;
+        long now = System.currentTimeMillis();
+        return now - sInstance.mLastNotificationClickMs < 5 * 1000;
+    }
+
+    /**
      * Closes the notification associated with the given parameters.
      *
      * @param persistentNotificationId The persistent id of the notification.
@@ -488,6 +504,7 @@ public class NotificationUIManager {
      */
     private boolean onNotificationClicked(long persistentNotificationId, String origin,
                                           String tag) {
+        mLastNotificationClickMs = System.currentTimeMillis();
         return nativeOnNotificationClicked(mNativeNotificationManager, persistentNotificationId,
                                            origin, tag);
     }

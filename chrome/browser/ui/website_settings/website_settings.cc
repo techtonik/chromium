@@ -23,6 +23,7 @@
 #include "chrome/browser/browsing_data/browsing_data_indexed_db_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_local_storage_helper.h"
 #include "chrome/browser/history/history_service_factory.h"
+#include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate_factory.h"
@@ -30,6 +31,7 @@
 #include "chrome/browser/ui/website_settings/website_settings_infobar_delegate.h"
 #include "chrome/browser/ui/website_settings/website_settings_ui.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/content_settings/core/browser/content_settings_utils.h"
@@ -44,7 +46,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/ssl_status.h"
 #include "content/public/common/url_constants.h"
-#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "net/cert/cert_status_flags.h"
 #include "net/cert/x509_certificate.h"
 #include "net/ssl/ssl_cipher_suite_names.h"
@@ -146,14 +147,14 @@ WebsiteSettings::WebsiteSettings(
     WebsiteSettingsUI* ui,
     Profile* profile,
     TabSpecificContentSettings* tab_specific_content_settings,
-    InfoBarService* infobar_service,
+    content::WebContents* web_contents,
     const GURL& url,
     const content::SSLStatus& ssl,
     content::CertStore* cert_store)
     : TabSpecificContentSettings::SiteDataObserver(
           tab_specific_content_settings),
       ui_(ui),
-      infobar_service_(infobar_service),
+      web_contents_(web_contents),
       show_info_bar_(false),
       site_url_(url),
       site_identity_status_(SITE_IDENTITY_STATUS_UNKNOWN),
@@ -321,8 +322,12 @@ void WebsiteSettings::OnSiteDataAccessed() {
 }
 
 void WebsiteSettings::OnUIClosing() {
-  if (show_info_bar_)
-    WebsiteSettingsInfoBarDelegate::Create(infobar_service_);
+  if (show_info_bar_ && web_contents_) {
+    InfoBarService* infobar_service =
+        InfoBarService::FromWebContents(web_contents_);
+    if (infobar_service)
+      WebsiteSettingsInfoBarDelegate::Create(infobar_service);
+  }
 
   SSLCertificateDecisionsDidRevoke user_decision =
       did_revoke_user_ssl_decisions_ ? USER_CERT_DECISIONS_REVOKED
@@ -685,15 +690,11 @@ void WebsiteSettings::PresentSiteData() {
 
   // Add first party cookie and site data counts.
   WebsiteSettingsUI::CookieInfo cookie_info;
-  std::string cookie_source =
-      net::registry_controlled_domains::GetDomainAndRegistry(
-          site_url_,
-          net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
-  if (cookie_source.empty())
-    cookie_source = site_url_.host();
-  cookie_info.cookie_source = cookie_source;
+  cookie_info.cookie_source =
+      l10n_util::GetStringUTF8(IDS_WEBSITE_SETTINGS_FIRST_PARTY_SITE_DATA);
   cookie_info.allowed = allowed_objects.GetObjectCountForDomain(site_url_);
   cookie_info.blocked = blocked_objects.GetObjectCountForDomain(site_url_);
+  cookie_info.is_first_party = true;
   cookie_info_list.push_back(cookie_info);
 
   // Add third party cookie counts.
@@ -701,6 +702,7 @@ void WebsiteSettings::PresentSiteData() {
      IDS_WEBSITE_SETTINGS_THIRD_PARTY_SITE_DATA);
   cookie_info.allowed = allowed_objects.GetObjectCount() - cookie_info.allowed;
   cookie_info.blocked = blocked_objects.GetObjectCount() - cookie_info.blocked;
+  cookie_info.is_first_party = false;
   cookie_info_list.push_back(cookie_info);
 
   ui_->SetCookieInfo(cookie_info_list);

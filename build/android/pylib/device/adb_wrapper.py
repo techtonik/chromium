@@ -170,13 +170,13 @@ class AdbWrapper(object):
     return cls.Devices(timeout=timeout, retries=retries)
 
   @classmethod
-  def Devices(cls, is_ready=True, long_list=False, timeout=_DEFAULT_TIMEOUT,
-              retries=_DEFAULT_RETRIES):
+  def Devices(cls, desired_state=_READY_STATE, long_list=False,
+              timeout=_DEFAULT_TIMEOUT, retries=_DEFAULT_RETRIES):
     """Get the list of active attached devices.
 
     Args:
-      is_ready: Whether the devices should be limited to only those that are
-        ready for use.
+      desired_state: If not None, limit the devices returned to only those
+        in the given state.
       long_list: Whether to use the long listing format.
       timeout: (optional) Timeout per try in seconds.
       retries: (optional) Number of retries to attempt.
@@ -184,14 +184,20 @@ class AdbWrapper(object):
     Yields:
       AdbWrapper instances.
     """
+    lines = cls._RawDevices(long_list=long_list, timeout=timeout,
+                            retries=retries)
+    return [AdbWrapper(line[0]) for line in lines
+            if ((long_list or len(line) == 2)
+                and (not desired_state or line[1] == desired_state))]
+
+  @classmethod
+  def _RawDevices(cls, long_list=False, timeout=_DEFAULT_TIMEOUT,
+                  retries=_DEFAULT_RETRIES):
     cmd = ['devices']
     if long_list:
       cmd.append('-l')
     output = cls._RunAdbCmd(cmd, timeout=timeout, retries=retries)
-    lines = (line.split() for line in output.splitlines()[1:])
-    return [AdbWrapper(line[0]) for line in lines
-            if ((long_list or len(line) == 2)
-                and (not is_ready or line[1] == _READY_STATE))]
+    return [line.split() for line in output.splitlines()[1:]]
 
   def GetDeviceSerial(self):
     """Gets the device serial number associated with this object.
@@ -251,7 +257,7 @@ class AdbWrapper(object):
     if expect_status is None:
       args = ['shell', command]
     else:
-      args = ['shell', '%s; echo %%$?;' % command.rstrip()]
+      args = ['shell', '(%s);echo %%$?' % command.rstrip()]
     output = self._RunDeviceAdbCmd(args, timeout, retries, check_error=False)
     if expect_status is not None:
       output_end = output.rfind('%')
@@ -559,7 +565,16 @@ class AdbWrapper(object):
     Returns:
       One of 'offline', 'bootloader', or 'device'.
     """
-    return self._RunDeviceAdbCmd(['get-state'], timeout, retries).strip()
+    # TODO(jbudorick): Revert to using get-state once it doesn't cause a
+    # a protocol fault.
+    # return self._RunDeviceAdbCmd(['get-state'], timeout, retries).strip()
+
+    lines = self._RawDevices(timeout=timeout, retries=retries)
+    for line in lines:
+      if len(line) >= 2 and line[0] == self._device_serial:
+        return line[1]
+    return 'offline'
+
 
   def GetDevPath(self, timeout=_DEFAULT_TIMEOUT, retries=_DEFAULT_RETRIES):
     """Gets the device path.

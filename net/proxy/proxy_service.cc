@@ -430,9 +430,9 @@ class ProxyService::InitProxyResolver {
 
   // Returns the PAC script data that was selected by ProxyScriptDecider.
   // Should only be called upon completion of the initialization.
-  ProxyResolverScriptData* script_data() {
+  const scoped_refptr<ProxyResolverScriptData>& script_data() {
     DCHECK_EQ(STATE_NONE, next_state_);
-    return script_data_.get();
+    return script_data_;
   }
 
   LoadState GetLoadState() const {
@@ -585,7 +585,8 @@ class ProxyService::ProxyScriptDeciderPoller {
                            ProxyScriptFetcher* proxy_script_fetcher,
                            DhcpProxyScriptFetcher* dhcp_proxy_script_fetcher,
                            int init_net_error,
-                           ProxyResolverScriptData* init_script_data,
+                           const scoped_refptr<ProxyResolverScriptData>&
+                               init_script_data,
                            NetLog* net_log)
       : change_callback_(callback),
         config_(config),
@@ -680,7 +681,7 @@ class ProxyService::ProxyScriptDeciderPoller {
           FROM_HERE,
           base::Bind(&ProxyScriptDeciderPoller::NotifyProxyServiceOfChange,
                      weak_factory_.GetWeakPtr(), result,
-                     make_scoped_refptr(decider_->script_data()),
+                     decider_->script_data(),
                      decider_->effective_config()));
       return;
     }
@@ -694,7 +695,8 @@ class ProxyService::ProxyScriptDeciderPoller {
     TryToStartNextPoll(false);
   }
 
-  bool HasScriptDataChanged(int result, ProxyResolverScriptData* script_data) {
+  bool HasScriptDataChanged(int result,
+      const scoped_refptr<ProxyResolverScriptData>& script_data) {
     if (result != last_error_) {
       // Something changed -- it was failing before and now it succeeded, or
       // conversely it succeeded before and now it failed. Or it failed in
@@ -1073,7 +1075,7 @@ int ProxyService::ResolveProxyHelper(const GURL& raw_url,
 
   DCHECK_EQ(ERR_IO_PENDING, rv);
   DCHECK(!ContainsPendingRequest(req.get()));
-  pending_requests_.push_back(req);
+  pending_requests_.insert(req);
 
   // Completion will be notified through |callback|, unless the caller cancels
   // the request using |pac_request|.
@@ -1346,16 +1348,12 @@ LoadState ProxyService::GetLoadState(const PacRequest* req) const {
 }
 
 bool ProxyService::ContainsPendingRequest(PacRequest* req) {
-  PendingRequests::iterator it = std::find(
-      pending_requests_.begin(), pending_requests_.end(), req);
-  return pending_requests_.end() != it;
+  return pending_requests_.count(req) == 1;
 }
 
 void ProxyService::RemovePendingRequest(PacRequest* req) {
   DCHECK(ContainsPendingRequest(req));
-  PendingRequests::iterator it = std::find(
-      pending_requests_.begin(), pending_requests_.end(), req);
-  pending_requests_.erase(it);
+  pending_requests_.erase(req);
 }
 
 int ProxyService::DidFinishResolvingProxy(const GURL& url,
@@ -1440,11 +1438,11 @@ int ProxyService::DidFinishResolvingProxy(const GURL& url,
 
 void ProxyService::SetProxyScriptFetchers(
     ProxyScriptFetcher* proxy_script_fetcher,
-    DhcpProxyScriptFetcher* dhcp_proxy_script_fetcher) {
+    scoped_ptr<DhcpProxyScriptFetcher> dhcp_proxy_script_fetcher) {
   DCHECK(CalledOnValidThread());
   State previous_state = ResetProxyConfig(false);
   proxy_script_fetcher_.reset(proxy_script_fetcher);
-  dhcp_proxy_script_fetcher_.reset(dhcp_proxy_script_fetcher);
+  dhcp_proxy_script_fetcher_ = dhcp_proxy_script_fetcher.Pass();
   if (previous_state != STATE_NONE)
     ApplyProxyConfigIfAvailable();
 }

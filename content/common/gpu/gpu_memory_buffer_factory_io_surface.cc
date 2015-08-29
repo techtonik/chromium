@@ -10,7 +10,6 @@
 
 #include "base/logging.h"
 #include "content/common/gpu/client/gpu_memory_buffer_impl.h"
-#include "content/common/mac/io_surface_manager.h"
 #include "ui/gfx/buffer_format_util.h"
 #include "ui/gl/gl_image_io_surface.h"
 
@@ -33,10 +32,9 @@ int32 BytesPerElement(gfx::BufferFormat format, int plane) {
     case gfx::BufferFormat::BGRA_8888:
       DCHECK_EQ(plane, 0);
       return 4;
-    case gfx::BufferFormat::YUV_420_BIPLANAR:
-      static int32 bytes_per_element[] = {1, 2};
-      DCHECK_LT(static_cast<size_t>(plane), arraysize(bytes_per_element));
-      return bytes_per_element[plane];
+    case gfx::BufferFormat::UYVY_422:
+      DCHECK_EQ(plane, 0);
+      return 2;
     case gfx::BufferFormat::ATC:
     case gfx::BufferFormat::ATCIA:
     case gfx::BufferFormat::DXT1:
@@ -44,7 +42,7 @@ int32 BytesPerElement(gfx::BufferFormat format, int plane) {
     case gfx::BufferFormat::ETC1:
     case gfx::BufferFormat::RGBA_4444:
     case gfx::BufferFormat::RGBA_8888:
-    case gfx::BufferFormat::RGBX_8888:
+    case gfx::BufferFormat::BGRX_8888:
     case gfx::BufferFormat::YUV_420:
       NOTREACHED();
       return 0;
@@ -60,8 +58,8 @@ int32 PixelFormat(gfx::BufferFormat format) {
       return 'L008';
     case gfx::BufferFormat::BGRA_8888:
       return 'BGRA';
-    case gfx::BufferFormat::YUV_420_BIPLANAR:
-      return '420v';
+    case gfx::BufferFormat::UYVY_422:
+      return '2vuy';
     case gfx::BufferFormat::ATC:
     case gfx::BufferFormat::ATCIA:
     case gfx::BufferFormat::DXT1:
@@ -69,7 +67,7 @@ int32 PixelFormat(gfx::BufferFormat format) {
     case gfx::BufferFormat::ETC1:
     case gfx::BufferFormat::RGBA_4444:
     case gfx::BufferFormat::RGBA_8888:
-    case gfx::BufferFormat::RGBX_8888:
+    case gfx::BufferFormat::BGRX_8888:
     case gfx::BufferFormat::YUV_420:
       NOTREACHED();
       return 0;
@@ -85,8 +83,8 @@ const GpuMemoryBufferFactory::Configuration kSupportedConfigurations[] = {
     {gfx::BufferFormat::R_8, gfx::BufferUsage::MAP},
     {gfx::BufferFormat::BGRA_8888, gfx::BufferUsage::PERSISTENT_MAP},
     {gfx::BufferFormat::BGRA_8888, gfx::BufferUsage::MAP},
-    {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferUsage::MAP},
-    {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferUsage::PERSISTENT_MAP},
+    {gfx::BufferFormat::UYVY_422, gfx::BufferUsage::MAP},
+    {gfx::BufferFormat::UYVY_422, gfx::BufferUsage::PERSISTENT_MAP},
 };
 
 }  // namespace
@@ -129,7 +127,7 @@ GpuMemoryBufferFactoryIOSurface::CreateGpuMemoryBuffer(
       kCFAllocatorDefault, num_planes, &kCFTypeArrayCallBacks));
 
   for (size_t plane = 0; plane < num_planes; ++plane) {
-    size_t factor = GpuMemoryBufferImpl::SubsamplingFactor(format, plane);
+    size_t factor = gfx::SubsamplingFactorForBufferFormat(format, plane);
 
     base::ScopedCFTypeRef<CFMutableDictionaryRef> plane_info(
         CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
@@ -209,7 +207,7 @@ GpuMemoryBufferFactoryIOSurface::CreateImageForGpuMemoryBuffer(
     return scoped_refptr<gfx::GLImage>();
 
   scoped_refptr<gfx::GLImageIOSurface> image(
-      new gfx::GLImageIOSurface(size, internalformat));
+      new gfx::GLImageIOSurface(handle.id, size, internalformat));
   if (!image->Initialize(it->second.get(), format))
     return scoped_refptr<gfx::GLImage>();
 

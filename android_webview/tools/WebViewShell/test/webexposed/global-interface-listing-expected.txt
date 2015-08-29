@@ -287,6 +287,7 @@ interface CSSRuleList
     method constructor
     method item
 interface CSSStyleDeclaration
+    getter cssFloat
     getter cssText
     getter length
     getter parentRule
@@ -296,6 +297,7 @@ interface CSSStyleDeclaration
     method item
     method removeProperty
     method setProperty
+    setter cssFloat
     setter cssText
 interface CSSStyleRule
     getter selectorText
@@ -898,6 +900,9 @@ interface DocumentType
     getter systemId
     method constructor
     method remove
+interface DragEvent
+    getter dataTransfer
+    method constructor
 interface DynamicsCompressorNode
     getter attack
     getter knee
@@ -2778,6 +2783,9 @@ interface MIDIPort
     method constructor
     method open
     setter onstatechange
+interface MediaDevices
+    method constructor
+    method enumerateDevices
 interface MediaElementAudioSourceNode
     getter mediaElement
     method constructor
@@ -2937,7 +2945,6 @@ interface MouseEvent
     getter clientX
     getter clientY
     getter ctrlKey
-    getter dataTransfer
     getter fromElement
     getter layerX
     getter layerY
@@ -3009,6 +3016,7 @@ interface Navigator
     getter language
     getter languages
     getter maxTouchPoints
+    getter mediaDevices
     getter mimeTypes
     getter onLine
     getter platform
@@ -3206,6 +3214,7 @@ interface PerformanceResourceTiming
     getter responseEnd
     getter responseStart
     getter secureConnectionStart
+    getter workerStart
     method constructor
 interface PerformanceTiming
     getter connectEnd
@@ -3326,11 +3335,12 @@ interface ReadableStream
     method getReader
 interface Request
     getter bodyUsed
-    getter context
     getter credentials
     getter headers
+    getter integrity
     getter method
     getter mode
+    getter redirect
     getter referrer
     getter url
     method arrayBuffer
@@ -4650,8 +4660,6 @@ interface ServiceWorkerRegistration
     getter onupdatefound
     getter scope
     method constructor
-    method getNotifications
-    method showNotification
     method unregister
     method update
     setter onupdatefound
