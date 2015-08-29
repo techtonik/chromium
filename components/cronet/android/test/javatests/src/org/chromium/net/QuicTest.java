@@ -86,8 +86,11 @@ public class QuicTest extends CronetTestBase {
         listener.blockForDone();
 
         assertEquals(200, listener.mResponseInfo.getHttpStatusCode());
-        assertEquals("This is a simple text file served by QUIC.\n", listener.mResponseAsString);
+        String expectedContent = "This is a simple text file served by QUIC.\n";
+        assertEquals(expectedContent, listener.mResponseAsString);
         assertEquals("quic/1+spdy/3", listener.mResponseInfo.getNegotiatedProtocol());
+        assertEquals(
+                expectedContent.length(), listener.mExtendedResponseInfo.getTotalReceivedBytes());
 
         // This test takes a long time, since the update will only be scheduled
         // after kUpdatePrefsDelayMs in http_server_properties_manager.cc.
@@ -109,7 +112,7 @@ public class QuicTest extends CronetTestBase {
         // Make another request using a new context but with no QUIC hints.
         UrlRequestContextConfig config = new UrlRequestContextConfig();
         config.setStoragePath(mActivity.getTestStorage());
-        config.enableHttpCache(UrlRequestContextConfig.HttpCache.DISK, 1000 * 1024);
+        config.enableHttpCache(UrlRequestContextConfig.HTTP_CACHE_DISK, 1000 * 1024);
         config.enableQUIC(true);
         CronetUrlRequestContext newContext =
                 new CronetUrlRequestContext(getInstrumentation().getTargetContext(), config);
@@ -118,8 +121,10 @@ public class QuicTest extends CronetTestBase {
         request2.start();
         listener2.blockForDone();
         assertEquals(200, listener2.mResponseInfo.getHttpStatusCode());
-        assertEquals("This is a simple text file served by QUIC.\n", listener2.mResponseAsString);
+        assertEquals(expectedContent, listener2.mResponseAsString);
         assertEquals("quic/1+spdy/3", listener2.mResponseInfo.getNegotiatedProtocol());
+        assertEquals(
+                expectedContent.length(), listener2.mExtendedResponseInfo.getTotalReceivedBytes());
     }
 
     // Returns whether a file contains a particular string.

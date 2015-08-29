@@ -10,6 +10,7 @@ import glob
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -52,24 +53,6 @@ def SlaveBaseDir(chrome_dir):
     raise chromium_utils.PathNotFound('Unable to find slave base dir above %s' %
                                       chrome_dir)
   return result
-
-
-def GypFlagIsOn(options, flag):
-  value = GetGypFlag(options, flag, False)
-  # The values we understand as Off are False and a text zero.
-  if value is False or value == '0':
-    return False
-  return True
-
-
-def GetGypFlag(options, flag, default=None):
-  gclient = options.factory_properties.get('gclient_env', {})
-  defines = gclient.get('GYP_DEFINES', '')
-  gypflags = dict([(a, c if b == '=' else True) for (a, b, c) in
-                   [x.partition('=') for x in defines.split(' ')]])
-  if flag not in gypflags:
-    return default
-  return gypflags[flag]
 
 
 def LogAndRemoveFiles(temp_dir, regex_pattern):
@@ -212,7 +195,7 @@ def RemoveChromeTemporaryFiles():
   elif chromium_utils.IsMac():
     nstempdir_path = '/usr/local/libexec/nstempdir'
     if os.path.exists(nstempdir_path):
-      ns_temp_dir = chromium_utils.GetCommandOutput([nstempdir_path]).strip()
+      ns_temp_dir = subprocess.check_output([nstempdir_path]).strip()
       if ns_temp_dir:
         LogAndRemoveFiles(ns_temp_dir, kLogRegex)
     for i in ('Chromium', 'Google Chrome'):

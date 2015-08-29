@@ -39,6 +39,7 @@
 #include "content/public/browser/resource_dispatcher_host.h"
 #include "content/public/common/resource_type.h"
 #include "ipc/ipc_message.h"
+#include "net/base/request_priority.h"
 #include "net/cookies/canonical_cookie.h"
 #include "net/url_request/url_request.h"
 
@@ -92,7 +93,8 @@ class CONTENT_EXPORT ResourceDispatcherHostImpl
       bool is_content_initiated,
       ResourceContext* context,
       int child_id,
-      int route_id,
+      int render_view_route_id,
+      int render_frame_route_id,
       bool prefer_cache,
       bool do_not_prompt_for_login,
       scoped_ptr<DownloadSaveInfo> save_info,
@@ -126,7 +128,8 @@ class CONTENT_EXPORT ResourceDispatcherHostImpl
   void BeginSaveFile(const GURL& url,
                      const Referrer& referrer,
                      int child_id,
-                     int route_id,
+                     int render_view_route_id,
+                     int render_frame_route_id,
                      ResourceContext* context);
 
   // Cancels the given request if it still exists.
@@ -458,15 +461,18 @@ class CONTENT_EXPORT ResourceDispatcherHostImpl
       scoped_ptr<ResourceHandler> handler);
 
   void OnDataDownloadedACK(int request_id);
-  void OnUploadProgressACK(int request_id);
   void OnCancelRequest(int request_id);
   void OnReleaseDownloadedFile(int request_id);
+  void OnDidChangePriority(int request_id,
+                           net::RequestPriority new_priority,
+                           int intra_priority_value);
 
   // Creates ResourceRequestInfoImpl for a download or page save.
   // |download| should be true if the request is a file download.
   ResourceRequestInfoImpl* CreateRequestInfo(
       int child_id,
-      int route_id,
+      int render_view_route_id,
+      int render_frame_route_id,
       bool download,
       ResourceContext* context);
 

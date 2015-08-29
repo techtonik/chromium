@@ -61,6 +61,12 @@ class DiscardableMemoryImpl : public base::DiscardableMemory {
     return reinterpret_cast<void*>(span_->start() * base::GetPageSize());
   }
 
+  base::trace_event::MemoryAllocatorDump* CreateMemoryAllocatorDump(
+      const char* name,
+      base::trace_event::ProcessMemoryDump* pmd) const override {
+    return manager_->CreateMemoryAllocatorDump(span_.get(), name, pmd);
+  }
+
  private:
   ChildDiscardableSharedMemoryManager* const manager_;
   scoped_ptr<DiscardableSharedMemoryHeap::Span> span_;
@@ -261,6 +267,15 @@ void ChildDiscardableSharedMemoryManager::ReleaseSpan(
   MemoryUsageChanged(heap_.GetSize(), heap_.GetSizeOfFreeLists());
 }
 
+base::trace_event::MemoryAllocatorDump*
+ChildDiscardableSharedMemoryManager::CreateMemoryAllocatorDump(
+    DiscardableSharedMemoryHeap::Span* span,
+    const char* name,
+    base::trace_event::ProcessMemoryDump* pmd) const {
+  base::AutoLock lock(lock_);
+  return heap_.CreateMemoryAllocatorDump(span, name, pmd);
+}
+
 scoped_ptr<base::DiscardableSharedMemory>
 ChildDiscardableSharedMemoryManager::AllocateLockedDiscardableSharedMemory(
     size_t size,
@@ -284,9 +299,6 @@ ChildDiscardableSharedMemoryManager::AllocateLockedDiscardableSharedMemory(
 void ChildDiscardableSharedMemoryManager::MemoryUsageChanged(
     size_t new_bytes_total,
     size_t new_bytes_free) const {
-  TRACE_COUNTER2("renderer", "DiscardableMemoryUsage", "allocated",
-                 new_bytes_total - new_bytes_free, "free", new_bytes_free);
-
   static const char kDiscardableMemoryAllocatedKey[] =
       "discardable-memory-allocated";
   base::debug::SetCrashKeyValue(kDiscardableMemoryAllocatedKey,

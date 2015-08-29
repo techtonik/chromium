@@ -23,6 +23,7 @@
 #include "components/autofill/core/common/autofill_constants.h"
 #include "components/autofill/core/common/autofill_data_validation.h"
 #include "components/autofill/core/common/autofill_switches.h"
+#include "components/autofill/core/common/autofill_util.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/form_data_predictions.h"
 #include "components/autofill/core/common/form_field_data.h"
@@ -190,7 +191,6 @@ bool AutofillAgent::OnMessageReceived(const IPC::Message& message) {
   IPC_BEGIN_MESSAGE_MAP(AutofillAgent, message)
   IPC_MESSAGE_HANDLER(AutofillMsg_FirstUserGestureObservedInTab,
                       OnFirstUserGestureObservedInTab)
-    IPC_MESSAGE_HANDLER(AutofillMsg_Ping, OnPing)
     IPC_MESSAGE_HANDLER(AutofillMsg_FillForm, OnFillForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_PreviewForm, OnPreviewForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_FieldTypePredictionsAvailable,
@@ -255,10 +255,9 @@ void AutofillAgent::WillSubmitForm(const WebFormElement& form) {
 }
 
 void AutofillAgent::DidChangeScrollOffset() {
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableAccessorySuggestionView)) {
+  if (IsKeyboardAccessoryEnabled())
     return;
-  }
+
   HidePopup();
 }
 

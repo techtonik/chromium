@@ -17,6 +17,7 @@
 #include "ppapi/cpp/instance.h"
 #include "ppapi/cpp/text_input_controller.h"
 #include "ppapi/cpp/var.h"
+#include "remoting/client/chromoting_stats.h"
 #include "remoting/client/client_context.h"
 #include "remoting/client/client_user_interface.h"
 #include "remoting/client/empty_cursor_filter.h"
@@ -164,6 +165,20 @@ class ChromotingInstance : public ClientUserInterface,
       const std::string& scope,
       const base::WeakPtr<TokenFetcherProxy> pepper_token_fetcher);
 
+  // Updates the specified UMA enumeration histogram with the input value.
+  void UpdateUmaEnumHistogram(const std::string& histogram_name,
+                              int64 value,
+                              int histogram_max);
+
+  // Updates the specified UMA custom counts or custom times histogram with the
+  // input value.
+  void UpdateUmaCustomHistogram(bool is_custom_counts_histogram,
+                                const std::string& histogram_name,
+                                int64 value,
+                                int histogram_min,
+                                int histogram_max,
+                                int histogram_buckets);
+
  private:
   FRIEND_TEST_ALL_PREFIXES(ChromotingInstanceTest, TestCaseSetup);
 
@@ -272,6 +287,10 @@ class ChromotingInstance : public ClientUserInterface,
 
   // Weak reference to this instance, used for global logging and task posting.
   base::WeakPtrFactory<ChromotingInstance> weak_factory_;
+
+  base::TimeTicks connection_started_time;
+  base::TimeTicks connection_authenticated_time_;
+  base::TimeTicks connection_connected_time_;
 
   DISALLOW_COPY_AND_ASSIGN(ChromotingInstance);
 };

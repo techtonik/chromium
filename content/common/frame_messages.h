@@ -239,12 +239,6 @@ IPC_STRUCT_BEGIN(FrameMsg_PostMessage_Params)
   // equivalent frame proxy in the destination process.
   IPC_STRUCT_MEMBER(int, source_routing_id)
 
-  // When sent from the browser, this is the routing ID of the source view in
-  // the destination process.  This currently exists only to support legacy
-  // postMessage to Android WebView and will be removed once crbug.com/473258
-  // is fixed.
-  IPC_STRUCT_MEMBER(int, source_view_routing_id)
-
   // The origin of the source frame.
   IPC_STRUCT_MEMBER(base::string16, source_origin)
 
@@ -446,8 +440,10 @@ IPC_MESSAGE_ROUTED2(FrameMsg_CustomContextMenuAction,
                     content::CustomContextMenuContext /* custom_context */,
                     unsigned /* action */)
 
-// Requests that the RenderFrame or RenderFrameProxy sets its opener to null.
-IPC_MESSAGE_ROUTED0(FrameMsg_DisownOpener)
+// Requests that the RenderFrame or RenderFrameProxy updates its opener to the
+// specified frame.  The routing ID may be MSG_ROUTING_NONE if the opener was
+// disowned.
+IPC_MESSAGE_ROUTED1(FrameMsg_UpdateOpener, int /* opener_routing_id */)
 
 // Requests that the RenderFrame send back a response after waiting for the
 // commit, activation and frame swap of the current DOM tree in blink.
@@ -750,9 +746,11 @@ IPC_MESSAGE_ROUTED2(FrameHostMsg_DocumentOnLoadCompleted,
 // making a URL spoof possible.
 IPC_MESSAGE_ROUTED0(FrameHostMsg_DidAccessInitialDocument)
 
-// Sent when the frame sets its opener to null, disowning it for the lifetime of
-// the window. Sent for top-level frames.
-IPC_MESSAGE_ROUTED0(FrameHostMsg_DidDisownOpener)
+// Sent when the RenderFrame or RenderFrameProxy either updates its opener to
+// another frame identified by |opener_routing_id|, or, if |opener_routing_id|
+// is MSG_ROUTING_NONE, the frame disowns its opener for the lifetime of the
+// window.
+IPC_MESSAGE_ROUTED1(FrameHostMsg_DidChangeOpener, int /* opener_routing_id */)
 
 // Notifies the browser that a page id was assigned.
 IPC_MESSAGE_ROUTED1(FrameHostMsg_DidAssignPageId,
@@ -903,6 +901,10 @@ IPC_MESSAGE_ROUTED1(FrameHostMsg_ReclaimCompositorResources,
 // input directly to subframes. http://crbug.com/339659
 IPC_MESSAGE_ROUTED1(FrameHostMsg_ForwardInputEvent,
                     IPC::WebInputEventPointer /* event */)
+
+// Tells the parent that a child's frame rect has changed (or the rect/scroll
+// position of a child's ancestor has changed).
+IPC_MESSAGE_ROUTED1(FrameHostMsg_FrameRectChanged, gfx::Rect /* frame_rect */)
 
 // Used to tell the parent that the user right clicked on an area of the
 // content area, and a context menu should be shown for it. The params

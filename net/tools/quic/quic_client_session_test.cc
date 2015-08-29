@@ -95,7 +95,8 @@ TEST_P(ToolsQuicClientSessionTest, GoAwayReceived) {
 
   // After receiving a GoAway, I should no longer be able to create outgoing
   // streams.
-  session_->OnGoAway(QuicGoAwayFrame(QUIC_PEER_GOING_AWAY, 1u, "Going away."));
+  session_->connection()->OnGoAwayFrame(
+      QuicGoAwayFrame(QUIC_PEER_GOING_AWAY, 1u, "Going away."));
   EXPECT_EQ(nullptr, session_->CreateOutgoingDynamicStream());
 }
 
@@ -174,7 +175,7 @@ TEST_P(ToolsQuicClientSessionTest, InvalidFramedPacketReceived) {
   QuicConnectionId connection_id = session_->connection()->connection_id();
   scoped_ptr<QuicEncryptedPacket> packet(ConstructMisFramedEncryptedPacket(
       connection_id, false, false, 100, "data", PACKET_8BYTE_CONNECTION_ID,
-      PACKET_6BYTE_SEQUENCE_NUMBER, nullptr));
+      PACKET_6BYTE_PACKET_NUMBER, nullptr));
   EXPECT_CALL(*connection_, SendConnectionCloseWithDetails(_, _)).Times(1);
   session_->connection()->ProcessUdpPacket(client_address, server_address,
                                            *packet);

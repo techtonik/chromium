@@ -117,6 +117,9 @@ class ObservingAutofillClient : public autofill::TestAutofillClient {
   DISALLOW_COPY_AND_ASSIGN(ObservingAutofillClient);
 };
 
+// TODO(dvadym): This is for avoiding unused function compilation error. Remove
+// it when http://crbug.com/359315 is implemented for Mac.
+#if !defined(OS_MACOSX)
 // For simplicity we assume that password store contains only 1 credentials.
 void CheckThatCredentialsStored(
     password_manager::TestPasswordStore* password_store,
@@ -130,6 +133,7 @@ void CheckThatCredentialsStored(
   EXPECT_EQ(username, form.username_value);
   EXPECT_EQ(password, form.password_value);
 }
+#endif
 
 }  // namespace
 
@@ -1116,7 +1120,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        DontPromptWhenEnableAutomaticPasswordSavingSwitchIsSet) {
-  password_manager::TestPasswordStore* password_store =
+  scoped_refptr<password_manager::TestPasswordStore> password_store =
       static_cast<password_manager::TestPasswordStore*>(
           PasswordStoreFactory::GetForProfile(
               browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
@@ -1205,7 +1209,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase, NoLastLoadGoodLastLoad) {
   // interested in is for a new tab to be opened, and thus does not exist yet.
   login_observer.Register(content::NotificationService::AllSources());
 
-  password_manager::TestPasswordStore* password_store =
+  scoped_refptr<password_manager::TestPasswordStore> password_store =
       static_cast<password_manager::TestPasswordStore*>(
           PasswordStoreFactory::GetForProfile(
               browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
@@ -1340,7 +1344,7 @@ IN_PROC_BROWSER_TEST_F(
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        PromptWhenPasswordFormWithoutUsernameFieldSubmitted) {
-  password_manager::TestPasswordStore* password_store =
+  scoped_refptr<password_manager::TestPasswordStore> password_store =
       static_cast<password_manager::TestPasswordStore*>(
           PasswordStoreFactory::GetForProfile(
               browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
@@ -1370,44 +1374,11 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        AutofillSuggetionsForPasswordFormWithoutUsernameField) {
-  password_manager::TestPasswordStore* password_store =
-      static_cast<password_manager::TestPasswordStore*>(
-          PasswordStoreFactory::GetForProfile(
-              browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
-
-  EXPECT_TRUE(password_store->IsEmpty());
-
-  // Password form without username-field.
-  NavigateToFile("/password/form_with_only_password_field.html");
-
-  NavigationObserver observer(WebContents());
-  scoped_ptr<PromptObserver> prompt_observer(
-      PromptObserver::Create(WebContents()));
   std::string submit =
       "document.getElementById('password').value = 'mypassword';"
       "document.getElementById('submit-button').click();";
-  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), submit));
-  observer.Wait();
-
-  prompt_observer->Accept();
-
-  // Spin the message loop to make sure the password store had a chance to save
-  // the password.
-  base::RunLoop run_loop;
-  run_loop.RunUntilIdle();
-  EXPECT_FALSE(password_store->IsEmpty());
-
-  // Now, navigate to same html password form and verify whether password is
-  // autofilled.
-  NavigateToFile("/password/form_with_only_password_field.html");
-
-  // Let the user interact with the page, so that DOM gets modification events,
-  // needed for autofilling fields.
-  content::SimulateMouseClickAt(
-      WebContents(), 0, blink::WebMouseEvent::ButtonLeft, gfx::Point(1, 1));
-
-  // Wait until that interaction causes the password value to be revealed.
-  WaitForElementValue("password", "mypassword");
+  VerifyPasswordIsSavedAndFilled("/password/form_with_only_password_field.html",
+                                 submit, "password", "mypassword");
 }
 
 // Test that if a form gets autofilled, then it gets autofilled on re-creation
@@ -1562,46 +1533,32 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   observing_autofill_client.Wait();
 }
 
-// Passwords from change password forms should only be offered for saving when
-// it is certain that the username is correct.
-IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase, ChangePwdCorrect) {
+IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
+                       ChangePwdFormBubbleShown) {
   NavigateToFile("/password/password_form.html");
 
   NavigationObserver observer(WebContents());
   scoped_ptr<PromptObserver> prompt_observer(
       PromptObserver::Create(WebContents()));
   std::string fill_and_submit =
-      "document.getElementById('mark_chg_username_field').value = 'temp';"
-      "document.getElementById('mark_chg_password_field').value = 'random';"
-      "document.getElementById('mark_chg_new_password_1').value = 'random1';"
-      "document.getElementById('mark_chg_new_password_2').value = 'random1';"
-      "document.getElementById('mark_chg_submit_button').click()";
-  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
-  observer.Wait();
-  EXPECT_TRUE(prompt_observer->IsShowingPrompt());
-}
-
-IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase, ChangePwdIncorrect) {
-  NavigateToFile("/password/password_form.html");
-
-  NavigationObserver observer(WebContents());
-  scoped_ptr<PromptObserver> prompt_observer(
-      PromptObserver::Create(WebContents()));
-  std::string fill_and_submit =
-      "document.getElementById('chg_not_username_field').value = 'temp';"
+      "document.getElementById('chg_username_field').value = 'temp';"
       "document.getElementById('chg_password_field').value = 'random';"
       "document.getElementById('chg_new_password_1').value = 'random1';"
       "document.getElementById('chg_new_password_2').value = 'random1';"
       "document.getElementById('chg_submit_button').click()";
   ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
   observer.Wait();
+// TODO(dvadym): Turn on this test when Change password UI will be implemented
+// for Mac. http://crbug.com/359315
+#if defined(OS_MACOSX)
   EXPECT_FALSE(prompt_observer->IsShowingPrompt());
+#else
+  EXPECT_TRUE(prompt_observer->IsShowingPrompt());
+#endif
 }
 
-// As the two ChangePwd* tests above, only with submitting through
-// history.pushState().
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
-                       ChangePwdPushStateCorrect) {
+                       ChangePwdFormPushStateBubbleShown) {
   NavigateToFile("/password/password_push_state.html");
 
   NavigationObserver observer(WebContents());
@@ -1609,33 +1566,20 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   scoped_ptr<PromptObserver> prompt_observer(
       PromptObserver::Create(WebContents()));
   std::string fill_and_submit =
-      "document.getElementById('mark_chg_username_field').value = 'temp';"
-      "document.getElementById('mark_chg_password_field').value = 'random';"
-      "document.getElementById('mark_chg_new_password_1').value = 'random1';"
-      "document.getElementById('mark_chg_new_password_2').value = 'random1';"
-      "document.getElementById('mark_chg_submit_button').click()";
-  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
-  observer.Wait();
-  EXPECT_TRUE(prompt_observer->IsShowingPrompt());
-}
-
-IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
-                       ChangePwdPushStateIncorrect) {
-  NavigateToFile("/password/password_push_state.html");
-
-  NavigationObserver observer(WebContents());
-  observer.set_quit_on_entry_committed(true);
-  scoped_ptr<PromptObserver> prompt_observer(
-      PromptObserver::Create(WebContents()));
-  std::string fill_and_submit =
-      "document.getElementById('chg_not_username_field').value = 'temp';"
+      "document.getElementById('chg_username_field').value = 'temp';"
       "document.getElementById('chg_password_field').value = 'random';"
       "document.getElementById('chg_new_password_1').value = 'random1';"
       "document.getElementById('chg_new_password_2').value = 'random1';"
       "document.getElementById('chg_submit_button').click()";
   ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
   observer.Wait();
+// TODO(dvadym): Turn on this test when Change password UI will be implemented
+// for Mac. http://crbug.com/359315
+#if defined(OS_MACOSX)
   EXPECT_FALSE(prompt_observer->IsShowingPrompt());
+#else
+  EXPECT_TRUE(prompt_observer->IsShowingPrompt());
+#endif
 }
 
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase, NoPromptOnBack) {
@@ -1746,86 +1690,24 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
 // login form still gets autofilled.
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        AutofillSuggetionsForLoginSignupForm) {
-  password_manager::TestPasswordStore* password_store =
-      static_cast<password_manager::TestPasswordStore*>(
-          PasswordStoreFactory::GetForProfile(
-              browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
-
-  EXPECT_TRUE(password_store->IsEmpty());
-
-  NavigateToFile("/password/login_signup_form.html");
-
-  NavigationObserver observer(WebContents());
-  scoped_ptr<PromptObserver> prompt_observer(
-      PromptObserver::Create(WebContents()));
   std::string submit =
       "document.getElementById('username').value = 'myusername';"
       "document.getElementById('password').value = 'mypassword';"
       "document.getElementById('submit').click();";
-  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), submit));
-  observer.Wait();
-
-  prompt_observer->Accept();
-
-  // Spin the message loop to make sure the password store had a chance to save
-  // the password.
-  base::RunLoop run_loop;
-  run_loop.RunUntilIdle();
-  EXPECT_FALSE(password_store->IsEmpty());
-
-  // Now, navigate to the same html password form and verify whether password is
-  // autofilled.
-  NavigateToFile("/password/login_signup_form.html");
-
-  // Let the user interact with the page, so that DOM gets modification events,
-  // needed for autofilling fields.
-  content::SimulateMouseClickAt(
-      WebContents(), 0, blink::WebMouseEvent::ButtonLeft, gfx::Point(1, 1));
-
-  // Wait until that interaction causes the password value to be revealed.
-  WaitForElementValue("password", "mypassword");
+  VerifyPasswordIsSavedAndFilled("/password/login_signup_form.html",
+                                 submit, "password", "mypassword");
 }
 
 // Check that we can fill in cases where <base href> is set and the action of
 // the form is not set. Regression test for https://crbug.com/360230.
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        BaseTagWithNoActionTest) {
-  password_manager::TestPasswordStore* password_store =
-      static_cast<password_manager::TestPasswordStore*>(
-          PasswordStoreFactory::GetForProfile(
-              browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS).get());
-
-  EXPECT_TRUE(password_store->IsEmpty());
-
-  NavigateToFile("/password/password_xhr_submit.html");
-
-  NavigationObserver observer(WebContents());
-  scoped_ptr<PromptObserver> prompt_observer(
-      PromptObserver::Create(WebContents()));
   std::string submit =
       "document.getElementById('username_field').value = 'myusername';"
       "document.getElementById('password_field').value = 'mypassword';"
       "document.getElementById('submit_button').click();";
-  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), submit));
-  observer.Wait();
-
-  prompt_observer->Accept();
-
-  // Spin the message loop to make sure the password store had a chance to save
-  // the password.
-  base::RunLoop run_loop;
-  run_loop.RunUntilIdle();
-  EXPECT_FALSE(password_store->IsEmpty());
-
-  NavigateToFile("/password/password_xhr_submit.html");
-
-  // Let the user interact with the page, so that DOM gets modification events,
-  // needed for autofilling fields.
-  content::SimulateMouseClickAt(
-      WebContents(), 0, blink::WebMouseEvent::ButtonLeft, gfx::Point(1, 1));
-
-  // Wait until that interaction causes the password value to be revealed.
-  WaitForElementValue("password_field", "mypassword");
+  VerifyPasswordIsSavedAndFilled("/password/password_xhr_submit.html",
+                                 submit, "password_field", "mypassword");
 }
 
 // Check that a password form in an iframe of different origin will not be
@@ -1976,7 +1858,17 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
 
   // Verify username has been autofilled
   CheckElementValue("iframe", "username_field", "temp");
+}
 
+IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase, NoFormElementTest) {
+  std::string submit =
+      "document.getElementById('username_field').value = 'myusername';"
+      "document.getElementById('password_field').value = 'mypassword';"
+      "send_xhr();";
+  VerifyPasswordIsSavedAndFilled("/password/no_form_element.html",
+                                 submit,
+                                 "password_field",
+                                 "mypassword");
 }
 
 // The password manager driver will kill processes when they try to access
@@ -2035,13 +1927,13 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   iframe_killed.Wait();
 }
 
+// TODO(dvadym): Turn on this test when Change password UI will be implemented
+// for Mac. http://crbug.com/359315
+#if !defined(OS_MACOSX)
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        ChangePwdNoAccountStored) {
   ASSERT_TRUE(ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled());
   NavigateToFile("/password/password_form.html");
-
-  base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      password_manager::switches::kEnablePasswordChangeSupport);
 
   // Fill a form and submit through a <input type="submit"> button.
   NavigationObserver observer(WebContents());
@@ -2075,15 +1967,14 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   CheckThatCredentialsStored(password_store.get(), base::ASCIIToUTF16(""),
                              base::ASCIIToUTF16("new_pw"));
 }
+#endif
 
 // TODO(dvadym): Turn on this test when Change password UI will be implemented
 // for Mac. http://crbug.com/359315
-#ifndef OS_MACOSX
+#if !defined(OS_MACOSX)
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        ChangePwd1AccountStored) {
   ASSERT_TRUE(ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled());
-  base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      password_manager::switches::kEnablePasswordChangeSupport);
   // At first let us save credentials to the PasswordManager.
   scoped_refptr<password_manager::TestPasswordStore> password_store =
       static_cast<password_manager::TestPasswordStore*>(
@@ -2114,7 +2005,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   observer.Wait();
   EXPECT_TRUE(prompt_observer->IsShowingUpdatePrompt());
 
-  const autofill::PasswordForm& stored_form =
+  const autofill::PasswordForm stored_form =
       password_store->stored_passwords().begin()->second[0];
   prompt_observer->AcceptUpdatePrompt(stored_form);
   // Spin the message loop to make sure the password store had a chance to
@@ -2123,6 +2014,88 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   run_loop.RunUntilIdle();
   CheckThatCredentialsStored(password_store.get(), base::ASCIIToUTF16("temp"),
                              base::ASCIIToUTF16("new_pw"));
+}
+#endif
+
+// TODO(dvadym): Turn on this test when Change password UI will be implemented
+// for Mac. http://crbug.com/359315
+#if !defined(OS_MACOSX)
+IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
+                       PasswordOverridenUpdateBubbleShown) {
+  ASSERT_TRUE(ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled());
+  // At first let us save credentials to the PasswordManager.
+  scoped_refptr<password_manager::TestPasswordStore> password_store =
+      static_cast<password_manager::TestPasswordStore*>(
+          PasswordStoreFactory::GetForProfile(
+              browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS)
+              .get());
+  autofill::PasswordForm signin_form;
+  signin_form.signon_realm = embedded_test_server()->base_url().spec();
+  signin_form.username_value = base::ASCIIToUTF16("temp");
+  signin_form.password_value = base::ASCIIToUTF16("pw");
+  password_store->AddLogin(signin_form);
+
+  // Check that password update bubble is shown.
+  NavigateToFile("/password/password_form.html");
+  NavigationObserver observer(WebContents());
+  scoped_ptr<PromptObserver> prompt_observer(
+      PromptObserver::Create(WebContents()));
+  std::string fill_and_submit =
+      "document.getElementById('username_field').value = 'temp';"
+      "document.getElementById('password_field').value = 'new_pw';"
+      "document.getElementById('input_submit_button').click()";
+  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
+  observer.Wait();
+  // The stored password "pw" was overriden with "new_pw", so update prompt is
+  // expected.
+  EXPECT_TRUE(prompt_observer->IsShowingUpdatePrompt());
+
+  const autofill::PasswordForm stored_form =
+      password_store->stored_passwords().begin()->second[0];
+  prompt_observer->AcceptUpdatePrompt(stored_form);
+  // Spin the message loop to make sure the password store had a chance to
+  // update the password.
+  base::RunLoop run_loop;
+  run_loop.RunUntilIdle();
+  CheckThatCredentialsStored(password_store.get(), base::ASCIIToUTF16("temp"),
+                             base::ASCIIToUTF16("new_pw"));
+}
+#endif
+
+// TODO(dvadym): Turn on this test when Change password UI will be implemented
+// for Mac. http://crbug.com/359315
+#if !defined(OS_MACOSX)
+IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
+                       PasswordNotOverridenUpdateBubbleNotShown) {
+  ASSERT_TRUE(ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled());
+  // At first let us save credentials to the PasswordManager.
+  scoped_refptr<password_manager::TestPasswordStore> password_store =
+      static_cast<password_manager::TestPasswordStore*>(
+          PasswordStoreFactory::GetForProfile(
+              browser()->profile(), ServiceAccessType::IMPLICIT_ACCESS)
+              .get());
+  autofill::PasswordForm signin_form;
+  signin_form.signon_realm = embedded_test_server()->base_url().spec();
+  signin_form.username_value = base::ASCIIToUTF16("temp");
+  signin_form.password_value = base::ASCIIToUTF16("pw");
+  password_store->AddLogin(signin_form);
+
+  // Check that password update bubble is shown.
+  NavigateToFile("/password/password_form.html");
+  NavigationObserver observer(WebContents());
+  scoped_ptr<PromptObserver> prompt_observer(
+      PromptObserver::Create(WebContents()));
+  std::string fill_and_submit =
+      "document.getElementById('username_field').value = 'temp';"
+      "document.getElementById('password_field').value = 'pw';"
+      "document.getElementById('input_submit_button').click()";
+  ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
+  observer.Wait();
+  // The stored password "pw" was not overriden, so update prompt is not
+  // expected.
+  EXPECT_FALSE(prompt_observer->IsShowingUpdatePrompt());
+  CheckThatCredentialsStored(password_store.get(), base::ASCIIToUTF16("temp"),
+                             base::ASCIIToUTF16("pw"));
 }
 #endif
 

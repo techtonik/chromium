@@ -130,7 +130,8 @@ source_set("lib") {
     "//mojo/common:tracing_impl",
     "//mojo/message_pump",
     "//mojo/services/network/public/interfaces",
-    "//mojo/services/tracing:bindings",
+    "//mojo/services/tracing/public/cpp",
+    "//mojo/services/tracing/public/interfaces",
     "//mojo/shell",
     "//mojo/util:filename_util",
     "//third_party/mojo/src/mojo/edk/system",
@@ -175,7 +176,6 @@ source_set("lib") {
       ":jni_headers",
       ":run_android_application_function",
       "//components/view_manager/gles2",
-      "//components/view_manager/native_viewport",
       "//mojo/application/public/cpp:content_handler",
     ]
   }
@@ -381,8 +381,8 @@ if (is_android) {
       ":java",
       ":resources",
       "//base:base_java",
-      "//third_party/android_tools:google_play_services_default_resources",
       "//ui/platform_window/android:platform_window_java",
+      google_play_services_resources,
     ]
   }
 

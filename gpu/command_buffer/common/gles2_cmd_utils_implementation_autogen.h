@@ -253,6 +253,9 @@ static const GLES2Util::EnumToString enum_to_string_table[] = {
         0x8A53, "GL_SYNC_OBJECT_APPLE",
     },
     {
+        0x78FB, "GL_RGB_YCBCR_422_CHROMIUM",
+    },
+    {
         0x8DF8, "GL_SHADER_BINARY_FORMATS",
     },
     {
@@ -1022,9 +1025,6 @@ static const GLES2Util::EnumToString enum_to_string_table[] = {
     },
     {
         0x8E7D, "GL_MAX_PATCH_VERTICES_EXT",
-    },
-    {
-        0x6005, "GL_ASYNC_PIXEL_UNPACK_COMPLETED_CHROMIUM",
     },
     {
         0x9105, "GL_TEXTURE_BINDING_2D_MULTISAMPLE_ARRAY_OES",
@@ -3801,6 +3801,7 @@ std::string GLES2Util::GetStringGLState(uint32_t value) {
       {GL_DRAW_FRAMEBUFFER_BINDING, "GL_DRAW_FRAMEBUFFER_BINDING"},
       {GL_FRAGMENT_SHADER_DERIVATIVE_HINT,
        "GL_FRAGMENT_SHADER_DERIVATIVE_HINT"},
+      {GL_GPU_DISJOINT_EXT, "GL_GPU_DISJOINT_EXT"},
       {GL_MAJOR_VERSION, "GL_MAJOR_VERSION"},
       {GL_MAX_3D_TEXTURE_SIZE, "GL_MAX_3D_TEXTURE_SIZE"},
       {GL_MAX_ARRAY_TEXTURE_LAYERS, "GL_MAX_ARRAY_TEXTURE_LAYERS"},
@@ -3847,6 +3848,7 @@ std::string GLES2Util::GetStringGLState(uint32_t value) {
       {GL_READ_BUFFER, "GL_READ_BUFFER"},
       {GL_READ_FRAMEBUFFER_BINDING, "GL_READ_FRAMEBUFFER_BINDING"},
       {GL_SAMPLER_BINDING, "GL_SAMPLER_BINDING"},
+      {GL_TIMESTAMP_EXT, "GL_TIMESTAMP_EXT"},
       {GL_TEXTURE_BINDING_2D_ARRAY, "GL_TEXTURE_BINDING_2D_ARRAY"},
       {GL_TEXTURE_BINDING_3D, "GL_TEXTURE_BINDING_3D"},
       {GL_TRANSFORM_FEEDBACK_BINDING, "GL_TRANSFORM_FEEDBACK_BINDING"},
@@ -3917,6 +3919,7 @@ std::string GLES2Util::GetStringImageInternalFormat(uint32_t value) {
   static const EnumToString string_table[] = {
       {GL_RGB, "GL_RGB"},
       {GL_RGB_YUV_420_CHROMIUM, "GL_RGB_YUV_420_CHROMIUM"},
+      {GL_RGB_YCBCR_422_CHROMIUM, "GL_RGB_YCBCR_422_CHROMIUM"},
       {GL_RGBA, "GL_RGBA"},
   };
   return GLES2Util::GetQualifiedEnumString(string_table,
@@ -4133,8 +4136,6 @@ std::string GLES2Util::GetStringQueryTarget(uint32_t value) {
        "GL_ANY_SAMPLES_PASSED_CONSERVATIVE_EXT"},
       {GL_COMMANDS_ISSUED_CHROMIUM, "GL_COMMANDS_ISSUED_CHROMIUM"},
       {GL_LATENCY_QUERY_CHROMIUM, "GL_LATENCY_QUERY_CHROMIUM"},
-      {GL_ASYNC_PIXEL_UNPACK_COMPLETED_CHROMIUM,
-       "GL_ASYNC_PIXEL_UNPACK_COMPLETED_CHROMIUM"},
       {GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM,
        "GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM"},
       {GL_COMMANDS_COMPLETED_CHROMIUM, "GL_COMMANDS_COMPLETED_CHROMIUM"},
@@ -4173,6 +4174,11 @@ std::string GLES2Util::GetStringReadPixelFormat(uint32_t value) {
       {GL_ALPHA, "GL_ALPHA"},
       {GL_RGB, "GL_RGB"},
       {GL_RGBA, "GL_RGBA"},
+      {GL_RED, "GL_RED"},
+      {GL_RED_INTEGER, "GL_RED_INTEGER"},
+      {GL_RG, "GL_RG"},
+      {GL_RG_INTEGER, "GL_RG_INTEGER"},
+      {GL_RGB_INTEGER, "GL_RGB_INTEGER"},
       {GL_RGBA_INTEGER, "GL_RGBA_INTEGER"},
   };
   return GLES2Util::GetQualifiedEnumString(string_table,
@@ -4185,8 +4191,12 @@ std::string GLES2Util::GetStringReadPixelType(uint32_t value) {
       {GL_UNSIGNED_SHORT_5_6_5, "GL_UNSIGNED_SHORT_5_6_5"},
       {GL_UNSIGNED_SHORT_4_4_4_4, "GL_UNSIGNED_SHORT_4_4_4_4"},
       {GL_UNSIGNED_SHORT_5_5_5_1, "GL_UNSIGNED_SHORT_5_5_5_1"},
+      {GL_BYTE, "GL_BYTE"},
+      {GL_UNSIGNED_SHORT, "GL_UNSIGNED_SHORT"},
+      {GL_SHORT, "GL_SHORT"},
       {GL_UNSIGNED_INT, "GL_UNSIGNED_INT"},
       {GL_INT, "GL_INT"},
+      {GL_HALF_FLOAT, "GL_HALF_FLOAT"},
       {GL_FLOAT, "GL_FLOAT"},
       {GL_UNSIGNED_INT_2_10_10_10_REV, "GL_UNSIGNED_INT_2_10_10_10_REV"},
   };

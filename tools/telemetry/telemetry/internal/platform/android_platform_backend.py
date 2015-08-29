@@ -31,14 +31,10 @@ from telemetry.internal.util import exception_formatter
 from telemetry.internal.util import external_modules
 
 psutil = external_modules.ImportOptionalModule('psutil')
-util.AddDirToPythonPath(util.GetChromiumSrcDir(),
-                        'third_party', 'webpagereplay')
 import adb_install_cert
 import certutils
 import platformsettings
 
-# Get build/android scripts into our path.
-util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
 from pylib import constants
 from pylib import screenshot
 from pylib.device import battery_utils
@@ -522,7 +518,14 @@ class AndroidPlatformBackend(
     self._device.adb.Forward('tcp:%d' % host_port, device_port)
 
   def StopForwardingHost(self, host_port):
-    self._device.adb.ForwardRemove('tcp:%d' % host_port)
+    for line in self._device.adb.ForwardList().strip().splitlines():
+      line = line.split(' ')
+      if line[0] == self._device and line[1] == 'tcp:%s' % host_port:
+        self._device.adb.ForwardRemove('tcp:%d' % host_port)
+        break
+    else:
+      logging.warning('Port %s not found in adb forward --list for device %s',
+                      host_port, self._device)
 
   def DismissCrashDialogIfNeeded(self):
     """Dismiss any error dialogs.
@@ -801,8 +804,8 @@ class AndroidPlatformBackend(
 
   def IsScreenOn(self):
     """Determines if device screen is on."""
-    input_methods = self._device.RunShellCommand('dumpsys input_method',
-                                                 check_return=True)
+    input_methods = self._device.RunShellCommand(
+        'dumpsys input_method', check_return=True, large_output=True)
     return self._IsScreenOn(input_methods)
 
   @staticmethod

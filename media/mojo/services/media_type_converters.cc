@@ -137,11 +137,10 @@ ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_I420, VIDEO_FORMAT_I420);
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_YV16, VIDEO_FORMAT_YV16);
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_YV12A, VIDEO_FORMAT_YV12A);
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_YV24, VIDEO_FORMAT_YV24);
-#if defined(OS_MACOSX)
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_NV12, VIDEO_FORMAT_NV12);
-#endif
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_ARGB, VIDEO_FORMAT_ARGB);
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_XRGB, VIDEO_FORMAT_XRGB);
+ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_UYVY, VIDEO_FORMAT_UYVY);
 ASSERT_ENUM_EQ_RAW(VideoPixelFormat, PIXEL_FORMAT_MAX, VIDEO_FORMAT_FORMAT_MAX);
 
 // ColorSpace.
@@ -438,7 +437,6 @@ TypeConverter<media::AudioDecoderConfig,
       input->extra_data.size() ? &input->extra_data.front() : NULL,
       input->extra_data.size(),
       input->is_encrypted,
-      false,
       base::TimeDelta::FromMicroseconds(input->seek_preroll_usec),
       input->codec_delay);
   return config;
@@ -483,7 +481,7 @@ TypeConverter<media::VideoDecoderConfig,
       input->coded_size.To<gfx::Size>(), input->visible_rect.To<gfx::Rect>(),
       input->natural_size.To<gfx::Size>(),
       input->extra_data.size() ? &input->extra_data.front() : NULL,
-      input->extra_data.size(), input->is_encrypted, false);
+      input->extra_data.size(), input->is_encrypted);
   return config;
 }
 

@@ -12,8 +12,8 @@
 #include "base/lazy_instance.h"
 #include "base/macros.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/memory/scoped_vector.h"
 #include "base/path_service.h"
+#include "base/process/process_info.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
@@ -33,7 +33,8 @@
 #include "mojo/runner/in_process_native_runner.h"
 #include "mojo/runner/out_of_process_native_runner.h"
 #include "mojo/runner/switches.h"
-#include "mojo/services/tracing/tracing.mojom.h"
+#include "mojo/services/tracing/public/cpp/switches.h"
+#include "mojo/services/tracing/public/interfaces/tracing.mojom.h"
 #include "mojo/shell/application_loader.h"
 #include "mojo/shell/application_manager.h"
 #include "mojo/shell/switches.h"
@@ -226,7 +227,8 @@ class TracingServiceProvider : public ServiceProvider {
 
 }  // namespace
 
-Context::Context() : application_manager_(this) {
+Context::Context()
+    : application_manager_(this), main_entry_time_(base::Time::Now()) {
   DCHECK(!base::MessageLoop::current());
 
   // By default assume that the local apps reside alongside the shell.
@@ -304,14 +306,30 @@ bool Context::Init() {
   InitContentHandlers(&application_manager_, command_line);
   InitNativeOptions(&application_manager_, command_line);
 
+  ServiceProviderPtr service_provider_ptr;
   ServiceProviderPtr tracing_service_provider_ptr;
   new TracingServiceProvider(GetProxy(&tracing_service_provider_ptr));
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From("mojo:tracing");
   application_manager_.ConnectToApplication(
-      nullptr, request.Pass(), std::string(), GURL(""), nullptr,
-      tracing_service_provider_ptr.Pass(),
+      nullptr, request.Pass(), std::string(), GURL(),
+      GetProxy(&service_provider_ptr), tracing_service_provider_ptr.Pass(),
       shell::GetPermissiveCapabilityFilter(), base::Closure());
+
+  // Record the shell startup metrics used for performance testing.
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          tracing::kEnableStatsCollectionBindings)) {
+    tracing::StartupPerformanceDataCollectorPtr collector;
+    service_provider_ptr->ConnectToService(
+        tracing::StartupPerformanceDataCollector::Name_,
+        GetProxy(&collector).PassMessagePipe());
+#if defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
+    // CurrentProcessInfo::CreationTime is only defined on some platforms.
+    const base::Time creation_time = base::CurrentProcessInfo::CreationTime();
+    collector->SetShellProcessCreationTime(creation_time.ToInternalValue());
+#endif
+    collector->SetShellMainEntryPointTime(main_entry_time_.ToInternalValue());
+  }
 
   InitDevToolsServiceIfNeeded(&application_manager_, command_line);
 

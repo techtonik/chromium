@@ -5,6 +5,8 @@
 #include "content/browser/presentation/presentation_service_impl.h"
 
 #include <algorithm>
+#include <string>
+#include <vector>
 
 #include "base/logging.h"
 #include "base/stl_util.h"
@@ -30,19 +32,34 @@ int GetNextRequestSessionId() {
   return ++next_request_session_id;
 }
 
+// Converts a PresentationSessionMessage |input| to a SessionMessage.
+// |input|: The message to convert.
+// |pass_ownership|: If true, function may reuse strings or buffers from
+//     |input| without copying. |input| can be freely modified.
 presentation::SessionMessagePtr ToMojoSessionMessage(
-    const content::PresentationSessionMessage& input) {
+    content::PresentationSessionMessage* input,
+    bool pass_ownership) {
+  DCHECK(input);
   presentation::SessionMessagePtr output(presentation::SessionMessage::New());
-  if (input.is_binary()) {
+  if (input->is_binary()) {
     // binary data
+    DCHECK(input->data);
     output->type = presentation::PresentationMessageType::
         PRESENTATION_MESSAGE_TYPE_ARRAY_BUFFER;
-    output->data = mojo::Array<uint8_t>::From(*input.data);
+    if (pass_ownership) {
+      output->data.Swap(input->data.get());
+    } else {
+      output->data = mojo::Array<uint8_t>::From(*input->data);
+    }
   } else {
     // string message
     output->type =
         presentation::PresentationMessageType::PRESENTATION_MESSAGE_TYPE_TEXT;
-    output->message = input.message;
+    if (pass_ownership) {
+      output->message.Swap(&input->message);
+    } else {
+      output->message = input->message;
+    }
   }
   return output.Pass();
 }
@@ -102,7 +119,7 @@ void InvokeNewSessionMojoCallbackWithError(
             PresentationError(PRESENTATION_ERROR_UNKNOWN, "Internal error")));
 }
 
-} // namespace
+}  // namespace
 
 PresentationServiceImpl::PresentationServiceImpl(
     RenderFrameHost* render_frame_host,
@@ -152,12 +169,10 @@ void PresentationServiceImpl::Bind(
     mojo::InterfaceRequest<presentation::PresentationService> request) {
   binding_.reset(new mojo::Binding<presentation::PresentationService>(
       this, request.Pass()));
-  binding_->set_error_handler(this);
-}
-
-void PresentationServiceImpl::OnConnectionError() {
-  DVLOG(1) << "OnConnectionError";
-  delete this;
+  binding_->set_connection_error_handler([this]() {
+    DVLOG(1) << "Connection error";
+    delete this;
+  });
 }
 
 void PresentationServiceImpl::SetClient(
@@ -170,8 +185,10 @@ void PresentationServiceImpl::SetClient(
 void PresentationServiceImpl::ListenForScreenAvailability(
       const mojo::String& url) {
   DVLOG(2) << "ListenForScreenAvailability " << url;
-  if (!delegate_)
+  if (!delegate_) {
+    client_->OnScreenAvailabilityUpdated(url, false);
     return;
+  }
 
   const std::string& availability_url = url.get();
   if (screen_availability_listeners_.count(availability_url))
@@ -219,7 +236,11 @@ void PresentationServiceImpl::StartSession(
     const NewSessionMojoCallback& callback) {
   DVLOG(2) << "StartSession";
   if (!delegate_) {
-    InvokeNewSessionMojoCallbackWithError(callback);
+    callback.Run(
+          presentation::PresentationSessionInfoPtr(),
+          presentation::PresentationError::From(
+              PresentationError(PRESENTATION_ERROR_NO_AVAILABLE_SCREENS,
+                                "No screens found.")));
     return;
   }
 
@@ -246,7 +267,11 @@ void PresentationServiceImpl::JoinSession(
     const NewSessionMojoCallback& callback) {
   DVLOG(2) << "JoinSession";
   if (!delegate_) {
-    InvokeNewSessionMojoCallbackWithError(callback);
+    callback.Run(
+          presentation::PresentationSessionInfoPtr(),
+          presentation::PresentationError::From(
+              PresentationError(PRESENTATION_ERROR_NO_PRESENTATION_FOUND,
+                                "Error joining route: No matching route")));
     return;
   }
 
@@ -433,13 +458,14 @@ void PresentationServiceImpl::ListenForSessionMessages(
 
 void PresentationServiceImpl::OnSessionMessages(
     const PresentationSessionInfo& session,
-    const ScopedVector<PresentationSessionMessage>& messages) {
+    const ScopedVector<PresentationSessionMessage>& messages,
+    bool pass_ownership) {
   DCHECK(client_);
 
   DVLOG(2) << "OnSessionMessages";
   mojo::Array<presentation::SessionMessagePtr> mojoMessages(messages.size());
   for (size_t i = 0; i < messages.size(); ++i)
-    mojoMessages[i] = ToMojoSessionMessage(*messages[i]);
+    mojoMessages[i] = ToMojoSessionMessage(messages[i], pass_ownership);
 
   client_->OnSessionMessagesReceived(
       presentation::PresentationSessionInfo::From(session),

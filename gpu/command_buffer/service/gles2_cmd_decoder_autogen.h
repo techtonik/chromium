@@ -141,6 +141,10 @@ error::Error GLES2DecoderImpl::HandleBindSampler(uint32_t immediate_data_size,
   (void)c;
   GLuint unit = static_cast<GLuint>(c.unit);
   GLuint sampler = c.sampler;
+  if (sampler == 0) {
+    glBindSampler(unit, sampler);
+    return error::kNoError;
+  }
   if (!group_->GetSamplerServiceId(sampler, &sampler)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glBindSampler",
                        "invalid sampler id");
@@ -391,7 +395,7 @@ error::Error GLES2DecoderImpl::HandleClearBufferfi(uint32_t immediate_data_size,
   GLint drawbuffers = static_cast<GLint>(c.drawbuffers);
   GLfloat depth = static_cast<GLfloat>(c.depth);
   GLint stencil = static_cast<GLint>(c.stencil);
-  glClearBufferfi(buffer, drawbuffers, depth, stencil);
+  DoClearBufferfi(buffer, drawbuffers, depth, stencil);
   return error::kNoError;
 }
 
@@ -417,7 +421,7 @@ error::Error GLES2DecoderImpl::HandleClearBufferfvImmediate(
   if (value == NULL) {
     return error::kOutOfBounds;
   }
-  glClearBufferfv(buffer, drawbuffers, value);
+  DoClearBufferfv(buffer, drawbuffers, value);
   return error::kNoError;
 }
 
@@ -443,7 +447,7 @@ error::Error GLES2DecoderImpl::HandleClearBufferivImmediate(
   if (value == NULL) {
     return error::kOutOfBounds;
   }
-  glClearBufferiv(buffer, drawbuffers, value);
+  DoClearBufferiv(buffer, drawbuffers, value);
   return error::kNoError;
 }
 
@@ -469,7 +473,7 @@ error::Error GLES2DecoderImpl::HandleClearBufferuivImmediate(
   if (value == NULL) {
     return error::kOutOfBounds;
   }
-  glClearBufferuiv(buffer, drawbuffers, value);
+  DoClearBufferuiv(buffer, drawbuffers, value);
   return error::kNoError;
 }
 
@@ -4548,6 +4552,37 @@ error::Error GLES2DecoderImpl::HandleCompressedCopyTextureCHROMIUM(
   GLenum source_id = static_cast<GLenum>(c.source_id);
   GLenum dest_id = static_cast<GLenum>(c.dest_id);
   DoCompressedCopyTextureCHROMIUM(target, source_id, dest_id);
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderImpl::HandleCompressedCopySubTextureCHROMIUM(
+    uint32_t immediate_data_size,
+    const void* cmd_data) {
+  const gles2::cmds::CompressedCopySubTextureCHROMIUM& c =
+      *static_cast<const gles2::cmds::CompressedCopySubTextureCHROMIUM*>(
+          cmd_data);
+  (void)c;
+  GLenum target = static_cast<GLenum>(c.target);
+  GLenum source_id = static_cast<GLenum>(c.source_id);
+  GLenum dest_id = static_cast<GLenum>(c.dest_id);
+  GLint xoffset = static_cast<GLint>(c.xoffset);
+  GLint yoffset = static_cast<GLint>(c.yoffset);
+  GLint x = static_cast<GLint>(c.x);
+  GLint y = static_cast<GLint>(c.y);
+  GLsizei width = static_cast<GLsizei>(c.width);
+  GLsizei height = static_cast<GLsizei>(c.height);
+  if (width < 0) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCompressedCopySubTextureCHROMIUM",
+                       "width < 0");
+    return error::kNoError;
+  }
+  if (height < 0) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCompressedCopySubTextureCHROMIUM",
+                       "height < 0");
+    return error::kNoError;
+  }
+  DoCompressedCopySubTextureCHROMIUM(target, source_id, dest_id, xoffset,
+                                     yoffset, x, y, width, height);
   return error::kNoError;
 }
 

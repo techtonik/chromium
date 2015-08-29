@@ -75,6 +75,8 @@ struct CC_EXPORT TransformNodeData {
 
   bool is_animated : 1;
   bool to_screen_is_animated : 1;
+  bool has_only_translation_animations : 1;
+  bool to_screen_has_scale_animation : 1;
 
   // Flattening, when needed, is only applied to a node's inherited transform,
   // never to its local transform.
@@ -104,6 +106,24 @@ struct CC_EXPORT TransformNodeData {
 
   // TODO(vollick): will be moved when accelerated effects are implemented.
   float post_local_scale_factor;
+
+  // The maximum scale that that node's |local| transform will have during
+  // current animations, considering only scales at keyframes not including the
+  // starting keyframe of each animation.
+  float local_maximum_animation_target_scale;
+
+  // The maximum scale that this node's |local| transform will have during
+  // current animatons, considering only the starting scale of each animation.
+  float local_starting_animation_scale;
+
+  // The maximum scale that this node's |to_target| transform will have during
+  // current animations, considering only scales at keyframes not incuding the
+  // starting keyframe of each animation.
+  float combined_maximum_animation_target_scale;
+
+  // The maximum scale that this node's |to_target| transform will have during
+  // current animations, considering only the starting scale of each animation.
+  float combined_starting_animation_scale;
 
   gfx::Vector2dF sublayer_scale;
 
@@ -137,6 +157,7 @@ struct CC_EXPORT ClipNodeData {
 
   gfx::RectF clip;
   gfx::RectF combined_clip;
+  gfx::RectF clip_in_target_space;
   int transform_id;
   int target_id;
   // This value is true for clip nodes created by layers that do not apply any
@@ -144,18 +165,19 @@ struct CC_EXPORT ClipNodeData {
   // target space clip.
   bool inherit_parent_target_space_clip;
   bool requires_tight_clip_rect;
+  bool render_surface_is_clipped;
 };
 
 typedef TreeNode<ClipNodeData> ClipNode;
 
-struct CC_EXPORT OpacityNodeData {
-  OpacityNodeData();
+struct CC_EXPORT EffectNodeData {
+  EffectNodeData();
 
   float opacity;
   float screen_space_opacity;
 };
 
-typedef TreeNode<OpacityNodeData> OpacityNode;
+typedef TreeNode<EffectNodeData> EffectNode;
 
 template <typename T>
 class CC_EXPORT PropertyTree {
@@ -298,7 +320,8 @@ class CC_EXPORT TransformTree final : public PropertyTree<TransformNode> {
   void UpdateSublayerScale(TransformNode* node);
   void UpdateTargetSpaceTransform(TransformNode* node,
                                   TransformNode* target_node);
-  void UpdateIsAnimated(TransformNode* node, TransformNode* parent_node);
+  void UpdateAnimationProperties(TransformNode* node,
+                                 TransformNode* parent_node);
   void UpdateSnapping(TransformNode* node);
   void UpdateNodeAndAncestorsHaveIntegerTranslations(
       TransformNode* node,
@@ -312,9 +335,13 @@ class CC_EXPORT TransformTree final : public PropertyTree<TransformNode> {
   std::vector<int> nodes_affected_by_outer_viewport_bounds_delta_;
 };
 
-class CC_EXPORT ClipTree final : public PropertyTree<ClipNode> {};
+class CC_EXPORT ClipTree final : public PropertyTree<ClipNode> {
+ public:
+  void SetViewportClip(gfx::RectF viewport_rect);
+  gfx::RectF ViewportClip();
+};
 
-class CC_EXPORT OpacityTree final : public PropertyTree<OpacityNode> {
+class CC_EXPORT EffectTree final : public PropertyTree<EffectNode> {
  public:
   void UpdateOpacities(int id);
 };
@@ -324,7 +351,7 @@ class CC_EXPORT PropertyTrees final {
   PropertyTrees();
 
   TransformTree transform_tree;
-  OpacityTree opacity_tree;
+  EffectTree effect_tree;
   ClipTree clip_tree;
   bool needs_rebuild;
   int sequence_number;

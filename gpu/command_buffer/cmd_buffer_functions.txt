@@ -239,8 +239,11 @@ GL_APICALL void         GL_APIENTRY glBeginTransformFeedback (GLenumTransformFee
 GL_APICALL void         GL_APIENTRY glEndQueryEXT (GLenumQueryTarget target);
 GL_APICALL void         GL_APIENTRY glEndTransformFeedback (void);
 GL_APICALL void         GL_APIENTRY glGetQueryivEXT (GLenumQueryTarget target, GLenumQueryParameter pname, GLint* params);
+GL_APICALL void         GL_APIENTRY glGetQueryObjectivEXT (GLidQuery id, GLenumQueryObjectParameter pname, GLint* params);
 GL_APICALL void         GL_APIENTRY glGetQueryObjectuivEXT (GLidQuery id, GLenumQueryObjectParameter pname, GLuint* params);
+GL_APICALL void         GL_APIENTRY glGetQueryObjecti64vEXT (GLidQuery id, GLenumQueryObjectParameter pname, GLint64* params);
 GL_APICALL void         GL_APIENTRY glGetQueryObjectui64vEXT (GLidQuery id, GLenumQueryObjectParameter pname, GLuint64* params);
+GL_APICALL void         GL_APIENTRY glSetDisjointValueSyncCHROMIUM (void);
 GL_APICALL void         GL_APIENTRY glInsertEventMarkerEXT (GLsizei length, const GLchar* marker);
 GL_APICALL void         GL_APIENTRY glPushGroupMarkerEXT (GLsizei length, const GLchar* marker);
 GL_APICALL void         GL_APIENTRY glPopGroupMarkerEXT (void);
@@ -280,6 +283,7 @@ GL_APICALL void         GL_APIENTRY glTexImageIOSurface2DCHROMIUM (GLenumTexture
 GL_APICALL void         GL_APIENTRY glCopyTextureCHROMIUM (GLenum target, GLenum source_id, GLenum dest_id, GLintTextureInternalFormat internalformat, GLenumPixelType dest_type, GLboolean unpack_flip_y, GLboolean unpack_premultiply_alpha, GLboolean unpack_unmultiply_alpha);
 GL_APICALL void         GL_APIENTRY glCopySubTextureCHROMIUM (GLenum target, GLenum source_id, GLenum dest_id, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height, GLboolean unpack_flip_y, GLboolean unpack_premultiply_alpha, GLboolean unpack_unmultiply_alpha);
 GL_APICALL void         GL_APIENTRY glCompressedCopyTextureCHROMIUM (GLenum target, GLenum source_id, GLenum dest_id);
+GL_APICALL void         GL_APIENTRY glCompressedCopySubTextureCHROMIUM (GLenum target, GLenum source_id, GLenum dest_id, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height);
 GL_APICALL void         GL_APIENTRY glDrawArraysInstancedANGLE (GLenumDrawMode mode, GLint first, GLsizei count, GLsizei primcount);
 GL_APICALL void         GL_APIENTRY glDrawElementsInstancedANGLE (GLenumDrawMode mode, GLsizei count, GLenumIndexType type, const void* indices, GLsizei primcount);
 GL_APICALL void         GL_APIENTRY glVertexAttribDivisorANGLE (GLuint index, GLuint divisor);
@@ -300,10 +304,6 @@ GL_APICALL void         GL_APIENTRY glBindTexImage2DCHROMIUM (GLenumTextureBindT
 GL_APICALL void         GL_APIENTRY glReleaseTexImage2DCHROMIUM (GLenumTextureBindTarget target, GLint imageId);
 GL_APICALL void         GL_APIENTRY glTraceBeginCHROMIUM (const char* category_name, const char* trace_name);
 GL_APICALL void         GL_APIENTRY glTraceEndCHROMIUM (void);
-GL_APICALL void         GL_APIENTRY glAsyncTexSubImage2DCHROMIUM (GLenumTextureTarget target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenumTextureFormat format, GLenumPixelType type, const void* data);
-GL_APICALL void         GL_APIENTRY glAsyncTexImage2DCHROMIUM (GLenumTextureTarget target, GLint level, GLenumTextureInternalFormat internalformat, GLsizei width, GLsizei height, GLintTextureBorder border, GLenumTextureFormat format, GLenumPixelType type, const void* pixels);
-GL_APICALL void         GL_APIENTRY glWaitAsyncTexImage2DCHROMIUM (GLenumTextureTarget target);
-GL_APICALL void         GL_APIENTRY glWaitAllAsyncTexImage2DCHROMIUM (void);
 GL_APICALL void         GL_APIENTRY glDiscardFramebufferEXT (GLenum target, GLsizei count, const GLenum* attachments);
 GL_APICALL void         GL_APIENTRY glLoseContextCHROMIUM (GLenumResetStatus current, GLenumResetStatus other);
 GL_APICALL GLuint       GL_APIENTRY glInsertSyncPointCHROMIUM (void);

@@ -122,6 +122,19 @@ class AppBannerSettingsHelper {
   static void SetEngagementWeights(double direct_engagement,
                                    double indirect_engagement);
 
+  // Set the minimum number of minutes between banner visits that will
+  // trigger a could show banner event. This must be less than the
+  // number of minutes in a day, and evenly divide the number of minutes
+  // in a day.
+  static void SetMinimumMinutesBetweenVisits(unsigned int minutes);
+
+  // Bucket a given time to the given resolution in local time.
+  static base::Time BucketTimeToResolution(base::Time time,
+                                           unsigned int minutes);
+
+  // Updates all values from field trial.
+  static void UpdateFromFieldTrial();
+
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(AppBannerSettingsHelper);
 };

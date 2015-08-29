@@ -59,18 +59,11 @@ bool HpackDecoder::HandleControlFrameHeadersComplete(SpdyStreamId id,
   }
   headers_block_buffer_.clear();
 
-  // Emit the Cookie header, if any crumbles were encountered.
-  if (!cookie_value_.empty()) {
-    decoded_block_[kCookieKey] = cookie_value_;
-    cookie_value_.clear();
-  }
   return true;
 }
 
 bool HpackDecoder::HandleHeaderRepresentation(StringPiece name,
                                               StringPiece value) {
-  typedef std::pair<SpdyHeaderBlock::iterator, bool> InsertResult;
-
   // Fail if pseudo-header follows regular header.
   if (name.size() > 0) {
     if (name[0] == kPseudoHeaderPrefix) {
@@ -82,20 +75,19 @@ bool HpackDecoder::HandleHeaderRepresentation(StringPiece name,
     }
   }
 
-  if (name == kCookieKey) {
-    if (cookie_value_.empty()) {
-      cookie_value_.assign(value.data(), value.size());
-    } else {
-      cookie_value_ += "; ";
-      cookie_value_.insert(cookie_value_.end(), value.begin(), value.end());
-    }
+  auto it = decoded_block_.find(name.as_string());
+  if (it == decoded_block_.end()) {
+    // This is a new key.
+    decoded_block_[name.as_string()].assign(value.data(), value.size());
   } else {
-    InsertResult result = decoded_block_.insert(
-        std::make_pair(name.as_string(), value.as_string()));
-    if (!result.second) {
-      result.first->second.push_back('\0');
-      result.first->second.insert(result.first->second.end(), value.begin(),
-                                  value.end());
+    // The key already exists, append |value| with appropriate delimiter.
+    string& old_value = it->second;
+    if (name == kCookieKey) {
+      old_value.append("; ");
+      value.AppendToString(&old_value);
+    } else {
+      old_value.push_back('\0');
+      old_value.insert(old_value.end(), value.begin(), value.end());
     }
   }
   return true;

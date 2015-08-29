@@ -5,6 +5,7 @@
 #include "content/test/weburl_loader_mock.h"
 
 #include "base/logging.h"
+#include "base/memory/scoped_ptr.h"
 #include "content/test/weburl_loader_mock_factory.h"
 #include "third_party/WebKit/public/platform/WebData.h"
 #include "third_party/WebKit/public/platform/WebURLError.h"
@@ -18,14 +19,10 @@ WebURLLoaderMock::WebURLLoaderMock(WebURLLoaderMockFactory* factory,
       default_loader_(default_loader),
       using_default_loader_(false),
       is_deferred_(false),
-      this_deleted_(NULL) {
+      weak_factory_(this) {
 }
 
 WebURLLoaderMock::~WebURLLoaderMock() {
-  // When |this_deleted_| is not null, there is someone interested to know if
-  // |this| got deleted. We notify them by setting the pointed value to true.
-  if (this_deleted_)
-    *this_deleted_ = true;
 }
 
 void WebURLLoaderMock::ServeAsynchronousRequest(
@@ -37,28 +34,32 @@ void WebURLLoaderMock::ServeAsynchronousRequest(
   if (!client_)
     return;
 
-  bool this_deleted = false;
-  this_deleted_ = &this_deleted;
-  client_->didReceiveResponse(this, response);
+  // If no delegate is provided then create an empty one. The default behavior
+  // will just proxy to the client.
+  scoped_ptr<blink::WebURLLoaderTestDelegate> defaultDelegate;
+  if (!delegate) {
+    defaultDelegate.reset(new blink::WebURLLoaderTestDelegate());
+    delegate = defaultDelegate.get();
+  }
 
-  // didReceiveResponse might end up getting ::cancel() to be called which will
-  // make the ResourceLoader to delete |this|. If that happens, |this_deleted|,
-  // created on the stack, will be set to true.
-  if (this_deleted)
+  // didReceiveResponse() and didReceiveData() might end up getting ::cancel()
+  // to be called which will make the ResourceLoader to delete |this|.
+  base::WeakPtr<WebURLLoaderMock> self(weak_factory_.GetWeakPtr());
+
+  delegate->didReceiveResponse(client_, this, response);
+  if (!self)
     return;
-  this_deleted_ = NULL;
 
   if (error.reason) {
-    client_->didFail(this, error);
+    delegate->didFail(client_, this, error);
     return;
   }
-  if (delegate) {
-    delegate->didReceiveData(client_, this, data.data(), data.size(),
+  delegate->didReceiveData(client_, this, data.data(), data.size(),
                              data.size());
-  } else {
-    client_->didReceiveData(this, data.data(), data.size(), data.size());
-  }
-  client_->didFinishLoading(this, 0, data.size());
+  if (!self)
+    return;
+
+  delegate->didFinishLoading(client_, this, 0, data.size());
 }
 
 blink::WebURLRequest WebURLLoaderMock::ServeRedirect(

@@ -18,7 +18,7 @@ import android.view.View.OnClickListener;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkModelObserver;
-import org.chromium.chrome.browser.offline_pages.OfflinePageBridge;
+import org.chromium.chrome.browser.offlinepages.OfflinePageBridge;
 import org.chromium.chrome.browser.widget.NumberRollView;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkType;
@@ -97,7 +97,7 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
                 EnhancedBookmarkAddEditFolderActivity.startEditFolderActivity(getContext(),
                         item.getId());
             } else {
-                EnhancedBookmarkUtils.startEditActivity(getContext(), item.getId());
+                EnhancedBookmarkUtils.startEditActivity(getContext(), item.getId(), null);
             }
             return true;
         } else if (menuItem.getItemId() == R.id.selection_mode_move_menu_id) {
@@ -284,7 +284,7 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
 
     private int getTitleForAllItems() {
         return OfflinePageBridge.isEnabled()
-                ? R.string.enhanced_bookmark_title_bar_all_items_offline_pages
+                ? R.string.offline_pages_all_items
                 : R.string.enhanced_bookmark_title_bar_all_items;
     }
 }

@@ -4,18 +4,12 @@
 
 #include "ui/ozone/platform/drm/gpu/hardware_display_plane_manager.h"
 
-#include <drm.h>
-#include <xf86drm.h>
-
 #include <set>
 
 #include "base/logging.h"
 #include "ui/gfx/geometry/rect.h"
-#include "ui/ozone/platform/drm/gpu/crtc_controller.h"
 #include "ui/ozone/platform/drm/gpu/drm_device.h"
-#include "ui/ozone/platform/drm/gpu/hardware_display_controller.h"
 #include "ui/ozone/platform/drm/gpu/scanout_buffer.h"
-#include "ui/ozone/public/ozone_switches.h"
 
 namespace ui {
 namespace {
@@ -31,14 +25,6 @@ HardwareDisplayPlaneList::HardwareDisplayPlaneList() {
 }
 
 HardwareDisplayPlaneList::~HardwareDisplayPlaneList() {
-  for (auto* plane : plane_list) {
-    plane->set_in_use(false);
-    plane->set_owning_crtc(0);
-  }
-  for (auto* plane : old_plane_list) {
-    plane->set_in_use(false);
-    plane->set_owning_crtc(0);
-  }
 }
 
 HardwareDisplayPlaneList::PageFlipInfo::PageFlipInfo(uint32_t crtc_id,
@@ -115,8 +101,12 @@ bool HardwareDisplayPlaneManager::Initialize(DrmDevice* drm) {
     for (uint32_t j = 0; j < formats_size; j++)
       supported_formats.push_back(drm_plane->formats[j]);
 
-    if (plane->Initialize(drm, supported_formats)) {
-      planes_.push_back(plane.Pass());
+    if (plane->Initialize(drm, supported_formats, false, false)) {
+      // CRTC controllers always assume they have a cursor plane and the cursor
+      // plane is updated via cursor specific DRM API. Hence, we dont keep
+      // track of Cursor plane here to avoid re-using it for any other purpose.
+      if (plane->type() != HardwareDisplayPlane::kCursor)
+        planes_.push_back(plane.Pass());
     }
   }
 
@@ -129,8 +119,8 @@ bool HardwareDisplayPlaneManager::Initialize(DrmDevice* drm) {
       if (plane_ids.find(resources->crtcs[i] - 1) == plane_ids.end()) {
         scoped_ptr<HardwareDisplayPlane> dummy_plane(
             CreatePlane(resources->crtcs[i] - 1, (1 << i)));
-        dummy_plane->set_is_dummy(true);
-        if (dummy_plane->Initialize(drm, std::vector<uint32_t>())) {
+        if (dummy_plane->Initialize(drm, std::vector<uint32_t>(), true,
+                                    false)) {
           planes_.push_back(dummy_plane.Pass());
         }
       }
@@ -193,15 +183,15 @@ bool HardwareDisplayPlaneManager::AssignOverlayPlanes(
 
   size_t plane_idx = 0;
   for (const auto& plane : overlay_list) {
-    HardwareDisplayPlane* hw_plane =
-        FindNextUnusedPlane(&plane_idx, crtc_index, plane.buffer->GetFormat());
+    HardwareDisplayPlane* hw_plane = FindNextUnusedPlane(
+        &plane_idx, crtc_index, plane.buffer->GetFramebufferPixelFormat());
     if (!hw_plane) {
       LOG(ERROR) << "Failed to find a free plane for crtc " << crtc_id;
       return false;
     }
 
     gfx::Rect fixed_point_rect;
-    if (!hw_plane->is_dummy()) {
+    if (hw_plane->type() != HardwareDisplayPlane::kDummy) {
       const gfx::Size& size = plane.buffer->GetSize();
       gfx::RectF crop_rect = plane.crop_rect;
       crop_rect.Scale(size.width(), size.height());
@@ -226,21 +216,6 @@ bool HardwareDisplayPlaneManager::AssignOverlayPlanes(
     }
   }
   return true;
-}
-
-void HardwareDisplayPlaneManager::ResetPlanes(
-    HardwareDisplayPlaneList* plane_list,
-    uint32_t crtc_id) {
-  std::vector<HardwareDisplayPlane*> planes;
-  planes.swap(plane_list->old_plane_list);
-  for (auto* plane : planes) {
-    if (plane->owning_crtc() == crtc_id) {
-      plane->set_owning_crtc(0);
-      plane->set_in_use(false);
-    } else {
-      plane_list->old_plane_list.push_back(plane);
-    }
-  }
 }
 
 }  // namespace ui

@@ -109,6 +109,80 @@ class LayerTreeHostTestSetNeedsCommitInsideLayout : public LayerTreeHostTest {
 
 SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostTestSetNeedsCommitInsideLayout);
 
+class LayerTreeHostTestFrameOrdering : public LayerTreeHostTest {
+ protected:
+  enum MainOrder : int {
+    MAIN_START = 1,
+    MAIN_LAYOUT,
+    MAIN_COMMIT_COMPLETE,
+    MAIN_DID_BEGIN_FRAME,
+    MAIN_END,
+  };
+
+  enum ImplOrder : int {
+    IMPL_START = 1,
+    IMPL_COMMIT,
+    IMPL_COMMIT_COMPLETE,
+    IMPL_ACTIVATE,
+    IMPL_DRAW,
+    IMPL_SWAP,
+    IMPL_END,
+  };
+
+  template <typename T>
+  bool CheckStep(T next, T* var) {
+    int expected = next - 1;
+    EXPECT_EQ(expected, *var);
+    bool correct = expected == *var;
+    *var = next;
+    return correct;
+  }
+
+  void BeginTest() override { PostSetNeedsCommitToMainThread(); }
+
+  void Layout() override { EXPECT_TRUE(CheckStep(MAIN_LAYOUT, &main_)); }
+
+  void DidCommit() override {
+    EXPECT_TRUE(CheckStep(MAIN_COMMIT_COMPLETE, &main_));
+  }
+
+  void DidBeginMainFrame() override {
+    EXPECT_TRUE(CheckStep(MAIN_DID_BEGIN_FRAME, &main_));
+  }
+
+  void BeginCommitOnThread(LayerTreeHostImpl* impl) override {
+    EXPECT_TRUE(CheckStep(IMPL_COMMIT, &impl_));
+  }
+
+  void CommitCompleteOnThread(LayerTreeHostImpl* impl) override {
+    EXPECT_TRUE(CheckStep(IMPL_COMMIT_COMPLETE, &impl_));
+  }
+
+  void WillActivateTreeOnThread(LayerTreeHostImpl* impl) override {
+    EXPECT_TRUE(CheckStep(IMPL_ACTIVATE, &impl_));
+  }
+
+  void DrawLayersOnThread(LayerTreeHostImpl* impl) override {
+    EXPECT_TRUE(CheckStep(IMPL_DRAW, &impl_));
+  }
+
+  void SwapBuffersCompleteOnThread(LayerTreeHostImpl* impl) override {
+    EXPECT_TRUE(CheckStep(IMPL_SWAP, &impl_));
+
+    EndTest();
+  }
+
+  void AfterTest() override {
+    EXPECT_TRUE(CheckStep(MAIN_END, &main_));
+    EXPECT_TRUE(CheckStep(IMPL_END, &impl_));
+  }
+
+  MainOrder main_ = MAIN_START;
+  ImplOrder impl_ = IMPL_START;
+};
+
+SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostTestFrameOrdering);
+
 class LayerTreeHostTestSetNeedsUpdateInsideLayout : public LayerTreeHostTest {
  protected:
   void BeginTest() override { PostSetNeedsCommitToMainThread(); }
@@ -516,7 +590,6 @@ class LayerTreeHostTestPushPropertiesTo : public LayerTreeHostTest {
  protected:
   void SetupTree() override {
     scoped_refptr<Layer> root = Layer::Create(layer_settings());
-    root->CreateRenderSurface();
     root->SetBounds(gfx::Size(10, 10));
     layer_tree_host()->SetRootLayer(root);
     LayerTreeHostTest::SetupTree();
@@ -786,7 +859,6 @@ class LayerTreeHostTestNoExtraCommitFromInvalidate : public LayerTreeHostTest {
   void SetupTree() override {
     root_layer_ = Layer::Create(layer_settings());
     root_layer_->SetBounds(gfx::Size(10, 20));
-    root_layer_->CreateRenderSurface();
 
     scaled_layer_ = FakePictureLayer::Create(layer_settings(), &client_);
     scaled_layer_->SetBounds(gfx::Size(1, 1));
@@ -837,7 +909,6 @@ class LayerTreeHostTestNoExtraCommitFromScrollbarInvalidate
   void SetupTree() override {
     root_layer_ = Layer::Create(layer_settings());
     root_layer_->SetBounds(gfx::Size(10, 20));
-    root_layer_->CreateRenderSurface();
 
     bool paint_scrollbar = true;
     bool has_thumb = false;
@@ -1703,7 +1774,6 @@ class LayerTreeHostTestCompositeImmediatelyStateTransitions
   void InitializeSettings(LayerTreeSettings* settings) override {
     settings->single_thread_proxy_scheduler = false;
     settings->use_zero_copy = true;
-    settings->use_one_copy = false;
   }
 
   void BeginTest() override {
@@ -1954,6 +2024,10 @@ class LayerTreeHostTestAbortedCommitDoesntStallSynchronousCompositor
   }
 
   void ScheduledActionInvalidateOutputSurface() override {
+    // Do not call ImplThreadTaskRunner after the test ended because of the
+    // possibility of use-after-free due to a race.
+    if (TestEnded())
+      return;
     ImplThreadTaskRunner()->PostTask(
         FROM_HERE,
         base::Bind(
@@ -2543,7 +2617,6 @@ class LayerTreeHostTestLayersPushProperties : public LayerTreeHostTest {
 
   void SetupTree() override {
     root_ = PushPropertiesCountingLayer::Create(layer_settings());
-    root_->CreateRenderSurface();
     child_ = PushPropertiesCountingLayer::Create(layer_settings());
     child2_ = PushPropertiesCountingLayer::Create(layer_settings());
     grandchild_ = PushPropertiesCountingLayer::Create(layer_settings());
@@ -2557,7 +2630,6 @@ class LayerTreeHostTestLayersPushProperties : public LayerTreeHostTest {
     child2_->AddChild(leaf_always_pushing_layer_);
 
     other_root_ = PushPropertiesCountingLayer::Create(layer_settings());
-    other_root_->CreateRenderSurface();
 
     // Don't set the root layer here.
     LayerTreeHostTest::SetupTree();
@@ -2935,7 +3007,6 @@ class LayerTreeHostTestPropertyChangesDuringUpdateArePushed
 
   void SetupTree() override {
     root_ = Layer::Create(layer_settings());
-    root_->CreateRenderSurface();
     root_->SetBounds(gfx::Size(1, 1));
 
     bool paint_scrollbar = true;
@@ -2992,7 +3063,6 @@ class LayerTreeHostTestSetDrawableCausesCommit : public LayerTreeHostTest {
 
   void SetupTree() override {
     root_ = PushPropertiesCountingLayer::Create(layer_settings());
-    root_->CreateRenderSurface();
     child_ = PushPropertiesCountingLayer::Create(layer_settings());
     root_->AddChild(child_);
 
@@ -3054,7 +3124,6 @@ class LayerTreeHostTestCasePushPropertiesThreeGrandChildren
 
   void SetupTree() override {
     root_ = PushPropertiesCountingLayer::Create(layer_settings());
-    root_->CreateRenderSurface();
     child_ = PushPropertiesCountingLayer::Create(layer_settings());
     grandchild1_ = PushPropertiesCountingLayer::Create(layer_settings());
     grandchild2_ = PushPropertiesCountingLayer::Create(layer_settings());
@@ -3600,7 +3669,6 @@ class LayerTreeHostTestPushHiddenLayer : public LayerTreeHostTest {
  protected:
   void SetupTree() override {
     root_layer_ = Layer::Create(layer_settings());
-    root_layer_->CreateRenderSurface();
     root_layer_->SetPosition(gfx::Point());
     root_layer_->SetBounds(gfx::Size(10, 10));
 
@@ -3694,55 +3762,6 @@ class LayerTreeHostTestUpdateLayerInEmptyViewport : public LayerTreeHostTest {
 };
 
 MULTI_THREAD_TEST_F(LayerTreeHostTestUpdateLayerInEmptyViewport);
-
-class LayerTreeHostTestMaxTransferBufferUsageBytes : public LayerTreeHostTest {
- protected:
-  void InitializeSettings(LayerTreeSettings* settings) override {
-    // Testing async uploads.
-    settings->use_zero_copy = false;
-    settings->use_one_copy = false;
-  }
-
-  scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
-    scoped_refptr<TestContextProvider> context_provider =
-        TestContextProvider::Create();
-    context_provider->SetMaxTransferBufferUsageBytes(512 * 512);
-    if (delegating_renderer())
-      return FakeOutputSurface::CreateDelegating3d(context_provider);
-    else
-      return FakeOutputSurface::Create3d(context_provider);
-  }
-
-  void SetupTree() override {
-    client_.set_fill_with_nonsolid_color(true);
-    scoped_refptr<FakePictureLayer> root_layer =
-        FakePictureLayer::Create(layer_settings(), &client_);
-    root_layer->SetBounds(gfx::Size(1024, 1024));
-    root_layer->SetIsDrawable(true);
-
-    layer_tree_host()->SetRootLayer(root_layer);
-    LayerTreeHostTest::SetupTree();
-  }
-
-  void BeginTest() override { PostSetNeedsCommitToMainThread(); }
-
-  void DidActivateTreeOnThread(LayerTreeHostImpl* impl) override {
-    TestWebGraphicsContext3D* context = TestContext();
-
-    // Expect that the transfer buffer memory used is equal to the
-    // MaxTransferBufferUsageBytes value set in CreateOutputSurface.
-    EXPECT_EQ(512 * 512u, context->max_used_transfer_buffer_usage_bytes());
-    EndTest();
-  }
-
-  void AfterTest() override {}
-
- private:
-  FakeContentLayerClient client_;
-};
-
-// Impl-side painting is a multi-threaded compositor feature.
-MULTI_THREAD_TEST_F(LayerTreeHostTestMaxTransferBufferUsageBytes);
 
 class LayerTreeHostTestSetMemoryPolicyOnLostOutputSurface
     : public LayerTreeHostTest {
@@ -4475,7 +4494,6 @@ class LayerTreeHostTestContinuousPainting : public LayerTreeHostTest {
   void SetupTree() override {
     scoped_refptr<Layer> root_layer = Layer::Create(layer_settings());
     root_layer->SetBounds(bounds_);
-    root_layer->CreateRenderSurface();
 
     child_layer_ = FakePictureLayer::Create(layer_settings(), &client_);
     child_layer_->SetBounds(bounds_);
@@ -4735,7 +4753,6 @@ class LayerTreeHostTestSynchronousCompositeSwapPromise
   void InitializeSettings(LayerTreeSettings* settings) override {
     settings->single_thread_proxy_scheduler = false;
     settings->use_zero_copy = true;
-    settings->use_one_copy = false;
   }
 
   void BeginTest() override {
@@ -4879,7 +4896,6 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
     layer->SetContentsOpaque(true);
     // Avoid LCD text on the layer so we don't cause extra commits when we
     // pinch.
-    layer->disable_lcd_text();
     pinch->AddChild(layer);
 
     layer_tree_host()->RegisterViewportLayers(NULL, root, pinch, pinch);
@@ -5039,10 +5055,6 @@ MULTI_THREAD_TEST_F(LayerTreeHostTestCrispUpAfterPinchEnds);
 class LayerTreeHostTestCrispUpAfterPinchEndsWithOneCopy
     : public LayerTreeHostTestCrispUpAfterPinchEnds {
  protected:
-  void InitializeSettings(LayerTreeSettings* settings) override {
-    settings->use_one_copy = true;
-  }
-
   scoped_ptr<FakeOutputSurface> CreateFakeOutputSurface() override {
     scoped_ptr<TestWebGraphicsContext3D> context3d =
         TestWebGraphicsContext3D::Create();
@@ -5183,7 +5195,6 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
     layer->SetContentsOpaque(true);
     // Avoid LCD text on the layer so we don't cause extra commits when we
     // pinch.
-    layer->disable_lcd_text();
     pinch->AddChild(layer);
 
     layer_tree_host()->RegisterViewportLayers(NULL, root, pinch, pinch);
@@ -5573,12 +5584,10 @@ class LayerTreeHostTestUpdateCopyRequests : public LayerTreeHostTest {
       case 1:
         child->RequestCopyOfOutput(CopyOutputRequest::CreateBitmapRequest(
             base::Bind(CopyOutputCallback)));
-        EXPECT_TRUE(
-            root->draw_properties().layer_or_descendant_has_copy_request);
+        EXPECT_GT(root->num_layer_or_descendants_with_copy_request(), 0);
         break;
       case 2:
-        EXPECT_FALSE(
-            root->draw_properties().layer_or_descendant_has_copy_request);
+        EXPECT_EQ(root->num_layer_or_descendants_with_copy_request(), 0);
         EndTest();
         break;
     }
@@ -6134,6 +6143,72 @@ class LayerTreeTestPageScaleFlags : public LayerTreeTest {
 };
 
 SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeTestPageScaleFlags);
+
+class LayerTreeHostScrollingAndScalingUpdatesLayers : public LayerTreeHostTest {
+ public:
+  LayerTreeHostScrollingAndScalingUpdatesLayers()
+      : requested_update_layers_(false), commit_count_(0) {}
+
+  void SetupTree() override {
+    LayerTreeHostTest::SetupTree();
+    Layer* root_layer = layer_tree_host()->root_layer();
+    scoped_refptr<Layer> scroll_layer = Layer::Create(layer_settings());
+    CreateVirtualViewportLayers(root_layer, scroll_layer, root_layer->bounds(),
+                                root_layer->bounds(), layer_tree_host(),
+                                layer_settings());
+  }
+
+  void BeginTest() override {
+    LayerTreeHostCommon::ScrollUpdateInfo scroll;
+    scroll.layer_id = layer_tree_host()->root_layer()->id();
+    scroll.scroll_delta = gfx::Vector2d(0, 33);
+    scroll_info_.scrolls.push_back(scroll);
+
+    scale_info_.page_scale_delta = 2.71f;
+
+    PostSetNeedsCommitToMainThread();
+  }
+
+  void BeginMainFrame(const BeginFrameArgs& args) override {
+    switch (commit_count_) {
+      case 0:
+        requested_update_layers_ = false;
+        layer_tree_host()->ApplyScrollAndScale(&no_op_info_);
+        EXPECT_FALSE(requested_update_layers_);
+        break;
+      case 1:
+        requested_update_layers_ = false;
+        layer_tree_host()->ApplyScrollAndScale(&scale_info_);
+        EXPECT_TRUE(requested_update_layers_);
+        break;
+      case 2:
+        requested_update_layers_ = false;
+        layer_tree_host()->ApplyScrollAndScale(&scroll_info_);
+        EXPECT_TRUE(requested_update_layers_);
+        EndTest();
+        break;
+      default:
+        NOTREACHED();
+    }
+  }
+
+  void DidSetNeedsUpdateLayers() override { requested_update_layers_ = true; }
+
+  void DidCommit() override {
+    if (++commit_count_ < 3)
+      PostSetNeedsCommitToMainThread();
+  }
+
+  void AfterTest() override {}
+
+  ScrollAndScaleSet scroll_info_;
+  ScrollAndScaleSet scale_info_;
+  ScrollAndScaleSet no_op_info_;
+  bool requested_update_layers_;
+  int commit_count_;
+};
+
+MULTI_THREAD_TEST_F(LayerTreeHostScrollingAndScalingUpdatesLayers);
 
 }  // namespace
 }  // namespace cc

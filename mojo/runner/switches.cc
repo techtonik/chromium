@@ -4,8 +4,6 @@
 
 #include "mojo/runner/switches.h"
 
-#include "base/basictypes.h"
-
 namespace switches {
 
 // Used internally by the main process to indicate that a new process should be
@@ -39,10 +37,6 @@ const char kHelp[] = "help";
 // Specify origin to map to base url. See url_resolver.cc for details.
 // Can be used multiple times.
 const char kMapOrigin[] = "map-origin";
-
-// Starts tracing when the shell starts up, saving a trace file on disk after 5
-// seconds or when the shell exits.
-const char kTraceStartup[] = "trace-startup";
 
 // Specifies a set of mappings to apply when resolving URLs. The value is a set
 // of comma-separated mappings, where each mapping consists of a pair of URLs

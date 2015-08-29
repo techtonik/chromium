@@ -10,8 +10,8 @@
 #include "content/child/service_worker/web_service_worker_impl.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/common/service_worker/service_worker_utils.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerProviderClient.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerProviderClient.h"
 
 using blink::WebURL;
 
@@ -61,7 +61,7 @@ void WebServiceWorkerProviderImpl::registerServiceWorker(
 
 void WebServiceWorkerProviderImpl::getRegistration(
     const blink::WebURL& document_url,
-    WebServiceWorkerRegistrationCallbacks* callbacks) {
+    WebServiceWorkerGetRegistrationCallbacks* callbacks) {
   GetDispatcher()->GetRegistration(
       context_->provider_id(), document_url, callbacks);
 }

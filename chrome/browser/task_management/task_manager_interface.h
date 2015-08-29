@@ -5,6 +5,8 @@
 #ifndef CHROME_BROWSER_TASK_MANAGEMENT_TASK_MANAGER_INTERFACE_H_
 #define CHROME_BROWSER_TASK_MANAGEMENT_TASK_MANAGER_INTERFACE_H_
 
+#include <stdint.h>
+
 #include "base/memory/scoped_ptr.h"
 #include "base/observer_list.h"
 #include "base/process/process_handle.h"
@@ -15,6 +17,10 @@
 #include "third_party/WebKit/public/web/WebCache.h"
 #include "ui/gfx/image/image_skia.h"
 
+namespace net {
+class URLRequest;
+}  // namespace net
+
 namespace task_management {
 
 // Defines the interface for any implementation of the task manager.
@@ -22,6 +28,15 @@ namespace task_management {
 // enabled calculations of the usage of the various resources.
 class TaskManagerInterface {
  public:
+  // Gets the existing instance of the task manager if any, otherwise it will
+  // create it first. Must be called on the UI thread.
+  static TaskManagerInterface* GetTaskManager();
+
+  // This notification will be received on the IO thread from
+  // ChromeNetworkDelegate to update the task manager with network usage.
+  static void OnRawBytesRead(const net::URLRequest& request,
+                             int64_t bytes_read);
+
   void AddObserver(TaskManagerObserver* observer);
   void RemoveObserver(TaskManagerObserver* observer);
 
@@ -106,6 +121,15 @@ class TaskManagerInterface {
       TaskId task_id,
       blink::WebCache::ResourceTypeStats* stats) const = 0;
 
+  // Gets the list of task IDs currently tracked by the task manager. The list
+  // will be sorted by the process IDs on which the tasks are running, then by
+  // the task IDs themselves.
+  virtual const TaskIdList& GetTaskIdsList() const = 0;
+
+  // Gets the number of task-manager tasks running on the same process on which
+  // the Task with |task_id| is running.
+  virtual size_t GetNumberOfTasksOnSameProcess(TaskId task_id) const = 0;
+
   // Returns true if the resource |type| usage calculation is enabled and
   // the implementation should refresh its value (this means that at least one
   // of the observers require this value). False otherwise.
@@ -122,7 +146,11 @@ class TaskManagerInterface {
 
   // Refresh all the enabled resources usage of all the available tasks.
   virtual void Refresh() = 0;
-  // TODO(afakhry): Add more virtual methods here as needed.
+
+  // StartUpdating will be called once an observer is added, and StopUpdating
+  // will be called when the last observer is removed.
+  virtual void StartUpdating() = 0;
+  virtual void StopUpdating() = 0;
 
   // Returns the current refresh time that this task manager is running at. It
   // will return base::TimeDelta::Max() if the task manager is not running.
@@ -135,6 +163,12 @@ class TaskManagerInterface {
   }
 
  private:
+  friend class TaskManagerObserver;
+
+  // This should be called after each time an observer changes its own desired
+  // resources refresh flags.
+  void RecalculateRefreshFlags();
+
   // Appends |flags| to the |enabled_resources_flags_|.
   void ResourceFlagsAdded(int64 flags);
 

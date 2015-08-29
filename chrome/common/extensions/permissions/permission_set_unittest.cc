@@ -41,10 +41,9 @@ static void AddPattern(URLPatternSet* extent, const std::string& pattern) {
   extent->AddPattern(URLPattern(schemes, pattern));
 }
 
-size_t IndexOf(const CoalescedPermissionMessages& warnings,
-               const std::string& warning) {
+size_t IndexOf(const PermissionMessages& warnings, const std::string& warning) {
   size_t i = 0;
-  for (const CoalescedPermissionMessage& msg : warnings) {
+  for (const PermissionMessage& msg : warnings) {
     if (msg.message() == base::ASCIIToUTF16(warning))
       return i;
     ++i;
@@ -81,10 +80,9 @@ std::string PermissionIDsToString(const PermissionIDSet& ids) {
   return base::StringPrintf("[ %s ]", base::JoinString(strs, ", ").c_str());
 }
 
-std::string CoalescedPermissionIDsToString(
-    const CoalescedPermissionMessages& msgs) {
+std::string CoalescedPermissionIDsToString(const PermissionMessages& msgs) {
   std::vector<std::string> strs;
-  for (const CoalescedPermissionMessage& msg : msgs)
+  for (const PermissionMessage& msg : msgs)
     strs.push_back(PermissionIDsToString(msg.permissions()));
   return base::JoinString(strs, " ");
 }
@@ -97,7 +95,7 @@ testing::AssertionResult PermissionSetProducesMessage(
     const PermissionIDSet& expected_ids) {
   const PermissionMessageProvider* provider = PermissionMessageProvider::Get();
 
-  CoalescedPermissionMessages msgs = provider->GetPermissionMessages(
+  PermissionMessages msgs = provider->GetPermissionMessages(
       provider->GetAllPermissionIDs(permissions, extension_type));
   if (msgs.size() != 1) {
     return testing::AssertionFailure()
@@ -840,12 +838,12 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kFileSystemWrite);
   skip.insert(APIPermission::kSocket);
   skip.insert(APIPermission::kUsb);
-  skip.insert(APIPermission::kUsbDevice);
   skip.insert(APIPermission::kLauncherSearchProvider);
 
   // We already have a generic message for declaring externally_connectable.
   skip.insert(APIPermission::kExternallyConnectableAllUrls);
 
+  const PermissionMessageProvider* provider = PermissionMessageProvider::Get();
   PermissionsInfo* info = PermissionsInfo::GetInstance();
   APIPermissionSet permissions = info->GetAll();
   for (APIPermissionSet::const_iterator i = permissions.begin();
@@ -853,13 +851,11 @@ TEST(PermissionsTest, PermissionMessages) {
     const APIPermissionInfo* permission_info = i->info();
     EXPECT_TRUE(permission_info != NULL);
 
-    if (skip.count(i->id())) {
-      EXPECT_EQ(PermissionMessage::kNone, permission_info->message_id())
-          << "unexpected message_id for " << permission_info->name();
-    } else {
-      EXPECT_NE(PermissionMessage::kNone, permission_info->message_id())
-          << "missing message_id for " << permission_info->name();
-    }
+    PermissionIDSet id;
+    id.insert(permission_info->id());
+    bool has_message = !provider->GetPermissionMessages(id).empty();
+    bool should_have_message = !skip.count(i->id());
+    EXPECT_EQ(should_have_message, has_message) << permission_info->name();
   }
 }
 
@@ -875,43 +871,10 @@ TEST(PermissionsTest, FileSystemPermissionMessages) {
       MakePermissionIDSet(api_permissions)));
 }
 
-// The file system permissions have a special-case hack to show a warning for
-// write and directory at the same time.
-// TODO(sammc): Remove this. See http://crbug.com/284849.
-TEST(PermissionsTest, FileSystemImplicitPermissions) {
-  APIPermissionSet apis;
-  apis.insert(APIPermission::kFileSystemWrite);
-  apis.AddImpliedPermissions();
-
-  EXPECT_EQ(apis.find(APIPermission::kFileSystemWrite)->id(),
-            APIPermission::kFileSystemWrite);
-  EXPECT_EQ(apis.size(), 1u);
-
-  apis.erase(APIPermission::kFileSystemWrite);
-  apis.insert(APIPermission::kFileSystemDirectory);
-  apis.AddImpliedPermissions();
-
-  EXPECT_EQ(apis.find(APIPermission::kFileSystemDirectory)->id(),
-            APIPermission::kFileSystemDirectory);
-  EXPECT_EQ(apis.size(), 1u);
-
-  apis.insert(APIPermission::kFileSystemWrite);
-  apis.AddImpliedPermissions();
-
-  EXPECT_EQ(apis.find(APIPermission::kFileSystemWrite)->id(),
-            APIPermission::kFileSystemWrite);
-  EXPECT_EQ(apis.find(APIPermission::kFileSystemDirectory)->id(),
-            APIPermission::kFileSystemDirectory);
-  EXPECT_EQ(apis.find(APIPermission::kFileSystemWriteDirectory)->id(),
-            APIPermission::kFileSystemWriteDirectory);
-  EXPECT_EQ(apis.size(), 3u);
-}
-
 TEST(PermissionsTest, HiddenFileSystemPermissionMessages) {
   APIPermissionSet api_permissions;
   api_permissions.insert(APIPermission::kFileSystemWrite);
   api_permissions.insert(APIPermission::kFileSystemDirectory);
-  api_permissions.insert(APIPermission::kFileSystemWriteDirectory);
   scoped_refptr<PermissionSet> permissions(
       new PermissionSet(api_permissions, ManifestPermissionSet(),
                         URLPatternSet(), URLPatternSet()));
@@ -1076,8 +1039,8 @@ TEST(PermissionsTest, MergedFileSystemPermissionComparison) {
                         URLPatternSet(), URLPatternSet()));
 
   APIPermissionSet write_directory_api_permissions;
-  write_directory_api_permissions.insert(
-      APIPermission::kFileSystemWriteDirectory);
+  write_directory_api_permissions.insert(APIPermission::kFileSystemWrite);
+  write_directory_api_permissions.insert(APIPermission::kFileSystemDirectory);
   scoped_refptr<PermissionSet> write_directory_permissions(
       new PermissionSet(write_directory_api_permissions,
                         ManifestPermissionSet(),
@@ -1142,7 +1105,7 @@ TEST(PermissionsTest, GetWarningMessages_AudioVideo) {
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kAudio));
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kVideo));
   EXPECT_TRUE(VerifyHasPermissionMessage(set, extension->GetType(), kBoth));
-  CoalescedPermissionMessages warnings = provider->GetPermissionMessages(
+  PermissionMessages warnings = provider->GetPermissionMessages(
       provider->GetAllPermissionIDs(set, extension->GetType()));
   size_t combined_index = IndexOf(warnings, kBoth);
   size_t combined_size = warnings.size();
@@ -1152,7 +1115,7 @@ TEST(PermissionsTest, GetWarningMessages_AudioVideo) {
   EXPECT_TRUE(VerifyHasPermissionMessage(set, extension->GetType(), kAudio));
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kVideo));
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kBoth));
-  CoalescedPermissionMessages warnings2 = provider->GetPermissionMessages(
+  PermissionMessages warnings2 = provider->GetPermissionMessages(
       provider->GetAllPermissionIDs(set, extension->GetType()));
   EXPECT_EQ(combined_size, warnings2.size());
   EXPECT_EQ(combined_index, IndexOf(warnings2, kAudio));
@@ -1163,7 +1126,7 @@ TEST(PermissionsTest, GetWarningMessages_AudioVideo) {
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kAudio));
   EXPECT_TRUE(VerifyHasPermissionMessage(set, extension->GetType(), kVideo));
   EXPECT_FALSE(VerifyHasPermissionMessage(set, extension->GetType(), kBoth));
-  CoalescedPermissionMessages warnings3 = provider->GetPermissionMessages(
+  PermissionMessages warnings3 = provider->GetPermissionMessages(
       provider->GetAllPermissionIDs(set, extension->GetType()));
   EXPECT_EQ(combined_size, warnings3.size());
   EXPECT_EQ(combined_index, IndexOf(warnings3, kVideo));

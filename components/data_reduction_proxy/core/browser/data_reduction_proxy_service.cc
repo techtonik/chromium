@@ -41,14 +41,14 @@ DataReductionProxyService::DataReductionProxyService(
       initialized_(false),
       weak_factory_(this) {
   DCHECK(settings);
-  if (prefs_) {
-    compression_stats_.reset(new DataReductionProxyCompressionStats(
-        this, prefs_, ui_task_runner, commit_delay));
-  }
-  event_store_.reset(new DataReductionProxyEventStore());
   db_task_runner_->PostTask(FROM_HERE,
                             base::Bind(&DBDataOwner::InitializeOnDBThread,
                                        db_data_owner_->GetWeakPtr()));
+  if (prefs_) {
+    compression_stats_.reset(
+        new DataReductionProxyCompressionStats(this, prefs_, commit_delay));
+  }
+  event_store_.reset(new DataReductionProxyEventStore());
 }
 
 DataReductionProxyService::~DataReductionProxyService() {
@@ -93,21 +93,22 @@ void DataReductionProxyService::EnableCompressionStatisticsLogging(
   DCHECK(!compression_stats_);
   DCHECK(!prefs_);
   prefs_ = prefs;
-  compression_stats_.reset(new DataReductionProxyCompressionStats(
-      this, prefs_, ui_task_runner, commit_delay));
+  compression_stats_.reset(
+      new DataReductionProxyCompressionStats(this, prefs_, commit_delay));
 }
 
 void DataReductionProxyService::UpdateContentLengths(
-    int64 received_content_length,
-    int64 original_content_length,
+    int64 data_used,
+    int64 original_size,
     bool data_reduction_proxy_enabled,
     DataReductionProxyRequestType request_type,
+    const std::string& data_usage_host,
     const std::string& mime_type) {
   DCHECK(CalledOnValidThread());
   if (compression_stats_) {
     compression_stats_->UpdateContentLengths(
-        received_content_length, original_content_length,
-        data_reduction_proxy_enabled, request_type, mime_type);
+        data_used, original_size, data_reduction_proxy_enabled, request_type,
+        data_usage_host, mime_type);
   }
 }
 
@@ -182,12 +183,20 @@ void DataReductionProxyService::InitializeLoFiPrefs() {
         params::IsLoFiCellularOnlyViaFlags() ||
         params::IsLoFiDisabledViaFlags()) {
       // Don't record the session state.
-    } else if (prefs_->GetBoolean(prefs::kLoFiWasUsedThisSession)) {
-      RecordLoFiSessionState(LO_FI_SESSION_STATE_USED);
     } else if (prefs_->GetInteger(prefs::kLoFiConsecutiveSessionDisables) >=
                lo_fi_consecutive_session_disables) {
       RecordLoFiSessionState(LO_FI_SESSION_STATE_OPTED_OUT);
+    } else if (prefs_->GetInteger(prefs::kLoFiLoadImagesPerSession) >=
+               lo_fi_user_requests_for_images_per_session) {
+      DCHECK(prefs_->GetBoolean(prefs::kLoFiWasUsedThisSession));
+      DCHECK_GT(prefs_->GetInteger(prefs::kLoFiConsecutiveSessionDisables), 0);
+      // Consider the session as temporary opt out only if the number of
+      // requests for images were more than the threshold.
+      RecordLoFiSessionState(LO_FI_SESSION_STATE_TEMPORARILY_OPTED_OUT);
+    } else if (prefs_->GetBoolean(prefs::kLoFiWasUsedThisSession)) {
+      RecordLoFiSessionState(LO_FI_SESSION_STATE_USED);
     } else {
+      DCHECK(!prefs_->GetBoolean(prefs::kLoFiWasUsedThisSession));
       RecordLoFiSessionState(LO_FI_SESSION_STATE_NOT_USED);
     }
 
@@ -208,14 +217,16 @@ void DataReductionProxyService::InitializeLoFiPrefs() {
       // session.
       SetLoFiModeOff();
     } else if (prefs_->GetInteger(prefs::kLoFiLoadImagesPerSession) <
-               lo_fi_user_requests_for_images_per_session) {
+                   lo_fi_user_requests_for_images_per_session &&
+               prefs_->GetInteger(prefs::kLoFiSnackbarsShownPerSession) >=
+                   lo_fi_user_requests_for_images_per_session) {
       // If the last session didn't have
-      // |lo_fi_user_requests_for_images_per_session| and the number of
-      // |consecutive_session_disables| hasn't been met, reset the consecutive
-      // sessions count.
+      // |lo_fi_user_requests_for_images_per_session|, but the user saw at least
+      // that many "Load image" snackbars, reset the consecutive sessions count.
       prefs_->SetInteger(prefs::kLoFiConsecutiveSessionDisables, 0);
     }
     prefs_->SetInteger(prefs::kLoFiLoadImagesPerSession, 0);
+    prefs_->SetInteger(prefs::kLoFiSnackbarsShownPerSession, 0);
     prefs_->SetBoolean(prefs::kLoFiWasUsedThisSession, false);
   }
 }

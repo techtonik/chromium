@@ -23,7 +23,6 @@ import threading
 import time
 import zipfile
 
-import pylib.android_commands
 from pylib import cmd_helper
 from pylib import constants
 from pylib import device_signal
@@ -174,16 +173,10 @@ class DeviceUtils(object):
                        value is provided.
     """
     self.adb = None
-    self.old_interface = None
     if isinstance(device, basestring):
       self.adb = adb_wrapper.AdbWrapper(device)
-      self.old_interface = pylib.android_commands.AndroidCommands(device)
     elif isinstance(device, adb_wrapper.AdbWrapper):
       self.adb = device
-      self.old_interface = pylib.android_commands.AndroidCommands(str(device))
-    elif isinstance(device, pylib.android_commands.AndroidCommands):
-      self.adb = adb_wrapper.AdbWrapper(device.GetDevice())
-      self.old_interface = device
     else:
       raise ValueError('Unsupported device value: %r' % device)
     self._commands_installed = None
@@ -284,7 +277,7 @@ class DeviceUtils(object):
     if 'needs_su' not in self._cache:
       try:
         self.RunShellCommand(
-            'su -c ls /root && ! ls /root', check_return=True,
+            '%s && ! ls /root' % self._Su('ls /root'), check_return=True,
             timeout=self._default_timeout if timeout is DEFAULT else timeout,
             retries=self._default_retries if retries is DEFAULT else retries)
         self._cache['needs_su'] = True
@@ -292,6 +285,11 @@ class DeviceUtils(object):
         self._cache['needs_su'] = False
     return self._cache['needs_su']
 
+  def _Su(self, command):
+    if (self.build_version_sdk
+        >= constants.ANDROID_SDK_VERSION_CODES.MARSHMALLOW):
+      return 'su 0 %s' % command
+    return 'su -c %s' % command
 
   @decorators.WithTimeoutAndRetriesFromInstance()
   def EnableRoot(self, timeout=None, retries=None):
@@ -391,6 +389,28 @@ class DeviceUtils(object):
       apks.append(line[len('package:'):])
     self._cache['package_apk_paths'][package] = list(apks)
     return apks
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def GetApplicationVersion(self, package, timeout=None, retries=None):
+    """Get the version name of a package installed on the device.
+
+    Args:
+      package: Name of the package.
+
+    Returns:
+      A string with the version name or None if the package is not found
+      on the device.
+    """
+    output = self.RunShellCommand(
+        ['dumpsys', 'package', package], check_return=True)
+    if not output:
+      return None
+    for line in output:
+      line = line.strip()
+      if line.startswith('versionName='):
+        return line[len('versionName='):]
+    raise device_errors.CommandFailedError(
+        'Version name for %s not found on dumpsys output' % package, str(self))
 
   @decorators.WithTimeoutAndRetriesFromInstance()
   def GetApplicationDataDirectory(self, package, timeout=None, retries=None):
@@ -731,7 +751,7 @@ class DeviceUtils(object):
       cmd = 'cd %s && %s' % (cmd_helper.SingleQuote(cwd), cmd)
     if as_root and self.NeedsSU():
       # "su -c sh -c" allows using shell features in |cmd|
-      cmd = 'su -c sh -c %s' % cmd_helper.SingleQuote(cmd)
+      cmd = self._Su('sh -c %s' % cmd_helper.SingleQuote(cmd))
 
     output = handle_large_output(cmd, large_output).splitlines()
 
@@ -770,12 +790,16 @@ class DeviceUtils(object):
     return output
 
   @decorators.WithTimeoutAndRetriesFromInstance()
-  def KillAll(self, process_name, signum=device_signal.SIGKILL, as_root=False,
-              blocking=False, quiet=False, timeout=None, retries=None):
+  def KillAll(self, process_name, exact=False, signum=device_signal.SIGKILL,
+              as_root=False, blocking=False, quiet=False,
+              timeout=None, retries=None):
     """Kill all processes with the given name on the device.
 
     Args:
       process_name: A string containing the name of the process to kill.
+      exact: A boolean indicating whether to kill all processes matching
+             the string |process_name| exactly, or all of those which contain
+             |process_name| as a substring. Defaults to False.
       signum: An integer containing the signal number to send to kill. Defaults
               to SIGKILL (9).
       as_root: A boolean indicating whether the kill should be executed with
@@ -796,7 +820,9 @@ class DeviceUtils(object):
       DeviceUnreachableError on missing device.
     """
     procs_pids = self.GetPids(process_name)
-    pids = list(itertools.chain(*procs_pids.values()))
+    if exact:
+      procs_pids = {process_name: procs_pids.get(process_name, [])}
+    pids = set(itertools.chain(*procs_pids.values()))
     if not pids:
       if quiet:
         return 0
@@ -805,19 +831,20 @@ class DeviceUtils(object):
             'No process "%s"' % process_name, str(self))
 
     logging.info(
-        'KillAll(%s, ...) attempting to kill the following:', process_name)
+        'KillAll(%r, ...) attempting to kill the following:', process_name)
     for name, ids  in procs_pids.iteritems():
       for i in ids:
         logging.info('  %05s %s', str(i), name)
 
-    cmd = ['kill', '-%d' % signum] + pids
+    cmd = ['kill', '-%d' % signum] + sorted(pids)
     self.RunShellCommand(cmd, as_root=as_root, check_return=True)
 
+    def all_pids_killed():
+      procs_pids_remain = self.GetPids(process_name)
+      return not pids.intersection(itertools.chain(*procs_pids_remain.values()))
+
     if blocking:
-      # TODO(perezu): use timeout_retry.WaitFor
-      wait_period = 0.1
-      while self.GetPids(process_name):
-        time.sleep(wait_period)
+      timeout_retry.WaitFor(all_pids_killed, wait_period=0.1)
 
     return len(pids)
 
@@ -1012,22 +1039,24 @@ class DeviceUtils(object):
 
     all_changed_files = []
     all_stale_files = []
+    missing_dirs = []
     for h, d in host_device_tuples:
-      if os.path.isdir(h):
-        self.RunShellCommand(['mkdir', '-p', d], check_return=True)
-      changed_files, stale_files = (
+      changed_files, up_to_date_files, stale_files = (
           self._GetChangedAndStaleFiles(h, d, delete_device_stale))
       all_changed_files += changed_files
       all_stale_files += stale_files
+      if (os.path.isdir(h) and changed_files and not up_to_date_files
+          and not stale_files):
+        missing_dirs.append(d)
 
-    if delete_device_stale:
+    if delete_device_stale and all_stale_files:
       self.RunShellCommand(['rm', '-f'] + all_stale_files,
                              check_return=True)
 
-    if not all_changed_files:
-      return
-
-    self._PushFilesImpl(host_device_tuples, all_changed_files)
+    if all_changed_files:
+      if missing_dirs:
+        self.RunShellCommand(['mkdir', '-p'] + missing_dirs, check_return=True)
+      self._PushFilesImpl(host_device_tuples, all_changed_files)
 
   def _GetChangedAndStaleFiles(self, host_path, device_path, track_stale=False):
     """Get files to push and delete
@@ -1038,9 +1067,10 @@ class DeviceUtils(object):
       track_stale: whether to bother looking for stale files (slower)
 
     Returns:
-      a two-element tuple
+      a three-element tuple
       1st element: a list of (host_files_path, device_files_path) tuples to push
-      2nd element: a list of stale files under device_path, or [] when
+      2nd element: a list of host_files_path that are up-to-date
+      3rd element: a list of stale files under device_path, or [] when
         track_stale == False
     """
     real_host_path = os.path.realpath(host_path)
@@ -1050,7 +1080,7 @@ class DeviceUtils(object):
     except device_errors.CommandFailedError:
       real_device_path = None
     if not real_device_path:
-      return ([(host_path, device_path)], [])
+      return ([(host_path, device_path)], [], [])
 
     try:
       host_checksums = md5sum.CalculateHostMd5Sums([real_host_path])
@@ -1063,25 +1093,29 @@ class DeviceUtils(object):
           interesting_device_paths, self)
     except EnvironmentError as e:
       logging.warning('Error calculating md5: %s', e)
-      return ([(host_path, device_path)], [])
+      return ([(host_path, device_path)], [], [])
 
+    to_push = []
+    up_to_date = []
+    to_delete = []
     if os.path.isfile(host_path):
       host_checksum = host_checksums.get(real_host_path)
       device_checksum = device_checksums.get(real_device_path)
-      if host_checksum != device_checksum:
-        return ([(host_path, device_path)], [])
+      if host_checksum == device_checksum:
+        up_to_date.append(host_path)
       else:
-        return ([], [])
+        to_push.append((host_path, device_path))
     else:
-      to_push = []
       for host_abs_path, host_checksum in host_checksums.iteritems():
-        device_abs_path = '%s/%s' % (
+        device_abs_path = posixpath.join(
             real_device_path, os.path.relpath(host_abs_path, real_host_path))
         device_checksum = device_checksums.pop(device_abs_path, None)
-        if device_checksum != host_checksum:
+        if device_checksum == host_checksum:
+          up_to_date.append(host_abs_path)
+        else:
           to_push.append((host_abs_path, device_abs_path))
       to_delete = device_checksums.keys()
-      return (to_push, to_delete)
+    return (to_push, up_to_date, to_delete)
 
   def _ComputeDeviceChecksumsForApks(self, package_name):
     ret = self._cache['package_apk_checksums'].get(package_name)
@@ -1850,7 +1884,7 @@ class DeviceUtils(object):
     }
 
   @classmethod
-  def parallel(cls, devices=None, async=False):
+  def parallel(cls, devices, async=False):
     """Creates a Parallelizer to operate over the provided list of devices.
 
     If |devices| is either |None| or an empty list, the Parallelizer will
@@ -1867,9 +1901,7 @@ class DeviceUtils(object):
       A Parallelizer operating over |devices|.
     """
     if not devices:
-      devices = cls.HealthyDevices()
-      if not devices:
-        raise device_errors.NoDevicesError()
+      raise device_errors.NoDevicesError()
 
     devices = [d if isinstance(d, cls) else cls(d) for d in devices]
     if async:
@@ -1878,10 +1910,14 @@ class DeviceUtils(object):
       return parallelizer.SyncParallelizer(devices)
 
   @classmethod
-  def HealthyDevices(cls):
-    blacklist = device_blacklist.ReadBlacklist()
+  def HealthyDevices(cls, blacklist=None):
+    if not blacklist:
+      # TODO(jbudorick): Remove once clients pass in the blacklist.
+      blacklist = device_blacklist.Blacklist(device_blacklist.BLACKLIST_JSON)
+
+    blacklisted_devices = blacklist.Read()
     def blacklisted(adb):
-      if adb.GetDeviceSerial() in blacklist:
+      if adb.GetDeviceSerial() in blacklisted_devices:
         logging.warning('Device %s is blacklisted.', adb.GetDeviceSerial())
         return True
       return False

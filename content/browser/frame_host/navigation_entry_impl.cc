@@ -548,7 +548,6 @@ void NavigationEntryImpl::AddOrUpdateFrameEntry(FrameTreeNode* frame_tree_node,
   if (!parent_node) {
     // The renderer should not send a commit for a subframe before its parent.
     // TODO(creis): Kill the renderer if we get here.
-    NOTREACHED() << "Shouldn't see a commit for a subframe before parent.";
     return;
   }
 

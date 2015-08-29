@@ -941,6 +941,34 @@ TEST_F(PictureLayerImplTest, CreateTilingsEvenIfTwinHasNone) {
   ASSERT_EQ(0u, active_layer_->tilings()->num_tilings());
 }
 
+TEST_F(PictureLayerImplTest, LowResTilingStaysOnActiveTree) {
+  gfx::Size tile_size(400, 400);
+  gfx::Size layer_bounds(1300, 1900);
+
+  scoped_refptr<FakePicturePileImpl> valid_pile =
+      FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
+  scoped_refptr<FakePicturePileImpl> other_valid_pile =
+      FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
+
+  SetupPendingTree(valid_pile);
+  ASSERT_EQ(1u, pending_layer_->tilings()->num_tilings());
+
+  ActivateTree();
+  SetupPendingTree(other_valid_pile);
+  ASSERT_EQ(2u, active_layer_->tilings()->num_tilings());
+  ASSERT_EQ(1u, pending_layer_->tilings()->num_tilings());
+  auto* low_res_tiling =
+      active_layer_->tilings()->FindTilingWithResolution(LOW_RESOLUTION);
+  EXPECT_TRUE(low_res_tiling);
+
+  ActivateTree();
+  ASSERT_EQ(2u, active_layer_->tilings()->num_tilings());
+  auto* other_low_res_tiling =
+      active_layer_->tilings()->FindTilingWithResolution(LOW_RESOLUTION);
+  EXPECT_TRUE(other_low_res_tiling);
+  EXPECT_EQ(low_res_tiling, other_low_res_tiling);
+}
+
 TEST_F(PictureLayerImplTest, ZoomOutCrash) {
   gfx::Size tile_size(400, 400);
   gfx::Size layer_bounds(1300, 1900);
@@ -983,6 +1011,9 @@ TEST_F(PictureLayerImplTest, PinchGestureTilings) {
   EXPECT_EQ(active_layer_->tilings()->tiling_at(0)->contents_scale(), 2.f);
   EXPECT_EQ(active_layer_->tilings()->tiling_at(1)->contents_scale(),
             2.f * low_res_factor);
+  // One of the tilings has to be a low resolution one.
+  EXPECT_EQ(LOW_RESOLUTION,
+            active_layer_->tilings()->tiling_at(1)->resolution());
 
   // Ensure UpdateTiles won't remove any tilings.
   active_layer_->MarkAllTilingsUsed();
@@ -1000,6 +1031,9 @@ TEST_F(PictureLayerImplTest, PinchGestureTilings) {
                   active_layer_->tilings()->tiling_at(1)->contents_scale());
   EXPECT_FLOAT_EQ(2.0f * low_res_factor,
                   active_layer_->tilings()->tiling_at(2)->contents_scale());
+  // Since we're pinching, we shouldn't create a low resolution tiling.
+  EXPECT_FALSE(
+      active_layer_->tilings()->FindTilingWithResolution(LOW_RESOLUTION));
 
   // Ensure UpdateTiles won't remove any tilings.
   active_layer_->MarkAllTilingsUsed();
@@ -1009,6 +1043,8 @@ TEST_F(PictureLayerImplTest, PinchGestureTilings) {
   SetContentsScaleOnBothLayers(low_res_factor * 2.1f, 1.0f,
                                low_res_factor * 2.1f, 1.0f, 0.f, false);
   EXPECT_EQ(3u, active_layer_->tilings()->num_tilings());
+  EXPECT_FALSE(
+      active_layer_->tilings()->FindTilingWithResolution(LOW_RESOLUTION));
 
   // Zoom in a lot now. Since we increase by increments of
   // kMaxScaleRatioDuringPinch, this will create a new tiling at 4.0.
@@ -1016,6 +1052,31 @@ TEST_F(PictureLayerImplTest, PinchGestureTilings) {
   EXPECT_EQ(4u, active_layer_->tilings()->num_tilings());
   EXPECT_FLOAT_EQ(4.0f,
                   active_layer_->tilings()->tiling_at(0)->contents_scale());
+  // Although one of the tilings matches the low resolution scale, it still
+  // shouldn't be marked as low resolution since we're pinching.
+  auto* low_res_tiling =
+      active_layer_->tilings()->FindTilingWithScale(4.f * low_res_factor);
+  EXPECT_TRUE(low_res_tiling);
+  EXPECT_NE(LOW_RESOLUTION, low_res_tiling->resolution());
+
+  // Stop a pinch gesture.
+  host_impl_.PinchGestureEnd();
+
+  // Ensure UpdateTiles won't remove any tilings.
+  active_layer_->MarkAllTilingsUsed();
+
+  // After pinch ends, set the scale to what the raster scale was updated to
+  // (checked above).
+  SetContentsScaleOnBothLayers(4.0f, 1.0f, 4.0f, 1.f, 0.f, false);
+  EXPECT_EQ(4u, active_layer_->tilings()->num_tilings());
+  EXPECT_FLOAT_EQ(4.0f,
+                  active_layer_->tilings()->tiling_at(0)->contents_scale());
+  // Now that we stopped pinching, the low resolution tiling that existed should
+  // now be marked as low resolution.
+  low_res_tiling =
+      active_layer_->tilings()->FindTilingWithScale(4.f * low_res_factor);
+  EXPECT_TRUE(low_res_tiling);
+  EXPECT_EQ(LOW_RESOLUTION, low_res_tiling->resolution());
 }
 
 TEST_F(PictureLayerImplTest, SnappedTilingDuringZoom) {

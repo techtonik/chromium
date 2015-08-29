@@ -361,7 +361,9 @@ static bool DeviceScaleEnsuresTextQuality(float device_scale_factor) {
   // On Android, we never have subpixel antialiasing.
   return true;
 #else
-  return device_scale_factor > 1.5f;
+  // 1.5 is a common touchscreen tablet device scale factor. For such
+  // devices main thread antialiasing is a heavy burden.
+  return device_scale_factor >= 1.5f;
 #endif
 
 }
@@ -612,42 +614,6 @@ void ApplyBlinkSettings(const base::CommandLine& command_line,
   }
 }
 
-// Looks up and returns the WebFrame corresponding to a given opener frame
-// routing ID.  Also stores the opener's RenderView routing ID into
-// |opener_view_routing_id|.
-WebFrame* ResolveOpener(int opener_frame_routing_id,
-                        int* opener_view_routing_id) {
-  *opener_view_routing_id = MSG_ROUTING_NONE;
-  if (opener_frame_routing_id == MSG_ROUTING_NONE)
-    return nullptr;
-
-  // Opener routing ID could refer to either a RenderFrameProxy or a
-  // RenderFrame, so need to check both.
-  RenderFrameProxy* opener_proxy =
-      RenderFrameProxy::FromRoutingID(opener_frame_routing_id);
-  if (opener_proxy) {
-    *opener_view_routing_id = opener_proxy->render_view()->GetRoutingID();
-
-    // TODO(nasko,alexmos): This check won't be needed once swapped-out:// is
-    // gone.
-    if (opener_proxy->IsMainFrameDetachedFromTree()) {
-      DCHECK(!SiteIsolationPolicy::IsSwappedOutStateForbidden());
-      return opener_proxy->render_view()->webview()->mainFrame();
-    } else {
-      return opener_proxy->web_frame();
-    }
-  }
-
-  RenderFrameImpl* opener_frame =
-      RenderFrameImpl::FromRoutingID(opener_frame_routing_id);
-  if (opener_frame) {
-    *opener_view_routing_id = opener_frame->render_view()->GetRoutingID();
-    return opener_frame->GetWebFrame();
-  }
-
-  return nullptr;
-}
-
 }  // namespace
 
 RenderViewImpl::RenderViewImpl(CompositorDependencies* compositor_deps,
@@ -702,8 +668,8 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   surface_id_ = params.surface_id;
 
   int opener_view_routing_id;
-  WebFrame* opener_frame =
-      ResolveOpener(params.opener_frame_route_id, &opener_view_routing_id);
+  WebFrame* opener_frame = RenderFrameImpl::ResolveOpener(
+      params.opener_frame_route_id, &opener_view_routing_id);
   if (opener_view_routing_id != MSG_ROUTING_NONE && was_created_by_renderer)
     opener_id_ = opener_view_routing_id;
 
@@ -711,16 +677,6 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
 
   // Ensure we start with a valid next_page_id_ from the browser.
   DCHECK_GE(next_page_id_, 0);
-
-  if (params.main_frame_routing_id != MSG_ROUTING_NONE) {
-    main_render_frame_ = RenderFrameImpl::Create(
-        this, params.main_frame_routing_id);
-    // The main frame WebLocalFrame object is closed by
-    // RenderFrameImpl::frameDetached().
-    WebLocalFrame* web_frame = WebLocalFrame::create(
-        blink::WebTreeScopeType::Document, main_render_frame_);
-    main_render_frame_->SetWebFrame(web_frame);
-  }
 
   webwidget_ = WebView::create(this);
   webwidget_mouse_lock_target_.reset(new WebWidgetLockTarget(webwidget_));
@@ -734,33 +690,27 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   if (command_line.HasSwitch(switches::kStatsCollectionController))
     stats_collection_observer_.reset(new StatsCollectionObserver(this));
 
-  RenderFrameProxy* proxy = NULL;
+  if (params.main_frame_routing_id != MSG_ROUTING_NONE) {
+    main_render_frame_ =
+        RenderFrameImpl::CreateMainFrame(this, params.main_frame_routing_id);
+  }
+
   if (params.proxy_routing_id != MSG_ROUTING_NONE) {
     CHECK(params.swapped_out);
     if (main_render_frame_) {
-      proxy = RenderFrameProxy::CreateProxyToReplaceFrame(
+      DCHECK(!SiteIsolationPolicy::IsSwappedOutStateForbidden());
+      RenderFrameProxy* proxy = RenderFrameProxy::CreateProxyToReplaceFrame(
           main_render_frame_, params.proxy_routing_id,
           blink::WebTreeScopeType::Document);
       main_render_frame_->set_render_frame_proxy(proxy);
     } else {
-      proxy = RenderFrameProxy::CreateFrameProxy(
-          params.proxy_routing_id,
-          MSG_ROUTING_NONE,
-          routing_id_,
-          params.replicated_frame_state);
+      DCHECK(SiteIsolationPolicy::IsSwappedOutStateForbidden());
+      RenderFrameProxy::CreateFrameProxy(params.proxy_routing_id,
+                                         MSG_ROUTING_NONE, routing_id_,
+                                         params.replicated_frame_state);
     }
   }
 
-  // When not using swapped out state, just use the WebRemoteFrame as the main
-  // frame.
-  if (proxy && SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
-    webview()->setMainFrame(proxy->web_frame());
-    // Initialize the WebRemoteFrame with information replicated from the
-    // browser process.
-    proxy->SetReplicatedState(params.replicated_frame_state);
-  } else {
-    webview()->setMainFrame(main_render_frame_->GetWebFrame());
-  }
   if (main_render_frame_)
     main_render_frame_->Initialize();
 
@@ -1002,8 +952,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setCookieEnabled(prefs.cookie_enabled);
   settings->setNavigateOnDragDrop(prefs.navigate_on_drag_drop);
 
-  settings->setJavaEnabled(prefs.java_enabled);
-
   // By default, allow_universal_access_from_file_urls is set to false and thus
   // we mitigate attacks from local HTML files by not granting file:// URLs
   // universal access. Only test shell will enable this.
@@ -1048,8 +996,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   // default value if not).
   settings->setAccelerated2dCanvasMSAASampleCount(
       prefs.accelerated_2d_canvas_msaa_sample_count);
-
-  WebRuntimeFeatures::enableTextBlobs(prefs.text_blobs_enabled);
 
   settings->setAsynchronousSpellCheckingEnabled(
       prefs.asynchronous_spell_checking_enabled);
@@ -1735,7 +1681,8 @@ void RenderViewImpl::saveImageFromDataURL(const blink::WebString& data_url) {
   // Note: We should basically send GURL but we use size-limited string instead
   // in order to send a larger data url to save a image for <canvas> or <img>.
   if (data_url.length() < kMaxLengthOfDataURLString)
-    Send(new ViewHostMsg_SaveImageFromDataURL(routing_id_, data_url.utf8()));
+    Send(new ViewHostMsg_SaveImageFromDataURL(
+        routing_id_, GetMainRenderFrame()->GetRoutingID(), data_url.utf8()));
 }
 
 bool RenderViewImpl::enumerateChosenDirectory(

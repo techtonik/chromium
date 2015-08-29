@@ -62,17 +62,19 @@ class SpellCheck : public content::RenderProcessObserver,
   bool InitializeIfNeeded();
 
   // SpellCheck a word.
-  // Returns true if spelled correctly, false otherwise.
-  // If the spellchecker failed to initialize, always returns true.
+  // Returns true if spelled correctly for any language in |languages_|, false
+  // otherwise.
+  // If any spellcheck languages failed to initialize, always returns true.
   // The |tag| parameter should either be a unique identifier for the document
   // that the word came from (if the current platform requires it), or 0.
   // In addition, finds the suggested words for a given word
   // and puts them into |*optional_suggestions|.
   // If the word is spelled correctly, the vector is empty.
   // If optional_suggestions is NULL, suggested words will not be looked up.
-  // Note that Doing suggest lookups can be slow.
-  bool SpellCheckWord(const base::char16* in_word,
-                      int in_word_len,
+  // Note that doing suggest lookups can be slow.
+  bool SpellCheckWord(const base::char16* text_begin,
+                      int position_in_text,
+                      int text_length,
                       int tag,
                       int* misspelling_start,
                       int* misspelling_len,
@@ -118,6 +120,14 @@ class SpellCheck : public content::RenderProcessObserver,
    FRIEND_TEST_ALL_PREFIXES(SpellCheckTest, GetAutoCorrectionWord_EN_US);
    FRIEND_TEST_ALL_PREFIXES(SpellCheckTest,
        RequestSpellCheckMultipleTimesWithoutInitialization);
+
+   // Evenly fill |optional_suggestions| with a maximum of |kMaxSuggestions|
+   // suggestions from |suggestions_list|. suggestions_list[i][j] is the j-th
+   // suggestion from the i-th language's suggestions. |optional_suggestions|
+   // cannot be null.
+   static void FillSuggestions(
+       const std::vector<std::vector<base::string16>>& suggestions_list,
+       std::vector<base::string16>* optional_suggestions);
 
   // RenderProcessObserver implementation:
    bool OnControlMessageReceived(const IPC::Message& message) override;

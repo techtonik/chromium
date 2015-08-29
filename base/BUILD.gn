@@ -758,6 +758,11 @@ component("base") {
 
   # Windows.
   if (is_win) {
+    sources += [
+      "profiler/win32_stack_frame_unwinder.cc",
+      "profiler/win32_stack_frame_unwinder.h",
+    ]
+
     sources -= [
       "message_loop/message_pump_libevent.cc",
       "strings/string16.cc",
@@ -1251,6 +1256,7 @@ test("base_unittests") {
     "files/file_util_proxy_unittest.cc",
     "files/file_util_unittest.cc",
     "files/important_file_writer_unittest.cc",
+    "files/memory_mapped_file_unittest.cc",
     "files/scoped_temp_dir_unittest.cc",
     "gmock_unittest.cc",
     "guid_unittest.cc",
@@ -1311,6 +1317,7 @@ test("base_unittests") {
     "metrics/field_trial_unittest.cc",
     "metrics/histogram_base_unittest.cc",
     "metrics/histogram_delta_serialization_unittest.cc",
+    "metrics/histogram_macros_unittest.cc",
     "metrics/histogram_snapshot_manager_unittest.cc",
     "metrics/histogram_unittest.cc",
     "metrics/sample_map_unittest.cc",
@@ -1381,6 +1388,9 @@ test("base_unittests") {
     "task_runner_util_unittest.cc",
     "template_util_unittest.cc",
     "test/histogram_tester_unittest.cc",
+    "test/icu_test_util.cc",
+    "test/icu_test_util.h",
+    "test/test_pending_task_unittest.cc",
     "test/test_reg_util_win_unittest.cc",
     "test/trace_event_analyzer_unittest.cc",
     "test/user_action_tester_unittest.cc",
@@ -1581,6 +1591,7 @@ if (is_android) {
     ]
 
     deps = [
+      "//third_party/android_tools:android_support_multidex_java",
       "//third_party/jsr-305:jsr_305_javalib",
     ]
 
@@ -1612,12 +1623,29 @@ if (is_android) {
     DEPRECATED_java_in_dir = "test/android/javatests/src"
   }
 
+  # TODO(jbudorick): Remove this once we roll to robolectric 3.0 and pull
+  # in the multidex shadow library. crbug.com/522043
+  # GYP: //base.gyp:base_junit_test_support
+  java_library("base_junit_test_support") {
+    testonly = true
+    java_files = [ "test/android/junit/src/org/chromium/base/test/shadows/ShadowMultiDex.java" ]
+    deps = [
+      "//third_party/android_tools:android_support_multidex_java",
+      "//third_party/robolectric:android-all-4.3_r2-robolectric-0",
+      "//third_party/robolectric:robolectric_java",
+    ]
+  }
+
   # GYP: //base.gyp:base_junit_tests
   junit_binary("base_junit_tests") {
-    java_files = [ "android/junit/src/org/chromium/base/LogTest.java" ]
+    java_files = [
+      "android/junit/src/org/chromium/base/BaseChromiumApplicationTest.java",
+      "android/junit/src/org/chromium/base/LogTest.java",
+    ]
     deps = [
       ":base_java",
       ":base_java_test_support",
+      ":base_junit_test_support",
     ]
   }
 

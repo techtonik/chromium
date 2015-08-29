@@ -15,6 +15,7 @@
 #include "base/strings/string16.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "ipc/ipc_channel_proxy.h"
+#include "v8/include/v8.h"
 
 class ChromeExtensionsDispatcherDelegate;
 class ChromeRenderProcessObserver;
@@ -88,10 +89,6 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
                             blink::WebLocalFrame* frame,
                             const blink::WebPluginParams& params,
                             blink::WebPlugin** plugin) override;
-  scoped_ptr<blink::WebPluginPlaceholder> CreatePluginPlaceholder(
-      content::RenderFrame* render_frame,
-      blink::WebLocalFrame* frame,
-      const blink::WebPluginParams& params) override;
   blink::WebPlugin* CreatePluginReplacement(
       content::RenderFrame* render_frame,
       const base::FilePath& plugin_path) override;
@@ -105,6 +102,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
                                  std::string* error_html,
                                  base::string16* error_description) override;
   void DeferMediaLoad(content::RenderFrame* render_frame,
+                      bool has_played_media_before,
                       const base::Closure& closure) override;
   bool RunIdleHandlerWhenWidgetsHidden() override;
   bool AllowPopup() override;
@@ -153,7 +151,10 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   void AddImageContextMenuProperties(
       const blink::WebURLResponse& response,
       std::map<std::string, std::string>* properties) override;
-
+  void DidInitializeServiceWorkerContextOnWorkerThread(
+      v8::Local<v8::Context> context,
+      const GURL& url) override;
+  void WillDestroyServiceWorkerContextOnWorkerThread(const GURL& url) override;
 #if defined(ENABLE_EXTENSIONS)
   // Takes ownership.
   void SetExtensionDispatcherForTest(
@@ -197,7 +198,6 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   // extension app's extent.
   bool CrossesExtensionExtents(blink::WebLocalFrame* frame,
                                const GURL& new_url,
-                               const extensions::ExtensionSet& extensions,
                                bool is_extension_url,
                                bool is_initial_navigation);
 #endif

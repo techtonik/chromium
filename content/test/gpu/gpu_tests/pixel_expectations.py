@@ -11,4 +11,6 @@ class PixelExpectations(GpuTestExpectations):
     # Sample Usage:
     # self.Fail('Pixel.Canvas2DRedBox',
     #     ['mac', 'amd', ('nvidia', 0x1234)], bug=123)
-    pass
+
+    self.Fail('Pixel.ScissorTestWithPreserveDrawingBuffer',
+        ['android'], bug=521588)

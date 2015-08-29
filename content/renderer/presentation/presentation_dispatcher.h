@@ -5,6 +5,8 @@
 #ifndef CONTENT_RENDERER_PRESENTATION_PRESENTATION_DISPATCHER_H_
 #define CONTENT_RENDERER_PRESENTATION_PRESENTATION_DISPATCHER_H_
 
+#include <queue>
+
 #include "base/compiler_specific.h"
 #include "base/containers/scoped_ptr_map.h"
 #include "base/id_map.h"
@@ -14,6 +16,7 @@
 #include "content/common/presentation/presentation_service.mojom.h"
 #include "content/public/renderer/render_frame_observer.h"
 #include "third_party/WebKit/public/platform/modules/presentation/WebPresentationClient.h"
+#include "third_party/mojo/src/mojo/public/cpp/bindings/binding.h"
 
 namespace blink {
 class WebPresentationAvailabilityObserver;
@@ -83,14 +86,8 @@ class CONTENT_EXPORT PresentationDispatcher
   virtual void getAvailability(
       const blink::WebString& availabilityUrl,
       blink::WebPresentationAvailabilityCallbacks* callbacks);
-  // TODO(mfoltz): Remove (http://crbug.com/510814)
   virtual void startListening(blink::WebPresentationAvailabilityObserver*);
-  virtual void startListening(const blink::WebString& availabilityUrl,
-                              blink::WebPresentationAvailabilityObserver*);
-  // TODO(mfoltz): Remove (http://crbug.com/510814)
   virtual void stopListening(blink::WebPresentationAvailabilityObserver*);
-  virtual void stopListening(const blink::WebString& availabilityUrl,
-                             blink::WebPresentationAvailabilityObserver*);
   virtual void setDefaultPresentationUrl(const blink::WebString& url);
 
   // RenderFrameObserver implementation.
@@ -135,10 +132,6 @@ class CONTENT_EXPORT PresentationDispatcher
   // over mojo channel.
   using MessageRequestQueue = std::queue<linked_ptr<SendMessageRequest>>;
   MessageRequestQueue message_request_queue_;
-
-  // TODO(mfoltz): Remove |default_presentation_url_| when Blink passes the
-  // presentation URL with startListening() (http://crbug.com/510814)
-  std::string default_presentation_url_;
 
   enum class ListeningState {
     INACTIVE,

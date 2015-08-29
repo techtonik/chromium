@@ -55,7 +55,6 @@ NextProtoVector SpdyNextProtos() {
   NextProtoVector next_protos;
   next_protos.push_back(kProtoHTTP11);
   next_protos.push_back(kProtoSPDY31);
-  next_protos.push_back(kProtoHTTP2_14);
   next_protos.push_back(kProtoHTTP2);
   next_protos.push_back(kProtoQUIC1SPDY3);
   return next_protos;
@@ -374,7 +373,7 @@ SpdySessionDependencies::SpdySessionDependencies(NextProto protocol)
       stream_max_recv_window_size(
           SpdySession::GetDefaultInitialWindowSize(protocol)),
       time_func(&base::TimeTicks::Now),
-      use_alternate_protocols(false),
+      use_alternative_services(false),
       net_log(NULL) {
   DCHECK(next_proto_is_spdy(protocol)) << "Invalid protocol: " << protocol;
 
@@ -408,7 +407,7 @@ SpdySessionDependencies::SpdySessionDependencies(NextProto protocol,
       stream_max_recv_window_size(
           SpdySession::GetDefaultInitialWindowSize(protocol)),
       time_func(&base::TimeTicks::Now),
-      use_alternate_protocols(false),
+      use_alternative_services(true),
       net_log(NULL) {
   DCHECK(next_proto_is_spdy(protocol)) << "Invalid protocol: " << protocol;
 }
@@ -467,7 +466,7 @@ HttpNetworkSession::Params SpdySessionDependencies::CreateSessionParams(
   params.time_func = session_deps->time_func;
   params.next_protos = session_deps->next_protos;
   params.trusted_spdy_proxy = session_deps->trusted_spdy_proxy;
-  params.use_alternate_protocols = session_deps->use_alternate_protocols;
+  params.use_alternative_services = session_deps->use_alternative_services;
   params.net_log = session_deps->net_log;
   return params;
 }
@@ -609,9 +608,8 @@ namespace {
 // A ClientSocket used for CreateFakeSpdySession() below.
 class FakeSpdySessionClientSocket : public MockClientSocket {
  public:
-  FakeSpdySessionClientSocket(int read_result)
-      : MockClientSocket(BoundNetLog()),
-        read_result_(read_result) {}
+  explicit FakeSpdySessionClientSocket(int read_result)
+      : MockClientSocket(BoundNetLog()), read_result_(read_result) {}
 
   ~FakeSpdySessionClientSocket() override {}
 
@@ -747,7 +745,7 @@ scoped_ptr<SpdyHeaderBlock> SpdyTestUtil::ConstructGetHeaderBlockForProxy(
 scoped_ptr<SpdyHeaderBlock> SpdyTestUtil::ConstructHeadHeaderBlock(
     base::StringPiece url,
     int64 content_length) const {
-  return ConstructHeaderBlock("HEAD", url, &content_length);
+  return ConstructHeaderBlock("HEAD", url, nullptr);
 }
 
 scoped_ptr<SpdyHeaderBlock> SpdyTestUtil::ConstructPostHeaderBlock(

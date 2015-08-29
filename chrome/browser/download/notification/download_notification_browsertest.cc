@@ -12,6 +12,7 @@
 #include "chrome/browser/download/download_prefs.h"
 #include "chrome/browser/download/download_service.h"
 #include "chrome/browser/download/download_service_factory.h"
+#include "chrome/browser/download/notification/download_group_notification.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -86,15 +87,19 @@ class MessageCenterChangeObserver
   void RunLoop() {
     base::MessageLoop::ScopedNestableTaskAllower allow(
         base::MessageLoop::current());
-    run_loop_.Run();
+    run_loop_->Run();
   }
 
   void QuitRunLoop() {
-    run_loop_.Quit();
+    run_loop_->Quit();
+  }
+
+  void ResetRunLoop() {
+    run_loop_.reset(new base::RunLoop);
   }
 
  private:
-  base::RunLoop run_loop_;
+  scoped_ptr<base::RunLoop> run_loop_;
 
   DISALLOW_COPY_AND_ASSIGN(MessageCenterChangeObserver);
 };
@@ -113,6 +118,7 @@ class NotificationAddObserver : public MessageCenterChangeObserver {
       return count_ == 0;
 
     waiting_ = true;
+    ResetRunLoop();
     RunLoop();
     waiting_ = false;
     return count_ == 0;
@@ -152,9 +158,13 @@ class NotificationUpdateObserver : public MessageCenterChangeObserver {
       return notification_id_;
 
     waiting_ = true;
+    ResetRunLoop();
     RunLoop();
     waiting_ = false;
-    return notification_id_;
+
+    std::string notification_id(notification_id_);
+    notification_id_.clear();
+    return notification_id;
   }
 
   void OnNotificationUpdated(const std::string& notification_id) override {
@@ -184,6 +194,7 @@ class NotificationRemoveObserver : public MessageCenterChangeObserver {
       return notification_id_;
 
     waiting_ = true;
+    ResetRunLoop();
     RunLoop();
     waiting_ = false;
     return notification_id_;
@@ -484,6 +495,8 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DiscardDangerousFile) {
 
   // Opens the message center.
   GetMessageCenter()->SetVisibility(message_center::VISIBILITY_MESSAGE_CENTER);
+  // Ensures the notification exists.
+  EXPECT_EQ(1u, GetMessageCenter()->GetVisibleNotifications().size());
 
   NotificationRemoveObserver notification_close_observer;
 
@@ -494,6 +507,9 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DiscardDangerousFile) {
 
   // Confirms that the notification is closed.
   EXPECT_EQ(notification_id(), notification_close_observer.Wait());
+
+  // Ensures the notification has closed.
+  EXPECT_EQ(0u, GetMessageCenter()->GetVisibleNotifications().size());
 
   // Wait for the download completion.
   download_terminal_observer.WaitForFinished();
@@ -631,8 +647,8 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, InterruptDownload) {
   EXPECT_EQ(l10n_util::GetStringFUTF16(
                 IDS_DOWNLOAD_STATUS_INTERRUPTED,
                 l10n_util::GetStringUTF16(
-                    IDS_DOWNLOAD_INTERRUPTED_STATUS_NETWORK_ERROR)),
-            GetNotification(notification_id())->message());
+                    IDS_DOWNLOAD_INTERRUPTED_DESCRIPTION_NETWORK_ERROR)),
+            GetNotification(notification_id())->message().substr(48));
   EXPECT_EQ(message_center::NOTIFICATION_TYPE_BASE_FORMAT,
             GetNotification(notification_id())->type());
 }
@@ -693,7 +709,13 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DownloadRemoved) {
   EXPECT_EQ(0u, downloads.size());
 }
 
-IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DownloadMultipleFiles) {
+#if defined(MEMORY_SANITIZER)
+# define MAYBE_DownloadMultipleFiles DISABLED_DownloadMultipleFiles
+#else
+# define MAYBE_DownloadMultipleFiles DownloadMultipleFiles
+#endif
+
+IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, MAYBE_DownloadMultipleFiles) {
   GURL url1(net::URLRequestSlowDownloadJob::kUnknownSizeUrl);
   GURL url2(net::URLRequestSlowDownloadJob::kKnownSizeUrl);
 
@@ -759,9 +781,9 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DownloadMultipleFiles) {
       browser(), GURL(net::URLRequestSlowDownloadJob::kFinishDownloadUrl));
 
   // Waits for the completion of downloads.
+  NotificationUpdateObserver download_change_notification_observer;
   while (download1->GetState() != content::DownloadItem::COMPLETE ||
          download2->GetState() != content::DownloadItem::COMPLETE) {
-    NotificationUpdateObserver download_change_notification_observer;
     download_change_notification_observer.Wait();
   }
 
@@ -782,6 +804,10 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest, DownloadMultipleFiles) {
   EXPECT_EQ(message_center::NOTIFICATION_TYPE_MULTIPLE,
             GetNotification(notification_id_group)->type());
   EXPECT_EQ(2u, GetNotification(notification_id_group)->items().size());
+  EXPECT_EQ(DownloadGroupNotification::TruncateFileName(download2),
+            GetNotification(notification_id_group)->items()[0].title);
+  EXPECT_EQ(DownloadGroupNotification::TruncateFileName(download1),
+            GetNotification(notification_id_group)->items()[1].title);
 }
 
 IN_PROC_BROWSER_TEST_F(DownloadNotificationTest,
@@ -1183,6 +1209,7 @@ IN_PROC_BROWSER_TEST_F(MultiProfileDownloadNotificationTest,
             GetNotification(notification_id_user2_2)->type());
 
   // Requests to complete the downloads.
+  NotificationUpdateObserver download_change_notification_observer;
   ui_test_utils::NavigateToURL(
       browser(), GURL(net::URLRequestSlowDownloadJob::kFinishDownloadUrl));
 
@@ -1190,7 +1217,9 @@ IN_PROC_BROWSER_TEST_F(MultiProfileDownloadNotificationTest,
   while (download1->GetState() != content::DownloadItem::COMPLETE ||
          download2->GetState() != content::DownloadItem::COMPLETE ||
          download3->GetState() != content::DownloadItem::COMPLETE) {
-    NotificationUpdateObserver download_change_notification_observer;
+    // Requests again, since sometimes the request may fail.
+    ui_test_utils::NavigateToURL(
+        browser(), GURL(net::URLRequestSlowDownloadJob::kFinishDownloadUrl));
     download_change_notification_observer.Wait();
   }
 

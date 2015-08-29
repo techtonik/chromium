@@ -39,6 +39,7 @@
 #include "base/values.h"
 #include "net/base/chunked_upload_data_stream.h"
 #include "net/base/elements_upload_data_stream.h"
+#include "net/base/external_estimate_provider.h"
 #include "net/base/load_flags.h"
 #include "net/base/load_timing_info.h"
 #include "net/base/load_timing_info_test_util.h"
@@ -665,10 +666,12 @@ class URLRequestTest : public PlatformTest {
   }
 
   virtual void SetUpFactory() {
-    job_factory_impl_->SetProtocolHandler("data", new DataProtocolHandler);
+    job_factory_impl_->SetProtocolHandler(
+        "data", make_scoped_ptr(new DataProtocolHandler));
 #if !defined(DISABLE_FILE_SUPPORT)
     job_factory_impl_->SetProtocolHandler(
-        "file", new FileProtocolHandler(base::ThreadTaskRunnerHandle::Get()));
+        "file", make_scoped_ptr(new FileProtocolHandler(
+                    base::ThreadTaskRunnerHandle::Get())));
 #endif
   }
 
@@ -684,8 +687,9 @@ class URLRequestTest : public PlatformTest {
   // Adds the TestJobInterceptor to the default context.
   TestJobInterceptor* AddTestInterceptor() {
     TestJobInterceptor* protocol_handler_ = new TestJobInterceptor();
-    job_factory_impl_->SetProtocolHandler("http", NULL);
-    job_factory_impl_->SetProtocolHandler("http", protocol_handler_);
+    job_factory_impl_->SetProtocolHandler("http", nullptr);
+    job_factory_impl_->SetProtocolHandler("http",
+                                          make_scoped_ptr(protocol_handler_));
     return protocol_handler_;
   }
 
@@ -4097,7 +4101,8 @@ TEST_F(URLRequestTestHTTP, NetworkQualityEstimator) {
   ASSERT_TRUE(test_server_.Start());
   // Enable requests to local host to be used for network quality estimation.
   std::map<std::string, std::string> variation_params;
-  NetworkQualityEstimator estimator(variation_params, true, true);
+  NetworkQualityEstimator estimator(scoped_ptr<net::ExternalEstimateProvider>(),
+                                    variation_params, true, true);
 
   TestDelegate d;
   TestNetworkDelegate network_delegate;  // Must outlive URLRequest.
@@ -5460,8 +5465,10 @@ TEST_F(URLRequestTestHTTP, MAYBE_ProcessPKPAndSendReport) {
   HashValue hash2;
   // The values here don't matter, as long as they are different from
   // the mocked CertVerifyResult below.
-  ASSERT_TRUE(hash1.FromString("sha1/111111111111111111111111111="));
-  ASSERT_TRUE(hash2.FromString("sha1/222222222222222222222222222="));
+  ASSERT_TRUE(
+      hash1.FromString("sha256/1111111111111111111111111111111111111111111="));
+  ASSERT_TRUE(
+      hash2.FromString("sha256/2222222222222222222222222222222222222222222="));
   hashes.push_back(hash1);
   hashes.push_back(hash2);
   security_state.AddHPKP(test_server_hostname, expiry,
@@ -5481,7 +5488,8 @@ TEST_F(URLRequestTestHTTP, MAYBE_ProcessPKPAndSendReport) {
   verify_result.verified_cert = cert;
   verify_result.is_issued_by_known_root = true;
   HashValue hash3;
-  ASSERT_TRUE(hash3.FromString("sha1/333333333333333333333333333="));
+  ASSERT_TRUE(
+      hash3.FromString("sha256/3333333333333333333333333333333333333333333="));
   verify_result.public_key_hashes.push_back(hash3);
   cert_verifier.AddResultForCert(cert.get(), verify_result, OK);
 
@@ -5543,7 +5551,8 @@ TEST_F(URLRequestTestHTTP, MAYBE_ProcessPKPReportOnly) {
   HashValue hash;
   // This value doesn't matter, as long as it is different from the pins
   // for the request to hpkp-headers-report-only.html.
-  ASSERT_TRUE(hash.FromString("sha1/111111111111111111111111111="));
+  ASSERT_TRUE(
+      hash.FromString("sha256/1111111111111111111111111111111111111111111="));
   verify_result.public_key_hashes.push_back(hash);
   cert_verifier.AddResultForCert(cert.get(), verify_result, OK);
 
@@ -9084,7 +9093,8 @@ class URLRequestTestFTP : public URLRequestTest {
   void SetUpFactory() override {
     // Add FTP support to the default URLRequestContext.
     job_factory_impl_->SetProtocolHandler(
-        "ftp", new FtpProtocolHandler(&ftp_transaction_factory_));
+        "ftp",
+        make_scoped_ptr(new FtpProtocolHandler(&ftp_transaction_factory_)));
   }
 
   std::string GetTestFileContents() {

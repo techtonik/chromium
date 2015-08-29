@@ -7,14 +7,13 @@ package org.chromium.chrome.browser.sync;
 import android.accounts.Account;
 import android.app.Activity;
 import android.content.Context;
-import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
 import android.util.Log;
 
-import org.chromium.base.ApplicationState;
+import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
-import org.chromium.base.ApplicationStatus.ApplicationStateListener;
+import org.chromium.base.ApplicationStatus.ActivityStateListener;
 import org.chromium.base.ThreadUtils;
+import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.browser.identity.UniqueIdentificationGeneratorFactory;
 import org.chromium.chrome.browser.invalidation.InvalidationController;
 import org.chromium.chrome.browser.signin.AccountManagementFragment;
@@ -22,6 +21,8 @@ import org.chromium.chrome.browser.signin.SigninManager;
 import org.chromium.chrome.browser.signin.SigninManager.SignInFlowObserver;
 import org.chromium.chrome.browser.sync.ui.PassphraseActivity;
 import org.chromium.sync.AndroidSyncSettings;
+import org.chromium.sync.ModelType;
+import org.chromium.sync.PassphraseType;
 import org.chromium.sync.signin.AccountManagerHelper;
 import org.chromium.sync.signin.ChromeSigninController;
 
@@ -42,9 +43,8 @@ import org.chromium.sync.signin.ChromeSigninController;
  * are careful to not change the Android Chrome sync setting so we know whether to turn sync back
  * on when it is re-enabled.
  */
-public class SyncController implements ApplicationStateListener,
-        ProfileSyncService.SyncStateChangedListener,
-        AndroidSyncSettings.AndroidSyncSettingsObserver {
+public class SyncController implements ProfileSyncService.SyncStateChangedListener,
+                                       AndroidSyncSettings.AndroidSyncSettingsObserver {
     private static final String TAG = "SyncController";
 
     /**
@@ -53,11 +53,6 @@ public class SyncController implements ApplicationStateListener,
      * method.
      */
     public static final String GENERATOR_ID = "SYNC";
-
-    /**
-     * Key for the delay_sync_setup preference.
-     */
-    private static final String DELAY_SYNC_SETUP_PREF = "delay_sync_setup";
 
     private static SyncController sInstance;
 
@@ -70,10 +65,8 @@ public class SyncController implements ApplicationStateListener,
         mContext = context;
         mChromeSigninController = ChromeSigninController.get(mContext);
         AndroidSyncSettings.registerObserver(context, this);
-        mProfileSyncService = ProfileSyncService.get(mContext);
+        mProfileSyncService = ProfileSyncService.get();
         mProfileSyncService.addSyncStateChangedListener(this);
-
-        mChromeSigninController.ensureGcmIsInitialized();
 
         // Set the sessions ID using the generator that was registered for GENERATOR_ID.
         mProfileSyncService.setSessionsId(
@@ -86,7 +79,15 @@ public class SyncController implements ApplicationStateListener,
 
         updateSyncStateFromAndroid();
 
-        ApplicationStatus.registerApplicationStateListener(this);
+        // When the application gets paused, tell sync to flush the directory to disk.
+        ApplicationStatus.registerStateListenerForAllActivities(new ActivityStateListener() {
+            @Override
+            public void onActivityStateChange(Activity activity, int newState) {
+                if (newState == ActivityState.PAUSED) {
+                    mProfileSyncService.flushDirectory();
+                }
+            }
+        });
     }
 
     /**
@@ -112,6 +113,7 @@ public class SyncController implements ApplicationStateListener,
      * @param activity the current activity.
      * @param accountName the full account name.
      */
+    @VisibleForTesting
     public void signIn(Activity activity, String accountName) {
         final Account account = AccountManagerHelper.createAccountFromName(accountName);
 
@@ -213,34 +215,18 @@ public class SyncController implements ApplicationStateListener,
     }
 
     /**
+     * @return Whether sync is enabled to sync urls or open tabs with a non custom passphrase.
+     */
+    public boolean isSyncingUrlsWithKeystorePassphrase() {
+        return mProfileSyncService.isSyncInitialized()
+            && mProfileSyncService.getPreferredDataTypes().contains(ModelType.TYPED_URLS)
+            && mProfileSyncService.getPassphraseType().equals(PassphraseType.KEYSTORE_PASSPHRASE);
+    }
+
+    /**
      * Returns the SyncNotificationController.
      */
     public SyncNotificationController getSyncNotificationController() {
         return mSyncNotificationController;
-    }
-
-    @Override
-    public void onApplicationStateChange(int newState) {
-        if (newState == ApplicationState.HAS_RUNNING_ACTIVITIES) {
-            onMainActivityStart();
-        }
-    }
-
-    /**
-     * Set the value of the delay_sync_setup preference.
-     */
-    public void setDelaySync(boolean delay) {
-        PreferenceManager.getDefaultSharedPreferences(mContext).edit()
-                .putBoolean(DELAY_SYNC_SETUP_PREF, delay).apply();
-    }
-
-    public void onMainActivityStart() {
-        if (mProfileSyncService.isFirstSetupInProgress()) {
-            mProfileSyncService.setSyncSetupCompleted();
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
-            if (prefs.getBoolean(DELAY_SYNC_SETUP_PREF, false)) {
-                mProfileSyncService.setSetupInProgress(false);
-            }
-        }
     }
 }

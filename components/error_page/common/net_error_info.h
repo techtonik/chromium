@@ -5,8 +5,7 @@
 #ifndef COMPONENTS_ERROR_PAGE_COMMON_NET_ERROR_INFO_H_
 #define COMPONENTS_ERROR_PAGE_COMMON_NET_ERROR_INFO_H_
 
-// TODO(hashimoto): Change this to namespace error_page.
-namespace chrome_common_net {
+namespace error_page {
 
 // Network error page events.  Used for UMA statistics.
 enum NetworkErrorPageEvent {
@@ -33,11 +32,12 @@ enum NetworkErrorPageEvent {
 
   NETWORK_ERROR_EASTER_EGG_ACTIVATED = 12,         // Easter egg activated.
 
-  // For "Google cached copy" label experiment button.
+  // For "Google cached copy" button experiment.
   NETWORK_ERROR_PAGE_CACHED_COPY_BUTTON_SHOWN = 13,
   NETWORK_ERROR_PAGE_CACHED_COPY_BUTTON_CLICKED = 14,
-  NETWORK_ERROR_PAGE_CACHED_PAGE_BUTTON_SHOWN = 15,
-  NETWORK_ERROR_PAGE_CACHED_PAGE_BUTTON_CLICKED = 16,
+  // Obsolete. No longer experimenting with the label.
+  // NETWORK_ERROR_PAGE_CACHED_PAGE_BUTTON_SHOWN = 15,
+  // NETWORK_ERROR_PAGE_CACHED_PAGE_BUTTON_CLICKED = 16,
 
   NETWORK_ERROR_DIAGNOSE_BUTTON_CLICKED = 17,      // Diagnose button clicked.
 
@@ -83,10 +83,6 @@ enum DnsProbeStatus {
   DNS_PROBE_MAX
 };
 
-}  // namespace chrome_common_net
-
-namespace error_page {
-
 // Returns a string representing |status|.  It should be simply the name of
 // the value as a string, but don't rely on that.  This is presented to the
 // user as part of the DNS error page (as the error code, at the bottom),
@@ -98,10 +94,10 @@ namespace error_page {
 const char* DnsProbeStatusToString(int status);
 
 // Returns true if |status| is one of the DNS_PROBE_FINISHED_* statuses.
-bool DnsProbeStatusIsFinished(chrome_common_net::DnsProbeStatus status);
+bool DnsProbeStatusIsFinished(DnsProbeStatus status);
 
 // Record specific error page events.
-void RecordEvent(chrome_common_net::NetworkErrorPageEvent event);
+void RecordEvent(NetworkErrorPageEvent event);
 
 // The error domain used to pass DNS probe statuses to the localized error
 // code.

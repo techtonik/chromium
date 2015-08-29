@@ -12,11 +12,11 @@
 #include "components/html_viewer/blink_url_request_type_converters.h"
 #include "components/html_viewer/document_resource_waiter.h"
 #include "components/html_viewer/global_state.h"
+#include "components/html_viewer/html_factory.h"
 #include "components/html_viewer/html_frame.h"
 #include "components/html_viewer/html_frame_delegate.h"
 #include "components/html_viewer/html_viewer_switches.h"
-#include "components/view_manager/public/cpp/view_manager.h"
-#include "mojo/application/public/cpp/application_impl.h"
+#include "components/view_manager/public/cpp/view_tree_connection.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebRemoteFrame.h"
 #include "third_party/WebKit/public/web/WebTreeScopeType.h"
@@ -49,7 +49,6 @@ HTMLFrameTreeManager::TreeMap* HTMLFrameTreeManager::instances_ = nullptr;
 // static
 HTMLFrame* HTMLFrameTreeManager::CreateFrameAndAttachToTree(
     GlobalState* global_state,
-    mojo::ApplicationImpl* app,
     mojo::View* view,
     scoped_ptr<DocumentResourceWaiter> resource_waiter,
     HTMLFrameDelegate* delegate) {
@@ -89,15 +88,26 @@ HTMLFrame* HTMLFrameTreeManager::CreateFrameAndAttachToTree(
     const mandoline::FrameDataPtr& data = frame_data[frame_data_index];
     if (existing_frame) {
       CHECK(!existing_frame->IsLocal());
-      existing_frame->set_delegate(delegate);
-      existing_frame->SwapToLocal(view, data->client_properties);
+      existing_frame->SwapToLocal(delegate, view, data->client_properties);
     } else {
+      // If we can't find the frame and the change_id of the incoming
+      // tree is before the change id we've processed, then we removed the
+      // frame and need do nothing.
+      if (change_id < frame_tree->change_id_)
+        return nullptr;
+
+      // We removed the frame but it hasn't been acked yet.
+      if (frame_tree->pending_remove_ids_.count(view->id()))
+        return nullptr;
+
+      // TODO(sky): if change_id > frame_tree->change_id_ then this needs
+      // to wait and bind once the change has been processed.
+
       HTMLFrame* parent = frame_tree->root_->FindFrame(data->parent_id);
       CHECK(parent);
-      HTMLFrame::CreateParams params(frame_tree, parent, view->id());
-      HTMLFrame* frame = new HTMLFrame(params);
-      frame->set_delegate(delegate);
-      frame->Init(view, data->client_properties);
+      HTMLFrame::CreateParams params(frame_tree, parent, view->id(), view,
+                                     data->client_properties, delegate);
+      delegate->GetHTMLFactory()->CreateHTMLFrame(&params);
     }
   }
 
@@ -167,18 +177,17 @@ HTMLFrame* HTMLFrameTreeManager::BuildFrameTree(
     }
     HTMLFrame::CreateParams params(this,
                                    !parents.empty() ? parents.back() : nullptr,
-                                   frame_data[i]->frame_id);
-    HTMLFrame* frame = new HTMLFrame(params);
+                                   frame_data[i]->frame_id, local_view,
+                                   frame_data[i]->client_properties, nullptr);
+    if (frame_data[i]->frame_id == local_frame_id)
+      params.delegate = delegate;
+
+    HTMLFrame* frame = delegate->GetHTMLFactory()->CreateHTMLFrame(&params);
     if (!last_frame)
       root = frame;
     else
       DCHECK(frame->parent());
     last_frame = frame;
-
-    if (frame_data[i]->frame_id == local_frame_id)
-      frame->set_delegate(delegate);
-
-    frame->Init(local_view, frame_data[i]->client_properties);
   }
   return root;
 }
@@ -235,10 +244,10 @@ void HTMLFrameTreeManager::ProcessOnFrameAdded(
   if (pending_remove_ids_.count(frame_data->frame_id))
     return;
 
-  HTMLFrame::CreateParams params(this, parent, frame_data->frame_id);
-  // |parent| takes ownership of |frame|.
-  HTMLFrame* frame = new HTMLFrame(params);
-  frame->Init(nullptr, frame_data->client_properties);
+  HTMLFrame::CreateParams params(this, parent, frame_data->frame_id, nullptr,
+                                 frame_data->client_properties, nullptr);
+  // |parent| takes ownership of created HTMLFrame.
+  source->GetLocalRoot()->delegate_->GetHTMLFactory()->CreateHTMLFrame(&params);
 }
 
 void HTMLFrameTreeManager::ProcessOnFrameRemoved(HTMLFrame* source,

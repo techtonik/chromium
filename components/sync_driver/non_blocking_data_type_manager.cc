@@ -8,7 +8,7 @@
 #include "components/sync_driver/non_blocking_data_type_controller.h"
 #include "sync/engine/model_type_sync_proxy_impl.h"
 
-namespace sync_driver {
+namespace sync_driver_v2 {
 
 NonBlockingDataTypeManager::NonBlockingDataTypeManager() {
 }
@@ -29,7 +29,7 @@ void NonBlockingDataTypeManager::RegisterType(
 void NonBlockingDataTypeManager::InitializeType(
     syncer::ModelType type,
     const scoped_refptr<base::SequencedTaskRunner>& task_runner,
-    const base::WeakPtr<syncer::ModelTypeSyncProxyImpl>& proxy_impl) {
+    const base::WeakPtr<syncer_v2::ModelTypeSyncProxyImpl>& proxy_impl) {
   NonBlockingDataTypeControllerMap::const_iterator it =
       non_blocking_data_type_controllers_.find(type);
   DCHECK(it != non_blocking_data_type_controllers_.end());
@@ -72,4 +72,4 @@ syncer::ModelTypeSet NonBlockingDataTypeManager::GetRegisteredTypes() const {
   return result;
 }
 
-}  // namespace sync_driver
+}  // namespace sync_driver_v2

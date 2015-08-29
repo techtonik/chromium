@@ -24,7 +24,6 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.widget.TintedImageButton;
 import org.chromium.components.bookmarks.BookmarkId;
-import org.chromium.components.bookmarks.BookmarkType;
 
 import java.util.List;
 
@@ -58,8 +57,10 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
     BookmarkItem setBookmarkId(BookmarkId bookmarkId) {
         mBookmarkId = bookmarkId;
         BookmarkItem bookmarkItem = mDelegate.getModel().getBookmarkById(bookmarkId);
-        mMoreIcon.setVisibility(bookmarkItem.isEditable() && isSelectable() ? VISIBLE : GONE);
-        setChecked(mDelegate.isBookmarkSelected(bookmarkId));
+        if (isSelectable()) {
+            mMoreIcon.setVisibility(bookmarkItem.isEditable() ? VISIBLE : GONE);
+            setChecked(mDelegate.isBookmarkSelected(bookmarkId));
+        }
         return bookmarkItem;
     }
 
@@ -82,7 +83,7 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
     }
 
     private void updateSelectionState() {
-        mMoreIcon.setClickable(!mDelegate.isSelectionEnabled());
+        if (isSelectable()) mMoreIcon.setClickable(!mDelegate.isSelectionEnabled());
     }
 
     /**
@@ -106,7 +107,7 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
                             getContext().getString(R.string.enhanced_bookmark_item_edit),
                             getContext().getString(R.string.enhanced_bookmark_item_move),
                             getContext().getString(R.string.enhanced_bookmark_item_delete)}) {
-                private static final int MOVE_POSITION = 1;
+                private static final int MOVE_POSITION = 2;
 
                 @Override
                 public boolean areAllItemsEnabled() {
@@ -115,9 +116,10 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
 
                 @Override
                 public boolean isEnabled(int position) {
-                    // Partner bookmarks can't move, so disable that.
-                    return mBookmarkId.getType() != BookmarkType.PARTNER
-                            || position != MOVE_POSITION;
+                    if (position == MOVE_POSITION) {
+                        return mDelegate.getModel().getBookmarkById(mBookmarkId).isMovable();
+                    }
+                    return true;
                 }
 
                 @Override
@@ -144,7 +146,8 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
                             EnhancedBookmarkAddEditFolderActivity.startEditFolderActivity(
                                     getContext(), item.getId());
                         } else {
-                            EnhancedBookmarkUtils.startEditActivity(getContext(), item.getId());
+                            EnhancedBookmarkUtils.startEditActivity(
+                                    getContext(), item.getId(), null);
                         }
                     } else if (position == 2) {
                         EnhancedBookmarkFolderSelectActivity.startFolderSelectActivity(getContext(),
@@ -168,10 +171,12 @@ abstract class EnhancedBookmarkRow extends FrameLayout implements EnhancedBookma
 
         mIconImageView = (ImageView) findViewById(R.id.bookmark_image);
         mTitleView = (TextView) findViewById(R.id.title);
-        mMoreIcon = (TintedImageButton) findViewById(R.id.more);
-        mHighlightView = (EnhancedBookmarkItemHighlightView) findViewById(R.id.highlight);
 
         if (isSelectable()) {
+            mHighlightView = (EnhancedBookmarkItemHighlightView) findViewById(R.id.highlight);
+
+            mMoreIcon = (TintedImageButton) findViewById(R.id.more);
+            mMoreIcon.setVisibility(VISIBLE);
             mMoreIcon.setColorFilterMode(PorterDuff.Mode.MULTIPLY);
             mMoreIcon.setOnClickListener(new OnClickListener() {
                 @Override

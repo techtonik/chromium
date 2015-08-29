@@ -12,21 +12,10 @@ from telemetry.page import shared_page_state
 from telemetry.value import skip
 
 import exception_formatter
-import test_expectations
+import gpu_test_expectations
 
 """Base classes for all GPU tests in this directory. Implements
 support for per-page test expectations."""
-
-# TODO(kbr): add unit tests for these classes, specifically:
-#   - one matching testHandlingOfCrashedTabWithExpectedFailure from
-#     telemetry/page/page_run_end_to_end_unittest.py
-#     (https://crbug.com/444240), which was removed during the test
-#     expectations refactoring
-#   - verify behavior of expected failures
-#   - verify behavior of skipping tests
-#   - after GpuTestExpectations is folded into TestExpectations,
-#     verify handling of flaky tests
-# See http://crbug.com/495870.
 
 def _PageOperationWrapper(page, tab, expectations,
                           show_expected_failure, inner_func,
@@ -43,13 +32,16 @@ def _PageOperationWrapper(page, tab, expectations,
       'Skip expectations should have been handled at a higher level')
   try:
     inner_func()
-  except:
+  except Exception:
     page.SetHadError()
     if expectation == 'pass':
       raise
     elif expectation == 'fail':
       msg = 'Expected exception while running %s' % page.display_name
       exception_formatter.PrintFormattedException(msg=msg)
+    elif expectation == 'flaky':
+      if not page.GetSuppressFlakyFailures():
+        raise
     else:
       logging.warning(
           'Unknown expectation %s while handling exception for %s' %
@@ -70,13 +62,18 @@ class TestBase(benchmark_module.Benchmark):
     """Returns the expectations that apply to this test."""
     if not self._cached_expectations:
       self._cached_expectations = self._CreateExpectations()
+    if not isinstance(self._cached_expectations,
+                      gpu_test_expectations.GpuTestExpectations):
+      raise Exception('gpu_test_base requires use of GpuTestExpectations')
     return self._cached_expectations
 
   def _CreateExpectations(self):
-    # By default, creates an empty TestExpectations object. Override
-    # this in subclasses to set up test-specific expectations. Don't
-    # call this directly. Call GetExpectations where necessary.
-    return test_expectations.TestExpectations()
+    # By default, creates an empty GpuTestExpectations object. Override
+    # this in subclasses to set up test-specific expectations. Must
+    # return an instance of GpuTestExpectations or a subclass.
+    #
+    # Do not call this directly. Call GetExpectations where necessary.
+    return gpu_test_expectations.GpuTestExpectations()
 
 
 class ValidatorBase(page_test.PageTest):
@@ -109,12 +106,53 @@ class ValidatorBase(page_test.PageTest):
     """Validates and measures the page, taking into account test
     expectations. Do not override this method. Override
     ValidateAndMeasurePageInner, below."""
+
+    # First figure out whether this test is marked flaky in the test
+    # expectations.
+    num_retries = page.GetExpectations().GetFlakyRetriesForPage(
+      tab.browser, page)
+
     try:
       _PageOperationWrapper(
         page, tab, page.GetExpectations(), True,
         lambda: self.ValidateAndMeasurePageInner(page, tab, results),
         results=results)
+    except Exception:
+      # If we're going to re-execute a flaky test in the finally
+      # clause, then we have to squelch this exception.
+      if num_retries == 0:
+        raise
     finally:
+      if page.HadError() and num_retries:
+        # Emulate the logic that's in shared_page_state to re-run the
+        # test up to |num_retries| times. It would be ideal if it
+        # could be reused (by calling SharedPageState.RunStory), but
+        # unfortunately it's not possible to fetch the active
+        # SharedPageState on demand.
+        for ii in xrange(0, num_retries):
+          print 'FLAKY TEST FAILURE, retrying: ' + page.display_name
+          page.ClearHadError()
+          page.SetSuppressFlakyFailures(False)
+          try:
+            self.WillNavigateToPage(page, tab)
+            page.RunNavigateSteps(page.cached_action_runner)
+            self.DidNavigateToPage(page, tab)
+            page.RunPageInteractions(page.cached_action_runner)
+            # Must not re-enter ourselves!
+            _PageOperationWrapper(
+              page, tab, page.GetExpectations(), True,
+              lambda: self.ValidateAndMeasurePageInner(page, tab, results),
+              results=results)
+          except Exception:
+            # Squelch any exceptions from any but the last retry.
+            if ii == num_retries - 1:
+              raise
+          finally:
+            # If the retry succeeded, stop.
+            if not page.HadError():
+              break
+            # Otherwise, clear the error state and retry.
+            page.ClearHadError()
       # Clear the error state of the page at this point so that if
       # --page-repeat or --pageset-repeat are used, the subsequent
       # iterations don't turn into no-ops.
@@ -168,6 +206,8 @@ class PageBase(page_module.Page):
     # _PageOperationWrapper, above. Need to rethink.
     self._expectations = expectations
     self._had_error = False
+    self._cached_action_runner = None
+    self._suppress_flaky_failures = True
 
   def GetExpectations(self):
     return self._expectations
@@ -181,9 +221,20 @@ class PageBase(page_module.Page):
   def ClearHadError(self):
     self._had_error = False
 
+  def SetSuppressFlakyFailures(self, value):
+    self._suppress_flaky_failures = value
+
+  def GetSuppressFlakyFailures(self):
+    return self._suppress_flaky_failures
+
+  @property
+  def cached_action_runner(self):
+    return self._cached_action_runner
+
   def RunNavigateSteps(self, action_runner):
     """Runs navigation steps, taking into account test expectations.
     Do not override this method. Override RunNavigateStepsInner, below."""
+    self._cached_action_runner = action_runner
     def Functor():
       self.RunDefaultNavigateSteps(action_runner)
       self.RunNavigateStepsInner(action_runner)

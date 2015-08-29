@@ -9,6 +9,7 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.provider.Browser;
+import android.text.TextUtils;
 import android.webkit.WebView;
 
 import org.chromium.base.CommandLine;
@@ -167,7 +168,7 @@ public class ExternalNavigationHandler {
         // http://crbug/331571 : Do not override a navigation started from user typing.
         // http://crbug/424029 : Need to stay in Chrome for an intent heading explicitly to Chrome.
         if (params.getRedirectHandler() != null) {
-            if (params.getRedirectHandler().shouldStayInChrome()
+            if (params.getRedirectHandler().shouldStayInChrome(isExternalProtocol)
                     || params.getRedirectHandler().shouldNotOverrideUrlLoading()) {
                 return OverrideUrlLoadingResult.NO_OVERRIDE;
             }
@@ -322,7 +323,7 @@ public class ExternalNavigationHandler {
                 }
 
                 if (currentUri != null && previousUri != null
-                        && currentUri.getHost().equals(previousUri.getHost())) {
+                        && TextUtils.equals(currentUri.getHost(), previousUri.getHost())) {
 
                     Intent previousIntent;
                     try {

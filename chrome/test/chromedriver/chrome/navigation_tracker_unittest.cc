@@ -49,6 +49,14 @@ class DeterminingLoadStateDevToolsClient : public StubDevToolsClient {
         result_dict.SetString("root.baseURL", "http://test");
       result->reset(result_dict.DeepCopy());
       return Status(kOk);
+    } else if (method == "Runtime.evaluate") {
+      std::string expression;
+      if (params.GetString("expression", &expression) && expression == "1") {
+        base::DictionaryValue result_dict;
+        result_dict.SetInteger("result.value", 1);
+        result->reset(result_dict.DeepCopy());
+        return Status(kOk);
+      }
     }
 
     if (send_event_first_.length()) {
@@ -258,6 +266,7 @@ TEST(NavigationTracker, DiscardScheduledNavigationsOnMainFrameCommit) {
 
   base::DictionaryValue params_navigated;
   params_navigated.SetString("frame.parentId", "something");
+  params_navigated.SetString("frame.name", std::string());
   params_navigated.SetString("frame.url", "http://abc.xyz");
   ASSERT_EQ(
       kOk,
@@ -351,5 +360,9 @@ TEST(NavigationTracker, OnSuccessfulNavigate) {
   tracker.OnCommandSuccess(&client, "Page.navigate", result);
   ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", true));
   tracker.OnEvent(&client, "Page.loadEventFired", params);
+  ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", true));
+  params.Clear();
+  params.SetString("frameId", "f");
+  tracker.OnEvent(&client, "Page.frameStoppedLoading", params);
   ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", false));
 }

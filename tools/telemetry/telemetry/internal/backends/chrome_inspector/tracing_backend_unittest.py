@@ -4,7 +4,6 @@
 
 import unittest
 
-from telemetry.core import util
 from telemetry.internal.backends.chrome_inspector import tracing_backend
 from telemetry.internal.backends.chrome_inspector import websocket
 from telemetry.testing import simple_mock
@@ -12,8 +11,6 @@ from telemetry.testing import tab_test_case
 from telemetry.timeline import model as model_module
 from telemetry.timeline import tracing_category_filter
 from telemetry.timeline import tracing_options
-
-util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
 import mock
 
 

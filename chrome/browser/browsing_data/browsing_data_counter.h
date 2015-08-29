@@ -9,6 +9,7 @@
 
 #include "base/callback.h"
 #include "base/prefs/pref_member.h"
+#include "chrome/browser/browsing_data/browsing_data_remover.h"
 #include "chrome/browser/profiles/profile.h"
 
 class BrowsingDataCounter {
@@ -25,18 +26,28 @@ class BrowsingDataCounter {
   // Name of the preference associated with this counter.
   virtual const std::string& GetPrefName() const = 0;
 
+  // The profile associated with this counter.
+  Profile* GetProfile() const;
+
  protected:
+  // Called when some conditions have changed and the counting should be
+  // restarted, e.g. when the deletion preference changed state or when
+  // we were notified of data changes.
+  void RestartCounting();
+
   // Should be called from |Count| by any overriding class to indicate that
   // counting is finished and report the |result|.
   void ReportResult(uint32 result);
 
+  // Calculates the beginning of the counting period as |period_| before now.
+  base::Time GetPeriodStart();
+
  private:
-  // Called when the boolean preference indicating whether this data type
-  // is to be deleted changes.
-  void OnPrefChanged();
+  // Called after the class is initialized by calling |Init|.
+  virtual void OnInitialized();
 
   // Count the data.
-  virtual void Count();
+  virtual void Count() = 0;
 
   // The profile for which we will count the data volume.
   Profile* profile_;
@@ -49,11 +60,12 @@ class BrowsingDataCounter {
   // If false, we will not count it.
   BooleanPrefMember pref_;
 
-  // Whether this counter is currently in the process of counting.
-  bool counting_;
+  // The integer preference describing the time period for which this data type
+  // is to be deleted.
+  IntegerPrefMember period_;
 
   // Whether this class was properly initialized by calling |Init|.
-  bool initialized_;
+  bool initialized_ = false;
 };
 
 #endif  // CHROME_BROWSER_BROWSING_DATA_BROWSING_DATA_COUNTER_H_

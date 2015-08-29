@@ -68,6 +68,9 @@ class AppWindowContents {
   // Called in tests when the window is shown
   virtual void DispatchWindowShownForTests() const = 0;
 
+  // Called when the renderer notifies the browser that the window is ready.
+  virtual void OnWindowReady() = 0;
+
   virtual content::WebContents* GetWebContents() const = 0;
 
   virtual extensions::WindowController* GetWindowController() const = 0;
@@ -341,6 +344,10 @@ class AppWindow : public content::WebContentsDelegate,
   // app.
   void WindowEventsReady();
 
+  // Notifies the window's contents that the render view is ready and it can
+  // unblock resource requests.
+  void NotifyRenderViewReady();
+
   // Whether the app window wants to be alpha enabled.
   bool requested_alpha_enabled() const { return requested_alpha_enabled_; }
 
@@ -422,11 +429,6 @@ class AppWindow : public content::WebContentsDelegate,
   void OnExtensionUnloaded(content::BrowserContext* browser_context,
                            const Extension* extension,
                            UnloadedExtensionInfo::Reason reason) override;
-  void OnExtensionWillBeInstalled(content::BrowserContext* browser_context,
-                                  const Extension* extension,
-                                  bool is_update,
-                                  bool from_ephemeral,
-                                  const std::string& old_name) override;
 
   // web_modal::WebContentsModalDialogManagerDelegate implementation.
   void SetWebContentsBlocked(content::WebContents* web_contents,

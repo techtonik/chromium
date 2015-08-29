@@ -221,6 +221,7 @@
       'browser/indexed_db/mock_browsertest_indexed_db_class_factory.cc',
       'browser/indexed_db/mock_browsertest_indexed_db_class_factory.h',
       'browser/loader/resource_dispatcher_host_browsertest.cc',
+      'browser/loader/async_resource_handler_browsertest.cc',
       'browser/manifest/manifest_browsertest.cc',
       'browser/media/android/media_session_browsertest.cc',
       'browser/media/encrypted_media_browsertest.cc',
@@ -246,6 +247,7 @@
       'browser/site_per_process_browsertest.cc',
       'browser/site_per_process_browsertest.h',
       'browser/tracing/background_tracing_manager_browsertest.cc',
+      'browser/tracing/memory_tracing_browsertest.cc',
       'browser/tracing/tracing_controller_browsertest.cc',
       'browser/web_contents/opened_by_dom_browsertest.cc',
       'browser/web_contents/web_contents_impl_browsertest.cc',
@@ -475,7 +477,6 @@
       'browser/loader/temporary_file_stream_unittest.cc',
       'browser/loader/upload_data_stream_builder_unittest.cc',
       'browser/mach_broker_mac_unittest.cc',
-      'browser/media/audio_stream_monitor_unittest.cc',
       'browser/media/capture/audio_mirroring_manager_unittest.cc',
       'browser/media/capture/web_contents_audio_input_stream_unittest.cc',
       'browser/media/capture/web_contents_video_capture_device_unittest.cc',
@@ -507,6 +508,7 @@
       'browser/quota/usage_tracker_unittest.cc',
       'browser/renderer_host/begin_frame_observer_proxy_unittest.cc',
       'browser/renderer_host/clipboard_message_filter_unittest.cc',
+      'browser/renderer_host/event_with_latency_info_unittest.cc',
       'browser/renderer_host/input/gesture_event_queue_unittest.cc',
       'browser/renderer_host/input/input_router_impl_unittest.cc',
       'browser/renderer_host/input/mock_input_ack_handler.cc',
@@ -620,6 +622,9 @@
       'common/dwrite_font_platform_win_unittest.cc',
       'common/fileapi/file_system_util_unittest.cc',
       'common/gpu/client/gpu_memory_buffer_impl_unittest.cc',
+      'common/gpu/gpu_channel_test_common.cc',
+      'common/gpu/gpu_channel_test_common.h',
+      'common/gpu/gpu_channel_unittest.cc',
       'common/gpu/gpu_channel_manager_unittest.cc',
       'common/gpu/gpu_memory_buffer_factory_unittest.cc',
       'common/gpu/gpu_memory_manager_unittest.cc',
@@ -702,7 +707,7 @@
       'browser/renderer_host/pepper/pepper_printing_host_unittest.cc',
       'browser/renderer_host/pepper/quota_reservation_unittest.cc',
       'child/npapi/plugin_lib_unittest.cc',
-      'renderer/media/webrtc/video_destination_handler_unittest.cc',
+      'renderer/media/pepper_to_video_track_adapter_unittest.cc',
       'renderer/npapi/webplugin_impl_unittest.cc',
       'renderer/pepper/event_conversion_unittest.cc',
       'renderer/pepper/host_var_tracker_unittest.cc',
@@ -723,7 +728,8 @@
       'renderer/media/media_stream_audio_processor_unittest.cc',
       'renderer/media/media_stream_constraints_util_unittest.cc',
       'renderer/media/media_stream_dispatcher_unittest.cc',
-      'renderer/media/media_stream_video_capture_source_unittest.cc',
+      'renderer/media/media_stream_video_capturer_source_unittest.cc',
+      'renderer/media/media_stream_video_renderer_sink_unittest.cc',
       'renderer/media/media_stream_video_source_unittest.cc',
       'renderer/media/media_stream_video_track_unittest.cc',
       'renderer/media/mock_media_constraint_factory.cc',
@@ -738,7 +744,8 @@
       'renderer/media/rtc_video_decoder_unittest.cc',
       'renderer/media/speech_recognition_audio_sink_unittest.cc',
       'renderer/media/user_media_client_impl_unittest.cc',
-      'renderer/media/video_source_handler_unittest.cc',
+      'renderer/media/video_track_recorder_unittest.cc',
+      'renderer/media/video_track_to_pepper_adapter_unittest.cc',
       'renderer/media/webrtc/media_stream_remote_video_source_unittest.cc',
       'renderer/media/webrtc/media_stream_track_metrics_unittest.cc',
       'renderer/media/webrtc/peer_connection_dependency_factory_unittest.cc',
@@ -1086,7 +1093,7 @@
           ]
         }, {
           'sources!': [
-            'renderer/media/webrtc/video_destination_handler_unittest.cc',
+            'renderer/media/pepper_to_video_track_adapter_unittest.cc',
           ],
         }],
         ['enable_webrtc==1 and (OS=="linux" or OS=="mac" or OS=="win")', {
@@ -1327,6 +1334,9 @@
             '../testing/gtest.gyp:gtest',
             '../ui/accessibility/accessibility.gyp:ax_gen',
             '../ui/base/ime/ui_base_ime.gyp:ui_base_ime',
+          ],
+          'export_dependent_settings': [
+            '../skia/skia.gyp:skia',
           ],
           'sources': [
             # Source list duplicated in GN build.
@@ -1913,6 +1923,11 @@
                   '<(PRODUCT_DIR)/snapshot_blob.bin',
                 ],
               }],
+              ['enable_plugins==1', {
+                'additional_bundled_libs': [
+                  '<(PRODUCT_DIR)/libppapi_tests.so',
+                ],
+              }],
             ],
           },
           'includes': [ '../build/apk_browsertest.gypi' ],
@@ -1993,6 +2008,7 @@
             # Required to include "content/public/browser/android/compositor.h"
             # in chromium_linker_test_android.cc :-(
             '../skia/skia.gyp:skia',
+            '../third_party/re2/re2.gyp:re2',
           ],
           'sources': [
             'shell/android/linker_test_apk/chromium_linker_test_android.cc',

@@ -61,7 +61,7 @@ ExtensionActionViewController::~ExtensionActionViewController() {
   DCHECK(!is_showing_popup());
 }
 
-const std::string& ExtensionActionViewController::GetId() const {
+std::string ExtensionActionViewController::GetId() const {
   return extension_->id();
 }
 
@@ -178,10 +178,6 @@ void ExtensionActionViewController::OnContextMenuClosed() {
       !is_showing_popup()) {
     toolbar_actions_bar_->UndoPopOut();
   }
-}
-
-bool ExtensionActionViewController::CanDrag() const {
-  return true;
 }
 
 bool ExtensionActionViewController::ExecuteAction(bool by_user) {

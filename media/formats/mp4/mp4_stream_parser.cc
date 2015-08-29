@@ -268,8 +268,7 @@ bool MP4StreamParser::ParseMoov(BoxReader* reader) {
       audio_config.Initialize(
           codec, sample_format, channel_layout, sample_per_second,
           extra_data.size() ? &extra_data[0] : NULL, extra_data.size(),
-          is_audio_track_encrypted_, false, base::TimeDelta(),
-          0);
+          is_audio_track_encrypted_, base::TimeDelta(), 0);
       has_audio_ = true;
       audio_track_id_ = track->header.track_id;
     }
@@ -299,10 +298,8 @@ bool MP4StreamParser::ParseMoov(BoxReader* reader) {
             GetNaturalSize(visible_rect.size(), entry.pixel_aspect.h_spacing,
                            entry.pixel_aspect.v_spacing);
       } else if (track->header.width && track->header.height) {
-        // An even width makes things easier for YV12 and appears to be the
-        // behavior expected by WebKit layout tests. See GetNaturalSize().
         natural_size =
-            gfx::Size(track->header.width & ~1, track->header.height);
+            gfx::Size(track->header.width, track->header.height);
       }
 
       is_video_track_encrypted_ = entry.sinf.info.track_encryption.is_encrypted;
@@ -312,7 +309,7 @@ bool MP4StreamParser::ParseMoov(BoxReader* reader) {
                               natural_size,
                               // No decoder-specific buffer needed for AVC;
                               // SPS/PPS are embedded in the video stream
-                              NULL, 0, is_video_track_encrypted_, false);
+                              NULL, 0, is_video_track_encrypted_);
       has_video_ = true;
       video_track_id_ = track->header.track_id;
     }
@@ -385,36 +382,6 @@ void MP4StreamParser::OnEncryptedMediaInitData(
     pos += headers[i].raw_box.size();
   }
   encrypted_media_init_data_cb_.Run(EmeInitDataType::CENC, init_data);
-}
-
-bool MP4StreamParser::PrepareAVCBuffer(
-    const AVCDecoderConfigurationRecord& avc_config,
-    std::vector<uint8>* frame_buf,
-    std::vector<SubsampleEntry>* subsamples) const {
-  // Convert the AVC NALU length fields to Annex B headers, as expected by
-  // decoding libraries. Since this may enlarge the size of the buffer, we also
-  // update the clear byte count for each subsample if encryption is used to
-  // account for the difference in size between the length prefix and Annex B
-  // start code.
-  RCHECK(AVC::ConvertFrameToAnnexB(avc_config.length_size, frame_buf));
-  if (!subsamples->empty()) {
-    const int nalu_size_diff = 4 - avc_config.length_size;
-    size_t expected_size = runs_->sample_size() +
-        subsamples->size() * nalu_size_diff;
-    RCHECK(frame_buf->size() == expected_size);
-    for (size_t i = 0; i < subsamples->size(); i++)
-      (*subsamples)[i].clear_bytes += nalu_size_diff;
-  }
-
-  if (runs_->is_keyframe()) {
-    // If this is a keyframe, we (re-)inject SPS and PPS headers at the start of
-    // a frame. If subsample info is present, we also update the clear byte
-    // count for that first subsample.
-    RCHECK(AVC::InsertParamSetsAnnexB(avc_config, frame_buf, subsamples));
-  }
-
-  DCHECK(AVC::IsValidAnnexB(*frame_buf, *subsamples));
-  return true;
 }
 
 bool MP4StreamParser::PrepareAACBuffer(
@@ -507,8 +474,9 @@ bool MP4StreamParser::EnqueueSample(BufferQueue* audio_buffers,
 
   std::vector<uint8> frame_buf(buf, buf + runs_->sample_size());
   if (video) {
-    if (!PrepareAVCBuffer(runs_->video_description().avcc,
-                          &frame_buf, &subsamples)) {
+    DCHECK(runs_->video_description().frame_bitstream_converter);
+    if (!runs_->video_description().frame_bitstream_converter->ConvertFrame(
+        &frame_buf, runs_->is_keyframe(), &subsamples)) {
       MEDIA_LOG(ERROR, media_log_) << "Failed to prepare AVC sample for decode";
       *err = true;
       return false;
@@ -548,12 +516,9 @@ bool MP4StreamParser::EnqueueSample(BufferQueue* audio_buffers,
   // TODO(wolenetz/acolwell): Validate and use a common cross-parser TrackId
   // type and allow multiple tracks for same media type, if applicable. See
   // https://crbug.com/341581.
-  //
-  // NOTE: MPEG's "random access point" concept is equivalent to the
-  // downstream code's "is keyframe" concept.
   scoped_refptr<StreamParserBuffer> stream_buf =
       StreamParserBuffer::CopyFrom(&frame_buf[0], frame_buf.size(),
-                                   runs_->is_random_access_point(),
+                                   runs_->is_keyframe(),
                                    buffer_type, 0);
 
   if (decrypt_config)
@@ -565,7 +530,6 @@ bool MP4StreamParser::EnqueueSample(BufferQueue* audio_buffers,
 
   DVLOG(3) << "Pushing frame: aud=" << audio
            << ", key=" << runs_->is_keyframe()
-           << ", rap=" << runs_->is_random_access_point()
            << ", dur=" << runs_->duration().InMilliseconds()
            << ", dts=" << runs_->dts().InMilliseconds()
            << ", cts=" << runs_->cts().InMilliseconds()

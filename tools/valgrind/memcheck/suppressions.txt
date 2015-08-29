@@ -369,7 +369,7 @@
    ...
    fun:_ZN4base9SampleMap10AccumulateEii
    ...
-   fun:_ZN4base15SparseHistogram3AddEi
+   fun:_ZN4base15SparseHistogram*
 }
 {
    bug_73299 (Intentional)
@@ -2470,12 +2470,12 @@
 {
    bug_345432
    Memcheck:Leak
-   ...
-   fun:_ZN7content14GpuChannelHost7ConnectERKN3IPC13ChannelHandle*
-   fun:_ZN7content14GpuChannelHost6CreateEPNS_21GpuChannelHostFactoryERKN3gpu7GPUInfoERKN3IPC13ChannelHandle*
+   fun:_Znw*
+   fun:_ZN3IPC11SyncChannel23CreateSyncMessageFilterEv
+   fun:_ZN7content14GpuChannelHost7ConnectERKN3IPC13ChannelHandleEPN4base13WaitableEventE
+   fun:_ZN7content14GpuChannelHost6CreateEPNS_21GpuChannelHostFactoryERKN3gpu7GPUInfoERKN3IPC13ChannelHandleEPN4base13WaitableEventEPNS3_22GpuMemoryBufferManagerE
    fun:_ZN7content28BrowserGpuChannelHostFactory21GpuChannelEstablishedEv
    fun:_ZN7content28BrowserGpuChannelHostFactory16EstablishRequest12FinishOnMainEv
-   fun:_ZN7content28BrowserGpuChannelHostFactory16EstablishRequest4WaitEv
 }
 {
    bug_346336_a
@@ -2856,7 +2856,7 @@
    fun:_ZN4base8internal20PostTaskAndReplyImpl16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEESA_
    fun:_ZN4base10WorkerPool16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEES9_b
    fun:_ZN3net16HostResolverImpl16LoopbackProbeJob*
-   fun:_ZN3net16HostResolverImplC*
+   fun:_ZN3net16HostResolverImpl*
 }
 {
    bug_387993
@@ -3577,4 +3577,80 @@
    fun:_ZN5blink13CallbackStack4Item4callEPNS_7VisitorE
    fun:_ZN5blink4Heap25popAndInvokeTraceCallbackEPNS_7VisitorE
    fun:_ZN5blink4Heap19processMarkingStackEPNS_7VisitorE
+}
+{
+   bug_522049
+   Memcheck:Unaddressable
+   ...
+   fun:_ZNKSt8_Rb_treeISsSt4pairIKSsN2ui13TextInputModeEESt10_Select1stIS4_ESt4lessISsESaIS4_EE4findERS1_
+   fun:_ZNKSt3mapISsN2ui13TextInputModeESt4lessISsESaISt4pairIKSsS1_EEE4findERS5_
+   fun:_ZN12_GLOBAL__N_116ConvertInputModeERKN5blink9WebStringE
+   fun:_ZN7content12RenderWidget20UpdateTextInputStateENS0_7ShowImeENS0_12ChangeSourceE
+   fun:_ZN7content12RenderWidget24WillBeginCompositorFrameEv
+   fun:_ZN7content22RenderWidgetCompositor18WillBeginMainFrameEv
+   fun:_ZThn8_N7content22RenderWidgetCompositor18WillBeginMainFrameEv
+   fun:_ZN2cc13LayerTreeHost18WillBeginMainFrameEv
+   fun:_ZN2cc17SingleThreadProxy16DoBeginMainFrameERKNS_14BeginFrameArgsE
+   fun:_ZN2cc17SingleThreadProxy20CompositeImmediatelyEN4base9TimeTicksE
+   fun:_ZN2cc13LayerTreeHost9CompositeEN4base9TimeTicksE
+   fun:_ZN7content12_GLOBAL__N_135RenderWidgetCompositorOutputSurface20SynchronousCompositeEv
+}
+{
+   bug_522463
+   Memcheck:Leak
+   fun:_Znw*
+   ...
+   fun:_ZN19KeyedServiceFactory20GetServiceForContextEPN4base16SupportsUserDataEb
+}
+{
+   bug_522468
+   Memcheck:Leak
+   fun:_Znw*
+   ...
+   fun:_ZN14TestingProfile4InitEv
+   fun:_ZN14TestingProfileC1Ev
+   fun:_ZN12_GLOBAL__N_131PermissionManagerTestingProfileC2Ev
+   fun:_ZN21PermissionManagerTestC2Ev
+   fun:_ZN*PermissionManagerTest_*
+}
+{
+   bug_522514
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN4base8internal20PostTaskAndReplyImpl16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEESA_
+   fun:_ZN4base10WorkerPool16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEES9_b
+   fun:_ZN3net15CertVerifierJob5StartERK13scoped_refptrINS_14CertVerifyProcEERKS1_INS_15X509CertificateEERKSsSB_iRKS1_INS_6CRLSetEERKSt6vectorIS7_SaIS7_EE
+   fun:_ZN3net25MultiThreadedCertVerifier6VerifyEPNS_15X509CertificateERKSsS4_iPNS_6CRLSetEPNS_16CertVerifyResultERKN4base8CallbackIFviEEEP10scoped_ptrINS_12CertVerifier7RequestENS9_14DefaultDeleterISH_EEERKNS_11BoundNetLogE
+   fun:_ZN3net56MultiThreadedCertVerifierTest_CancelRequestThenQuit_Test8TestBodyEv
+}
+{
+   bug_522524
+   Memcheck:Leak
+   fun:calloc
+   ...
+   fun:CERT_NewTempCertificate
+   fun:_ZN3net15X509Certificate39CreateOSCertHandleFromBytesWithNicknameEPKciS2_
+   fun:_ZN3net15X509Certificate27CreateOSCertHandleFromBytesEPKci
+   fun:_ZN3net15X509Certificate30CreateCertificateListFromBytesEPKcii
+   fun:_ZN3net18ImportCertFromFileERKN4base8FilePathERKSs
+   fun:_ZN3net59CertVerifyProcTest_IsIssuedByKnownRootIgnoresTestRoots_Test8TestBodyEv
+}
+{
+   bug_522620
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN3IPC11SyncChannel23CreateSyncMessageFilterEv
+   fun:_ZN7content14GpuChannelHost7ConnectERKN3IPC13ChannelHandleEPN4base13WaitableEventE
+   fun:_ZN7content14GpuChannelHost6CreateEPNS_21GpuChannelHostFactoryERKN3gpu7GPUInfoERKN3IPC13ChannelHandleEPN4base13WaitableEventEPNS3_22GpuMemoryBufferManagerE
+   fun:_ZN7content28BrowserGpuChannelHostFactory21GpuChannelEstablishedEv
+   fun:_ZN7content28BrowserGpuChannelHostFactory16EstablishRequest12FinishOnMainEv
+}
+{
+   bug_525328
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN9__gnu_cxx13new_allocatorISt13_Rb_tree_nodeISt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEEEE8allocateEmPKv
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEESt10_Select1stIS6_ESt4lessISsESaIS6_EE11_M_get_nodeEv
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEESt10_Select1stIS6_ESt4lessISsESaIS6_EE14_M_create_nodeIJS6_EEEPSt13_Rb_tree_nodeIS6_EDpOT_
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEESt10_Select1stIS6_ESt4lessISsESaIS6_EE10_M_insert_IS6_EESt17_Rb_tree_iteratorIS6_EPKSt18_Rb_tree_node_baseSI_OT_
 }

@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.toolbar;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
@@ -25,12 +26,9 @@ import android.widget.TextView;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.ContextualMenuBar.ActionBarDelegate;
-import org.chromium.chrome.browser.CustomSelectionActionModeCallback;
 import org.chromium.chrome.browser.WebsiteSettingsPopup;
 import org.chromium.chrome.browser.WindowDelegate;
 import org.chromium.chrome.browser.appmenu.AppMenuButtonHelper;
-import org.chromium.chrome.browser.document.BrandColorUtils;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerServiceFactory;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerTabUtils;
 import org.chromium.chrome.browser.ntp.NativePageFactory;
@@ -43,6 +41,8 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.toolbar.ActionModeController.ActionBarDelegate;
+import org.chromium.chrome.browser.util.ColorUtils;
 import org.chromium.chrome.browser.widget.TintedDrawable;
 import org.chromium.components.dom_distiller.core.DomDistillerService;
 import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
@@ -114,8 +114,9 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
             public void onClick(View v) {
                 Tab currentTab = getToolbarDataProvider().getTab();
                 if (currentTab == null || currentTab.getWebContents() == null) return;
-
-                WebsiteSettingsPopup.show(getContext(), currentTab.getProfile(),
+                Activity activity = currentTab.getWindowAndroid().getActivity().get();
+                if (activity == null) return;
+                WebsiteSettingsPopup.show(activity, currentTab.getProfile(),
                         currentTab.getWebContents());
             }
         });
@@ -161,6 +162,11 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     @VisibleForTesting
     public ImageButton getCustomActionButtonForTest() {
         return mCustomActionButton;
+    }
+
+    @Override
+    public int getTabStripHeight() {
+        return 0;
     }
 
     @Override
@@ -212,8 +218,11 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
 
         String url = getCurrentTab().getUrl().trim();
 
-        if (NativePageFactory.isNativePageUrl(url, getCurrentTab().isIncognito())) {
-            // Don't show anything for Chrome URLs.
+        // Don't show anything for Chrome URLs and "about:blank".
+        // If we have taken a pre-initialized WebContents, then the starting URL
+        // is "about:blank". We should not display it.
+        if (NativePageFactory.isNativePageUrl(url, getCurrentTab().isIncognito())
+                || "about:blank".equals(url)) {
             mUrlBar.setUrl("", null);
             return;
         }
@@ -305,11 +314,6 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     }
 
     @Override
-    public View getMenuAnchor() {
-        return mMenuButton;
-    }
-
-    @Override
     protected void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
         setTitleToPageTitle();
@@ -357,7 +361,7 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
         if (mBackgroundColorSet) return;
         int primaryColor = getToolbarDataProvider().getPrimaryColor();
         getBackground().setColor(primaryColor);
-        mUseDarkColors = !BrandColorUtils.shouldUseLightDrawablesForToolbar(primaryColor);
+        mUseDarkColors = !ColorUtils.shoudUseLightForegroundOnBackground(primaryColor);
         updateVisualsForState();
         mBackgroundColorSet = true;
     }
@@ -368,7 +372,7 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     }
 
     @Override
-    public void setDefaultTextEditActionModeCallback(CustomSelectionActionModeCallback callback) {
+    public void setDefaultTextEditActionModeCallback(ToolbarActionModeCallback callback) {
         mUrlBar.setCustomSelectionActionModeCallback(callback);
     }
 

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/id_map.h"
+#include "base/memory/scoped_vector.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
 #include "content/browser/service_worker/service_worker_registration_status.h"
@@ -64,9 +65,8 @@ class CONTENT_EXPORT ServiceWorkerDispatcherHost : public BrowserMessageFilter {
   ServiceWorkerHandle* FindServiceWorkerHandle(int provider_id,
                                                int64 version_id);
 
-  // Returns the existing registration handle whose reference count is
-  // incremented or newly created one if it doesn't exist.
-  ServiceWorkerRegistrationHandle* GetOrCreateRegistrationHandle(
+  // Creates a new registration handle and registers it.
+  ServiceWorkerRegistrationHandle* CreateRegistrationHandle(
       base::WeakPtr<ServiceWorkerProviderHost> provider_host,
       ServiceWorkerRegistration* registration);
 
@@ -135,10 +135,6 @@ class CONTENT_EXPORT ServiceWorkerDispatcherHost : public BrowserMessageFilter {
       const std::vector<TransferredMessagePort>& sent_message_ports);
   void OnServiceWorkerObjectDestroyed(int handle_id);
   void OnTerminateWorker(int handle_id);
-
-  ServiceWorkerRegistrationHandle* FindRegistrationHandle(
-      int provider_id,
-      int64 registration_id);
 
   void GetRegistrationObjectInfoAndVersionAttributes(
       base::WeakPtr<ServiceWorkerProviderHost> provider_host,

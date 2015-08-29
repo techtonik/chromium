@@ -201,24 +201,6 @@ void SingleThreadProxy::SetNeedsUpdateLayers() {
   SetNeedsCommit();
 }
 
-void SingleThreadProxy::DoAnimate() {
-  // Don't animate if there is no root layer.
-  // TODO(mithro): Both Animate and UpdateAnimationState already have a
-  // "!active_tree_->root_layer()" check?
-  if (!layer_tree_host_impl_->active_tree()->root_layer()) {
-    return;
-  }
-
-  layer_tree_host_impl_->Animate(
-      layer_tree_host_impl_->CurrentBeginFrameArgs().frame_time);
-
-  // If animations are not visible, update the animation state now as it
-  // won't happen in DoComposite.
-  if (!layer_tree_host_impl_->AnimationsAreVisible()) {
-    layer_tree_host_impl_->UpdateAnimationState(true);
-  }
-}
-
 void SingleThreadProxy::DoCommit() {
   TRACE_EVENT0("cc", "SingleThreadProxy::DoCommit");
   DCHECK(Proxy::IsMainThread());
@@ -274,6 +256,11 @@ void SingleThreadProxy::DoCommit() {
     DCHECK_EQ(1.f, scroll_info->page_scale_delta);
 #endif
 
+    if (scheduler_on_impl_thread_)
+      scheduler_on_impl_thread_->DidCommit();
+
+    layer_tree_host_impl_->CommitComplete();
+
     // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
     // is fixed.
     tracked_objects::ScopedTracker tracking_profile8(
@@ -289,16 +276,11 @@ void SingleThreadProxy::DoCommit() {
 }
 
 void SingleThreadProxy::CommitComplete() {
+  // Commit complete happens on the main side after activate to satisfy any
+  // SetNextCommitWaitsForActivation calls.
   DCHECK(!layer_tree_host_impl_->pending_tree())
       << "Activation is expected to have synchronously occurred by now.";
   DCHECK(commit_blocking_task_runner_);
-
-  if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->DidCommit();
-
-  // Notify commit complete on the impl side after activate to satisfy any
-  // SetNextCommitWaitsForActivation calls.
-  layer_tree_host_impl_->CommitComplete();
 
   DebugScopedSetMainThread main(this);
   commit_blocking_task_runner_.reset();
@@ -593,7 +575,8 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
     layer_tree_host_impl_->PrepareTiles();
     layer_tree_host_impl_->SynchronouslyInitializeAllTiles();
 
-    DoAnimate();
+    // TODO(danakj): Don't do this last... we prepared the wrong things. D:
+    layer_tree_host_impl_->Animate();
 
     LayerTreeHostImpl::FrameData frame;
     DoComposite(&frame);
@@ -881,7 +864,7 @@ void SingleThreadProxy::ScheduledActionCommit() {
 void SingleThreadProxy::ScheduledActionAnimate() {
   TRACE_EVENT0("cc", "ScheduledActionAnimate");
   DebugScopedSetImplThread impl(this);
-  DoAnimate();
+  layer_tree_host_impl_->Animate();
 }
 
 void SingleThreadProxy::ScheduledActionActivateSyncTree() {

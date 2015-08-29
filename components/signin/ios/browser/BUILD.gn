@@ -2,8 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-static_library("browser") {
+source_set("browser") {
   sources = [
+    "account_consistency_service.h",
+    "account_consistency_service.mm",
     "merge_session_observer_bridge.h",
     "merge_session_observer_bridge.mm",
     "oauth2_token_service_observer_bridge.h",
@@ -14,11 +16,12 @@ static_library("browser") {
   ]
 
   deps = [
+    "//ios/web",
     "//signin/core/browser",
   ]
 }
 
-static_library("test_support") {
+source_set("test_support") {
   testonly = true
   sources = [
     "fake_profile_oauth2_token_service_ios_delegate.h",
@@ -27,9 +30,23 @@ static_library("test_support") {
     "fake_profile_oauth2_token_service_ios_provider.mm",
   ]
 
-  deps = [
+  public_deps = [
+    ":browser",
     "//base",
     "//google_apis:test_support",
-    ":browser",
+  ]
+}
+
+source_set("unit_tests") {
+  testonly = true
+  sources = [
+    "account_consistency_service_unittest.mm",
+    "profile_oauth2_token_service_ios_delegate_unittest.mm",
+  ]
+
+  deps = [
+    ":test_support",
+    "//ios/web",
+    "//third_party/ocmock",
   ]
 }

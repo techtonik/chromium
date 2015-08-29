@@ -451,7 +451,7 @@ bool RenderFrameHostImpl::OnMessageReceived(const IPC::Message &msg) {
                                     OnRunBeforeUnloadConfirm)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidAccessInitialDocument,
                         OnDidAccessInitialDocument)
-    IPC_MESSAGE_HANDLER(FrameHostMsg_DidDisownOpener, OnDidDisownOpener)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidChangeOpener, OnDidChangeOpener)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidChangeName, OnDidChangeName)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidAssignPageId, OnDidAssignPageId)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidChangeSandboxFlags,
@@ -1262,24 +1262,9 @@ void RenderFrameHostImpl::OnDidAccessInitialDocument() {
   delegate_->DidAccessInitialDocument();
 }
 
-void RenderFrameHostImpl::OnDidDisownOpener() {
-  // This message is only sent for top-level frames for now.
-  // TODO(alexmos):  This should eventually support subframe openers as well,
-  // and it should allow openers to be updated to another frame (which can
-  // happen via window.open('','framename')) in addition to being disowned.
-
-  // No action is necessary if the opener has already been cleared.
-  if (!frame_tree_node_->opener())
-    return;
-
-  // Clear our opener so that future cross-process navigations don't have an
-  // opener assigned.
-  frame_tree_node_->SetOpener(nullptr);
-
-  // Notify all other RenderFrameHosts and RenderFrameProxies for this frame.
-  // This is important in case we go back to them, or if another window in
-  // those processes tries to access window.opener.
-  frame_tree_node_->render_manager()->DidDisownOpener(this);
+void RenderFrameHostImpl::OnDidChangeOpener(int32 opener_routing_id) {
+  frame_tree_node_->render_manager()->DidChangeOpener(opener_routing_id,
+                                                      GetSiteInstance());
 }
 
 void RenderFrameHostImpl::OnDidChangeName(const std::string& name) {
@@ -1671,6 +1656,8 @@ void RenderFrameHostImpl::Navigate(
     const StartNavigationParams& start_params,
     const RequestNavigationParams& request_params) {
   TRACE_EVENT0("navigation", "RenderFrameHostImpl::Navigate");
+  DCHECK(!base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kEnableBrowserSideNavigation));
 
   UpdatePermissionsForNavigation(common_params, request_params);
 
@@ -1708,12 +1695,19 @@ void RenderFrameHostImpl::Navigate(
     frame_tree_node_->DidStartLoading(true);
 }
 
-void RenderFrameHostImpl::NavigateToURL(const GURL& url) {
+void RenderFrameHostImpl::NavigateToInterstitialURL(const GURL& data_url) {
+  DCHECK(data_url.SchemeIs(url::kDataScheme));
   CommonNavigationParams common_params(
-      url, Referrer(), ui::PAGE_TRANSITION_LINK, FrameMsg_Navigate_Type::NORMAL,
-      true, false, base::TimeTicks::Now(),
+      data_url, Referrer(), ui::PAGE_TRANSITION_LINK,
+      FrameMsg_Navigate_Type::NORMAL, false, false, base::TimeTicks::Now(),
       FrameMsg_UILoadMetricsReportType::NO_REPORT, GURL(), GURL());
-  Navigate(common_params, StartNavigationParams(), RequestNavigationParams());
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableBrowserSideNavigation)) {
+    CommitNavigation(nullptr, nullptr, common_params,
+                     RequestNavigationParams());
+  } else {
+    Navigate(common_params, StartNavigationParams(), RequestNavigationParams());
+  }
 }
 
 void RenderFrameHostImpl::OpenURL(const FrameHostMsg_OpenURL_Params& params,
@@ -1779,8 +1773,18 @@ bool RenderFrameHostImpl::ShouldDispatchBeforeUnload() {
   return !GetParent() && IsRenderFrameLive();
 }
 
-void RenderFrameHostImpl::DisownOpener() {
-  Send(new FrameMsg_DisownOpener(GetRoutingID()));
+void RenderFrameHostImpl::UpdateOpener() {
+  // This frame (the frame whose opener is being updated) might not have had
+  // proxies for the new opener chain in its SiteInstance.  Make sure they
+  // exist.
+  if (frame_tree_node_->opener()) {
+    frame_tree_node_->opener()->render_manager()->CreateOpenerProxies(
+        GetSiteInstance());
+  }
+
+  int opener_routing_id =
+      frame_tree_node_->render_manager()->GetOpenerRoutingID(GetSiteInstance());
+  Send(new FrameMsg_UpdateOpener(GetRoutingID(), opener_routing_id));
 }
 
 void RenderFrameHostImpl::ExtendSelectionAndDelete(size_t before,

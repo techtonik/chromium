@@ -85,7 +85,6 @@ const char kChromeUIUberURL[] = "chrome://chrome/";
 const char kChromeUIUberFrameURL[] = "chrome://uber-frame/";
 const char kChromeUIUserActionsURL[] = "chrome://user-actions/";
 const char kChromeUIVersionURL[] = "chrome://version/";
-const char kChromeUIVoiceSearchURL[] = "chrome://voicesearch/";
 
 #if defined(OS_ANDROID)
 const char kChromeUIContextualSearchPromoURL[] =
@@ -249,7 +248,6 @@ const char kChromeUIUberFrameHost[] = "uber-frame";
 const char kChromeUIUberHost[] = "chrome";
 const char kChromeUIUserActionsHost[] = "user-actions";
 const char kChromeUIVersionHost[] = "version";
-const char kChromeUIVoiceSearchHost[] = "voicesearch";
 const char kChromeUIWebRTCDeviceProviderHost[] =
     "webrtc-device-provider";
 const char kChromeUIWorkersHost[] = "workers";
@@ -297,6 +295,7 @@ const char kChromeUISimUnlockHost[] = "sim-unlock";
 const char kChromeUISlowHost[] = "slow";
 const char kChromeUISlowTraceHost[] = "slow_trace";
 const char kChromeUIUserImageHost[] = "userimage";
+const char kChromeUIVoiceSearchHost[] = "voicesearch";
 
 const char kEULAPathFormat[] = "/usr/share/chromeos-assets/eula/%s/eula.html";
 const char kOemEulaURLPath[] = "oem";
@@ -439,9 +438,10 @@ const char kResetProfileSettingsLearnMoreURL[] =
 const char kAutomaticSettingsResetLearnMoreURL[] =
     "https://support.google.com/chrome/?p=ui_automatic_settings_reset";
 
-const char kSupervisedUserManagementURL[] = "https://www.chrome.com/manage";
-
-const char kSupervisedUserManagementDisplayURL[] = "www.chrome.com/manage";
+const char kLegacySupervisedUserManagementURL[] =
+    "https://www.chrome.com/manage";
+const char kLegacySupervisedUserManagementDisplayURL[] =
+    "www.chrome.com/manage";
 
 const char kSettingsSearchHelpURL[] =
 #if defined(OS_CHROMEOS)
@@ -615,7 +615,6 @@ const char* const kChromeHostURLs[] = {
   kChromeUITranslateInternalsHost,
   kChromeUIUserActionsHost,
   kChromeUIVersionHost,
-  kChromeUIVoiceSearchHost,
   content::kChromeUIAccessibilityHost,
   content::kChromeUIAppCacheInternalsHost,
   content::kChromeUIBlobInternalsHost,
@@ -628,7 +627,9 @@ const char* const kChromeHostURLs[] = {
   content::kChromeUITracingHost,
   content::kChromeUIWebRTCInternalsHost,
 #if !defined(OS_ANDROID)
+#if !defined(OS_CHROMEOS)
   kChromeUIAppLauncherPageHost,
+#endif
   kChromeUIBookmarksHost,
   kChromeUIDownloadsHost,
   kChromeUIFlashHost,
@@ -660,6 +661,7 @@ const char* const kChromeHostURLs[] = {
   kChromeUIOSCreditsHost,
   kChromeUIPowerHost,
   kChromeUIProxySettingsHost,
+  kChromeUIVoiceSearchHost,
 #endif
 #if defined(OS_WIN) || defined(OS_CHROMEOS)
   kChromeUIDiscardsHost,

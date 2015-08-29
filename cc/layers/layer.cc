@@ -24,6 +24,7 @@
 #include "cc/layers/scrollbar_layer_interface.h"
 #include "cc/output/copy_output_request.h"
 #include "cc/output/copy_output_result.h"
+#include "cc/trees/draw_property_utils.h"
 #include "cc/trees/layer_tree_host.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "third_party/skia/include/core/SkImageFilter.h"
@@ -51,11 +52,10 @@ Layer::Layer(const LayerSettings& settings)
       scroll_clip_layer_id_(INVALID_ID),
       num_descendants_that_draw_content_(0),
       transform_tree_index_(-1),
-      opacity_tree_index_(-1),
+      effect_tree_index_(-1),
       clip_tree_index_(-1),
       property_tree_sequence_number_(-1),
       num_layer_or_descendants_with_copy_request_(0),
-      num_layer_or_descendants_with_input_handler_(0),
       num_children_with_scroll_parent_(0),
       should_flatten_transform_from_property_tree_(false),
       is_clipped_(false),
@@ -81,6 +81,7 @@ Layer::Layer(const LayerSettings& settings)
       background_color_(0),
       opacity_(1.f),
       blend_mode_(SkXfermode::kSrcOver_Mode),
+      draw_blend_mode_(SkXfermode::kSrcOver_Mode),
       scroll_parent_(nullptr),
       layer_or_descendant_is_drawn_tracker_(0),
       sorted_for_recursion_tracker_(0),
@@ -88,6 +89,7 @@ Layer::Layer(const LayerSettings& settings)
       clip_parent_(nullptr),
       replica_layer_(nullptr),
       client_(nullptr),
+      num_unclipped_descendants_(0),
       frame_timing_requests_dirty_(false) {
   if (!settings.use_compositor_animation_timelines) {
     layer_animation_controller_ = LayerAnimationController::Create(layer_id_);
@@ -423,8 +425,6 @@ void Layer::UpdateNumCopyRequestsForSubtree(bool add) {
   int change = add ? 1 : -1;
   for (Layer* layer = this; layer; layer = layer->parent()) {
     layer->num_layer_or_descendants_with_copy_request_ += change;
-    layer->draw_properties().layer_or_descendant_has_copy_request =
-        (layer->num_layer_or_descendants_with_copy_request_ != 0);
     DCHECK_GE(layer->num_layer_or_descendants_with_copy_request_, 0);
   }
 }
@@ -761,6 +761,30 @@ bool Layer::HasPotentiallyRunningTransformAnimation() const {
   return layer_tree_host_->HasPotentiallyRunningTransformAnimation(this);
 }
 
+bool Layer::HasOnlyTranslationTransforms() const {
+  if (layer_animation_controller_) {
+    return layer_animation_controller_->HasOnlyTranslationTransforms(
+        LayerAnimationController::ObserverType::ACTIVE);
+  }
+  return layer_tree_host_->HasOnlyTranslationTransforms(this);
+}
+
+bool Layer::MaximumTargetScale(float* max_scale) const {
+  if (layer_animation_controller_) {
+    return layer_animation_controller_->MaximumTargetScale(
+        LayerAnimationController::ObserverType::ACTIVE, max_scale);
+  }
+  return layer_tree_host_->MaximumTargetScale(this, max_scale);
+}
+
+bool Layer::AnimationStartScale(float* start_scale) const {
+  if (layer_animation_controller_) {
+    return layer_animation_controller_->AnimationStartScale(
+        LayerAnimationController::ObserverType::ACTIVE, start_scale);
+  }
+  return layer_tree_host_->AnimationStartScale(this, start_scale);
+}
+
 bool Layer::HasAnyAnimationTargetingProperty(
     Animation::TargetProperty property) const {
   if (layer_animation_controller_)
@@ -799,7 +823,6 @@ void Layer::AddScrollChild(Layer* child) {
   scroll_children_->insert(child);
   if (layer_tree_host_ && !layer_tree_host_->needs_meta_info_recomputation()) {
     num_children_with_scroll_parent_++;
-    draw_properties().has_child_with_a_scroll_parent = true;
   }
   SetNeedsCommit();
 }
@@ -811,8 +834,6 @@ void Layer::RemoveScrollChild(Layer* child) {
   if (layer_tree_host_ && !layer_tree_host_->needs_meta_info_recomputation()) {
     num_children_with_scroll_parent_--;
     DCHECK_GE(num_children_with_scroll_parent_, 0);
-    draw_properties().has_child_with_a_scroll_parent =
-        (num_children_with_scroll_parent_ != 0);
   }
   SetNeedsCommit();
 }
@@ -948,22 +969,9 @@ void Layer::SetHaveWheelEventHandlers(bool have_wheel_event_handlers) {
   DCHECK(IsPropertyChangeAllowed());
   if (have_wheel_event_handlers_ == have_wheel_event_handlers)
     return;
-  if (touch_event_handler_region_.IsEmpty() && layer_tree_host_ &&
-      !layer_tree_host_->needs_meta_info_recomputation())
-    UpdateNumInputHandlersForSubtree(have_wheel_event_handlers);
 
   have_wheel_event_handlers_ = have_wheel_event_handlers;
   SetNeedsCommit();
-}
-
-void Layer::UpdateNumInputHandlersForSubtree(bool add) {
-  int change = add ? 1 : -1;
-  for (Layer* layer = this; layer; layer = layer->parent()) {
-    layer->num_layer_or_descendants_with_input_handler_ += change;
-    layer->draw_properties().layer_or_descendant_has_input_handler =
-        (layer->num_layer_or_descendants_with_input_handler_ != 0);
-    DCHECK_GE(layer->num_layer_or_descendants_with_input_handler_, 0);
-  }
 }
 
 void Layer::SetHaveScrollEventHandlers(bool have_scroll_event_handlers) {
@@ -986,9 +994,6 @@ void Layer::SetTouchEventHandlerRegion(const Region& region) {
   DCHECK(IsPropertyChangeAllowed());
   if (touch_event_handler_region_ == region)
     return;
-  if (!have_wheel_event_handlers_ && layer_tree_host_ &&
-      !layer_tree_host_->needs_meta_info_recomputation())
-    UpdateNumInputHandlersForSubtree(!region.IsEmpty());
 
   touch_event_handler_region_ = region;
   SetNeedsCommit();
@@ -1060,28 +1065,28 @@ int Layer::clip_tree_index() const {
   return clip_tree_index_;
 }
 
-void Layer::SetOpacityTreeIndex(int index) {
+void Layer::SetEffectTreeIndex(int index) {
   DCHECK(IsPropertyChangeAllowed());
-  if (opacity_tree_index_ == index)
+  if (effect_tree_index_ == index)
     return;
-  opacity_tree_index_ = index;
+  effect_tree_index_ = index;
   SetNeedsPushProperties();
 }
 
-int Layer::opacity_tree_index() const {
+int Layer::effect_tree_index() const {
   if (!layer_tree_host_ ||
       layer_tree_host_->property_trees()->sequence_number !=
           property_tree_sequence_number_) {
     return -1;
   }
-  return opacity_tree_index_;
+  return effect_tree_index_;
 }
 
 void Layer::InvalidatePropertyTreesIndices() {
   int invalid_property_tree_index = -1;
   SetTransformTreeIndex(invalid_property_tree_index);
   SetClipTreeIndex(invalid_property_tree_index);
-  SetOpacityTreeIndex(invalid_property_tree_index);
+  SetEffectTreeIndex(invalid_property_tree_index);
 }
 
 void Layer::SetShouldFlattenTransform(bool should_flatten) {
@@ -1183,7 +1188,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
     layer->SetDebugInfo(TakeDebugInfo());
 
   layer->SetTransformTreeIndex(transform_tree_index());
-  layer->SetOpacityTreeIndex(opacity_tree_index());
+  layer->SetEffectTreeIndex(effect_tree_index());
   layer->SetClipTreeIndex(clip_tree_index());
   layer->set_offset_to_transform_parent(offset_to_transform_parent_);
   layer->SetDoubleSided(double_sided_);
@@ -1215,6 +1220,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->set_should_flatten_transform_from_property_tree(
       should_flatten_transform_from_property_tree_);
   layer->set_is_clipped(is_clipped_);
+  layer->set_draw_blend_mode(draw_blend_mode_);
   layer->SetUseParentBackfaceVisibility(use_parent_backface_visibility_);
   if (!layer->TransformIsAnimatingOnImplOnly() && !TransformIsAnimating())
     layer->SetTransformAndInvertibility(transform_, transform_is_invertible_);
@@ -1393,10 +1399,6 @@ bool Layer::Update() {
   return false;
 }
 
-bool Layer::NeedMoreUpdates() {
-  return false;
-}
-
 bool Layer::IsSuitableForGpuRasterization() const {
   return true;
 }
@@ -1419,20 +1421,6 @@ void Layer::SetHasRenderSurface(bool has_render_surface) {
   layer_tree_host_->property_trees()->needs_rebuild = true;
 }
 
-void Layer::CreateRenderSurface() {
-  DCHECK(!render_surface_);
-  render_surface_ = make_scoped_ptr(new RenderSurface(this));
-}
-
-void Layer::ClearRenderSurface() {
-  render_surface_ = nullptr;
-}
-
-void Layer::ClearRenderSurfaceLayerList() {
-  if (render_surface_)
-    render_surface_->ClearLayerLists();
-}
-
 gfx::ScrollOffset Layer::ScrollOffsetForAnimation() const {
   return CurrentScrollOffset();
 }
@@ -1448,12 +1436,11 @@ void Layer::OnFilterAnimated(const FilterOperations& filters) {
 void Layer::OnOpacityAnimated(float opacity) {
   opacity_ = opacity;
   if (layer_tree_host_) {
-    if (OpacityNode* node =
-            layer_tree_host_->property_trees()->opacity_tree.Node(
-                opacity_tree_index())) {
+    if (EffectNode* node = layer_tree_host_->property_trees()->effect_tree.Node(
+            effect_tree_index())) {
       if (node->owner_id == id()) {
         node->data.opacity = opacity;
-        layer_tree_host_->property_trees()->opacity_tree.set_needs_update(true);
+        layer_tree_host_->property_trees()->effect_tree.set_needs_update(true);
       }
     }
   }
@@ -1501,6 +1488,25 @@ void Layer::OnTransformIsPotentiallyAnimatingChanged(bool is_animating) {
 
   if (node->owner_id == id()) {
     node->data.is_animated = is_animating;
+    if (is_animating) {
+      float maximum_target_scale = 0.f;
+      node->data.local_maximum_animation_target_scale =
+          MaximumTargetScale(&maximum_target_scale) ? maximum_target_scale
+                                                    : 0.f;
+
+      float animation_start_scale = 0.f;
+      node->data.local_starting_animation_scale =
+          AnimationStartScale(&animation_start_scale) ? animation_start_scale
+                                                      : 0.f;
+
+      node->data.has_only_translation_animations =
+          HasOnlyTranslationTransforms();
+
+    } else {
+      node->data.local_maximum_animation_target_scale = 0.f;
+      node->data.local_starting_animation_scale = 0.f;
+      node->data.has_only_translation_animations = true;
+    }
     transform_tree.set_needs_update(true);
   }
 }
@@ -1679,6 +1685,18 @@ void Layer::set_sorted_for_recursion(bool sorted_for_recursion) {
 bool Layer::sorted_for_recursion() {
   return sorted_for_recursion_tracker_ ==
          layer_tree_host()->meta_information_sequence_number();
+}
+
+gfx::Transform Layer::draw_transform() const {
+  DCHECK_NE(transform_tree_index_, -1);
+  return DrawTransformFromPropertyTrees(
+      this, layer_tree_host_->property_trees()->transform_tree);
+}
+
+gfx::Transform Layer::screen_space_transform() const {
+  DCHECK_NE(transform_tree_index_, -1);
+  return ScreenSpaceTransformFromPropertyTrees(
+      this, layer_tree_host_->property_trees()->transform_tree);
 }
 
 }  // namespace cc

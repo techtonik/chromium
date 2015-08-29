@@ -67,7 +67,9 @@ class CommandBufferClientImpl::SyncClientImpl
   }
 
   gpu::Capabilities GetCapabilities() {
-    return capabilities_.To<gpu::Capabilities>();
+    if (capabilities_)
+      return capabilities_.To<gpu::Capabilities>();
+    return gpu::Capabilities();
   }
 
  private:
@@ -312,7 +314,7 @@ int32_t CommandBufferClientImpl::CreateGpuMemoryBufferImage(
     unsigned usage) {
   scoped_ptr<gfx::GpuMemoryBuffer> buffer(MojoGpuMemoryBufferImpl::Create(
       gfx::Size(static_cast<int>(width), static_cast<int>(height)),
-      gpu::ImageFactory::ImageFormatToGpuMemoryBufferFormat(internalformat),
+      gpu::ImageFactory::DefaultBufferFormatForImageFormat(internalformat),
       gpu::ImageFactory::ImageUsageToGpuMemoryBufferUsage(usage)));
   if (!buffer)
     return -1;

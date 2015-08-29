@@ -14,6 +14,7 @@ group("all_components") {
   visibility = [ "//:*" ]  # Only for the root targets to bring in.
 
   deps = [
+    "//components/about_handler",
     "//components/auto_login_parser",
     "//components/autofill/content/browser",
     "//components/autofill/content/common",
@@ -22,6 +23,7 @@ group("all_components") {
     "//components/bookmarks/common",
     "//components/bookmarks/managed",
     "//components/bookmarks/test",
+    "//components/bubble",
     "//components/captive_portal",
     "//components/cdm/browser",
     "//components/cdm/common",
@@ -29,6 +31,7 @@ group("all_components") {
     "//components/cloud_devices/common",
     "//components/chrome_apps",
     "//components/component_updater",
+    "//components/compression",
     "//components/content_settings/core/browser",
     "//components/content_settings/core/common",
     "//components/crash/app",
@@ -60,10 +63,14 @@ group("all_components") {
     "//components/language_usage_metrics",
     "//components/leveldb_proto",
     "//components/login",
+    "//components/memory_pressure",
     "//components/metrics",
     "//components/mime_util",
     "//components/navigation_interception",
     "//components/navigation_metrics",
+    "//components/network_hints/browser",
+    "//components/network_hints/common",
+    "//components/network_hints/renderer",
     "//components/network_time",
     "//components/offline_pages",
     "//components/omnibox/browser",
@@ -106,7 +113,7 @@ group("all_components") {
     "//components/translate/content/renderer",
     "//components/translate/core/browser",
     "//components/translate/core/common",
-    "//components/ui/zoom:ui_zoom",
+    "//components/ui/zoom",
     "//components/undo",
     "//components/update_client",
     "//components/upload_list",
@@ -116,6 +123,7 @@ group("all_components") {
     "//components/user_prefs",
     "//components/user_prefs/tracked:user_prefs_tracked",
     "//components/variations",
+    "//components/variations/service",
     "//components/version_info",
     "//components/visitedlink/browser",
     "//components/visitedlink/common",
@@ -139,6 +147,7 @@ group("all_components") {
 
   if (!is_android && !is_ios) {
     deps += [
+      "//components/audio_modem",
       "//components/proximity_auth",
       "//components/proximity_auth/cryptauth",
     ]
@@ -166,6 +175,7 @@ group("all_components") {
     deps -= [
       "//components/history/content/browser",
       "//components/keyed_service/content",
+      "//components/network_hints/renderer",
     ]
   }
 
@@ -292,10 +302,12 @@ test("components_unittests") {
   deps = [
     "//components/auto_login_parser:unit_tests",
     "//components/autofill/content/browser:unit_tests",
+    "//components/autofill/content/renderer:unit_tests",
     "//components/autofill/core/browser:unit_tests",
     "//components/autofill/core/common:unit_tests",
     "//components/bookmarks/browser:unit_tests",
     "//components/bookmarks/managed:unit_tests",
+    "//components/bubble:unit_tests",
     "//components/captive_portal:unit_tests",
     "//components/cloud_devices/common:unit_tests",
     "//components/component_updater:unit_tests",
@@ -307,28 +319,62 @@ test("components_unittests") {
     "//components/data_reduction_proxy/core/common:unit_tests",
     "//components/device_event_log:unit_tests",
     "//components/devtools_http_handler:unit_tests",
+    "//components/dom_distiller/content:unit_tests",
     "//components/dom_distiller/core:unit_tests",
     "//components/domain_reliability:unit_tests",
+    "//components/enhanced_bookmarks:unit_tests",
+    "//components/favicon/content:unit_tests",
+    "//components/favicon/core:unit_tests",
     "//components/favicon_base:unit_tests",
     "//components/gcm_driver/crypto:unit_tests",
     "//components/gcm_driver/instance_id:unit_tests",
     "//components/gcm_driver:unit_tests",
     "//components/google/core/browser:unit_tests",
-    "//components/invalidation/impl:unittests",
+    "//components/history/content/browser:unit_tests",
+    "//components/history/core/browser:unit_tests",
+    "//components/history/core/common:unit_tests",
+    "//components/invalidation/impl:unit_tests",
+    "//components/json_schema:unit_tests",
+    "//components/keyed_service/content:unit_tests",
+    "//components/keyed_service/core:unit_tests",
+    "//components/language_usage_metrics:unit_tests",
+    "//components/leveldb_proto:unit_tests",
     "//components/login:unit_tests",
+    "//components/memory_pressure:unit_tests",
     "//components/metrics:unit_tests",
     "//components/mime_util:unit_tests",
+    "//components/network_time:unit_tests",
     "//components/offline_pages:unit_tests",
     "//components/omnibox/browser:unit_tests",
     "//components/open_from_clipboard:unit_tests",
+    "//components/os_crypt:unit_tests",
     "//components/packed_ct_ev_whitelist:unit_tests",
+    "//components/password_manager/content/browser:unit_tests",
+    "//components/password_manager/core/browser:unit_tests",
+    "//components/password_manager/core/common:unit_tests",
+    "//components/password_manager/sync/browser:unit_tests",
+    "//components/precache/content:unit_tests",
+    "//components/precache/core:unit_tests",
+    "//components/proxy_config:unit_tests",
+    "//components/query_parser:unit_tests",
+    "//components/rappor:unit_tests",
+    "//components/search:unit_tests",
+    "//components/search_engines:unit_tests",
+    "//components/search_provider_logos:unit_tests",
+    "//components/signin/core/browser:unit_tests",
+    "//components/suggestions:unit_tests",
     "//components/sync_driver:unit_tests",
+    "//components/translate/core/browser:unit_tests",
+    "//components/translate/core/common:unit_tests",
+    "//components/translate/core/language_detection:unit_tests",
     "//components/undo:unit_tests",
     "//components/url_formatter:unit_tests",
+    "//components/url_matcher:unit_tests",
     "//components/update_client:unit_tests",
     "//components/upload_list:unit_tests",
     "//components/user_prefs/tracked:unit_tests",
     "//components/variations:unit_tests",
+    "//components/wallpaper:unit_tests",
     "//components/web_resource:unit_tests",
     "//components/webcrypto:unit_tests",
     "//components/webdata/common:unit_tests",
@@ -360,11 +406,22 @@ test("components_unittests") {
     deps -= [
       "//components/gcm_driver:unit_tests",
       "//components/gcm_driver/instance_id:unit_tests",
+      "//components/password_manager/content/browser:unit_tests",
+      "//components/password_manager/core/browser:unit_tests",
+      "//components/password_manager/core/common:unit_tests",
+      "//components/password_manager/sync/browser:unit_tests",
     ]
   }
 
   if (!is_android && !is_ios) {
-    deps += [ "//components/proximity_auth:unit_tests" ]
+    deps += [
+      "//components/audio_modem:unit_tests",
+      "//components/copresence:unit_tests",
+      "//components/feedback:unit_tests",
+      "//components/proximity_auth:unit_tests",
+      "//components/sessions:unit_tests",
+      "//components/storage_monitor:unit_tests",
+    ]
   }
 
   if (is_chromeos) {
@@ -374,24 +431,45 @@ test("components_unittests") {
   # TODO(GYP) need this target.
   #'breakpad/app/crash_keys_win_unittest.cc',
 
-  # Precache tests need these defines.
-  #configs += [ "//components/precache/core:precache_config" ]
+  if (enable_configuration_policy) {
+    deps += [
+      "//components/policy/core/browser:unit_tests",
+      "//components/policy/core/common:unit_tests",
+    ]
+  }
 
   if (toolkit_views) {
-    # TODO(GYP) enable this as above.
+    # TODO bug 522654 Enable this when the undefined symbol is fixed in
+    # web_modal such that this links.
     #deps += [ "//components/constrained_window:unit_tests" ]
   }
   if (is_win) {
     deps += [ "//components/browser_watcher:unit_tests" ]
   }
   if (is_ios) {
+    deps += [ "//components/signin/core/browser:unit_tests" ]
     deps -= [ "//components/devtools_http_handler:unit_tests" ]
-  }
-
-  if (!is_ios) {
+  } else {
+    # Non-iOS tests.
     deps += [
+      "//components/error_page/renderer:unit_tests",
+      "//components/guest_view/browser:unit_tests",
+      "//components/navigation_interception:unit_tests",
+      "//components/network_hints/renderer:unit_tests",
+      "//components/power:unit_tests",
       "//components/safe_json:unit_tests",
       "//components/scheduler:unit_tests",
+      "//components/ui/zoom:unit_tests",
+      "//components/visitedlink/test:unit_tests",
+      "//components/web_cache/browser:unit_tests",
+    ]
+  }
+
+  if (enable_basic_printing || enable_print_preview) {
+    deps += [
+      "//components/printing/browser",
+      "//components/printing/common",
+      "//components/printing/renderer",
     ]
   }
 }
@@ -425,6 +503,7 @@ test("components_browsertests") {
     "autofill/content/renderer/password_form_conversion_utils_browsertest.cc",
     "dom_distiller/content/browser/distillable_page_utils_browsertest.cc",
     "dom_distiller/content/browser/distiller_page_web_contents_browsertest.cc",
+    "dom_distiller/content/browser/test/dom_distiller_js_browsertest.cc",
     "password_manager/content/renderer/credential_manager_client_browsertest.cc",
   ]
 
@@ -489,6 +568,11 @@ test("components_browsertests") {
       "pref_registry:test_support",
       "//base:prefs_test_support",
     ]
+  }
+
+  if (enable_basic_printing || enable_print_preview) {
+    sources += [ "printing/test/print_web_view_helper_browsertest.cc" ]
+    deps += [ "//components/printing/test:test_support" ]
   }
 }
 

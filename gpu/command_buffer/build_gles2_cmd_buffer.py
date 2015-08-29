@@ -812,6 +812,7 @@ _NAMED_TYPE_INFO = {
       'GL_DRAW_BUFFER15',
       'GL_DRAW_FRAMEBUFFER_BINDING',
       'GL_FRAGMENT_SHADER_DERIVATIVE_HINT',
+      'GL_GPU_DISJOINT_EXT',
       'GL_MAJOR_VERSION',
       'GL_MAX_3D_TEXTURE_SIZE',
       'GL_MAX_ARRAY_TEXTURE_LAYERS',
@@ -852,6 +853,7 @@ _NAMED_TYPE_INFO = {
       'GL_READ_BUFFER',
       'GL_READ_FRAMEBUFFER_BINDING',
       'GL_SAMPLER_BINDING',
+      'GL_TIMESTAMP_EXT',
       'GL_TEXTURE_BINDING_2D_ARRAY',
       'GL_TEXTURE_BINDING_3D',
       'GL_TRANSFORM_FEEDBACK_BINDING',
@@ -1258,7 +1260,6 @@ _NAMED_TYPE_INFO = {
       'GL_ANY_SAMPLES_PASSED_CONSERVATIVE_EXT',
       'GL_COMMANDS_ISSUED_CHROMIUM',
       'GL_LATENCY_QUERY_CHROMIUM',
-      'GL_ASYNC_PIXEL_UNPACK_COMPLETED_CHROMIUM',
       'GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM',
       'GL_COMMANDS_COMPLETED_CHROMIUM',
     ],
@@ -1506,11 +1507,12 @@ _NAMED_TYPE_INFO = {
       'GL_RGBA',
     ],
     'valid_es3': [
+      'GL_RED',
+      'GL_RED_INTEGER',
+      'GL_RG',
+      'GL_RG_INTEGER',
+      'GL_RGB_INTEGER',
       'GL_RGBA_INTEGER',
-    ],
-    'deprecated_es3': [
-      'GL_ALPHA',
-      'GL_RGB',
     ],
   },
   'PixelType': {
@@ -1598,19 +1600,15 @@ _NAMED_TYPE_INFO = {
       'GL_UNSIGNED_SHORT_4_4_4_4',
       'GL_UNSIGNED_SHORT_5_5_5_1',
     ],
-    'invalid': [
-      'GL_SHORT',
-    ],
     'valid_es3': [
+      'GL_BYTE',
+      'GL_UNSIGNED_SHORT',
+      'GL_SHORT',
       'GL_UNSIGNED_INT',
       'GL_INT',
+      'GL_HALF_FLOAT',
       'GL_FLOAT',
       'GL_UNSIGNED_INT_2_10_10_10_REV',
-    ],
-    'deprecated_es3': [
-      'GL_UNSIGNED_SHORT_5_6_5',
-      'GL_UNSIGNED_SHORT_4_4_4_4',
-      'GL_UNSIGNED_SHORT_5_5_5_1',
     ],
   },
   'RenderBufferFormat': {
@@ -1860,6 +1858,7 @@ _NAMED_TYPE_INFO = {
     'valid': [
       'GL_RGB',
       'GL_RGB_YUV_420_CHROMIUM',
+      'GL_RGB_YCBCR_422_CHROMIUM',
       'GL_RGBA',
     ],
   },
@@ -2228,12 +2227,16 @@ _FUNCTION_INFO = {
     'type': 'PUT',
     'use_count_func': True,
     'count': 4,
+    'decoder_func': 'DoClearBufferiv',
+    'unit_test': False,
     'unsafe': True,
     'trace_level': 2,
   },
   'ClearBufferuiv': {
     'type': 'PUT',
     'count': 4,
+    'decoder_func': 'DoClearBufferuiv',
+    'unit_test': False,
     'unsafe': True,
     'trace_level': 2,
   },
@@ -2241,11 +2244,15 @@ _FUNCTION_INFO = {
     'type': 'PUT',
     'use_count_func': True,
     'count': 4,
+    'decoder_func': 'DoClearBufferfv',
+    'unit_test': False,
     'unsafe': True,
     'trace_level': 2,
   },
   'ClearBufferfi': {
     'unsafe': True,
+    'decoder_func': 'DoClearBufferfi',
+    'unit_test': False,
     'trace_level': 2,
   },
   'ClearColor': {
@@ -3758,6 +3765,12 @@ _FUNCTION_INFO = {
     'extension': True,
     'chromium': True,
   },
+  'CompressedCopySubTextureCHROMIUM': {
+    'decoder_func': 'DoCompressedCopySubTextureCHROMIUM',
+    'unit_test': False,
+    'extension': True,
+    'chromium': True,
+  },
   'TexStorage2DEXT': {
     'unit_test': False,
     'extension': True,
@@ -3873,6 +3886,12 @@ _FUNCTION_INFO = {
     'gl_test_func': 'glQueryCounter',
     'extension': "disjoint_timer_query_EXT",
   },
+  'GetQueryObjectivEXT': {
+    'gen_cmd': False,
+    'client_test': False,
+    'gl_test_func': 'glGetQueryObjectiv',
+    'extension': "disjoint_timer_query_EXT",
+  },
   'GetQueryObjectuivEXT': {
     'gen_cmd': False,
     'client_test': False,
@@ -3880,11 +3899,25 @@ _FUNCTION_INFO = {
     'pepper_interface': 'Query',
     'extension': "occlusion_query_EXT",
   },
+  'GetQueryObjecti64vEXT': {
+    'gen_cmd': False,
+    'client_test': False,
+    'gl_test_func': 'glGetQueryObjecti64v',
+    'extension': "disjoint_timer_query_EXT",
+  },
   'GetQueryObjectui64vEXT': {
     'gen_cmd': False,
     'client_test': False,
     'gl_test_func': 'glGetQueryObjectui64v',
     'extension': "disjoint_timer_query_EXT",
+  },
+  'SetDisjointValueSyncCHROMIUM': {
+    'type': 'Manual',
+    'data_transfer_methods': ['shm'],
+    'client_test': False,
+    'cmd_args': 'void* sync_data',
+    'extension': True,
+    'chromium': True,
   },
   'BindUniformLocationCHROMIUM': {
     'type': 'GLchar',
@@ -3978,7 +4011,7 @@ _FUNCTION_INFO = {
   'OrderingBarrierCHROMIUM': {
     'impl_func': False,
     'gen_cmd': False,
-    'extension': True,
+    'extension': "CHROMIUM_miscellaneous",
     'chromium': True,
     'client_test': False,
   },
@@ -3997,51 +4030,6 @@ _FUNCTION_INFO = {
     'unit_test': False,
     'extension': True,
     'chromium': True,
-  },
-  'AsyncTexImage2DCHROMIUM': {
-    'type': 'Manual',
-    'data_transfer_methods': ['shm'],
-    'client_test': False,
-    'cmd_args': 'GLenumTextureTarget target, GLint level, '
-        'GLintTextureInternalFormat internalformat, '
-        'GLsizei width, GLsizei height, '
-        'GLintTextureBorder border, '
-        'GLenumTextureFormat format, GLenumPixelType type, '
-        'const void* pixels, '
-        'uint32_t async_upload_token, '
-        'void* sync_data',
-    'extension': True,
-    'chromium': True,
-    'trace_level': 2,
-  },
-  'AsyncTexSubImage2DCHROMIUM': {
-    'type': 'Manual',
-    'data_transfer_methods': ['shm'],
-    'client_test': False,
-    'cmd_args': 'GLenumTextureTarget target, GLint level, '
-        'GLint xoffset, GLint yoffset, '
-        'GLsizei width, GLsizei height, '
-        'GLenumTextureFormat format, GLenumPixelType type, '
-        'const void* data, '
-        'uint32_t async_upload_token, '
-        'void* sync_data',
-    'extension': True,
-    'chromium': True,
-    'trace_level': 2,
-  },
-  'WaitAsyncTexImage2DCHROMIUM': {
-    'type': 'Manual',
-    'client_test': False,
-    'extension': True,
-    'chromium': True,
-    'trace_level': 1,
-  },
-  'WaitAllAsyncTexImage2DCHROMIUM': {
-    'type': 'Manual',
-    'client_test': False,
-    'extension': True,
-    'chromium': True,
-    'trace_level': 1,
   },
   'DiscardFramebufferEXT': {
     'type': 'PUTn',
@@ -4437,6 +4425,15 @@ static_assert(offsetof(%(cmd_name)s::Result, %(field_name)s) == %(offset)d,
         if id_type == 'Sync':
           service_var = "service_%s" % service_var
           f.write("  GLsync %s = 0;\n" % service_var)
+        if id_type == 'Sampler' and func.IsType('Bind'):
+          # No error generated when binding a reserved zero sampler.
+          args = [arg.name for arg in func.GetOriginalArgs()]
+          f.write("""  if(%(var)s == 0) {
+    %(func)s(%(args)s);
+    return error::kNoError;
+  }""" % { 'var': id_type.lower(),
+           'func': func.GetGLFunctionName(),
+           'args': ", ".join(args) })
         if gen_func and id_type in gen_func:
           f.write(code_gen % { 'type': id_type,
                                   'var': id_type.lower(),

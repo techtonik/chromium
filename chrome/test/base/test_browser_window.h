@@ -85,6 +85,7 @@ class TestBrowserWindow : public BrowserWindow {
   void UpdateToolbar(content::WebContents* contents) override {}
   void ResetToolbarTabState(content::WebContents* contents) override {}
   void FocusToolbar() override {}
+  ToolbarActionsBar* GetToolbarActionsBar() override;
   void ToolbarSizeChanged(bool is_animating) override {}
   void FocusAppMenu() override {}
   void FocusBookmarksToolbar() override {}
@@ -174,7 +175,6 @@ class TestBrowserWindow : public BrowserWindow {
     bool ShowPageActionPopup(const extensions::Extension* extension,
                              bool grant_active_tab) override;
     void UpdateOpenPDFInReaderPrompt() override {}
-    void UpdateGeneratedCreditCardView() override {}
     void SaveStateToContents(content::WebContents* contents) override {}
     void Revert() override {}
     const OmniboxView* GetOmniboxView() const override;

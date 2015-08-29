@@ -45,6 +45,7 @@
     'ext/platform_device_linux.cc',
     'ext/platform_device_mac.cc',
     'ext/platform_device_win.cc',
+    'ext/discardable_image_utils.cc',
     'ext/recursive_gaussian_convolution.cc',
     'ext/SkDiscardableMemory_chrome.cc',
     'ext/SkMemory_new_handler.cpp',
@@ -55,6 +56,11 @@
     'ext/skia_utils_win.cc',
   ],
   'conditions': [
+    [ 'OS == "ios"', {
+      'sources!': [
+        'ext/platform_canvas.cc',
+      ],
+    }],
     [ 'OS == "android" and '
       'enable_basic_printing==0 and enable_print_preview==0', {
       'sources!': [

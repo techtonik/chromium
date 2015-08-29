@@ -80,7 +80,6 @@ extern const char kChromeUIUberURL[];
 extern const char kChromeUIUberFrameURL[];
 extern const char kChromeUIUserActionsURL[];
 extern const char kChromeUIVersionURL[];
-extern const char kChromeUIVoiceSearchURL[];
 
 #if defined(OS_ANDROID)
 extern const char kChromeUIContextualSearchPromoURL[];
@@ -235,7 +234,6 @@ extern const char kChromeUIUberFrameHost[];
 extern const char kChromeUIUberHost[];
 extern const char kChromeUIUserActionsHost[];
 extern const char kChromeUIVersionHost[];
-extern const char kChromeUIVoiceSearchHost[];
 extern const char kChromeUIWebRTCDeviceProviderHost[];
 extern const char kChromeUIWorkersHost[];
 
@@ -282,6 +280,7 @@ extern const char kChromeUISimUnlockHost[];
 extern const char kChromeUISlowHost[];
 extern const char kChromeUISlowTraceHost[];
 extern const char kChromeUIUserImageHost[];
+extern const char kChromeUIVoiceSearchHost[];
 
 extern const char kEULAPathFormat[];
 extern const char kOemEulaURLPath[];
@@ -381,12 +380,12 @@ extern const char kResetProfileSettingsLearnMoreURL[];
 // "Learn more" URL for when profile settings are automatically reset.
 extern const char kAutomaticSettingsResetLearnMoreURL[];
 
-// Management URL for the supervised users.
-extern const char kSupervisedUserManagementURL[];
+// Management URL for Chrome Supervised Users.
+extern const char kLegacySupervisedUserManagementURL[];
 
-// Management URL for the supervised users - version without scheme, used
+// Management URL for Chrome Supervised Users - version without scheme, used
 // for display.
-extern const char kSupervisedUserManagementDisplayURL[];
+extern const char kLegacySupervisedUserManagementDisplayURL[];
 
 // Help URL for the settings page's search feature.
 extern const char kSettingsSearchHelpURL[];

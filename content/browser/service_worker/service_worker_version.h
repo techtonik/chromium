@@ -28,7 +28,7 @@
 #include "content/common/service_worker/service_worker_types.h"
 #include "content/public/common/service_registry.h"
 #include "third_party/WebKit/public/platform/WebGeofencingEventType.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerEventResult.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerEventResult.h"
 
 // Windows headers will redefine SendMessage.
 #ifdef SendMessage
@@ -358,6 +358,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   typedef ServiceWorkerVersion self;
   using ServiceWorkerClients = std::vector<ServiceWorkerClientInfo>;
 
+  // Used for UMA; add new entries to the end, before NUM_REQUEST_TYPES.
   enum RequestType {
     REQUEST_ACTIVATE,
     REQUEST_INSTALL,
@@ -366,7 +367,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
     REQUEST_NOTIFICATION_CLICK,
     REQUEST_PUSH,
     REQUEST_GEOFENCING,
-    REQUEST_SERVICE_PORT_CONNECT
+    REQUEST_SERVICE_PORT_CONNECT,
+    NUM_REQUEST_TYPES
   };
 
   struct RequestInfo {
@@ -496,8 +498,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void GetNonWindowClients(int request_id,
                            const ServiceWorkerClientQueryOptions& options,
                            ServiceWorkerClients* clients);
-  void OnGetClientsFinished(int request_id,
-                            const ServiceWorkerClients& clients);
+  void OnGetClientsFinished(int request_id, ServiceWorkerClients* clients);
 
   // The timeout timer periodically calls OnTimeoutTimer, which stops the worker
   // if it is excessively idle or unresponsive to ping.
@@ -551,6 +552,11 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // as cleans up the dispatcher.
   void OnServicePortDispatcherConnectionError();
   void OnBackgroundSyncDispatcherConnectionError();
+
+  // Called at the beginning of each Dispatch*Event function: records
+  // the time elapsed since idle (generally the time since the previous
+  // event ended).
+  void OnBeginEvent();
 
   const int64 version_id_;
   const int64 registration_id_;
@@ -624,6 +630,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   scoped_ptr<PingController> ping_controller_;
   scoped_ptr<Metrics> metrics_;
+  const bool should_exclude_from_uma_ = false;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
 

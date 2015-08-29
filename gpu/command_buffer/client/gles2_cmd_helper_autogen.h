@@ -2283,6 +2283,15 @@ void EndTransformFeedback() {
   }
 }
 
+void SetDisjointValueSyncCHROMIUM(uint32_t sync_data_shm_id,
+                                  uint32_t sync_data_shm_offset) {
+  gles2::cmds::SetDisjointValueSyncCHROMIUM* c =
+      GetCmdSpace<gles2::cmds::SetDisjointValueSyncCHROMIUM>();
+  if (c) {
+    c->Init(sync_data_shm_id, sync_data_shm_offset);
+  }
+}
+
 void InsertEventMarkerEXT(GLuint bucket_id) {
   gles2::cmds::InsertEventMarkerEXT* c =
       GetCmdSpace<gles2::cmds::InsertEventMarkerEXT>();
@@ -2528,6 +2537,22 @@ void CompressedCopyTextureCHROMIUM(GLenum target,
   }
 }
 
+void CompressedCopySubTextureCHROMIUM(GLenum target,
+                                      GLenum source_id,
+                                      GLenum dest_id,
+                                      GLint xoffset,
+                                      GLint yoffset,
+                                      GLint x,
+                                      GLint y,
+                                      GLsizei width,
+                                      GLsizei height) {
+  gles2::cmds::CompressedCopySubTextureCHROMIUM* c =
+      GetCmdSpace<gles2::cmds::CompressedCopySubTextureCHROMIUM>();
+  if (c) {
+    c->Init(target, source_id, dest_id, xoffset, yoffset, x, y, width, height);
+  }
+}
+
 void DrawArraysInstancedANGLE(GLenum mode,
                               GLint first,
                               GLsizei count,
@@ -2698,65 +2723,6 @@ void TraceBeginCHROMIUM(GLuint category_bucket_id, GLuint name_bucket_id) {
 void TraceEndCHROMIUM() {
   gles2::cmds::TraceEndCHROMIUM* c =
       GetCmdSpace<gles2::cmds::TraceEndCHROMIUM>();
-  if (c) {
-    c->Init();
-  }
-}
-
-void AsyncTexSubImage2DCHROMIUM(GLenum target,
-                                GLint level,
-                                GLint xoffset,
-                                GLint yoffset,
-                                GLsizei width,
-                                GLsizei height,
-                                GLenum format,
-                                GLenum type,
-                                uint32_t data_shm_id,
-                                uint32_t data_shm_offset,
-                                uint32_t async_upload_token,
-                                uint32_t sync_data_shm_id,
-                                uint32_t sync_data_shm_offset) {
-  gles2::cmds::AsyncTexSubImage2DCHROMIUM* c =
-      GetCmdSpace<gles2::cmds::AsyncTexSubImage2DCHROMIUM>();
-  if (c) {
-    c->Init(target, level, xoffset, yoffset, width, height, format, type,
-            data_shm_id, data_shm_offset, async_upload_token, sync_data_shm_id,
-            sync_data_shm_offset);
-  }
-}
-
-void AsyncTexImage2DCHROMIUM(GLenum target,
-                             GLint level,
-                             GLint internalformat,
-                             GLsizei width,
-                             GLsizei height,
-                             GLenum format,
-                             GLenum type,
-                             uint32_t pixels_shm_id,
-                             uint32_t pixels_shm_offset,
-                             uint32_t async_upload_token,
-                             uint32_t sync_data_shm_id,
-                             uint32_t sync_data_shm_offset) {
-  gles2::cmds::AsyncTexImage2DCHROMIUM* c =
-      GetCmdSpace<gles2::cmds::AsyncTexImage2DCHROMIUM>();
-  if (c) {
-    c->Init(target, level, internalformat, width, height, format, type,
-            pixels_shm_id, pixels_shm_offset, async_upload_token,
-            sync_data_shm_id, sync_data_shm_offset);
-  }
-}
-
-void WaitAsyncTexImage2DCHROMIUM(GLenum target) {
-  gles2::cmds::WaitAsyncTexImage2DCHROMIUM* c =
-      GetCmdSpace<gles2::cmds::WaitAsyncTexImage2DCHROMIUM>();
-  if (c) {
-    c->Init(target);
-  }
-}
-
-void WaitAllAsyncTexImage2DCHROMIUM() {
-  gles2::cmds::WaitAllAsyncTexImage2DCHROMIUM* c =
-      GetCmdSpace<gles2::cmds::WaitAllAsyncTexImage2DCHROMIUM>();
   if (c) {
     c->Init();
   }

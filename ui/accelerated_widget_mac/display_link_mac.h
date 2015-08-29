@@ -24,18 +24,17 @@ class ACCELERATED_WIDGET_MAC_EXPORT DisplayLinkMac :
   static scoped_refptr<DisplayLinkMac> GetForDisplay(
       CGDirectDisplayID display_id);
 
-  CGDirectDisplayID display_id() const { return display_id_; }
-
   // Get vsync scheduling parameters.
   bool GetVSyncParameters(
       base::TimeTicks* timebase,
       base::TimeDelta* interval);
 
-  // Return the time of |interval_fraction| of the way through the next
-  // vsync period that starts after |from|. If the vsync parameters have
-  // not yet been computed, return |from|.
-  base::TimeTicks GetNextVSyncTimeAfter(
-      const base::TimeTicks& from, double interval_fraction);
+  // The vsync parameters are cached, because re-computing them is expensive.
+  // The parameters also skew over time (astonishingly quickly -- 0.1 msec per
+  // second), so, use this method to tell the display link the current time.
+  // If too much time has elapsed since the last time the vsync parameters were
+  // calculated, re-calculate them.
+  void NotifyCurrentTime(const base::TimeTicks& now);
 
  private:
   friend class base::RefCounted<DisplayLinkMac>;
@@ -78,8 +77,11 @@ class ACCELERATED_WIDGET_MAC_EXPORT DisplayLinkMac :
   // VSync parameters computed during Tick.
   bool timebase_and_interval_valid_;
   base::TimeTicks timebase_;
-  base::TimeTicks timebase_remainder_;
   base::TimeDelta interval_;
+
+  // The time after which we should re-start the display link to get fresh
+  // parameters.
+  base::TimeTicks recalculate_time_;
 
   // Each display link instance consumes a non-negligible number of cycles, so
   // make all display links on the same screen share the same object.

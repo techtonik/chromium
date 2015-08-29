@@ -147,6 +147,8 @@ class MetaBuildWrapper(object):
     if vals['type'] == 'gn':
       cmd = self.GNCmd('gen', '<path>', vals['gn_args'])
     elif vals['type'] == 'gyp':
+      if vals['gyp_crosscompile']:
+        self.Print('GYP_CROSSCOMPILE=1')
       cmd = self.GYPCmd('<path>', vals['gyp_defines'], vals['gyp_config'])
     else:
       raise MBErr('Unknown meta-build type "%s"' % vals['type'])
@@ -289,6 +291,7 @@ class MetaBuildWrapper(object):
       'gn_args': [],
       'gyp_config': [],
       'gyp_defines': [],
+      'gyp_crosscompile': False,
     }
 
     visited = []
@@ -314,6 +317,8 @@ class MetaBuildWrapper(object):
           vals['gn_args'] = mixin_vals['gn_args']
       if 'gyp_config' in mixin_vals:
         vals['gyp_config'] = mixin_vals['gyp_config']
+      if 'gyp_crosscompile' in mixin_vals:
+        vals['gyp_crosscompile'] = mixin_vals['gyp_crosscompile']
       if 'gyp_defines' in mixin_vals:
         if vals['gyp_defines']:
           vals['gyp_defines'] += ' ' + mixin_vals['gyp_defines']
@@ -358,6 +363,12 @@ class MetaBuildWrapper(object):
     for target in swarming_targets:
       if gn_isolate_map[target]['type'] == 'gpu_browser_test':
         runtime_deps_target = 'browser_tests'
+      elif gn_isolate_map[target]['type'] == 'script':
+        # For script targets, the build target is usually a group,
+        # for which gn generates the runtime_deps next to the stamp file
+        # for the label, which lives under the obj/ directory.
+        label = gn_isolate_map[target]['label']
+        runtime_deps_target = 'obj/%s.stamp' % label.replace(':', '/')
       else:
         runtime_deps_target = target
       if sys.platform == 'win32':
@@ -426,7 +437,13 @@ class MetaBuildWrapper(object):
                   'GYP configuration specified in the config (%s), and '
                   'it does not.' % (gyp_config, vals['gyp_config']))
     cmd = self.GYPCmd(output_dir, vals['gyp_defines'], config=gyp_config)
-    ret, _, _ = self.Run(cmd)
+    env = None
+    if vals['gyp_crosscompile']:
+      if self.args.verbose:
+        self.Print('Setting GYP_CROSSCOMPILE=1 in the environment')
+      env = os.environ.copy()
+      env['GYP_CROSSCOMPILE'] = '1'
+    ret, _, _ = self.Run(cmd, env=env)
     return ret
 
   def RunGYPAnalyze(self, vals):
@@ -557,12 +574,19 @@ class MetaBuildWrapper(object):
       gtest_filter = gn_isolate_map[target]['gtest_filter']
       cmdline = [
           '../../testing/test_env.py',
-          'browser_tests<(EXECUTABLE_SUFFIX)',
+          './browser_tests' + executable_suffix,
           '--test-launcher-bot-mode',
           '--enable-gpu',
           '--test-launcher-jobs=1',
           '--gtest_filter=%s' % gtest_filter,
       ]
+    elif test_type == 'script':
+      extra_files = [
+          '../../testing/test_env.py'
+      ]
+      cmdline = [
+          '../../testing/test_env.py',
+      ] + ['../../' + self.ToSrcRelPath(gn_isolate_map[target]['script'])]
     elif test_type in ('raw'):
       extra_files = []
       cmdline = [
@@ -677,8 +701,8 @@ class MetaBuildWrapper(object):
                                   output_path)
       for label in out.splitlines():
         build_target = label[2:]
-        # We want to accept 'chrome/android:chrome_shell_apk' and
-        # just 'chrome_shell_apk'. This may result in too many targets
+        # We want to accept 'chrome/android:chrome_public_apk' and
+        # just 'chrome_public_apk'. This may result in too many targets
         # getting built, but we can adjust that later if need be.
         for input_target in inp['targets']:
           if (input_target == build_target or
@@ -752,13 +776,13 @@ class MetaBuildWrapper(object):
     # This function largely exists so it can be overridden for testing.
     print(*args, **kwargs)
 
-  def Run(self, cmd):
+  def Run(self, cmd, env=None):
     # This function largely exists so it can be overridden for testing.
     if self.args.dryrun or self.args.verbose:
       self.PrintCmd(cmd)
     if self.args.dryrun:
       return 0, '', ''
-    ret, out, err = self.Call(cmd)
+    ret, out, err = self.Call(cmd, env=env)
     if self.args.verbose:
       if out:
         self.Print(out, end='')
@@ -766,9 +790,10 @@ class MetaBuildWrapper(object):
         self.Print(err, end='', file=sys.stderr)
     return ret, out, err
 
-  def Call(self, cmd):
+  def Call(self, cmd, env=None):
     p = subprocess.Popen(cmd, shell=False, cwd=self.chromium_src_dir,
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                         env=env)
     out, err = p.communicate()
     return p.returncode, out, err
 

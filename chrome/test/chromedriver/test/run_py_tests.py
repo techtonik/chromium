@@ -56,9 +56,6 @@ _NEGATIVE_FILTER = [
     'ChromeDriverTest.testEmulateNetworkConditionsSpeed',
     # crbug.com/469947
     'ChromeDriverTest.testTouchPinch',
-    # https://code.google.com/p/chromedriver/issues/detail?id=1167
-    'ChromeDriverTest.testShouldHandleNewWindowLoadingProperly',
-    'ChromeExtensionsCapabilityTest.testWaitsForExtensionToLoad',
 ]
 
 _VERSION_SPECIFIC_FILTER = {}
@@ -66,17 +63,9 @@ _VERSION_SPECIFIC_FILTER['HEAD'] = [
     # https://code.google.com/p/chromedriver/issues/detail?id=992
     'ChromeDownloadDirTest.testDownloadDirectoryOverridesExistingPreferences',
 ]
-_VERSION_SPECIFIC_FILTER['37'] = [
-    # https://code.google.com/p/chromedriver/issues/detail?id=954
-    'MobileEmulationCapabilityTest.testClickElement',
-    'MobileEmulationCapabilityTest.testHoverOverElement',
-    'MobileEmulationCapabilityTest.testSingleTapElement',
-]
-_VERSION_SPECIFIC_FILTER['36'] = [
-    # https://code.google.com/p/chromedriver/issues/detail?id=954
-    'MobileEmulationCapabilityTest.testClickElement',
-    'MobileEmulationCapabilityTest.testHoverOverElement',
-    'MobileEmulationCapabilityTest.testSingleTapElement',
+_VERSION_SPECIFIC_FILTER['44'] = [
+    # https://code.google.com/p/chromedriver/issues/detail?id=1202
+    'ChromeDownloadDirTest.testFileDownloadWithGet',
 ]
 
 _OS_SPECIFIC_FILTER = {}
@@ -156,16 +145,8 @@ _ANDROID_NEGATIVE_FILTER['chrome_stable'] = (
     _ANDROID_NEGATIVE_FILTER['chrome'])
 _ANDROID_NEGATIVE_FILTER['chrome_beta'] = (
     _ANDROID_NEGATIVE_FILTER['chrome'])
-_ANDROID_NEGATIVE_FILTER['chrome_shell'] = (
-    _ANDROID_NEGATIVE_FILTER['chrome'] + [
-        # ChromeShell doesn't support multiple tabs.
-        'ChromeDriverTest.testGetWindowHandles',
-        'ChromeDriverTest.testSwitchToWindow',
-        'ChromeDriverTest.testShouldHandleNewWindowLoadingProperly',
-    ]
-)
 _ANDROID_NEGATIVE_FILTER['chromedriver_webview_shell'] = (
-    _ANDROID_NEGATIVE_FILTER['chrome_shell'] + [
+    _ANDROID_NEGATIVE_FILTER['chrome'] + [
         'PerformanceLoggerTest.testPerformanceLogger',
         'ChromeDriverTest.testShadowDom*',
         # WebView doesn't support emulating network conditions.
@@ -185,6 +166,10 @@ _ANDROID_NEGATIVE_FILTER['chromedriver_webview_shell'] = (
         # WebView shell doesn't support popups or popup blocking.
         'ChromeDriverTest.testPopups',
         'ChromeDriverTest.testDontGoBackOrGoForward',
+        # ChromeDriver WebView shell doesn't support multiple tabs.
+        'ChromeDriverTest.testGetWindowHandles',
+        'ChromeDriverTest.testSwitchToWindow',
+        'ChromeDriverTest.testShouldHandleNewWindowLoadingProperly',
     ]
 )
 
@@ -1151,6 +1136,24 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     self._driver.Load(self.GetHttpUrlForFile('/chromedriver/empty.html'))
     self._driver.Load(self.GetHttpUrlForFile('/chromedriver/empty.html#x'))
 
+  def SetCookie(self, request):
+    return {'Set-Cookie': 'x=y; HttpOnly'}, "<!DOCTYPE html><html></html>"
+
+  def testGetHttpOnlyCookie(self):
+    self._http_server.SetCallbackForPath('/setCookie', self.SetCookie)
+    self._driver.Load(self.GetHttpUrlForFile('/setCookie'))
+    self._driver.AddCookie({'name': 'a', 'value': 'b'})
+    cookies = self._driver.GetCookies()
+    self.assertEquals(2, len(cookies))
+    for cookie in cookies:
+      self.assertIn('name', cookie)
+      if cookie['name'] == 'a':
+        self.assertFalse(cookie['httpOnly'])
+      elif cookie['name'] == 'x':
+        self.assertTrue(cookie['httpOnly'])
+      else:
+        self.fail('unexpected cookie: %s' % json.dumps(cookie))
+
 
 class ChromeDriverAndroidTest(ChromeDriverBaseTest):
   """End to end tests for Android-specific tests."""
@@ -1197,6 +1200,17 @@ class ChromeDownloadDirTest(ChromeDriverBaseTest):
     self._temp_dirs.append(temp_dir)
     return temp_dir
 
+  def RespondWithCsvFile(self, request):
+    return {'Content-Type': 'text/csv'}, 'a,b,c\n1,2,3\n'
+
+  def WaitForFileToDownload(self, path):
+    deadline = time.time() + 60
+    while True:
+      time.sleep(0.1)
+      if os.path.isfile(path) or time.time() > deadline:
+        break
+    self.assertTrue(os.path.isfile(path), "Failed to download file!")
+
   def tearDown(self):
     # Call the superclass tearDown() method before deleting temp dirs, so that
     # Chrome has a chance to exit before its user data dir is blown away from
@@ -1205,19 +1219,33 @@ class ChromeDownloadDirTest(ChromeDriverBaseTest):
     for temp_dir in self._temp_dirs:
       shutil.rmtree(temp_dir)
 
-  def testFileDownload(self):
+  def testFileDownloadWithClick(self):
     download_dir = self.CreateTempDir()
     download_name = os.path.join(download_dir, 'a_red_dot.png')
     driver = self.CreateDriver(download_dir=download_dir)
     driver.Load(ChromeDriverTest.GetHttpUrlForFile(
         '/chromedriver/download.html'))
     driver.FindElement('id', 'red-dot').Click()
-    deadline = time.time() + 60
-    while True:
-      time.sleep(0.1)
-      if os.path.isfile(download_name) or time.time() > deadline:
-        break
-    self.assertTrue(os.path.isfile(download_name), "Failed to download file!")
+    self.WaitForFileToDownload(download_name)
+    self.assertEqual(
+        ChromeDriverTest.GetHttpUrlForFile('/chromedriver/download.html'),
+        driver.GetCurrentUrl())
+
+  def testFileDownloadWithGet(self):
+    ChromeDriverTest._http_server.SetCallbackForPath(
+        '/abc.csv', self.RespondWithCsvFile)
+    download_dir = self.CreateTempDir()
+    download_name = os.path.join(download_dir, 'abc.csv')
+    driver = self.CreateDriver(download_dir=download_dir)
+    original_url = driver.GetCurrentUrl()
+    driver.Load(ChromeDriverTest.GetHttpUrlForFile('/abc.csv'))
+    self.WaitForFileToDownload(os.path.join(download_dir, 'abc.csv'))
+    major_version = int(driver.capabilities['version'].split('.')[0])
+    if major_version > 43:
+      # For some reason, the URL in M43 changes from 'data:,' to '', so we
+      # need to avoid doing this assertion unless we're on M44+.
+      # TODO(samuong): Assert unconditionally once we stop supporting M43.
+      self.assertEqual(original_url, driver.GetCurrentUrl())
 
   def testDownloadDirectoryOverridesExistingPreferences(self):
     user_data_dir = self.CreateTempDir()
@@ -1307,9 +1335,7 @@ class ChromeExtensionsCapabilityTest(ChromeDriverBaseTest):
     self.assertEqual(1, len(old_handles))
     driver.LaunchApp('gegjcdcfeiojglhifpmibkadodekakpc')
     new_window_handle = self.WaitForNewWindow(driver, old_handles)
-    current_window_handle = driver.GetCurrentWindowHandle()
-    self.assertEqual(new_window_handle, current_window_handle,
-        "focus should switch to the window that the app launches in")
+    driver.SwitchToWindow(new_window_handle)
     body_element = driver.FindElement('tag name', 'body')
     self.assertEqual('It works!', body_element.GetText())
 
@@ -1341,13 +1367,13 @@ class MobileEmulationCapabilityTest(ChromeDriverBaseTest):
   @staticmethod
   def GlobalSetUp():
     def respondWithUserAgentString(request):
-      return """
+      return {}, """
         <html>
         <body>%s</body>
         </html>""" % request.GetHeader('User-Agent')
 
     def respondWithUserAgentStringUseDeviceWidth(request):
-      return """
+      return {}, """
         <html>
         <head>
         <meta name="viewport" content="width=device-width,minimum-scale=1.0">

@@ -471,6 +471,7 @@ Browser::~Browser() {
   // The tab strip should not have any tabs at this point.
   DCHECK(tab_strip_model_->empty());
   tab_strip_model_->RemoveObserver(this);
+  bubble_manager_.reset();
 
   // Destroy the BrowserCommandController before removing the browser, so that
   // it doesn't act on any notifications that are sent as a result of removing
@@ -548,6 +549,12 @@ Browser::~Browser() {
 
 ///////////////////////////////////////////////////////////////////////////////
 // Getters & Setters
+
+ChromeBubbleManager* Browser::GetBubbleManager() {
+  if (!bubble_manager_)
+    bubble_manager_.reset(new ChromeBubbleManager(tab_strip_model_.get()));
+  return bubble_manager_.get();
+}
 
 FindBarController* Browser::GetFindBarController() {
   if (!find_bar_controller_.get()) {
@@ -1289,21 +1296,28 @@ bool Browser::CanDragEnter(content::WebContents* source,
 content::SecurityStyle Browser::GetSecurityStyle(
     WebContents* web_contents,
     content::SecurityStyleExplanations* security_style_explanations) {
-  // Check if the page is HTTP; if so, no explanations are needed.
-  const content::NavigationEntry* entry =
-      web_contents->GetController().GetVisibleEntry();
-  if (entry &&
-      entry->GetSSL().security_style ==
-          content::SECURITY_STYLE_UNAUTHENTICATED) {
-    return content::SECURITY_STYLE_UNAUTHENTICATED;
-  }
-
   connection_security::SecurityInfo security_info;
   connection_security::GetSecurityInfoForWebContents(web_contents,
                                                      &security_info);
 
-  if (security_info.security_style == content::SECURITY_STYLE_UNKNOWN)
+  security_style_explanations->ran_insecure_content_style =
+      connection_security::kRanInsecureContentStyle;
+  security_style_explanations->displayed_insecure_content_style =
+      connection_security::kDisplayedInsecureContentStyle;
+
+  // Check if the page is HTTP; if so, no explanations are needed. Note
+  // that SECURITY_STYLE_UNAUTHENTICATED does not necessarily mean that
+  // the page is loaded over HTTP, because the security style merely
+  // represents how the embedder wishes to display the security state of
+  // the page, and the embedder can choose to display HTTPS page as HTTP
+  // if it wants to (for example, displaying deprecated crypto
+  // algorithms with the same UI treatment as HTTP pages).
+  security_style_explanations->scheme_is_cryptographic =
+      security_info.scheme_is_cryptographic;
+  if (!security_info.scheme_is_cryptographic ||
+      security_info.security_style == content::SECURITY_STYLE_UNKNOWN) {
     return security_info.security_style;
+  }
 
   if (security_info.sha1_deprecation_status ==
       connection_security::DEPRECATED_SHA1_BROKEN) {
@@ -1319,26 +1333,16 @@ content::SecurityStyle Browser::GetSecurityStyle(
             l10n_util::GetStringUTF8(IDS_WARNING_SHA1_DESCRIPTION)));
   }
 
-  switch (security_info.mixed_content_status) {
-    case connection_security::RAN_MIXED_CONTENT:
-      security_style_explanations->broken_explanations.push_back(
-          content::SecurityStyleExplanation(
-              l10n_util::GetStringUTF8(IDS_ACTIVE_MIXED_CONTENT),
-              l10n_util::GetStringUTF8(IDS_ACTIVE_MIXED_CONTENT_DESCRIPTION)));
-      break;
-    case connection_security::DISPLAYED_MIXED_CONTENT:
-      security_style_explanations->warning_explanations.push_back(
-          content::SecurityStyleExplanation(
-              l10n_util::GetStringUTF8(IDS_PASSIVE_MIXED_CONTENT),
-              l10n_util::GetStringUTF8(IDS_PASSIVE_MIXED_CONTENT_DESCRIPTION)));
-      break;
-    case connection_security::NO_MIXED_CONTENT:
-      security_style_explanations->secure_explanations.push_back(
-          content::SecurityStyleExplanation(
-              l10n_util::GetStringUTF8(IDS_NO_MIXED_CONTENT),
-              l10n_util::GetStringUTF8(IDS_NO_MIXED_CONTENT_DESCRIPTION)));
-      break;
-  }
+  security_style_explanations->ran_insecure_content =
+      security_info.mixed_content_status ==
+          connection_security::RAN_MIXED_CONTENT ||
+      security_info.mixed_content_status ==
+          connection_security::RAN_AND_DISPLAYED_MIXED_CONTENT;
+  security_style_explanations->displayed_insecure_content =
+      security_info.mixed_content_status ==
+          connection_security::DISPLAYED_MIXED_CONTENT ||
+      security_info.mixed_content_status ==
+          connection_security::RAN_AND_DISPLAYED_MIXED_CONTENT;
 
   if (net::IsCertStatusError(security_info.cert_status)) {
     base::string16 error_string = base::UTF8ToUTF16(net::ErrorToString(
@@ -1379,24 +1383,7 @@ void Browser::OnWindowDidShow() {
     return;
   window_has_shown_ = true;
 
-// CurrentProcessInfo::CreationTime() is missing on some platforms.
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
-  // Measure the latency from startup till the first browser window becomes
-  // visible.
-  static bool is_first_browser_window = true;
-  if (is_first_browser_window &&
-      !startup_metric_utils::WasNonBrowserUIDisplayed()) {
-    is_first_browser_window = false;
-    const base::Time process_creation_time =
-        base::CurrentProcessInfo::CreationTime();
-
-    if (!process_creation_time.is_null()) {
-      UMA_HISTOGRAM_LONG_TIMES(
-          "Startup.BrowserWindowDisplay",
-          base::Time::Now() - process_creation_time);
-    }
-  }
-#endif  // defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
+  startup_metric_utils::RecordBrowserWindowDisplay(base::Time::Now());
 
   // Nothing to do for non-tabbed windows.
   if (!is_type_tabbed())

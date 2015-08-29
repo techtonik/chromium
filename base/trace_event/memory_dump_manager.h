@@ -32,7 +32,7 @@ class MemoryDumpSessionState;
 // RequestDumpPoint(). The extension by Un(RegisterDumpProvider).
 class BASE_EXPORT MemoryDumpManager : public TraceLog::EnabledStateObserver {
  public:
-  static const char* const kTraceCategoryForTesting;
+  static const char* const kTraceCategory;
 
   // This value is returned as the tracing id of the child processes by
   // GetTracingProcessId() when tracing is not enabled.
@@ -97,12 +97,19 @@ class BASE_EXPORT MemoryDumpManager : public TraceLog::EnabledStateObserver {
     return system_allocator_pool_name_;
   };
 
+  // Tells the initialization phase to skip scheduling periodic memory dumps.
+  void DisablePeriodicDumpsForTesting() {
+    disable_periodic_dumps_for_testing_ = true;
+  }
+
  private:
   friend struct DefaultDeleter<MemoryDumpManager>;  // For the testing instance.
   friend struct DefaultSingletonTraits<MemoryDumpManager>;
   friend class MemoryDumpManagerDelegate;
   friend class MemoryDumpManagerTest;
   FRIEND_TEST_ALL_PREFIXES(MemoryDumpManagerTest, DisableFailingDumpers);
+  FRIEND_TEST_ALL_PREFIXES(MemoryDumpManagerTest,
+                           UnregisterDumperFromThreadWhileDumping);
 
   // Descriptor struct used to hold information about registered MDPs. It is
   // deliberately copyable, in order to allow it to be used as std::set value.
@@ -123,6 +130,11 @@ class BASE_EXPORT MemoryDumpManager : public TraceLog::EnabledStateObserver {
     // as can be safely changed without impacting the order within the set.
     mutable int consecutive_failures;
     mutable bool disabled;
+
+    // When a dump provider unregisters, it is flagged as |unregistered| and it
+    // is removed only upon the next memory dump. This is to avoid altering the
+    // |dump_providers_| collection while a dump is in progress.
+    mutable bool unregistered;
   };
 
   using MemoryDumpProviderInfoSet = std::set<MemoryDumpProviderInfo>;
@@ -189,10 +201,6 @@ class BASE_EXPORT MemoryDumpManager : public TraceLog::EnabledStateObserver {
   // affinity (MDPs belonging to the same thread are adjacent).
   MemoryDumpProviderInfoSet dump_providers_;
 
-  // Flag used to signal that some provider was removed from |dump_providers_|
-  // and therefore the current memory dump (if any) should be aborted.
-  bool did_unregister_dump_provider_;
-
   // Shared among all the PMDs to keep state scoped to the tracing session.
   scoped_refptr<MemoryDumpSessionState> session_state_;
 
@@ -218,6 +226,11 @@ class BASE_EXPORT MemoryDumpManager : public TraceLog::EnabledStateObserver {
 
   // Skips the auto-registration of the core dumpers during Initialize().
   bool skip_core_dumpers_auto_registration_for_testing_;
+
+  // When true, the initialization phase does not start the periodic memory
+  // dumps.
+  // TODO(primiano): This should go into TraceConfig. https://goo.gl/5Hj3o0.
+  bool disable_periodic_dumps_for_testing_;
 
   DISALLOW_COPY_AND_ASSIGN(MemoryDumpManager);
 };

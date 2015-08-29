@@ -38,6 +38,13 @@ namespace views {
 namespace {
 
 NSInteger StyleMaskForParams(const Widget::InitParams& params) {
+  // If the Widget is modal, it will be displayed as a sheet. This works best if
+  // it has NSTitledWindowMask. For example, with NSBorderlessWindowMask, the
+  // parent window still accepts input.
+  if (params.delegate &&
+      params.delegate->GetModalType() == ui::MODAL_TYPE_WINDOW)
+    return NSTitledWindowMask;
+
   // TODO(tapted): Determine better masks when there are use cases for it.
   if (params.remove_standard_frame)
     return NSBorderlessWindowMask;
@@ -96,6 +103,12 @@ void NativeWidgetMac::OnWindowWillClose() {
   delegate_->OnNativeWidgetDestroyed();
   if (ownership_ == Widget::InitParams::NATIVE_WIDGET_OWNS_WIDGET)
     delete this;
+}
+
+int NativeWidgetMac::SheetPositionY() {
+  NSView* view = GetNativeView();
+  return
+      [view convertPoint:NSMakePoint(0, NSHeight([view frame])) toView:nil].y;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -508,8 +521,7 @@ void NativeWidgetMac::ClearNativeFocus() {
 }
 
 gfx::Rect NativeWidgetMac::GetWorkAreaBoundsInScreen() const {
-  NOTIMPLEMENTED();
-  return gfx::Rect();
+  return gfx::ScreenRectFromNSRect([[GetNativeWindow() screen] visibleFrame]);
 }
 
 Widget::MoveLoopResult NativeWidgetMac::RunMoveLoop(

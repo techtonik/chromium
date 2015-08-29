@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.webapps;
 
 import android.content.Intent;
-import android.os.Bundle;
 import android.test.InstrumentationTestCase;
 import android.test.suitebuilder.annotation.SmallTest;
 
@@ -28,7 +27,8 @@ public class WebappInfoTest extends InstrumentationTestCase {
 
         WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
                 ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING,
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
         assertNotNull(info);
     }
 
@@ -42,7 +42,8 @@ public class WebappInfoTest extends InstrumentationTestCase {
 
         WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
                 ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING,
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
         assertNotNull(info);
     }
 
@@ -77,7 +78,6 @@ public class WebappInfoTest extends InstrumentationTestCase {
         intent.putExtra(ShortcutHelper.EXTRA_URL, url);
 
         WebappInfo info = WebappInfo.create(intent);
-        assertNotNull(info);
         assertEquals(title, info.name());
         assertEquals(title, info.shortName());
     }
@@ -95,7 +95,6 @@ public class WebappInfoTest extends InstrumentationTestCase {
         intent.putExtra(ShortcutHelper.EXTRA_URL, url);
 
         WebappInfo info = WebappInfo.create(intent);
-        assertNotNull(info);
         assertEquals("", info.name());
         assertEquals(shortName, info.shortName());
     }
@@ -115,7 +114,6 @@ public class WebappInfoTest extends InstrumentationTestCase {
         intent.putExtra(ShortcutHelper.EXTRA_URL, url);
 
         WebappInfo info = WebappInfo.create(intent);
-        assertNotNull(info);
         assertEquals(title, info.name());
         assertEquals(shortName, info.shortName());
     }
@@ -135,7 +133,6 @@ public class WebappInfoTest extends InstrumentationTestCase {
         intent.putExtra(ShortcutHelper.EXTRA_URL, url);
 
         WebappInfo info = WebappInfo.create(intent);
-        assertNotNull(info);
         assertEquals(name, info.name());
         assertEquals(shortName, info.shortName());
     }
@@ -150,31 +147,32 @@ public class WebappInfoTest extends InstrumentationTestCase {
 
         WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
                 ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
-        assertNotNull(info);
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING,
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
         assertEquals(ScreenOrientationValues.DEFAULT, info.orientation());
         assertEquals(ShortcutSource.UNKNOWN, info.source());
     }
 
     @SmallTest
     @Feature({"Webapps"})
-    public void testNormalThemeColor() {
+    public void testNormalColors() {
         String id = "webapp id";
         String name = "longName";
         String shortName = "name";
         String url = "http://money.cnn.com";
-        long themeColor = 0xFF0000FF;
+        long themeColor = 0xFF00FF00L;
+        long backgroundColor = 0xFF0000FFL;
 
         WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
                 ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                themeColor);
-        assertNotNull(info);
+                themeColor, backgroundColor);
         assertEquals(info.themeColor(), themeColor);
+        assertEquals(info.backgroundColor(), backgroundColor);
     }
 
     @SmallTest
     @Feature({"Webapps"})
-    public void testInvalidThemeColor() {
+    public void testInvalidOrMissingColors() {
         String id = "webapp id";
         String name = "longName";
         String shortName = "name";
@@ -182,46 +180,28 @@ public class WebappInfoTest extends InstrumentationTestCase {
 
         WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
                 ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
-        assertNotNull(info);
-        assertEquals(info.themeColor(), ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING,
+                ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
+        assertEquals(info.themeColor(), ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
+        assertEquals(info.backgroundColor(), ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING);
     }
 
     @SmallTest
     @Feature({"Webapps"})
-    public void testThemeColorIntentCreation() {
+    public void testColorsIntentCreation() {
         String id = "webapp id";
         String url = "http://money.cnn.com";
+        long themeColor = 0xFF00FF00L;
+        long backgroundColor = 0xFF0000FFL;
 
         Intent intent = new Intent();
-        long themeColor = 0xFF0000FFL;
         intent.putExtra(ShortcutHelper.EXTRA_THEME_COLOR, themeColor);
+        intent.putExtra(ShortcutHelper.EXTRA_BACKGROUND_COLOR, backgroundColor);
         intent.putExtra(ShortcutHelper.EXTRA_ID, id);
         intent.putExtra(ShortcutHelper.EXTRA_URL, url);
 
         WebappInfo info = WebappInfo.create(intent);
-        assertNotNull(info);
         assertEquals(info.themeColor(), themeColor);
-    }
-
-    @SmallTest
-    @Feature({"Webapps"})
-    public void testThemeColorWrittenToBundle() {
-        String id = "webapp id";
-        String name = "longName";
-        String shortName = "name";
-        String url = "http://money.cnn.com";
-        long themeColor = 0xFF0000FF;
-
-        WebappInfo info = WebappInfo.create(id, url, null, name, shortName,
-                ScreenOrientationValues.DEFAULT, ShortcutSource.UNKNOWN,
-                themeColor);
-
-        Bundle bundle = new Bundle();
-        info.writeToBundle(bundle);
-
-        long bundleColor = bundle.getLong(ShortcutHelper.EXTRA_THEME_COLOR,
-                ShortcutHelper.THEME_COLOR_INVALID_OR_MISSING);
-        assertEquals(bundleColor, themeColor);
+        assertEquals(info.backgroundColor(), backgroundColor);
     }
 }

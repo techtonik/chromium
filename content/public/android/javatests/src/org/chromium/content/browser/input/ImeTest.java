@@ -919,7 +919,7 @@ public class ImeTest extends ContentShellTestBase {
 
     @SmallTest
     @Feature({"TextInput"})
-    public void testPastePopupShowOnLongPress() throws Throwable {
+    public void testPastePopupShowAndHide() throws Throwable {
         commitText("hello", 1);
         waitAndVerifyStatesAndCalls(1, "hello", 5, 5, -1, -1);
 
@@ -930,13 +930,41 @@ public class ImeTest extends ContentShellTestBase {
         waitAndVerifyStatesAndCalls(0, "", 0, 0, -1, -1);
 
         DOMUtils.longPressNode(this, mContentViewCore, "input_text");
-        final PastePopupMenu pastePopup = mContentViewCore.getPastePopupForTest();
         assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
-                return pastePopup.isShowing();
+                return mContentViewCore.isPastePopupShowing();
             }
         }));
+
+        DOMUtils.clickNode(this, mContentViewCore, "input_text");
+        assertWaitForKeyboardStatus(true);
+        DOMUtils.longPressNode(this, mContentViewCore, "input_text");
+        setComposingText("h", 1);
+        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
+            @Override
+            public boolean isSatisfied() {
+                return !mContentViewCore.isPastePopupShowing();
+            }
+        }));
+        assertFalse(mContentViewCore.hasInsertion());
+    }
+
+    @SmallTest
+    @Feature({"TextInput"})
+    public void testSelectionClearedOnKeyEvent() throws Throwable {
+        commitText("hello", 1);
+        waitAndVerifyStatesAndCalls(1, "hello", 5, 5, -1, -1);
+
+        DOMUtils.clickNode(this, mContentViewCore, "input_text");
+        assertWaitForKeyboardStatus(true);
+
+        DOMUtils.longPressNode(this, mContentViewCore, "input_text");
+        assertWaitForSelectActionBarStatus(true);
+
+        setComposingText("h", 1);
+        assertWaitForSelectActionBarStatus(false);
+        assertFalse(mContentViewCore.hasSelection());
     }
 
     @SmallTest

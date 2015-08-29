@@ -19,21 +19,16 @@ import re
 import sys
 import unittest
 
-from pylib import android_commands
 from pylib import cmd_helper
 from pylib import constants
 from pylib import device_signal
 from pylib.device import adb_wrapper
+from pylib.device import device_blacklist
 from pylib.device import device_errors
 from pylib.device import device_utils
 from pylib.device import intent
 from pylib.sdk import split_select
 from pylib.utils import mock_calls
-
-# RunCommand from third_party/android_testrunner/run_command.py is mocked
-# below, so its path needs to be in sys.path.
-sys.path.append(os.path.join(
-    constants.DIR_SOURCE_ROOT, 'third_party', 'android_testrunner'))
 
 sys.path.append(os.path.join(
     constants.DIR_SOURCE_ROOT, 'third_party', 'pymock'))
@@ -55,12 +50,6 @@ class DeviceUtilsInitTest(unittest.TestCase):
   def testInitWithAdbWrapper(self):
     serial = '123456789abcdef0'
     a = adb_wrapper.AdbWrapper(serial)
-    d = device_utils.DeviceUtils(a)
-    self.assertEqual(serial, d.adb.GetDeviceSerial())
-
-  def testInitWithAndroidCommands(self):
-    serial = '0fedcba987654321'
-    a = android_commands.AndroidCommands(device=serial)
     d = device_utils.DeviceUtils(a)
     self.assertEqual(serial, d.adb.GetDeviceSerial())
 
@@ -335,6 +324,36 @@ class DeviceUtils_GetApplicationPathsInternalTest(DeviceUtilsTest):
          self.CommandError('ERROR. Is package manager running?\n'))):
       with self.assertRaises(device_errors.CommandFailedError):
         self.device._GetApplicationPathsInternal('android')
+
+
+class DeviceUtils_GetApplicationVersionTest(DeviceUtilsTest):
+
+  def test_GetApplicationVersion_exists(self):
+    with self.assertCalls(
+        (self.call.adb.Shell('dumpsys package com.android.chrome'),
+         'Packages:\n'
+         '  Package [com.android.chrome] (3901ecfb):\n'
+         '    userId=1234 gids=[123, 456, 789]\n'
+         '    pkg=Package{1fecf634 com.android.chrome}\n'
+         '    versionName=45.0.1234.7\n')):
+      self.assertEquals('45.0.1234.7',
+                        self.device.GetApplicationVersion('com.android.chrome'))
+
+  def test_GetApplicationVersion_notExists(self):
+    with self.assertCalls(
+        (self.call.adb.Shell('dumpsys package com.android.chrome'), '')):
+      self.assertEquals(None,
+                        self.device.GetApplicationVersion('com.android.chrome'))
+
+  def test_GetApplicationVersion_fails(self):
+    with self.assertCalls(
+        (self.call.adb.Shell('dumpsys package com.android.chrome'),
+         'Packages:\n'
+         '  Package [com.android.chrome] (3901ecfb):\n'
+         '    userId=1234 gids=[123, 456, 789]\n'
+         '    pkg=Package{1fecf634 com.android.chrome}\n')):
+      with self.assertRaises(device_errors.CommandFailedError):
+        self.device.GetApplicationVersion('com.android.chrome')
 
 
 class DeviceUtilsGetApplicationDataDirectoryTest(DeviceUtilsTest):
@@ -626,6 +645,20 @@ class DeviceUtilsUninstallTest(DeviceUtilsTest):
       self.device.Uninstall('test.package', True)
 
 
+class DeviceUtilsSuTest(DeviceUtilsTest):
+  def testSu_preM(self):
+    with self.patch_call(
+        self.call.device.build_version_sdk,
+        return_value=constants.ANDROID_SDK_VERSION_CODES.LOLLIPOP_MR1):
+      self.assertEquals('su -c foo', self.device._Su('foo'))
+
+  def testSu_mAndAbove(self):
+    with self.patch_call(
+        self.call.device.build_version_sdk,
+        return_value=constants.ANDROID_SDK_VERSION_CODES.MARSHMALLOW):
+      self.assertEquals('su 0 foo', self.device._Su('foo'))
+
+
 class DeviceUtilsRunShellCommandTest(DeviceUtilsTest):
 
   def setUp(self):
@@ -678,11 +711,13 @@ class DeviceUtilsRunShellCommandTest(DeviceUtilsTest):
       self.assertEquals([payload],
                         self.device.RunShellCommand(['echo', payload]))
 
-  def testRunShellCommand_withHugeCmdAmdSU(self):
+  def testRunShellCommand_withHugeCmdAndSU(self):
     payload = 'hi! ' * 1024
-    expected_cmd = """su -c sh -c 'echo '"'"'%s'"'"''""" % payload
+    expected_cmd_without_su = """sh -c 'echo '"'"'%s'"'"''""" % payload
+    expected_cmd = 'su -c %s' % expected_cmd_without_su
     with self.assertCalls(
       (self.call.device.NeedsSU(), True),
+      (self.call.device._Su(expected_cmd_without_su), expected_cmd),
       (mock.call.pylib.utils.device_temp_file.DeviceTempFile(
           self.adb, suffix='.sh'), MockTempFile('/sdcard/temp-123.sh')),
       self.call.device._WriteFileWithPush('/sdcard/temp-123.sh', expected_cmd),
@@ -692,9 +727,12 @@ class DeviceUtilsRunShellCommandTest(DeviceUtilsTest):
           self.device.RunShellCommand(['echo', payload], as_root=True))
 
   def testRunShellCommand_withSu(self):
+    expected_cmd_without_su = "sh -c 'setprop service.adb.root 0'"
+    expected_cmd = 'su -c %s' % expected_cmd_without_su
     with self.assertCalls(
         (self.call.device.NeedsSU(), True),
-        (self.call.adb.Shell("su -c sh -c 'setprop service.adb.root 0'"), '')):
+        (self.call.device._Su(expected_cmd_without_su), expected_cmd),
+        (self.call.adb.Shell(expected_cmd), '')):
       self.device.RunShellCommand('setprop service.adb.root 0', as_root=True)
 
   def testRunShellCommand_manyLines(self):
@@ -847,24 +885,50 @@ class DeviceUtilsKillAllTest(DeviceUtilsTest):
 
   def testKillAll_nonblocking(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
-        (self.call.adb.Shell('kill -9 1234'), '')):
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1234'], 'some.processing.thing': ['5678']}),
+        (self.call.adb.Shell('kill -9 1234 5678'), '')):
       self.assertEquals(
-          1, self.device.KillAll('some.process', blocking=False))
+          2, self.device.KillAll('some.process', blocking=False))
 
   def testKillAll_blocking(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
-        (self.call.adb.Shell('kill -9 1234'), ''),
-        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
-        (self.call.device.GetPids('some.process'), [])):
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1234'], 'some.processing.thing': ['5678']}),
+        (self.call.adb.Shell('kill -9 1234 5678'), ''),
+        (self.call.device.GetPids('some.process'),
+         {'some.processing.thing': ['5678']}),
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1111']})): #  Other instance with different pid.
       self.assertEquals(
-          1, self.device.KillAll('some.process', blocking=True))
+          2, self.device.KillAll('some.process', blocking=True))
+
+  def testKillAll_exactNonblocking(self):
+    with self.assertCalls(
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1234'], 'some.processing.thing': ['5678']}),
+        (self.call.adb.Shell('kill -9 1234'), '')):
+      self.assertEquals(
+          1, self.device.KillAll('some.process', exact=True, blocking=False))
+
+  def testKillAll_exactBlocking(self):
+    with self.assertCalls(
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1234'], 'some.processing.thing': ['5678']}),
+        (self.call.adb.Shell('kill -9 1234'), ''),
+        (self.call.device.GetPids('some.process'),
+         {'some.process': ['1234'], 'some.processing.thing': ['5678']}),
+        (self.call.device.GetPids('some.process'),
+         {'some.processing.thing': ['5678']})):
+      self.assertEquals(
+          1, self.device.KillAll('some.process', exact=True, blocking=True))
 
   def testKillAll_root(self):
     with self.assertCalls(
         (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
         (self.call.device.NeedsSU(), True),
+        (self.call.device._Su("sh -c 'kill -9 1234'"),
+         "su -c sh -c 'kill -9 1234'"),
         (self.call.adb.Shell("su -c sh -c 'kill -9 1234'"), '')):
       self.assertEquals(
           1, self.device.KillAll('some.process', as_root=True))
@@ -1533,9 +1597,12 @@ class DeviceUtilsWriteFileTest(DeviceUtilsTest):
       self.device.WriteFile('/test/file/to write', 'the contents')
 
   def testWriteFile_withEchoAndSU(self):
+    expected_cmd_without_su =  "sh -c 'echo -n contents > /test/file'"
+    expected_cmd = 'su -c %s' % expected_cmd_without_su
     with self.assertCalls(
         (self.call.device.NeedsSU(), True),
-        (self.call.adb.Shell("su -c sh -c 'echo -n contents > /test/file'"),
+        (self.call.device._Su(expected_cmd_without_su), expected_cmd),
+        (self.call.adb.Shell(expected_cmd),
          '')):
       self.device.WriteFile('/test/file', 'contents', as_root=True)
 
@@ -1881,25 +1948,6 @@ class DeviceUtilsClientCache(DeviceUtilsTest):
     self.assertEqual(client_cache_two, {})
 
 
-class DeviceUtilsParallelTest(mock_calls.TestCase):
-
-  def testParallel_default(self):
-    test_serials = ['0123456789abcdef', 'fedcba9876543210']
-    with self.assertCall(
-        mock.call.pylib.device.device_utils.DeviceUtils.HealthyDevices(),
-        [device_utils.DeviceUtils(s) for s in test_serials]):
-      parallel_devices = device_utils.DeviceUtils.parallel()
-    for serial, device in zip(test_serials, parallel_devices.pGet(None)):
-      self.assertTrue(isinstance(device, device_utils.DeviceUtils))
-      self.assertEquals(serial, device.adb.GetDeviceSerial())
-
-  def testParallel_noDevices(self):
-    with self.assertCall(
-        mock.call.pylib.device.device_utils.DeviceUtils.HealthyDevices(), []):
-      with self.assertRaises(device_errors.NoDevicesError):
-        device_utils.DeviceUtils.parallel()
-
-
 class DeviceUtilsHealthyDevicesTest(mock_calls.TestCase):
 
   def _createAdbWrapperMock(self, serial, is_ready=True):
@@ -1907,25 +1955,25 @@ class DeviceUtilsHealthyDevicesTest(mock_calls.TestCase):
     adb.is_ready = is_ready
     return adb
 
-  def testHealthyDevices_default(self):
+  def testHealthyDevices_emptyBlacklist(self):
     test_serials = ['0123456789abcdef', 'fedcba9876543210']
     with self.assertCalls(
-        (mock.call.pylib.device.device_blacklist.ReadBlacklist(), []),
         (mock.call.pylib.device.adb_wrapper.AdbWrapper.Devices(),
          [self._createAdbWrapperMock(s) for s in test_serials])):
-      devices = device_utils.DeviceUtils.HealthyDevices()
+      blacklist = mock.NonCallableMock(**{'Read.return_value': []})
+      devices = device_utils.DeviceUtils.HealthyDevices(blacklist)
     for serial, device in zip(test_serials, devices):
       self.assertTrue(isinstance(device, device_utils.DeviceUtils))
       self.assertEquals(serial, device.adb.GetDeviceSerial())
 
-  def testHealthyDevices_blacklisted(self):
+  def testHealthyDevices_blacklist(self):
     test_serials = ['0123456789abcdef', 'fedcba9876543210']
     with self.assertCalls(
-        (mock.call.pylib.device.device_blacklist.ReadBlacklist(),
-         ['fedcba9876543210']),
         (mock.call.pylib.device.adb_wrapper.AdbWrapper.Devices(),
          [self._createAdbWrapperMock(s) for s in test_serials])):
-      devices = device_utils.DeviceUtils.HealthyDevices()
+      blacklist = mock.NonCallableMock(
+          **{'Read.return_value': ['fedcba9876543210']})
+      devices = device_utils.DeviceUtils.HealthyDevices(blacklist)
     self.assertEquals(1, len(devices))
     self.assertTrue(isinstance(devices[0], device_utils.DeviceUtils))
     self.assertEquals('0123456789abcdef', devices[0].adb.GetDeviceSerial())

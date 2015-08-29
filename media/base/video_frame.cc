@@ -86,14 +86,13 @@ static gfx::Size SampleSize(VideoPixelFormat format, size_t plane) {
         case PIXEL_FORMAT_YV12:
         case PIXEL_FORMAT_I420:
         case PIXEL_FORMAT_YV12A:
-#if defined(OS_MACOSX) || defined(OS_CHROMEOS)
         case PIXEL_FORMAT_NV12:
-#endif
           return gfx::Size(2, 2);
 
         case PIXEL_FORMAT_UNKNOWN:
         case PIXEL_FORMAT_ARGB:
         case PIXEL_FORMAT_XRGB:
+        case PIXEL_FORMAT_UYVY:
           break;
       }
   }
@@ -117,15 +116,28 @@ static gfx::Size CommonAlignment(VideoPixelFormat format) {
 // Returns the number of bytes per element for given |plane| and |format|.
 static int BytesPerElement(VideoPixelFormat format, size_t plane) {
   DCHECK(IsValidPlane(plane, format));
-  if (format == PIXEL_FORMAT_ARGB || format == PIXEL_FORMAT_XRGB)
-    return 4;
-
-#if defined(OS_MACOSX) || defined(OS_CHROMEOS)
-  if (format == PIXEL_FORMAT_NV12 && plane == VideoFrame::kUVPlane)
-    return 2;
-#endif
-
-  return 1;
+  switch (format) {
+    case PIXEL_FORMAT_ARGB:
+    case PIXEL_FORMAT_XRGB:
+      return 4;
+    case PIXEL_FORMAT_UYVY:
+      return 2;
+    case PIXEL_FORMAT_NV12: {
+      static const int bytes_per_element[] = {1, 2};
+      DCHECK_LT(plane, arraysize(bytes_per_element));
+      return bytes_per_element[plane];
+    }
+    case PIXEL_FORMAT_YV12:
+    case PIXEL_FORMAT_I420:
+    case PIXEL_FORMAT_YV16:
+    case PIXEL_FORMAT_YV12A:
+    case PIXEL_FORMAT_YV24:
+      return 1;
+    case PIXEL_FORMAT_UNKNOWN:
+      break;
+  }
+  NOTREACHED();
+  return 0;
 }
 
 // static
@@ -152,7 +164,7 @@ bool VideoFrame::IsValidConfig(VideoPixelFormat format,
     return true;
 
   // Make sure new formats are properly accounted for in the method.
-  static_assert(PIXEL_FORMAT_MAX == 8,
+  static_assert(PIXEL_FORMAT_MAX == 9,
                 "Added pixel format, please review IsValidConfig()");
 
   if (format == PIXEL_FORMAT_UNKNOWN) {
@@ -211,8 +223,8 @@ scoped_refptr<VideoFrame> VideoFrame::WrapNativeTexture(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
     base::TimeDelta timestamp) {
-  if (format != PIXEL_FORMAT_ARGB) {
-    DLOG(ERROR) << "Only ARGB pixel format supported, got "
+  if (format != PIXEL_FORMAT_ARGB && format != PIXEL_FORMAT_UYVY) {
+    DLOG(ERROR) << "Unsupported pixel format supported, got "
                 << VideoPixelFormatToString(format);
     return nullptr;
   }
@@ -509,11 +521,10 @@ size_t VideoFrame::NumPlanes(VideoPixelFormat format) {
   switch (format) {
     case PIXEL_FORMAT_ARGB:
     case PIXEL_FORMAT_XRGB:
+    case PIXEL_FORMAT_UYVY:
       return 1;
-#if defined(OS_MACOSX) || defined(OS_CHROMEOS)
     case PIXEL_FORMAT_NV12:
       return 2;
-#endif
     case PIXEL_FORMAT_YV12:
     case PIXEL_FORMAT_YV16:
     case PIXEL_FORMAT_I420:

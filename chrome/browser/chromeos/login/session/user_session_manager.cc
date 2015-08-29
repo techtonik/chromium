@@ -10,6 +10,7 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/logging.h"
+#include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/path_service.h"
 #include "base/prefs/pref_member.h"
@@ -97,6 +98,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/storage_partition.h"
+#include "ui/base/ime/chromeos/input_method_descriptor.h"
 #include "ui/base/ime/chromeos/input_method_manager.h"
 #include "url/gurl.h"
 
@@ -112,6 +114,10 @@ namespace {
 // Milliseconds until we timeout our attempt to fetch flags from the child
 // account service.
 static const int kFlagsFetchingLoginTimeoutMs = 1000;
+
+// The maximum ammount of time that we are willing to delay a browser restart
+// for, waiting for a session restore to finish.
+static const int kMaxRestartDelaySeconds = 10;
 
 // ChromeVox tutorial URL (used in place of "getting started" url when
 // accessibility is enabled).
@@ -141,21 +147,33 @@ void InitLocaleAndInputMethodsForNewUser(
   // First, we'll set kLanguagePreloadEngines.
   input_method::InputMethodManager* manager =
       input_method::InputMethodManager::Get();
-  std::vector<std::string> input_method_ids;
 
+  input_method::InputMethodDescriptor preferred_input_method;
   if (!public_session_input_method.empty()) {
-    // If this is a public session and the user chose a
-    // |public_session_input_method|, set kLanguagePreloadEngines to this input
-    // method only.
-    input_method_ids.push_back(public_session_input_method);
-  } else {
-    // Otherwise, set kLanguagePreloadEngines to a list of input methods derived
-    // from the |locale| and the currently active input method.
-    manager->GetInputMethodUtil()->GetFirstLoginInputMethodIds(
-        locale,
-        session_manager->GetDefaultIMEState(profile)->GetCurrentInputMethod(),
-        &input_method_ids);
+    // If this is a public session and the user chose a valid
+    // |public_session_input_method|, use it as the |preferred_input_method|.
+    const input_method::InputMethodDescriptor* const descriptor =
+        manager->GetInputMethodUtil()->GetInputMethodDescriptorFromId(
+            public_session_input_method);
+    if (descriptor) {
+      preferred_input_method = *descriptor;
+    } else {
+      LOG(WARNING) << "Public session is initialized with an invalid IME"
+                   << ", id=" << public_session_input_method;
+    }
   }
+
+  // If |preferred_input_method| is not set, use the currently active input
+  // method.
+  if (preferred_input_method.id().empty()) {
+    preferred_input_method =
+        session_manager->GetDefaultIMEState(profile)->GetCurrentInputMethod();
+  }
+
+  // Derive kLanguagePreloadEngines from |locale| and |preferred_input_method|.
+  std::vector<std::string> input_method_ids;
+  manager->GetInputMethodUtil()->GetFirstLoginInputMethodIds(
+      locale, preferred_input_method, &input_method_ids);
 
   // Save the input methods in the user's preferences.
   StringPrefMember language_preload_engines;
@@ -284,6 +302,12 @@ void LogCustomSwitches(const std::set<std::string>& switches) {
        it != switches.end(); ++it) {
     VLOG(1) << "Switch leading to restart: '" << *it << "'";
   }
+}
+
+void RestartOnTimeout() {
+  LOG(WARNING) << "Restarting Chrome because the time out was reached."
+                  "The session restore has not finished.";
+  chrome::AttemptRestart();
 }
 
 }  // namespace
@@ -673,8 +697,7 @@ bool UserSessionManager::RestartToApplyPerSessionFlagsIfNeed(
 }
 
 bool UserSessionManager::NeedsToUpdateEasyUnlockKeys() const {
-  return EasyUnlockService::IsSignInEnabled() &&
-         !user_context_.GetUserID().empty() &&
+  return !user_context_.GetUserID().empty() &&
          user_manager::User::TypeHasGaiaAccount(user_context_.GetUserType()) &&
          user_context_.GetKey() && !user_context_.GetKey()->GetSecret().empty();
 }
@@ -1496,6 +1519,12 @@ UserSessionManager::GetAuthRequestContext() const {
 }
 
 void UserSessionManager::AttemptRestart(Profile* profile) {
+  // Restart unconditionally in case if we are stuck somewhere in a session
+  // restore process. http://crbug.com/520346.
+  base::MessageLoop::current()->PostDelayedTask(
+      FROM_HERE, base::Bind(RestartOnTimeout),
+      base::TimeDelta::FromSeconds(kMaxRestartDelaySeconds));
+
   if (CheckEasyUnlockKeyOps(base::Bind(&UserSessionManager::AttemptRestart,
                                        AsWeakPtr(), profile))) {
     return;

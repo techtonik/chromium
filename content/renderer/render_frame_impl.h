@@ -26,6 +26,9 @@
 #include "content/renderer/renderer_webcookiejar_impl.h"
 #include "ipc/ipc_message.h"
 #include "media/blink/webmediaplayer_delegate.h"
+#include "media/blink/webmediaplayer_params.h"
+#include "mojo/application/public/interfaces/service_provider.mojom.h"
+#include "mojo/application/public/interfaces/shell.mojom.h"
 #include "third_party/WebKit/public/platform/modules/app_banner/WebAppBannerClient.h"
 #include "third_party/WebKit/public/web/WebAXObject.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
@@ -126,13 +129,9 @@ class CONTENT_EXPORT RenderFrameImpl
       NON_EXPORTED_BASE(public blink::WebFrameClient),
       NON_EXPORTED_BASE(public media::WebMediaPlayerDelegate) {
  public:
-  // Creates a new RenderFrame. |render_view| is the RenderView object that this
-  // frame belongs to.
-  // Callers *must* call |SetWebFrame| immediately after creation.
-  // Note: This is called only when RenderFrame is created by Blink through
-  // createChildFrame.
-  // TODO(creis): We should structure this so that |SetWebFrame| isn't needed.
-  static RenderFrameImpl* Create(RenderViewImpl* render_view, int32 routing_id);
+  // Creates a new RenderFrame as the main frame of |render_view|.
+  static RenderFrameImpl* CreateMainFrame(RenderViewImpl* render_view,
+                                          int32 routing_id);
 
   // Creates a new RenderFrame with |routing_id| as a child of the RenderFrame
   // identified by |parent_routing_id| or as the top-level frame if the latter
@@ -173,6 +172,15 @@ class CONTENT_EXPORT RenderFrameImpl
       RenderFrameImpl* (*)(const CreateParams&);
   static void InstallCreateHook(
       CreateRenderFrameImplFunction create_render_frame_impl);
+
+  // Looks up and returns the WebFrame corresponding to a given opener frame
+  // routing ID.  Also stores the opener's RenderView routing ID into
+  // |opener_view_routing_id|.
+  //
+  // TODO(alexmos): remove RenderViewImpl's dependency on
+  // opener_view_routing_id.
+  static blink::WebFrame* ResolveOpener(int opener_frame_routing_id,
+                                        int* opener_view_routing_id);
 
   virtual ~RenderFrameImpl();
 
@@ -354,9 +362,6 @@ class CONTENT_EXPORT RenderFrameImpl
                            const std::string& message) override;
 
   // blink::WebFrameClient implementation:
-  blink::WebPluginPlaceholder* createPluginPlaceholder(
-      blink::WebLocalFrame*,
-      const blink::WebPluginParams&) override;
   virtual blink::WebPlugin* createPlugin(blink::WebLocalFrame* frame,
                                          const blink::WebPluginParams& params);
   virtual blink::WebMediaPlayer* createMediaPlayer(
@@ -382,7 +387,7 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebTreeScopeType scope,
       const blink::WebString& name,
       blink::WebSandboxFlags sandboxFlags);
-  virtual void didDisownOpener(blink::WebLocalFrame* frame);
+  virtual void didChangeOpener(blink::WebFrame* frame);
   virtual void frameDetached(blink::WebFrame* frame, DetachType type);
   virtual void frameFocused();
   virtual void willClose(blink::WebFrame* frame);
@@ -545,6 +550,7 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual void unregisterProtocolHandler(const blink::WebString& scheme,
                                          const blink::WebURL& url);
   virtual blink::WebBluetooth* bluetooth();
+  virtual blink::WebUSBClient* usbClient();
 
 #if defined(ENABLE_WEBVR)
   blink::WebVRClient* webVRClient() override;
@@ -612,6 +618,11 @@ class CONTENT_EXPORT RenderFrameImpl
 
   typedef std::map<GURL, double> HostZoomLevels;
 
+  // Creates a new RenderFrame. |render_view| is the RenderView object that this
+  // frame belongs to.
+  // Callers *must* call |SetWebFrame| immediately after creation.
+  static RenderFrameImpl* Create(RenderViewImpl* render_view, int32 routing_id);
+
   // Functions to add and remove observers for this object.
   void AddObserver(RenderFrameObserver* observer);
   void RemoveObserver(RenderFrameObserver* observer);
@@ -676,7 +687,7 @@ class CONTENT_EXPORT RenderFrameImpl
   void OnTextSurroundingSelectionRequest(size_t max_length);
   void OnSetAccessibilityMode(AccessibilityMode new_mode);
   void OnSnapshotAccessibilityTree(int callback_id);
-  void OnDisownOpener();
+  void OnUpdateOpener(int opener_routing_id);
   void OnDidUpdateSandboxFlags(blink::WebSandboxFlags flags);
   void OnTextTrackSettingsChanged(
       const FrameMsg_TextTrackSettings_Params& params);
@@ -809,8 +820,7 @@ class CONTENT_EXPORT RenderFrameImpl
   blink::WebMediaPlayer* CreateAndroidWebMediaPlayer(
       blink::WebMediaPlayerClient* client,
       blink::WebMediaPlayerEncryptedMediaClient* encrypted_client,
-      media::MediaPermission* media_permission,
-      blink::WebContentDecryptionModule* initial_cdm);
+      const media::WebMediaPlayerParams& params);
 
   RendererMediaPlayerManager* GetMediaPlayerManager();
 #endif
@@ -829,6 +839,10 @@ class CONTENT_EXPORT RenderFrameImpl
   media::CdmFactory* GetCdmFactory();
 
   void RegisterMojoServices();
+
+  // Connects to a Mojo application and returns a proxy to its exposed
+  // ServiceProvider.
+  mojo::ServiceProviderPtr ConnectToApplication(const GURL& url);
 
   // Stores the WebLocalFrame we are associated with.  This is null from the
   // constructor until SetWebFrame is called, and it is null after
@@ -966,6 +980,9 @@ class CONTENT_EXPORT RenderFrameImpl
   bool contains_media_player_;
 #endif
 
+  // True if this RenderFrame has ever played media.
+  bool has_played_media_;
+
   // The devtools agent for this frame; only created for main frame and
   // local roots.
   DevToolsAgent* devtools_agent_;
@@ -981,6 +998,9 @@ class CONTENT_EXPORT RenderFrameImpl
   PresentationDispatcher* presentation_dispatcher_;
 
   ServiceRegistryImpl service_registry_;
+
+  // The shell proxy used to connect to Mojo applications.
+  mojo::ShellPtr mojo_shell_;
 
   // The screen orientation dispatcher attached to the frame, lazily
   // initialized.
@@ -1002,6 +1022,8 @@ class CONTENT_EXPORT RenderFrameImpl
   scoped_ptr<blink::WebAppBannerClient> app_banner_client_;
 
   scoped_ptr<blink::WebBluetooth> bluetooth_;
+
+  scoped_ptr<blink::WebUSBClient> usb_client_;
 
 #if defined(ENABLE_WEBVR)
   // The VR dispatcher attached to the frame, lazily initialized.

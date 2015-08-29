@@ -13,7 +13,6 @@
 #include "base/stl_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
-#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/common/pref_names.h"
 #include "components/content_settings/core/browser/website_settings_info.h"
@@ -405,18 +404,19 @@ base::Value* PrefModelAssociator::MergeDictionaryValues(
 
   for (base::DictionaryValue::Iterator it(from_dict_value); !it.IsAtEnd();
        it.Advance()) {
-    const base::Value* from_value = &it.value();
+    const base::Value* from_key_value = &it.value();
     base::Value* to_key_value;
     if (result->GetWithoutPathExpansion(it.key(), &to_key_value)) {
-      if (to_key_value->GetType() == base::Value::TYPE_DICTIONARY) {
+      if (from_key_value->GetType() == base::Value::TYPE_DICTIONARY &&
+          to_key_value->GetType() == base::Value::TYPE_DICTIONARY) {
         base::Value* merged_value =
-            MergeDictionaryValues(*from_value, *to_key_value);
+            MergeDictionaryValues(*from_key_value, *to_key_value);
         result->SetWithoutPathExpansion(it.key(), merged_value);
       }
       // Note that for all other types we want to preserve the "to"
       // values so we do nothing here.
     } else {
-      result->SetWithoutPathExpansion(it.key(), from_value->DeepCopy());
+      result->SetWithoutPathExpansion(it.key(), from_key_value->DeepCopy());
     }
   }
   return result;

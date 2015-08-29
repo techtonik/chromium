@@ -74,7 +74,7 @@ const GpuFeatureInfo GetGpuFeatureInfo(size_t index, bool* eof) {
           kWebGLFeatureName,
           manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_WEBGL),
           command_line.HasSwitch(switches::kDisableExperimentalWebGL),
-          "WebGL has been disabled, either via about:flags or command line.",
+          "WebGL has been disabled via the command line.",
           false
       },
       {
@@ -191,14 +191,6 @@ int NumberOfRendererRasterThreads() {
 
   int num_raster_threads = num_processors / 2;
 
-  // Async uploads is used when neither zero-copy nor one-copy is enabled and
-  // it uses its own thread, so reduce the number of raster threads when async
-  // uploads is in use.
-  bool async_uploads_is_used =
-      !IsZeroCopyUploadEnabled() && !IsOneCopyUploadEnabled();
-  if (async_uploads_is_used)
-    --num_raster_threads;
-
 #if defined(OS_ANDROID)
   // Limit the number of raster threads to 1 on Android.
   // TODO(reveman): Remove this when we have a better mechanims to prevent
@@ -222,35 +214,18 @@ int NumberOfRendererRasterThreads() {
                                     kMaxRasterThreads);
 }
 
-bool IsOneCopyUploadEnabled() {
-  if (IsZeroCopyUploadEnabled())
-    return false;
-
-  const base::CommandLine& command_line =
-      *base::CommandLine::ForCurrentProcess();
-  if (command_line.HasSwitch(switches::kEnableOneCopy))
-    return true;
-  if (command_line.HasSwitch(switches::kDisableOneCopy))
-    return false;
-
-#if defined(OS_ANDROID)
-  return false;
-#endif
-  return true;
-}
-
 bool IsZeroCopyUploadEnabled() {
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
-  // Single-threaded mode in the renderer process (for layout tests) is
-  // synchronous, which depends on tiles being ready to draw when raster is
-  // complete.  Therefore, it must use one of zero copy, software raster, or
-  // GPU raster. So we force zero-copy on for the case where software/GPU raster
-  // is not used.
-  // TODO(reveman): One-copy can work with sync compositing: crbug.com/490295.
-  if (command_line.HasSwitch(switches::kDisableThreadedCompositing))
-    return true;
   return command_line.HasSwitch(switches::kEnableZeroCopy);
+}
+
+bool IsPersistentGpuMemoryBufferEnabled() {
+  // Zero copy currently doesn't take advantage of persistent buffers.
+  if (IsZeroCopyUploadEnabled())
+    return false;
+  const auto& command_line = *base::CommandLine::ForCurrentProcess();
+  return command_line.HasSwitch(switches::kEnablePersistentGpuMemoryBuffer);
 }
 
 bool IsGpuRasterizationEnabled() {
@@ -307,7 +282,8 @@ int GpuRasterizationMSAASampleCount() {
 #if defined(OS_ANDROID)
     return 4;
 #else
-    return 8;
+    // Desktop platforms will compute this automatically based on DPI.
+    return -1;
 #endif
   std::string string_value = command_line.GetSwitchValueASCII(
       switches::kGpuRasterizationMSAASampleCount);

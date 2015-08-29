@@ -10,6 +10,7 @@
 #include "base/command_line.h"
 #include "base/location.h"
 #include "base/metrics/field_trial.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/single_thread_task_runner.h"
 #include "base/strings/string_util.h"
 #include "base/time/default_tick_clock.h"
@@ -17,6 +18,7 @@
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/buffers.h"
 #include "media/base/limits.h"
+#include "media/base/media_log.h"
 #include "media/base/media_switches.h"
 #include "media/base/pipeline.h"
 #include "media/base/video_frame.h"
@@ -42,20 +44,21 @@ static bool ShouldUseVideoRenderingPath() {
 }
 
 VideoRendererImpl::VideoRendererImpl(
-    const scoped_refptr<base::SingleThreadTaskRunner>& task_runner,
+    const scoped_refptr<base::SingleThreadTaskRunner>& media_task_runner,
+    const scoped_refptr<base::TaskRunner>& worker_task_runner,
     VideoRendererSink* sink,
     ScopedVector<VideoDecoder> decoders,
     bool drop_frames,
     const scoped_refptr<GpuVideoAcceleratorFactories>& gpu_factories,
     const scoped_refptr<MediaLog>& media_log)
-    : task_runner_(task_runner),
+    : task_runner_(media_task_runner),
       use_new_video_renderering_path_(ShouldUseVideoRenderingPath()),
       sink_(sink),
       sink_started_(false),
       video_frame_stream_(
-          new VideoFrameStream(task_runner, decoders.Pass(), media_log)),
-      gpu_memory_buffer_pool_(
-          new GpuMemoryBufferVideoFramePool(task_runner, gpu_factories)),
+          new VideoFrameStream(media_task_runner, decoders.Pass(), media_log)),
+      gpu_memory_buffer_pool_(nullptr),
+      media_log_(media_log),
       low_delay_(false),
       received_end_of_stream_(false),
       rendered_end_of_stream_(false),
@@ -74,6 +77,17 @@ VideoRendererImpl::VideoRendererImpl(
       render_first_frame_and_stop_(false),
       posted_maybe_stop_after_first_paint_(false),
       weak_factory_(this) {
+  if (gpu_factories &&
+      gpu_factories->ShouldUseGpuMemoryBuffersForVideoFrames()) {
+    gpu_memory_buffer_pool_.reset(new GpuMemoryBufferVideoFramePool(
+        media_task_runner, worker_task_runner, gpu_factories));
+    frame_ready_cb_ =
+        base::Bind(&VideoRendererImpl::FrameReadyForCopyingToGpuMemoryBuffers,
+                   weak_factory_.GetWeakPtr());
+  } else {
+    frame_ready_cb_ =
+        base::Bind(&VideoRendererImpl::FrameReady, weak_factory_.GetWeakPtr());
+  }
 }
 
 VideoRendererImpl::~VideoRendererImpl() {
@@ -168,6 +182,9 @@ void VideoRendererImpl::Initialize(
   DCHECK(!time_progressing_);
 
   low_delay_ = (stream->liveness() == DemuxerStream::LIVENESS_LIVE);
+  UMA_HISTOGRAM_BOOLEAN("Media.VideoRenderer.LowDelay", low_delay_);
+  if (low_delay_)
+    MEDIA_LOG(DEBUG, media_log_) << "Video rendering in low delay mode.";
 
   // Always post |init_cb_| because |this| could be destroyed if initialization
   // failed.
@@ -468,6 +485,20 @@ void VideoRendererImpl::DropNextReadyFrame_Locked() {
       base::Bind(&VideoRendererImpl::AttemptRead, weak_factory_.GetWeakPtr()));
 }
 
+void VideoRendererImpl::FrameReadyForCopyingToGpuMemoryBuffers(
+    VideoFrameStream::Status status,
+    const scoped_refptr<VideoFrame>& frame) {
+  if (status != VideoFrameStream::OK || start_timestamp_ > frame->timestamp()) {
+    VideoRendererImpl::FrameReady(status, frame);
+    return;
+  }
+
+  DCHECK(frame);
+  gpu_memory_buffer_pool_->MaybeCreateHardwareFrame(
+      frame, base::Bind(&VideoRendererImpl::FrameReady,
+                        weak_factory_.GetWeakPtr(), status));
+}
+
 void VideoRendererImpl::FrameReady(VideoFrameStream::Status status,
                                    const scoped_refptr<VideoFrame>& frame) {
   DCHECK(task_runner_->BelongsToCurrentThread());
@@ -679,8 +710,7 @@ void VideoRendererImpl::AttemptRead_Locked() {
   switch (state_) {
     case kPlaying:
       pending_read_ = true;
-      video_frame_stream_->Read(base::Bind(&VideoRendererImpl::FrameReady,
-                                           weak_factory_.GetWeakPtr()));
+      video_frame_stream_->Read(frame_ready_cb_);
       return;
 
     case kUninitialized:

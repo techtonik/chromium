@@ -328,15 +328,15 @@ void CrNetEnvironment::SetHTTPProtocolHandlerRegistered(bool registered) {
 
 void CrNetEnvironment::ConfigureSdchOnNetworkThread() {
   DCHECK(base::MessageLoop::current() == network_io_thread_->message_loop());
+  net::URLRequestContext* context =
+      main_context_getter_->GetURLRequestContext();
 
   if (!sdch_enabled_) {
-    net::SdchManager::EnableSdchSupport(false);
+    DCHECK_EQ(static_cast<net::SdchManager*>(nullptr), context->sdch_manager());
     return;
   }
 
   sdch_manager_.reset(new net::SdchManager());
-  net::URLRequestContext* context =
-      main_context_getter_->GetURLRequestContext();
   sdch_owner_.reset(new net::SdchOwner(sdch_manager_.get(), context));
   if (!sdch_pref_store_filename_.empty()) {
     base::FilePath path(sdch_pref_store_filename_);
@@ -431,7 +431,7 @@ void CrNetEnvironment::InitializeOnNetworkThread() {
   params.net_log = main_context_->net_log();
   params.next_protos =
       net::NextProtosWithSpdyAndQuic(spdy_enabled(), quic_enabled());
-  params.use_alternate_protocols = true;
+  params.use_alternative_services = true;
   params.enable_quic = quic_enabled();
   params.alternative_service_probability_threshold =
       alternate_protocol_threshold_;
@@ -456,9 +456,11 @@ void CrNetEnvironment::InitializeOnNetworkThread() {
 
   net::URLRequestJobFactoryImpl* job_factory =
       new net::URLRequestJobFactoryImpl;
-  job_factory->SetProtocolHandler("data", new net::DataProtocolHandler);
   job_factory->SetProtocolHandler(
-      "file", new net::FileProtocolHandler(file_thread_->task_runner()));
+      "data", make_scoped_ptr(new net::DataProtocolHandler));
+  job_factory->SetProtocolHandler(
+      "file", make_scoped_ptr(
+                  new net::FileProtocolHandler(file_thread_->task_runner())));
   main_context_->set_job_factory(job_factory);
 
   main_context_->set_net_log(net_log_.get());

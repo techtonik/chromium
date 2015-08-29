@@ -5,20 +5,22 @@
 #ifndef COMPONENTS_PASSWORD_MANAGER_SYNC_BROWSER_STORE_RESULT_FILTER_H_
 #define COMPONENTS_PASSWORD_MANAGER_SYNC_BROWSER_STORE_RESULT_FILTER_H_
 
-#include "components/password_manager/core/browser/store_result_filter.h"
+#include "components/password_manager/core/browser/credentials_filter.h"
 
 namespace password_manager {
 
 class PasswordManagerClient;
 
 // The sync- and GAIA- aware implementation of the filter.
-class SyncStoreResultFilter : public StoreResultFilter {
+// TODO(vabr): Rename this to match the interface.
+class SyncStoreResultFilter : public CredentialsFilter {
  public:
   explicit SyncStoreResultFilter(const PasswordManagerClient* client);
   ~SyncStoreResultFilter() override;
 
-  // StoreResultFilter
-  bool ShouldIgnore(const autofill::PasswordForm& form) override;
+  // CredentialsFilter
+  ScopedVector<autofill::PasswordForm> FilterResults(
+      ScopedVector<autofill::PasswordForm> results) const override;
 
  private:
   enum AutofillForSyncCredentialsState {
@@ -28,15 +30,9 @@ class SyncStoreResultFilter : public StoreResultFilter {
   };
 
   // Determines autofill state based on experiment and flag values.
-  static AutofillForSyncCredentialsState SetUpAutofillSyncState();
+  static AutofillForSyncCredentialsState GetAutofillForSyncCredentialsState();
 
   const PasswordManagerClient* const client_;
-
-  // How to handle the sync credential in ShouldFilterAutofillResult().
-  const AutofillForSyncCredentialsState autofill_sync_state_;
-
-  // For statistics about filtering the sync credential during autofill.
-  bool sync_credential_was_filtered_;
 
   DISALLOW_COPY_AND_ASSIGN(SyncStoreResultFilter);
 };

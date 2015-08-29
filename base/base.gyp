@@ -754,6 +754,11 @@
             }],
           ]},
         ],
+        [ 'OS == "win" and target_arch == "x64"', {
+          'sources': [
+            'profiler/win32_stack_frame_unwinder_unittest.cc',
+          ],
+        }],
         ['OS == "win"', {
           'sources!': [
             'file_descriptor_shuffle_unittest.cc',
@@ -900,6 +905,8 @@
         'test/gtest_xml_util.h',
         'test/histogram_tester.cc',
         'test/histogram_tester.h',
+	'test/icu_test_util.cc',
+	'test/icu_test_util.h',
         'test/ios/wait_util.h',
         'test/ios/wait_util.mm',
         'test/launcher/test_launcher.cc',
@@ -1443,6 +1450,7 @@
             'base_java_library_process_type',
             'base_java_memory_pressure_level',
             'base_native_libraries_gen',
+            '../third_party/android_tools/android_tools.gyp:android_support_multidex_javalib',
             '../third_party/jsr-305/jsr-305.gyp:jsr_305_javalib',
           ],
           'includes': [ '../build/java.gypi' ],
@@ -1500,12 +1508,30 @@
           'includes': [ '../build/java.gypi' ],
         },
         {
+          # TODO(jbudorick): Remove this once we roll to robolectric 3.0 and pull
+          # in the multidex shadow library. crbug.com/522043
+          # GN: //base:base_junit_test_support
+          'target_name': 'base_junit_test_support',
+          'type': 'none',
+          'dependencies': [
+            '../testing/android/junit/junit_test.gyp:junit_test_support',
+            '../third_party/android_tools/android_tools.gyp:android_support_multidex_javalib',
+          ],
+          'variables': {
+            'src_paths': [
+              '../base/test/android/junit/',
+            ],
+          },
+          'includes': [ '../build/host_jar.gypi' ]
+        },
+        {
           # GN: //base:base_junit_tests
           'target_name': 'base_junit_tests',
           'type': 'none',
           'dependencies': [
             'base_java',
             'base_java_test_support',
+            'base_junit_test_support',
             '../testing/android/junit/junit_test.gyp:junit_test_support',
           ],
           'variables': {
@@ -1534,7 +1560,13 @@
           'target_name': 'chromium_android_linker',
           'type': 'shared_library',
           'sources': [
+            'android/linker/android_dlext.h',
             'android/linker/legacy_linker_jni.cc',
+            'android/linker/legacy_linker_jni.h',
+            'android/linker/linker_jni.cc',
+            'android/linker/linker_jni.h',
+            'android/linker/modern_linker_jni.cc',
+            'android/linker/modern_linker_jni.h',
           ],
           # The crazy linker is never instrumented.
           'cflags!': [

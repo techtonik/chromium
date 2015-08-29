@@ -186,9 +186,8 @@ bool ApplicationManager::ConnectToRunningApplication(
     InterfaceRequest<ServiceProvider>* services,
     ServiceProviderPtr* exposed_services,
     const CapabilityFilter& filter) {
-  GURL application_url = GetBaseURLAndQuery(resolved_url, nullptr);
   ApplicationInstance* instance =
-      GetApplicationInstance(Identity(application_url, qualifier));
+      GetApplicationInstance(Identity(resolved_url, qualifier));
   if (!instance)
     return false;
 
@@ -240,6 +239,8 @@ InterfaceRequest<Application> ApplicationManager::RegisterInstance(
       application.Pass(), this,
       originator ? originator->identity() : Identity(GURL()), app_identity,
       filter, on_application_end);
+  DCHECK(identity_to_instance_.find(app_identity) ==
+         identity_to_instance_.end());
   identity_to_instance_[app_identity] = instance;
   instance->InitializeApplication();
   instance->ConnectToClient(originator, app_url, requestor_url, services.Pass(),
@@ -381,10 +382,13 @@ void ApplicationManager::HandleFetchCallback(
   // TODO(erg): Have a better way of switching the sandbox on. For now, switch
   // it on hard coded when we're using some of the sandboxable core services.
   bool start_sandboxed = false;
-  if (app_url == GURL("mojo://core_services/") && qualifier == "Sandboxed Core")
-    start_sandboxed = true;
-  else if (app_url == GURL("mojo://html_viewer/"))
-    start_sandboxed = true;
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kMojoNoSandbox)) {
+    if (app_url == GURL("mojo://core_services/") && qualifier == "Core")
+      start_sandboxed = true;
+    else if (app_url == GURL("mojo://html_viewer/"))
+      start_sandboxed = true;
+  }
 
   fetcher->AsPath(blocking_pool_,
                   base::Bind(&ApplicationManager::RunNativeApplication,

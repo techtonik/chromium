@@ -35,17 +35,22 @@ MediaCodecDecoder::MediaCodecDecoder(
     const scoped_refptr<base::SingleThreadTaskRunner>& media_task_runner,
     const base::Closure& external_request_data_cb,
     const base::Closure& starvation_cb,
+    const base::Closure& decoder_drained_cb,
     const base::Closure& stop_done_cb,
     const base::Closure& error_cb,
     const char* decoder_thread_name)
     : media_task_runner_(media_task_runner),
       decoder_thread_(decoder_thread_name),
       needs_reconfigure_(false),
+      drain_decoder_(false),
+      always_reconfigure_for_tests_(false),
       external_request_data_cb_(external_request_data_cb),
       starvation_cb_(starvation_cb),
+      decoder_drained_cb_(decoder_drained_cb),
       stop_done_cb_(stop_done_cb),
       error_cb_(error_cb),
       state_(kStopped),
+      preroll_mode_(kPrerollTillPTS),
       eos_enqueued_(false),
       completed_(false),
       last_frame_posted_(false),
@@ -61,35 +66,16 @@ MediaCodecDecoder::MediaCodecDecoder(
 
   internal_error_cb_ =
       base::Bind(&MediaCodecDecoder::OnCodecError, weak_factory_.GetWeakPtr());
+  internal_preroll_done_cb_ =
+      base::Bind(&MediaCodecDecoder::OnPrerollDone, weak_factory_.GetWeakPtr());
   request_data_cb_ =
       base::Bind(&MediaCodecDecoder::RequestData, weak_factory_.GetWeakPtr());
 }
 
-MediaCodecDecoder::~MediaCodecDecoder() {
-  DCHECK(media_task_runner_->BelongsToCurrentThread());
-
-  DVLOG(1) << "Decoder::~Decoder()";
-
-  // NB: ReleaseDecoderResources() is virtual
-  ReleaseDecoderResources();
-}
+MediaCodecDecoder::~MediaCodecDecoder() {}
 
 const char* MediaCodecDecoder::class_name() const {
   return "Decoder";
-}
-
-void MediaCodecDecoder::ReleaseDecoderResources() {
-  DCHECK(media_task_runner_->BelongsToCurrentThread());
-
-  DVLOG(1) << class_name() << "::" << __FUNCTION__;
-
-  // Set [kInEmergencyStop| state to block already posted ProcessNextFrame().
-  SetState(kInEmergencyStop);
-
-  decoder_thread_.Stop();  // synchronous
-
-  SetState(kStopped);
-  media_codec_bridge_.reset();
 }
 
 void MediaCodecDecoder::Flush() {
@@ -106,6 +92,7 @@ void MediaCodecDecoder::Flush() {
 
   eos_enqueued_ = false;
   completed_ = false;
+  drain_decoder_ = false;
   au_queue_.Flush();
 
 #ifndef NDEBUG
@@ -116,6 +103,8 @@ void MediaCodecDecoder::Flush() {
   // For video the first frame after flush must be key frame.
   verify_next_frame_is_key_ = true;
 #endif
+
+  preroll_mode_ = kPrerollTillPTS;
 
   if (media_codec_bridge_) {
     // MediaCodecBridge::Reset() performs MediaCodecBridge.flush()
@@ -134,13 +123,29 @@ void MediaCodecDecoder::ReleaseMediaCodec() {
   DVLOG(1) << class_name() << "::" << __FUNCTION__;
 
   media_codec_bridge_.reset();
+  preroll_mode_ = kPrerollTillPTS;
 }
 
 bool MediaCodecDecoder::IsPrefetchingOrPlaying() const {
   DCHECK(media_task_runner_->BelongsToCurrentThread());
 
+  // Whether decoder needs to be stopped.
   base::AutoLock lock(state_lock_);
-  return state_ == kPrefetching || state_ == kRunning;
+  switch (state_) {
+    case kPrefetching:
+    case kPrefetched:
+    case kPrerolling:
+    case kPrerolled:
+    case kRunning:
+      return true;
+    case kStopped:
+    case kStopping:
+    case kInEmergencyStop:
+    case kError:
+      return false;
+  }
+  NOTREACHED();
+  return false;
 }
 
 bool MediaCodecDecoder::IsStopped() const {
@@ -153,6 +158,19 @@ bool MediaCodecDecoder::IsCompleted() const {
   DCHECK(media_task_runner_->BelongsToCurrentThread());
 
   return completed_;
+}
+
+bool MediaCodecDecoder::NotCompletedAndNeedsPreroll() const {
+  DCHECK(media_task_runner_->BelongsToCurrentThread());
+
+  return HasStream() && preroll_mode_ != kNoPreroll && !completed_;
+}
+
+void MediaCodecDecoder::SetDecodingUntilOutputIsPresent() {
+  DCHECK(media_task_runner_->BelongsToCurrentThread());
+  DVLOG(1) << class_name() << "::" << __FUNCTION__;
+
+  preroll_mode_ = kPrerollTillOutputIsPresent;
 }
 
 base::android::ScopedJavaLocalRef<jobject> MediaCodecDecoder::GetMediaCrypto() {
@@ -192,48 +210,46 @@ MediaCodecDecoder::ConfigStatus MediaCodecDecoder::Configure() {
     DVLOG(1) << class_name() << "::" << __FUNCTION__
              << ": needs reconfigure, deleting MediaCodec";
     needs_reconfigure_ = false;
-    media_codec_bridge_.reset();
-
-    // No need to release these buffers since the MediaCodec is deleted, just
-    // remove their indexes from |delayed_buffers_|.
-
-    ClearDelayedBuffers(false);
+    ReleaseMediaCodec();
   }
 
-  MediaCodecDecoder::ConfigStatus result;
   if (media_codec_bridge_) {
     DVLOG(1) << class_name() << "::" << __FUNCTION__
              << ": reconfiguration is not required, ignoring";
-    result = kConfigOk;
-  } else {
-    result = ConfigureInternal();
+    return kConfigOk;
+  }
+
+  // Read all |kConfigChanged| units preceding the data one.
+  AccessUnitQueue::Info au_info = au_queue_.GetInfo();
+  while (au_info.configs) {
+    SetDemuxerConfigs(*au_info.configs);
+    au_queue_.Advance();
+    au_info = au_queue_.GetInfo();
+  }
+
+  MediaCodecDecoder::ConfigStatus result = ConfigureInternal();
 
 #ifndef NDEBUG
-    // We check and reset |verify_next_frame_is_key_| on Decoder thread.
-    // This DCHECK ensures we won't need to lock this variable.
-    DCHECK(!decoder_thread_.IsRunning());
+  // We check and reset |verify_next_frame_is_key_| on Decoder thread.
+  // This DCHECK ensures we won't need to lock this variable.
+  DCHECK(!decoder_thread_.IsRunning());
 
-    // For video the first frame after reconfiguration must be key frame.
-    if (result == kConfigOk)
-      verify_next_frame_is_key_ = true;
+  // For video the first frame after reconfiguration must be key frame.
+  if (result == kConfigOk)
+    verify_next_frame_is_key_ = true;
 #endif
-  }
 
   return result;
 }
 
-bool MediaCodecDecoder::Start(base::TimeDelta current_time) {
+bool MediaCodecDecoder::Preroll(base::TimeDelta preroll_timestamp,
+                                const base::Closure& preroll_done_cb) {
   DCHECK(media_task_runner_->BelongsToCurrentThread());
 
   DVLOG(1) << class_name() << "::" << __FUNCTION__
-           << " current_time:" << current_time;
+           << " preroll_timestamp:" << preroll_timestamp;
 
   DecoderState state = GetState();
-  if (state == kRunning) {
-    DVLOG(1) << class_name() << "::" << __FUNCTION__ << ": already started";
-    return true;  // already started
-  }
-
   if (state != kPrefetched) {
     DVLOG(0) << class_name() << "::" << __FUNCTION__ << ": wrong state "
              << AsString(state) << ", ignoring";
@@ -247,10 +263,15 @@ bool MediaCodecDecoder::Start(base::TimeDelta current_time) {
   }
 
   DCHECK(!decoder_thread_.IsRunning());
+  DCHECK(preroll_mode_ != kNoPreroll);
+
+  preroll_done_cb_ = preroll_done_cb;
 
   // We only synchronize video stream.
-  // When audio is present, the |current_time| is audio time.
-  SynchronizePTSWithTime(current_time);
+  DissociatePTSFromTime();  // associaton will happen after preroll is done.
+
+  preroll_timestamp_ = (preroll_mode_ == kPrerollTillPTS) ? preroll_timestamp
+                                                          : base::TimeDelta();
 
   last_frame_posted_ = false;
 
@@ -261,7 +282,48 @@ bool MediaCodecDecoder::Start(base::TimeDelta current_time) {
     return false;
   }
 
-  DVLOG(0) << class_name() << "::" << __FUNCTION__ << " decoder thread started";
+  SetState(kPrerolling);
+
+  decoder_thread_.task_runner()->PostTask(
+      FROM_HERE,
+      base::Bind(&MediaCodecDecoder::ProcessNextFrame, base::Unretained(this)));
+
+  return true;
+}
+
+bool MediaCodecDecoder::Start(base::TimeDelta start_timestamp) {
+  DCHECK(media_task_runner_->BelongsToCurrentThread());
+
+  DVLOG(1) << class_name() << "::" << __FUNCTION__
+           << " start_timestamp:" << start_timestamp;
+
+  DecoderState state = GetState();
+
+  if (state != kPrefetched && state != kPrerolled) {
+    DVLOG(0) << class_name() << "::" << __FUNCTION__ << ": wrong state "
+             << AsString(state) << ", ignoring";
+    return false;
+  }
+
+  if (!media_codec_bridge_) {
+    DVLOG(0) << class_name() << "::" << __FUNCTION__
+             << ": not configured, ignoring";
+    return false;
+  }
+
+  // We only synchronize video stream.
+  AssociateCurrentTimeWithPTS(start_timestamp);
+  preroll_timestamp_ = base::TimeDelta();
+
+  // Start the decoder thread
+  if (!decoder_thread_.IsRunning()) {
+    last_frame_posted_ = false;
+    if (!decoder_thread_.Start()) {
+      DVLOG(1) << class_name() << "::" << __FUNCTION__
+               << ": cannot start decoder thread";
+      return false;
+    }
+  }
 
   SetState(kRunning);
 
@@ -283,16 +345,9 @@ void MediaCodecDecoder::SyncStop() {
     return;
   }
 
-  // After this method returns, decoder thread will not be running.
+  DoEmergencyStop();
 
-  // Set [kInEmergencyStop| state to block already posted ProcessNextFrame().
-  SetState(kInEmergencyStop);
-
-  decoder_thread_.Stop();  // synchronous
-
-  SetState(kStopped);
-
-  ClearDelayedBuffers(true);  // release prior to clearing  |delayed_buffers_|.
+  ReleaseDelayedBuffers();
 }
 
 void MediaCodecDecoder::RequestToStop() {
@@ -309,12 +364,20 @@ void MediaCodecDecoder::RequestToStop() {
     case kRunning:
       SetState(kStopping);
       break;
+    case kPrerolling:
+    case kPrerolled:
+      DCHECK(decoder_thread_.IsRunning());
+      // Synchronous stop.
+      decoder_thread_.Stop();
+      SetState(kStopped);
+      media_task_runner_->PostTask(FROM_HERE, stop_done_cb_);
+      break;
     case kStopping:
       break;  // ignore
     case kStopped:
     case kPrefetching:
     case kPrefetched:
-      // There is nothing to wait for, we can sent nofigication right away.
+      // There is nothing to wait for, we can sent notification right away.
       DCHECK(!decoder_thread_.IsRunning());
       SetState(kStopped);
       media_task_runner_->PostTask(FROM_HERE, stop_done_cb_);
@@ -325,18 +388,46 @@ void MediaCodecDecoder::RequestToStop() {
   }
 }
 
-void MediaCodecDecoder::OnLastFrameRendered(bool completed) {
+void MediaCodecDecoder::OnLastFrameRendered(bool eos_encountered) {
   DCHECK(media_task_runner_->BelongsToCurrentThread());
 
-  DVLOG(0) << class_name() << "::" << __FUNCTION__
-           << " completed:" << completed;
+  DVLOG(1) << class_name() << "::" << __FUNCTION__
+           << " eos_encountered:" << eos_encountered;
 
   decoder_thread_.Stop();  // synchronous
 
   SetState(kStopped);
-  completed_ = completed;
+  completed_ = (eos_encountered && !drain_decoder_);
+
+  if (completed_ && !preroll_done_cb_.is_null()) {
+    media_task_runner_->PostTask(FROM_HERE,
+                                 base::ResetAndReturn(&preroll_done_cb_));
+  }
+
+  if (eos_encountered && drain_decoder_) {
+    ReleaseMediaCodec();
+    drain_decoder_ = false;
+    eos_enqueued_ = false;
+    preroll_mode_ = kPrerollTillOutputIsPresent;
+    media_task_runner_->PostTask(FROM_HERE, decoder_drained_cb_);
+  }
 
   media_task_runner_->PostTask(FROM_HERE, stop_done_cb_);
+}
+
+void MediaCodecDecoder::OnPrerollDone() {
+  DCHECK(media_task_runner_->BelongsToCurrentThread());
+
+  DVLOG(1) << class_name() << "::" << __FUNCTION__;
+
+  preroll_mode_ = kNoPreroll;
+
+  // The state might be kStopping.
+  if (GetState() == kPrerolling) {
+    SetState(kPrerolled);
+    media_task_runner_->PostTask(FROM_HERE,
+                                 base::ResetAndReturn(&preroll_done_cb_));
+  }
 }
 
 void MediaCodecDecoder::OnDemuxerDataAvailable(const DemuxerData& data) {
@@ -371,8 +462,37 @@ void MediaCodecDecoder::OnDemuxerDataAvailable(const DemuxerData& data) {
     PrefetchNextChunk();
 }
 
+bool MediaCodecDecoder::IsPrerollingForTests() const {
+  // UI task runner.
+  return GetState() == kPrerolling;
+}
+
+void MediaCodecDecoder::SetAlwaysReconfigureForTests() {
+  // UI task runner.
+  always_reconfigure_for_tests_ = true;
+}
+
+void MediaCodecDecoder::SetCodecCreatedCallbackForTests(base::Closure cb) {
+  // UI task runner.
+  codec_created_for_tests_cb_ = cb;
+}
+
 int MediaCodecDecoder::NumDelayedRenderTasks() const {
   return 0;
+}
+
+void MediaCodecDecoder::DoEmergencyStop() {
+  DCHECK(media_task_runner_->BelongsToCurrentThread());
+  DVLOG(1) << class_name() << "::" << __FUNCTION__;
+
+  // After this method returns, decoder thread will not be running.
+
+  // Set [kInEmergencyStop| state to block already posted ProcessNextFrame().
+  SetState(kInEmergencyStop);
+
+  decoder_thread_.Stop();  // synchronous
+
+  SetState(kStopped);
 }
 
 void MediaCodecDecoder::CheckLastFrame(bool eos_encountered,
@@ -421,7 +541,8 @@ void MediaCodecDecoder::PrefetchNextChunk() {
 
   AccessUnitQueue::Info au_info = au_queue_.GetInfo();
 
-  if (eos_enqueued_ || au_info.length >= kPrefetchLimit || au_info.has_eos) {
+  if (eos_enqueued_ || au_info.data_length >= kPrefetchLimit ||
+      au_info.has_eos) {
     // We are done prefetching
     SetState(kPrefetched);
     DVLOG(1) << class_name() << "::" << __FUNCTION__ << " posting PrefetchDone";
@@ -440,7 +561,7 @@ void MediaCodecDecoder::ProcessNextFrame() {
 
   DecoderState state = GetState();
 
-  if (state != kRunning && state != kStopping) {
+  if (state != kPrerolling && state != kRunning && state != kStopping) {
     DVLOG(1) << class_name() << "::" << __FUNCTION__ << ": not running";
     return;
   }
@@ -460,7 +581,7 @@ void MediaCodecDecoder::ProcessNextFrame() {
     return;
   }
 
-  DCHECK(state == kRunning);
+  DCHECK(state == kPrerolling || state == kRunning);
 
   if (!EnqueueInputBuffer())
     return;
@@ -500,39 +621,32 @@ bool MediaCodecDecoder::EnqueueInputBuffer() {
     return true;  // Nothing to do
   }
 
-  // Get the next frame from the queue and the queue info
+  // Get the next frame from the queue. As we go, request more data and
+  // consume |kConfigChanged| units.
 
-  AccessUnitQueue::Info au_info = au_queue_.GetInfo();
+  // |drain_decoder_| can be already set here if we could not dequeue the input
+  // buffer for it right away.
 
-  // Request the data from Demuxer
-  if (au_info.length <= kPlaybackLowLimit && !au_info.has_eos)
-    media_task_runner_->PostTask(FROM_HERE, request_data_cb_);
+  AccessUnitQueue::Info au_info;
+  if (!drain_decoder_) {
+    au_info = AdvanceAccessUnitQueue(&drain_decoder_);
+    if (!au_info.length) {
+      // Report starvation and return, Start() will be called again later.
+      DVLOG(1) << class_name() << "::" << __FUNCTION__
+               << ": starvation detected";
+      media_task_runner_->PostTask(FROM_HERE, starvation_cb_);
+      return true;
+    }
 
-  // Get the next frame from the queue
-
-  if (!au_info.length) {
-    // Report starvation and return, Start() will be called again later.
-    DVLOG(1) << class_name() << "::" << __FUNCTION__ << ": starvation detected";
-    media_task_runner_->PostTask(FROM_HERE, starvation_cb_);
-    return true;
-  }
-
-  if (au_info.configs) {
-    DVLOG(1) << class_name() << "::" << __FUNCTION__
-             << ": received new configs, not implemented";
-    // post an error for now?
-    media_task_runner_->PostTask(FROM_HERE, internal_error_cb_);
-    return false;
-  }
-
-  // We are ready to enqueue the front unit.
+    DCHECK(au_info.front_unit);
 
 #ifndef NDEBUG
-  if (verify_next_frame_is_key_) {
-    verify_next_frame_is_key_ = false;
-    VerifyUnitIsKeyFrame(au_info.front_unit);
-  }
+    if (verify_next_frame_is_key_) {
+      verify_next_frame_is_key_ = false;
+      VerifyUnitIsKeyFrame(au_info.front_unit);
+    }
 #endif
+  }
 
   // Dequeue input buffer
 
@@ -566,16 +680,18 @@ bool MediaCodecDecoder::EnqueueInputBuffer() {
   DCHECK_GE(index, 0);
 
   const AccessUnit* unit = au_info.front_unit;
-  DCHECK(unit);
 
-  if (unit->is_end_of_stream) {
+  if (drain_decoder_ || unit->is_end_of_stream) {
     DVLOG(1) << class_name() << "::" << __FUNCTION__ << ": QueueEOS";
     media_codec_bridge_->QueueEOS(index);
     eos_enqueued_ = true;
     return true;
   }
 
-  DVLOG(2) << class_name() << ":: QueueInputBuffer pts:" << unit->timestamp;
+  DCHECK(unit);
+
+  DVLOG(2) << class_name() << "::" << __FUNCTION__
+           << ": QueueInputBuffer pts:" << unit->timestamp;
 
   status = media_codec_bridge_->QueueInputBuffer(
       index, &unit->data[0], unit->data.size(), unit->timestamp);
@@ -592,6 +708,51 @@ bool MediaCodecDecoder::EnqueueInputBuffer() {
   return true;
 }
 
+AccessUnitQueue::Info MediaCodecDecoder::AdvanceAccessUnitQueue(
+    bool* drain_decoder) {
+  DCHECK(decoder_thread_.task_runner()->BelongsToCurrentThread());
+  DVLOG(2) << class_name() << "::" << __FUNCTION__;
+
+  // Retrieve access units from the |au_queue_| in a loop until we either get
+  // a non-config front unit or until the queue is empty.
+
+  DCHECK(drain_decoder != nullptr);
+
+  AccessUnitQueue::Info au_info;
+
+  do {
+    // Get current frame
+    au_info = au_queue_.GetInfo();
+
+    // Request the data from Demuxer
+    if (au_info.data_length <= kPlaybackLowLimit && !au_info.has_eos)
+      media_task_runner_->PostTask(FROM_HERE, request_data_cb_);
+
+    if (!au_info.length)
+      break;  // Starvation
+
+    if (au_info.configs) {
+      DVLOG(1) << class_name() << "::" << __FUNCTION__ << ": received configs "
+               << (*au_info.configs);
+
+      // Compare the new and current configs.
+      if (IsCodecReconfigureNeeded(*au_info.configs)) {
+        DVLOG(1) << class_name() << "::" << __FUNCTION__
+                 << ": reconfiguration and decoder drain required";
+        *drain_decoder = true;
+      }
+
+      // Replace the current configs.
+      SetDemuxerConfigs(*au_info.configs);
+
+      // Move to the next frame
+      au_queue_.Advance();
+    }
+  } while (au_info.configs);
+
+  return au_info;
+}
+
 // Returns false if there was MediaCodec error.
 bool MediaCodecDecoder::DepleteOutputBufferQueue() {
   DCHECK(decoder_thread_.task_runner()->BelongsToCurrentThread());
@@ -604,6 +765,8 @@ bool MediaCodecDecoder::DepleteOutputBufferQueue() {
   base::TimeDelta pts;
   MediaCodecStatus status;
   bool eos_encountered = false;
+
+  RenderMode render_mode;
 
   base::TimeDelta timeout =
       base::TimeDelta::FromMilliseconds(kOutputBufferTimeout);
@@ -632,8 +795,24 @@ bool MediaCodecDecoder::DepleteOutputBufferQueue() {
         break;
 
       case MEDIA_CODEC_OK:
-        // We got the decoded frame
-        Render(buffer_index, size, true, pts, eos_encountered);
+        // We got the decoded frame.
+
+        if (pts < preroll_timestamp_)
+          render_mode = kRenderSkip;
+        else if (GetState() == kPrerolling)
+          render_mode = kRenderAfterPreroll;
+        else
+          render_mode = kRenderNow;
+
+        Render(buffer_index, offset, size, render_mode, pts, eos_encountered);
+
+        if (render_mode == kRenderAfterPreroll) {
+          DVLOG(1) << class_name() << "::" << __FUNCTION__ << " pts " << pts
+                   << " >= preroll timestamp " << preroll_timestamp_
+                   << " preroll done, stopping frame processing";
+          media_task_runner_->PostTask(FROM_HERE, internal_preroll_done_cb_);
+          return false;
+        }
         break;
 
       case MEDIA_CODEC_DEQUEUE_OUTPUT_AGAIN_LATER:
@@ -686,18 +865,28 @@ void MediaCodecDecoder::SetState(DecoderState state) {
   case x:                \
     return #x;
 
+const char* MediaCodecDecoder::AsString(RenderMode render_mode) {
+  switch (render_mode) {
+    RETURN_STRING(kRenderSkip);
+    RETURN_STRING(kRenderAfterPreroll);
+    RETURN_STRING(kRenderNow);
+  }
+  return nullptr;  // crash early
+}
+
 const char* MediaCodecDecoder::AsString(DecoderState state) {
   switch (state) {
     RETURN_STRING(kStopped);
     RETURN_STRING(kPrefetching);
     RETURN_STRING(kPrefetched);
+    RETURN_STRING(kPrerolling);
+    RETURN_STRING(kPrerolled);
     RETURN_STRING(kRunning);
     RETURN_STRING(kStopping);
     RETURN_STRING(kInEmergencyStop);
     RETURN_STRING(kError);
-    default:
-      return "Unknown DecoderState";
   }
+  return nullptr;  // crash early
 }
 
 #undef RETURN_STRING

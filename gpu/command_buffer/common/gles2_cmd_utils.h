@@ -137,9 +137,10 @@ class GLES2_UTILS_EXPORT GLES2Util {
 
   static size_t GLTargetToFaceIndex(uint32_t target);
 
-  static uint32_t GetPreferredGLReadPixelsFormat(uint32_t internal_format);
+  static uint32_t GetGLReadPixelsImplementationFormat(
+      uint32_t internal_format);
 
-  static uint32_t GetPreferredGLReadPixelsType(
+  static uint32_t GetGLReadPixelsImplementationType(
       uint32_t internal_format, uint32_t texture_type);
 
   // Returns a bitmask for the channels the given format supports.
@@ -185,6 +186,10 @@ class GLES2_UTILS_EXPORT GLES2Util {
   static uint64_t MapTwoUint32ToUint64(uint32_t v32_0, uint32_t v32_1);
 
   static uint32_t MapBufferTargetToBindingEnum(uint32_t target);
+
+  static bool IsUnsignedIntegerFormat(uint32_t internal_format);
+  static bool IsSignedIntegerFormat(uint32_t internal_format);
+  static bool IsIntegerFormat(uint32_t internal_format);
 
   #include "../common/gles2_cmd_utils_autogen.h"
 

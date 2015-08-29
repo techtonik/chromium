@@ -600,10 +600,15 @@ virtual void BeginTransformFeedback(GLenum primitivemode) = 0;
 virtual void EndQueryEXT(GLenum target) = 0;
 virtual void EndTransformFeedback() = 0;
 virtual void GetQueryivEXT(GLenum target, GLenum pname, GLint* params) = 0;
+virtual void GetQueryObjectivEXT(GLuint id, GLenum pname, GLint* params) = 0;
 virtual void GetQueryObjectuivEXT(GLuint id, GLenum pname, GLuint* params) = 0;
+virtual void GetQueryObjecti64vEXT(GLuint id,
+                                   GLenum pname,
+                                   GLint64* params) = 0;
 virtual void GetQueryObjectui64vEXT(GLuint id,
                                     GLenum pname,
                                     GLuint64* params) = 0;
+virtual void SetDisjointValueSyncCHROMIUM() = 0;
 virtual void InsertEventMarkerEXT(GLsizei length, const GLchar* marker) = 0;
 virtual void PushGroupMarkerEXT(GLsizei length, const GLchar* marker) = 0;
 virtual void PopGroupMarkerEXT() = 0;
@@ -707,6 +712,15 @@ virtual void CopySubTextureCHROMIUM(GLenum target,
 virtual void CompressedCopyTextureCHROMIUM(GLenum target,
                                            GLenum source_id,
                                            GLenum dest_id) = 0;
+virtual void CompressedCopySubTextureCHROMIUM(GLenum target,
+                                              GLenum source_id,
+                                              GLenum dest_id,
+                                              GLint xoffset,
+                                              GLint yoffset,
+                                              GLint x,
+                                              GLint y,
+                                              GLsizei width,
+                                              GLsizei height) = 0;
 virtual void DrawArraysInstancedANGLE(GLenum mode,
                                       GLint first,
                                       GLsizei count,
@@ -743,26 +757,6 @@ virtual void ReleaseTexImage2DCHROMIUM(GLenum target, GLint imageId) = 0;
 virtual void TraceBeginCHROMIUM(const char* category_name,
                                 const char* trace_name) = 0;
 virtual void TraceEndCHROMIUM() = 0;
-virtual void AsyncTexSubImage2DCHROMIUM(GLenum target,
-                                        GLint level,
-                                        GLint xoffset,
-                                        GLint yoffset,
-                                        GLsizei width,
-                                        GLsizei height,
-                                        GLenum format,
-                                        GLenum type,
-                                        const void* data) = 0;
-virtual void AsyncTexImage2DCHROMIUM(GLenum target,
-                                     GLint level,
-                                     GLenum internalformat,
-                                     GLsizei width,
-                                     GLsizei height,
-                                     GLint border,
-                                     GLenum format,
-                                     GLenum type,
-                                     const void* pixels) = 0;
-virtual void WaitAsyncTexImage2DCHROMIUM(GLenum target) = 0;
-virtual void WaitAllAsyncTexImage2DCHROMIUM() = 0;
 virtual void DiscardFramebufferEXT(GLenum target,
                                    GLsizei count,
                                    const GLenum* attachments) = 0;
