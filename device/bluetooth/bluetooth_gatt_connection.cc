@@ -9,7 +9,7 @@
 namespace device {
 
 BluetoothGattConnection::BluetoothGattConnection(
-    BluetoothAdapter* adapter,
+    scoped_refptr<device::BluetoothAdapter> adapter,
     const std::string& device_address)
     : adapter_(adapter), device_address_(device_address) {
   DCHECK(adapter_.get());

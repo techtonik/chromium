@@ -22,7 +22,7 @@ class BluetoothAdapter;
 // operating system (e.g. due to user action).
 class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
  public:
-  BluetoothGattConnection(BluetoothAdapter* adapter,
+  BluetoothGattConnection(scoped_refptr<device::BluetoothAdapter> adapter,
                           const std::string& device_address);
 
   // Destructor automatically closes this GATT connection. If this is the last

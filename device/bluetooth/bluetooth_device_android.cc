@@ -188,8 +188,6 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
   NOTIMPLEMENTED();
 }
 
-}
-
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
     : BluetoothDevice(adapter) {}
 
