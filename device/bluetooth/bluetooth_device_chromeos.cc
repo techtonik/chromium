@@ -412,14 +412,10 @@ void BluetoothDeviceChromeOS::Disconnect(const base::Closure& callback,
 
 void BluetoothDeviceChromeOS::Forget(const ErrorCallback& error_callback) {
   VLOG(1) << object_path_.value() << ": Removing device";
-  DBusThreadManager::Get()->GetBluetoothAdapterClient()->
-      RemoveDevice(
-          adapter()->object_path(),
-          object_path_,
-          base::Bind(&base::DoNothing),
-          base::Bind(&BluetoothDeviceChromeOS::OnForgetError,
-                     weak_ptr_factory_.GetWeakPtr(),
-                     error_callback));
+  DBusThreadManager::Get()->GetBluetoothAdapterClient()->RemoveDevice(
+      adapter()->object_path(), object_path_, base::Bind(&base::DoNothing),
+      base::Bind(&BluetoothDeviceChromeOS::OnForgetError,
+                 weak_ptr_factory_.GetWeakPtr(), error_callback));
 }
 
 void BluetoothDeviceChromeOS::ConnectToService(
