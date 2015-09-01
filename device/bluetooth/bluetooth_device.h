@@ -433,7 +433,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
 
  protected:
   // BluetoothGattConnection is a friend to call
-  // In/DecrementGattConnectionReferenceCount.
+  // Inc/DecrementGattConnectionReferenceCount.
   friend BluetoothGattConnection;
 
   BluetoothDevice(BluetoothAdapter* adapter);
