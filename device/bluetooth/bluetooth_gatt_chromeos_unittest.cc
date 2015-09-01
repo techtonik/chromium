@@ -209,7 +209,6 @@ TEST_F(BluetoothGattChromeOSTest, GattConnection) {
                  base::Unretained(this)));
 
   EXPECT_EQ(1, success_callback_count_);
-  success_callback_count_ = 0;
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_TRUE(device->IsConnected());
   ASSERT_TRUE(gatt_conn_.get());
@@ -227,7 +226,7 @@ TEST_F(BluetoothGattChromeOSTest, GattConnection) {
       base::Bind(&BluetoothGattChromeOSTest::ConnectErrorCallback,
                  base::Unretained(this)));
 
-  EXPECT_EQ(1, success_callback_count_);
+  EXPECT_EQ(2, success_callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_TRUE(device->IsConnected());
   ASSERT_TRUE(gatt_conn_.get());
@@ -239,7 +238,7 @@ TEST_F(BluetoothGattChromeOSTest, GattConnection) {
       base::Bind(&BluetoothGattChromeOSTest::ErrorCallback,
                  base::Unretained(this)));
 
-  EXPECT_EQ(1, success_callback_count_);
+  EXPECT_EQ(3, success_callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   ASSERT_TRUE(gatt_conn_.get());
   EXPECT_FALSE(gatt_conn_->IsConnected());
@@ -250,7 +249,7 @@ TEST_F(BluetoothGattChromeOSTest, GattConnection) {
       base::Bind(&BluetoothGattChromeOSTest::ConnectErrorCallback,
                  base::Unretained(this)));
 
-  EXPECT_EQ(1, success_callback_count_--);
+  EXPECT_EQ(4, success_callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_TRUE(device->IsConnected());
   EXPECT_TRUE(gatt_conn_->IsConnected());
