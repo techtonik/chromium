@@ -72,7 +72,7 @@ class VideoCaptureImplManagerTest : public ::testing::Test {
       : manager_(new MockVideoCaptureImplManager(
           BindToCurrentLoop(cleanup_run_loop_.QuitClosure()))) {
     params_.requested_format = media::VideoCaptureFormat(
-        gfx::Size(176, 144), 30, media::VIDEO_CAPTURE_PIXEL_FORMAT_I420);
+        gfx::Size(176, 144), 30, media::PIXEL_FORMAT_I420);
     child_process_.reset(new ChildProcess());
   }
 
@@ -161,7 +161,11 @@ TEST_F(VideoCaptureImplManagerTest, RefusesMultipleClients) {
   // TODO(ajose): EXPECT_DEATH is unsafe in a threaded context - what to use
   // instead?
   base::Closure release_cb1 = manager_->UseDevice(0);
-  EXPECT_DEATH(base::Closure release_cb2 = manager_->UseDevice(0), "");
+// Use DCHECK_IS_ON rather than EXPECT_DEBUG_DEATH or similar to avoid
+// issues on release builds that include DCHECKs.
+#if DCHECK_IS_ON()
+  EXPECT_DEATH(manager_->UseDevice(0), "");
+#endif
 }
 
 TEST_F(VideoCaptureImplManagerTest, NoLeak) {

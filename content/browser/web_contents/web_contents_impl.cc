@@ -616,13 +616,13 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
                         OnMediaPlayingNotification)
     IPC_MESSAGE_HANDLER(FrameHostMsg_MediaPausedNotification,
                         OnMediaPausedNotification)
-    IPC_MESSAGE_HANDLER(FrameHostMsg_DidFirstVisuallyNonEmptyPaint,
+    IPC_MESSAGE_HANDLER(ViewHostMsg_DidFirstVisuallyNonEmptyPaint,
                         OnFirstVisuallyNonEmptyPaint)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidLoadResourceFromMemoryCache,
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidLoadResourceFromMemoryCache,
                         OnDidLoadResourceFromMemoryCache)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidDisplayInsecureContent,
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidDisplayInsecureContent,
                         OnDidDisplayInsecureContent)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidRunInsecureContent,
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidRunInsecureContent,
                         OnDidRunInsecureContent)
     IPC_MESSAGE_HANDLER(ViewHostMsg_GoToEntryAtOffset, OnGoToEntryAtOffset)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UpdateZoomLimits, OnUpdateZoomLimits)
@@ -835,18 +835,10 @@ void WebContentsImpl::RequestAXTreeSnapshot(AXTreeSnapshotCallback callback) {
   GetMainFrame()->RequestAXTreeSnapshot(callback);
 }
 
-WebUI* WebContentsImpl::CreateWebUI(const GURL& url) {
-  WebUIImpl* web_ui = new WebUIImpl(this);
-  WebUIController* controller = WebUIControllerFactoryRegistry::GetInstance()->
-      CreateWebUIControllerForURL(web_ui, url);
-  if (controller) {
-    web_ui->AddMessageHandler(new GenericHandler());
-    web_ui->SetController(controller);
-    return web_ui;
-  }
-
-  delete web_ui;
-  return NULL;
+WebUI* WebContentsImpl::CreateSubframeWebUI(const GURL& url,
+                                            const std::string& frame_name) {
+  DCHECK(!frame_name.empty());
+  return CreateWebUI(url, frame_name);
 }
 
 WebUI* WebContentsImpl::GetWebUI() const {
@@ -1340,9 +1332,9 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params) {
               params.main_frame_routing_id == MSG_ROUTING_NONE) ||
          (params.routing_id != MSG_ROUTING_NONE &&
               params.main_frame_routing_id != MSG_ROUTING_NONE));
-  GetRenderManager()->Init(
-      params.browser_context, params.site_instance, params.routing_id,
-      params.main_frame_routing_id);
+  GetRenderManager()->Init(params.browser_context, params.site_instance,
+                           params.routing_id, params.main_frame_routing_id,
+                           MSG_ROUTING_NONE, 0 /* surface_id */);
   frame_tree_.root()->SetFrameName(params.main_frame_name);
 
   WebContentsViewDelegate* delegate =
@@ -1807,19 +1799,23 @@ void WebContentsImpl::CreateNewWindow(
   }
 }
 
-void WebContentsImpl::CreateNewWidget(int render_process_id,
-                                      int route_id,
+void WebContentsImpl::CreateNewWidget(int32 render_process_id,
+                                      int32 route_id,
+                                      int32 surface_id,
                                       blink::WebPopupType popup_type) {
-  CreateNewWidget(render_process_id, route_id, false, popup_type);
+  CreateNewWidget(render_process_id, route_id, surface_id, false, popup_type);
 }
 
-void WebContentsImpl::CreateNewFullscreenWidget(int render_process_id,
-                                                int route_id) {
-  CreateNewWidget(render_process_id, route_id, true, blink::WebPopupTypeNone);
+void WebContentsImpl::CreateNewFullscreenWidget(int32 render_process_id,
+                                                int32 route_id,
+                                                int32 surface_id) {
+  CreateNewWidget(render_process_id, route_id, surface_id, true,
+                  blink::WebPopupTypeNone);
 }
 
-void WebContentsImpl::CreateNewWidget(int render_process_id,
-                                      int route_id,
+void WebContentsImpl::CreateNewWidget(int32 render_process_id,
+                                      int32 route_id,
+                                      int32 surface_id,
                                       bool is_fullscreen,
                                       blink::WebPopupType popup_type) {
   RenderProcessHost* process = GetRenderProcessHost();
@@ -1838,7 +1834,7 @@ void WebContentsImpl::CreateNewWidget(int render_process_id,
   }
 
   RenderWidgetHostImpl* widget_host =
-      new RenderWidgetHostImpl(this, process, route_id, IsHidden());
+      new RenderWidgetHostImpl(this, process, route_id, surface_id, IsHidden());
   created_widgets_.insert(widget_host);
 
   RenderWidgetHostViewBase* widget_view =
@@ -4331,7 +4327,8 @@ NavigationControllerImpl& WebContentsImpl::GetControllerForRenderManager() {
 
 scoped_ptr<WebUIImpl> WebContentsImpl::CreateWebUIForRenderManager(
     const GURL& url) {
-  return scoped_ptr<WebUIImpl>(static_cast<WebUIImpl*>(CreateWebUI(url)));
+  return scoped_ptr<WebUIImpl>(static_cast<WebUIImpl*>(CreateWebUI(
+      url, std::string())));
 }
 
 NavigationEntry*
@@ -4607,6 +4604,21 @@ void WebContentsImpl::RemoveAllMediaPlayerEntries(
   if (it == player_map->end())
     return;
   player_map->erase(it);
+}
+
+WebUI* WebContentsImpl::CreateWebUI(const GURL& url,
+                                    const std::string& frame_name) {
+  WebUIImpl* web_ui = new WebUIImpl(this, frame_name);
+  WebUIController* controller = WebUIControllerFactoryRegistry::GetInstance()->
+      CreateWebUIControllerForURL(web_ui, url);
+  if (controller) {
+    web_ui->AddMessageHandler(new GenericHandler());
+    web_ui->SetController(controller);
+    return web_ui;
+  }
+
+  delete web_ui;
+  return NULL;
 }
 
 void WebContentsImpl::SetForceDisableOverscrollContent(bool force_disable) {

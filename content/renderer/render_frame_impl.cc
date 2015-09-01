@@ -537,6 +537,8 @@ bool IsReload(FrameMsg_Navigate_Type::Value navigation_type) {
 RenderFrameImpl::CreateRenderFrameImplFunction g_create_render_frame_impl =
     nullptr;
 
+void OnGotContentHandlerID(uint32_t content_handler_id) {}
+
 }  // namespace
 
 // static
@@ -757,6 +759,8 @@ RenderFrameImpl::RenderFrameImpl(const CreateParams& params)
 #endif
 
   manifest_manager_ = new ManifestManager(this);
+
+  GetServiceRegistry()->ConnectToRemoteService(mojo::GetProxy(&mojo_shell_));
 }
 
 RenderFrameImpl::~RenderFrameImpl() {
@@ -3452,19 +3456,14 @@ void RenderFrameImpl::didLoadResourceFromMemoryCache(
 
   // Let the browser know we loaded a resource from the memory cache.  This
   // message is needed to display the correct SSL indicators.
-  render_view_->Send(new ViewHostMsg_DidLoadResourceFromMemoryCache(
-      render_view_->GetRoutingID(),
-      url,
-      response.securityInfo(),
-      request.httpMethod().utf8(),
-      response.mimeType().utf8(),
-      WebURLRequestToResourceType(request)));
+  Send(new FrameHostMsg_DidLoadResourceFromMemoryCache(
+      routing_id_, url, response.securityInfo(), request.httpMethod().utf8(),
+      response.mimeType().utf8(), WebURLRequestToResourceType(request)));
 }
 
 void RenderFrameImpl::didDisplayInsecureContent(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  render_view_->Send(new ViewHostMsg_DidDisplayInsecureContent(
-      render_view_->GetRoutingID()));
+  Send(new FrameHostMsg_DidDisplayInsecureContent(routing_id_));
 }
 
 void RenderFrameImpl::didRunInsecureContent(
@@ -3472,10 +3471,8 @@ void RenderFrameImpl::didRunInsecureContent(
     const blink::WebSecurityOrigin& origin,
     const blink::WebURL& target) {
   DCHECK(!frame_ || frame_ == frame);
-  render_view_->Send(new ViewHostMsg_DidRunInsecureContent(
-      render_view_->GetRoutingID(),
-      origin.toString().utf8(),
-      target));
+  Send(new FrameHostMsg_DidRunInsecureContent(
+      routing_id_, origin.toString().utf8(), target));
   GetContentClient()->renderer()->RecordRapporURL(
       "ContentSettings.MixedScript.RanMixedScript",
       GURL(origin.toString().utf8()));
@@ -3509,22 +3506,6 @@ void RenderFrameImpl::willReleaseScriptContext(blink::WebLocalFrame* frame,
   FOR_EACH_OBSERVER(RenderFrameObserver,
                     observers_,
                     WillReleaseScriptContext(context, world_id));
-}
-
-void RenderFrameImpl::didFirstVisuallyNonEmptyLayout(
-    blink::WebLocalFrame* frame) {
-  DCHECK(!frame_ || frame_ == frame);
-  if (frame->parent())
-    return;
-
-#if defined(OS_ANDROID)
-  GetRenderWidget()->DidChangeBodyBackgroundColor(
-      render_view_->webwidget_->backgroundColor());
-#endif
-
-  GetRenderWidget()->QueueMessage(
-      new FrameHostMsg_DidFirstVisuallyNonEmptyPaint(routing_id_),
-      MESSAGE_DELIVERY_POLICY_WITH_VISUAL_STATE);
 }
 
 void RenderFrameImpl::didChangeScrollOffset(blink::WebLocalFrame* frame) {
@@ -3730,8 +3711,8 @@ bool RenderFrameImpl::allowWebGL(blink::WebLocalFrame* frame,
     return false;
 
   bool blocked = true;
-  render_view_->Send(new ViewHostMsg_Are3DAPIsBlocked(
-      render_view_->GetRoutingID(),
+  Send(new FrameHostMsg_Are3DAPIsBlocked(
+      routing_id_,
       GURL(frame->top()->securityOrigin().toString()),
       THREE_D_API_TYPE_WEBGL,
       &blocked));
@@ -3741,7 +3722,7 @@ bool RenderFrameImpl::allowWebGL(blink::WebLocalFrame* frame,
 void RenderFrameImpl::didLoseWebGLContext(blink::WebLocalFrame* frame,
                                           int arb_robustness_status_code) {
   DCHECK(!frame_ || frame_ == frame);
-  render_view_->Send(new ViewHostMsg_DidLose3DContext(
+  Send(new FrameHostMsg_DidLose3DContext(
       GURL(frame->top()->securityOrigin().toString()),
       THREE_D_API_TYPE_WEBGL,
       arb_robustness_status_code));
@@ -3856,6 +3837,13 @@ blink::WebBluetooth* RenderFrameImpl::bluetooth() {
 }
 
 blink::WebUSBClient* RenderFrameImpl::usbClient() {
+#if !defined(OS_ANDROID)
+  if (!usb_client_) {
+    mojo::ServiceProviderPtr device_services =
+        ConnectToApplication(GURL(device::kDevicesMojoAppUrl));
+    usb_client_.reset(new WebUSBClientImpl(device_services.Pass()));
+  }
+#endif
   return usb_client_.get();
 }
 
@@ -5104,13 +5092,13 @@ void RenderFrameImpl::RegisterMojoServices() {
 
 mojo::ServiceProviderPtr RenderFrameImpl::ConnectToApplication(
     const GURL& url) {
-  if (!mojo_shell_)
-    GetServiceRegistry()->ConnectToRemoteService(mojo::GetProxy(&mojo_shell_));
+  DCHECK(mojo_shell_);
   mojo::ServiceProviderPtr service_provider;
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From(url);
   mojo_shell_->ConnectToApplication(request.Pass(), GetProxy(&service_provider),
-                                    nullptr, nullptr);
+                                    nullptr, nullptr,
+                                    base::Bind(&OnGotContentHandlerID));
   return service_provider.Pass();
 }
 

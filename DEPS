@@ -31,15 +31,15 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': 'e31c7ea0e9081344aa00c431107cdb5c06da492e', # from svn revision 201454
+  'webkit_revision': '1fe1783bc14eed98aa761242a46e6bb40dc30f67', # from svn revision 201568
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': 'a208ecae8e6fff1c0d4286bdc000d7c5efaab411',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '6d2a203117015b4da13dbc5f627646df69d92653',
+  'skia_revision': '73fa61670d95c52250a660a2cec618ab77716934',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '738e9567a03bc7530d46a8e5025b7f271003fae9',
+  'v8_revision': 'a1ea47147f475de7533dfa7471f6c1502b6723d2',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -55,7 +55,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '5e4a5cc9ad76dc08d62fb1e10bdfb811f3720c43',
+  'pdfium_revision': '7858c0aae5ee449dafe23c0e1aa0c164ae2889eb',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -150,7 +150,7 @@ deps = {
     Var('chromium_git') + '/external/grit-i18n.git' + '@' + '15d48e32cc9f346245c823ce48c54209d02ea983', # from svn revision 196
 
   'src/tools/gyp':
-    Var('chromium_git') + '/external/gyp.git' + '@' + '6ee91ad8659871916f9aa840d42e1513befdf638',
+    Var('chromium_git') + '/external/gyp.git' + '@' + '121d89dfcd4f6ebe1c89524b3f9ca11ddd437e77',
 
   'src/tools/swarming_client':
    Var('chromium_git') + '/external/swarming.client.git' + '@' +  Var('swarming_revision'),
@@ -192,7 +192,7 @@ deps = {
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '3651d8ef1fe8bf1fab61da6298341470402c991a',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '358c92ba9f1c415179bc282619ccfed6674720f0', # commit position 9797
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '34dfeb16274e03ee65bd9dce9a0b16e7b97f45c1', # commit position 9819
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -207,7 +207,7 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libjpeg_turbo.git' + '@' + '631e2dd119d49794e3572b6ca3f16ee39d59f372',
 
   'src/third_party/flac':
-   Var('chromium_git') + '/chromium/deps/flac.git' + '@' + 'e1b6e7983a8c54954f13f40772a40f490f1eefca',
+   Var('chromium_git') + '/chromium/deps/flac.git' + '@' + '2c4b86af352b23498315c016dc207e3fb2733fc0',
 
   'src/third_party/pyftpdlib/src':
     Var('chromium_git') + '/external/pyftpdlib.git' + '@' + '2be6d65e31c7ee6320d059f581f05ae8d89d7e45',
@@ -216,7 +216,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'f9604616b9b6faacd3d92118ed7b2c6f27692377', # commit position 9803
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'a0c5f5d1ee45e20e1d50d3a4d5539ee589f24f0a', # commit position 9824
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
