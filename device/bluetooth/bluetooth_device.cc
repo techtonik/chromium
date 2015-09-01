@@ -305,9 +305,14 @@ void BluetoothDevice::DidFailToConnectGatt(ConnectErrorCode error) {
 }
 
 void BluetoothDevice::DidDisconnectGatt() {
-  // If pending calls to connect GATT existed, flush them to ensure a consistent
-  // state.
-  DidFailToConnectGatt(ERROR_UNKNOWN);
+  // Pending calls to connect GATT are not expected, if they were then
+  // DidFailToConnectGatt should be called. But in case callbacks exist
+  // flush them to ensure a consistent state.
+  if (create_gatt_connection_error_callbacks_.size() > 0) {
+    VLOG(1) << "Unexpected / unexplained DidDisconnectGatt call while "
+               "create_gatt_connection_error_callbacks_ are pending.";
+  }
+  DidFailToConnectGatt(ERROR_FAILED);
 }
 
 void BluetoothDevice::IncrementGattConnectionReferenceCount() {
