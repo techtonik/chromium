@@ -1353,6 +1353,7 @@
       'browser/background/background_mode_manager_chromeos.cc',
       'browser/background/background_mode_manager_mac.mm',
       'browser/background/background_mode_manager_win.cc',
+      'browser/background/background_trigger.h',
     ],
     'chrome_browser_bookmark_sources': [
       'browser/bookmarks/bookmark_model_factory.cc',
@@ -1932,10 +1933,6 @@
       'browser/net/prediction_options.h',
       'browser/net/predictor.cc',
       'browser/net/predictor.h',
-      'browser/net/pref_proxy_config_tracker.cc',
-      'browser/net/pref_proxy_config_tracker.h',
-      'browser/net/pref_proxy_config_tracker_impl.cc',
-      'browser/net/pref_proxy_config_tracker_impl.h',
       'browser/net/probe_message.cc',
       'browser/net/probe_message.h',
       'browser/net/proxy_service_factory.cc',
@@ -2063,8 +2060,6 @@
       'browser/password_manager/save_password_infobar_delegate.h',
       'browser/password_manager/simple_password_store_mac.cc',
       'browser/password_manager/simple_password_store_mac.h',
-      'browser/password_manager/sync_metrics.cc',
-      'browser/password_manager/sync_metrics.h',
     ],
     'chrome_browser_permissions_sources': [
       'browser/permissions/permission_bubble_request_impl.cc',
@@ -2448,6 +2443,8 @@
       'browser/safe_browsing/remote_database_manager.h',
       'browser/safe_browsing/safe_browsing_api_handler.cc',
       'browser/safe_browsing/safe_browsing_api_handler.h',
+      'browser/safe_browsing/safe_browsing_api_handler_util.cc',
+      'browser/safe_browsing/safe_browsing_api_handler_util.h',
     ],
     # "Safe Browsing Full" files in addition to the "basic" ones to use for
     # full safe browsing. This has some in common with "mobile_extended."
@@ -2847,8 +2844,6 @@
       'browser/supervised_user/supervised_user_theme.h',
     ],
     'chrome_browser_sync_sources': [
-      'browser/sync/about_sync_util.cc',
-      'browser/sync/about_sync_util.h',
       'browser/sync/backup_rollback_controller.cc',
       'browser/sync/backup_rollback_controller.h',
       'browser/sync/chrome_sync_client.cc',
@@ -3252,6 +3247,7 @@
             '../components/components.gyp:password_manager_sync_browser',
             '../components/components.gyp:plugins_common',
             '../components/components.gyp:power',
+            '../components/components.gyp:proxy_config',
             '../components/components.gyp:safe_json',
             '../components/components.gyp:sessions_content',
             '../components/components.gyp:storage_monitor',

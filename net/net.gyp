@@ -294,10 +294,7 @@
             ],
           },
         ],
-        # Always need use_v8_in_net to be 1 to run gyp on Android, so just
-        # remove net_unittest's dependency on v8 when using icu alternatives
-        # instead of setting use_v8_in_net to 0.
-        [ 'use_v8_in_net==1 and use_icu_alternatives_on_android==0', {
+        [ 'use_v8_in_net==1', {
             'dependencies': [
               'net_with_v8',
             ],
@@ -411,16 +408,6 @@
             '../testing/android/native_test.gyp:native_test_native_code',
           ]
         }],
-        [ 'use_icu_alternatives_on_android == 1', {
-            'dependencies!': [
-              '../base/base.gyp:base_i18n',
-            ],
-            'sources!': [
-              'base/filename_util_unittest.cc',
-              'base/net_util_icu_unittest.cc',
-            ],
-          },
-        ],
         ['use_v8_in_net==1 and v8_use_external_startup_data==1', {
           'dependencies': [
             '../gin/gin.gyp:gin',
@@ -610,6 +597,16 @@
         ['OS != "ios"', {
           'dependencies': [
             '../third_party/protobuf/protobuf.gyp:py_proto',
+          ],
+        }, {
+          'sources!': [
+            'test/spawned_test_server/base_test_server.cc',
+            'test/spawned_test_server/base_test_server.h',
+            'test/spawned_test_server/local_test_server.cc',
+            'test/spawned_test_server/local_test_server.h',
+            'test/spawned_test_server/local_test_server_posix.cc',
+            'test/spawned_test_server/local_test_server_win.cc',
+            'test/spawned_test_server/spawned_test_server.h',
           ],
         }],
         ['use_nss_certs == 1 or OS == "ios"', {
@@ -1332,7 +1329,6 @@
             'disable_ftp_support': 1,
             'disable_file_support': 1,
             'enable_websockets': 0,
-            'use_icu_alternatives_on_android': 1,
           },
           'dependencies': [
             '../url/url.gyp:url_lib_use_icu_alternatives_on_android',

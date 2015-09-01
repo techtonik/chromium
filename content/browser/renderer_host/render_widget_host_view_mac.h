@@ -25,12 +25,12 @@
 #include "content/common/content_export.h"
 #include "content/common/cursors/webcursor.h"
 #include "content/common/edit_command.h"
-#import "content/public/browser/render_widget_host_view_mac_base.h"
 #include "ipc/ipc_sender.h"
 #include "third_party/WebKit/public/web/WebCompositionUnderline.h"
 #include "ui/accelerated_widget_mac/accelerated_widget_mac.h"
 #include "ui/accelerated_widget_mac/display_link_mac.h"
 #include "ui/accelerated_widget_mac/io_surface_layer.h"
+#import "ui/base/cocoa/command_dispatcher.h"
 #include "ui/base/cocoa/remote_layer_api.h"
 #import "ui/base/cocoa/tool_tip_base_view.h"
 #include "ui/gfx/display_observer.h"
@@ -61,7 +61,7 @@ class Layer;
 // but that means that the view needs to own the delegate and will dispose of it
 // when it's removed from the view system.
 @interface RenderWidgetHostViewCocoa
-    : ToolTipBaseView<RenderWidgetHostViewMacBase,
+    : ToolTipBaseView<CommandDispatcherTarget,
                       RenderWidgetHostViewMacOwner,
                       NSTextInputClient> {
  @private
@@ -362,9 +362,6 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   void PluginImeCompositionCompleted(const base::string16& text, int plugin_id);
 
   const std::string& selected_text() const { return selected_text_; }
-  const gfx::Range& composition_range() const { return composition_range_; }
-  const base::string16& selection_text() const { return selection_text_; }
-  size_t selection_text_offset() const { return selection_text_offset_; }
 
   // Returns true and stores first rectangle for character range if the
   // requested |range| is already cached, otherwise returns false.
@@ -589,9 +586,6 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
 
   // The current caret bounds.
   gfx::Rect caret_rect_;
-
-  // The current first selection bounds.
-  gfx::Rect first_selection_rect_;
 
   // Factory used to safely scope delayed calls to ShutdownHost().
   base::WeakPtrFactory<RenderWidgetHostViewMac> weak_factory_;

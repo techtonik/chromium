@@ -10,6 +10,7 @@
 #include "ipc/ipc_message_macros.h"
 #include "media/base/video_capture_types.h"
 #include "media/base/video_frame.h"
+#include "ui/gfx/gpu_memory_buffer.h"
 
 #undef IPC_MESSAGE_EXPORT
 #define IPC_MESSAGE_EXPORT CONTENT_EXPORT
@@ -22,8 +23,6 @@ IPC_ENUM_TRAITS_MAX_VALUE(media::ResolutionChangePolicy,
 IPC_ENUM_TRAITS_MAX_VALUE(media::VideoPixelFormat, media::PIXEL_FORMAT_MAX)
 IPC_ENUM_TRAITS_MAX_VALUE(media::VideoFrame::StorageType,
                           media::VideoFrame::STORAGE_LAST)
-IPC_ENUM_TRAITS_MAX_VALUE(media::VideoCapturePixelFormat,
-                          media::VIDEO_CAPTURE_PIXEL_FORMAT_MAX)
 IPC_ENUM_TRAITS_MAX_VALUE(media::VideoPixelStorage, media::PIXEL_STORAGE_MAX)
 IPC_ENUM_TRAITS_MAX_VALUE(media::PowerLineFrequency,
                           media::PowerLineFrequency::FREQUENCY_MAX)
@@ -60,6 +59,14 @@ IPC_MESSAGE_CONTROL4(VideoCaptureMsg_NewBuffer,
                      int /* device id */,
                      base::SharedMemoryHandle /* handle */,
                      int /* length */,
+                     int /* buffer_id */)
+
+// Tell the renderer process that a new GpuMemoryBuffer backed buffer is
+// allocated for video capture.
+IPC_MESSAGE_CONTROL4(VideoCaptureMsg_NewBuffer2,
+                     int /* device id */,
+                     std::vector<gfx::GpuMemoryBufferHandle> /* handles */,
+                     gfx::Size /* dimensions */,
                      int /* buffer_id */)
 
 // Tell the renderer process that it should release a buffer previously

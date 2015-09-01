@@ -289,6 +289,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::RendererPreferences)
   IPC_STRUCT_TRAITS_MEMBER(arrow_bitmap_height_vertical_scroll_bar_in_dips)
   IPC_STRUCT_TRAITS_MEMBER(arrow_bitmap_width_horizontal_scroll_bar_in_dips)
 #endif
+  IPC_STRUCT_TRAITS_MEMBER(default_font_size)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::WebPluginGeometry)
@@ -1119,25 +1120,6 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_UpdateTargetURL,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_DocumentAvailableInMainFrame,
                     bool /* uses_temporary_zoom_level */)
 
-// Sent when the renderer loads a resource from its memory cache.
-// The security info is non empty if the resource was originally loaded over
-// a secure connection.
-// Note: May only be sent once per URL per frame per committed load.
-IPC_MESSAGE_ROUTED5(ViewHostMsg_DidLoadResourceFromMemoryCache,
-                    GURL /* url */,
-                    std::string  /* security info */,
-                    std::string  /* http method */,
-                    std::string  /* mime type */,
-                    content::ResourceType /* resource type */)
-
-// Sent when the renderer displays insecure content in a secure page.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_DidDisplayInsecureContent)
-
-// Sent when the renderer runs insecure content in a secure origin.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidRunInsecureContent,
-                    std::string  /* security_origin */,
-                    GURL         /* target URL */)
-
 // Sent to update part of the view.  In response to this message, the host
 // generates a ViewMsg_UpdateRect_ACK message.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_UpdateRect,
@@ -1468,22 +1450,6 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_ShowDisambiguationPopup,
                     gfx::Size, /* Size of zoomed image */
                     cc::SharedBitmapId /* id */)
 
-// Sent by the renderer process to check whether client 3D APIs
-// (Pepper 3D, WebGL) are explicitly blocked.
-IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_Are3DAPIsBlocked,
-                            int /* render_view_id */,
-                            GURL /* top_origin_url */,
-                            content::ThreeDAPIType /* requester */,
-                            bool /* blocked */)
-
-// Sent by the renderer process to indicate that a context was lost by
-// client 3D content (Pepper 3D, WebGL) running on the page at the
-// given URL.
-IPC_MESSAGE_CONTROL3(ViewHostMsg_DidLose3DContext,
-                     GURL /* top_origin_url */,
-                     content::ThreeDAPIType /* context_type */,
-                     int /* arb_robustness_status_code */)
-
 // Notifies the browser that document has parsed the body. This is used by the
 // ResourceScheduler as an indication that bandwidth contention won't block
 // first paint.
@@ -1514,6 +1480,10 @@ IPC_MESSAGE_ROUTED0(ViewHostMsg_HideValidationMessage)
 // of the anchor for a HTML form validation message have changed.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_MoveValidationMessage,
                     gfx::Rect /* anchor rectangle in root view coordinate */)
+
+// Sent once a paint happens after the first non empty layout. In other words,
+// after the frame widget has painted something.
+IPC_MESSAGE_ROUTED0(ViewHostMsg_DidFirstVisuallyNonEmptyPaint)
 
 #if defined(OS_ANDROID)
 // Response to ViewMsg_FindMatchRects.

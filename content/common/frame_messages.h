@@ -24,6 +24,7 @@
 #include "content/public/common/message_port_types.h"
 #include "content/public/common/page_state.h"
 #include "content/public/common/resource_response.h"
+#include "content/public/common/three_d_api_types.h"
 #include "content/public/common/transition_element.h"
 #include "ipc/ipc_message_macros.h"
 #include "third_party/WebKit/public/web/WebTreeScopeType.h"
@@ -806,6 +807,22 @@ IPC_SYNC_MESSAGE_CONTROL3_1(FrameHostMsg_CookiesEnabled,
                             GURL /* first_party_for_cookies */,
                             bool /* cookies_enabled */)
 
+// Sent by the renderer process to check whether client 3D APIs
+// (Pepper 3D, WebGL) are explicitly blocked.
+IPC_SYNC_MESSAGE_CONTROL3_1(FrameHostMsg_Are3DAPIsBlocked,
+                            int /* render_frame_id */,
+                            GURL /* top_origin_url */,
+                            content::ThreeDAPIType /* requester */,
+                            bool /* blocked */)
+
+// Sent by the renderer process to indicate that a context was lost by
+// client 3D content (Pepper 3D, WebGL) running on the page at the
+// given URL.
+IPC_MESSAGE_CONTROL3(FrameHostMsg_DidLose3DContext,
+                     GURL /* top_origin_url */,
+                     content::ThreeDAPIType /* context_type */,
+                     int /* arb_robustness_status_code */)
+
 #if defined(ENABLE_PLUGINS)
 // Notification sent from a renderer to the browser that a Pepper plugin
 // instance is created in the DOM.
@@ -994,16 +1011,23 @@ IPC_MESSAGE_ROUTED3(FrameHostMsg_UnregisterProtocolHandler,
                     GURL /* url */,
                     bool /* user_gesture */)
 
+// Sent when the renderer loads a resource from its memory cache.
+// The security info is non empty if the resource was originally loaded over
+// a secure connection.
+// Note: May only be sent once per URL per frame per committed load.
+IPC_MESSAGE_ROUTED5(FrameHostMsg_DidLoadResourceFromMemoryCache,
+                    GURL /* url */,
+                    std::string /* security info */,
+                    std::string /* http method */,
+                    std::string /* mime type */,
+                    content::ResourceType /* resource type */)
+
 // PlzNavigate
 // Tells the browser to perform a navigation.
 IPC_MESSAGE_ROUTED3(FrameHostMsg_BeginNavigation,
                     content::CommonNavigationParams,
                     content::BeginNavigationParams,
                     scoped_refptr<content::ResourceRequestBody>)
-
-// Sent once a paint happens after the first non empty layout. In other words
-// after the frame has painted something.
-IPC_MESSAGE_ROUTED0(FrameHostMsg_DidFirstVisuallyNonEmptyPaint)
 
 // Sent as a response to FrameMsg_VisualStateRequest.
 // The message is delivered using RenderWidget::QueueMessage.
@@ -1021,6 +1045,14 @@ IPC_MESSAGE_ROUTED0(FrameHostMsg_DispatchLoad)
 // active renderer.
 IPC_MESSAGE_ROUTED1(FrameHostMsg_RouteMessageEvent,
                     FrameMsg_PostMessage_Params)
+
+// Sent when the renderer displays insecure content in a secure origin.
+IPC_MESSAGE_ROUTED0(FrameHostMsg_DidDisplayInsecureContent)
+
+// Sent when the renderer runs insecure content in a secure origin.
+IPC_MESSAGE_ROUTED2(FrameHostMsg_DidRunInsecureContent,
+                    std::string /* security_origin */,
+                    GURL /* target URL */)
 
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
 

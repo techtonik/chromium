@@ -467,7 +467,7 @@ void RenderWidget::ScreenMetricsEmulator::OnShowContextMenu(
 
 gfx::Rect RenderWidget::ScreenMetricsEmulator::AdjustValidationMessageAnchor(
     const gfx::Rect& anchor) {
-  gfx::Rect scaled = gfx::ToEnclosedRect(gfx::ScaleRect(anchor, scale_));
+  gfx::Rect scaled = gfx::ScaleToEnclosedRect(anchor, scale_);
   scaled.set_x(scaled.x() + offset_.x());
   scaled.set_y(scaled.y() + offset_.y());
   return scaled;
@@ -1022,10 +1022,15 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
 
     worker_context_provider = ContextProviderCommandBuffer::Create(
         CreateGraphicsContext3D(false), RENDER_WORKER_CONTEXT);
-    if (!worker_context_provider.get()) {
+    if (!worker_context_provider.get() ||
+        !worker_context_provider->BindToCurrentThread()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();
     }
+    worker_context_provider->SetupLock();
+    // Detach from thread to allow context to be destroyed on a different
+    // thread without being used.
+    worker_context_provider->DetachFromThread();
   }
 
   uint32 output_surface_id = next_output_surface_id_++;
@@ -1404,6 +1409,22 @@ void RenderWidget::WillCloseLayerTreeView() {
 
 blink::WebLayerTreeView* RenderWidget::layerTreeView() {
   return compositor_.get();
+}
+
+void RenderWidget::didFirstVisuallyNonEmptyLayout() {
+  // TODO(dglazkov): Remove this -- we should just pass background color
+  // in CompositorFrameMetadata.
+#if defined(OS_ANDROID)
+  DidChangeBodyBackgroundColor(webwidget_->backgroundColor());
+#endif
+
+  QueueMessage(
+      new ViewHostMsg_DidFirstVisuallyNonEmptyPaint(routing_id_),
+      MESSAGE_DELIVERY_POLICY_WITH_VISUAL_STATE);
+}
+
+void RenderWidget::didFirstLayoutAfterFinishedParsing() {
+  // TODO(dglazkov): Use this hook to drive CapturePageInfo.
 }
 
 void RenderWidget::WillBeginCompositorFrame() {

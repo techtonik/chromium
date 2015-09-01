@@ -105,6 +105,9 @@ class MockStoreResultFilter : public CredentialsFilter {
   MOCK_CONST_METHOD1(FilterResultsPtr,
                      void(ScopedVector<autofill::PasswordForm>* results));
 
+  // This method is not relevant here.
+  MOCK_CONST_METHOD1(ShouldSave, bool(const autofill::PasswordForm& form));
+
   // GMock cannot handle move-only arguments.
   ScopedVector<autofill::PasswordForm> FilterResults(
       ScopedVector<autofill::PasswordForm> results) const override {
@@ -124,20 +127,20 @@ class TestPasswordManagerClient : public StubPasswordManagerClient {
                                            true);
   }
 
-  // After this method is called, the filter returned by CreateStoreResultFilter
+  // After this method is called, the filter returned by GetStoreResultFilter()
   // will filter out all forms.
-  void FilterAllResults() { filter_all_results_ = true; }
+  void FilterAllResults() {
+    filter_all_results_ = true;
 
-  scoped_ptr<CredentialsFilter> CreateStoreResultFilter() const override {
-    scoped_ptr<NiceMock<MockStoreResultFilter>> stub_filter(
-        new NiceMock<MockStoreResultFilter>);
-    if (filter_all_results_) {
-      // EXPECT_CALL rather than ON_CALL, because if the test needs the
-      // filtering, then it needs it called.
-      EXPECT_CALL(*stub_filter, FilterResultsPtr(_))
-          .WillRepeatedly(testing::Invoke(ClearVector));
-    }
-    return stub_filter.Pass();
+    // EXPECT_CALL rather than ON_CALL, because if the test needs the
+    // filtering, then it needs it called.
+    EXPECT_CALL(all_filter_, FilterResultsPtr(_))
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly(testing::Invoke(ClearVector));
+  }
+
+  const CredentialsFilter* GetStoreResultFilter() const override {
+    return filter_all_results_ ? &all_filter_ : &none_filter_;
   }
 
   PrefService* GetPrefs() override { return &prefs_; }
@@ -165,6 +168,10 @@ class TestPasswordManagerClient : public StubPasswordManagerClient {
   PasswordStore* password_store_;
   scoped_ptr<MockPasswordManagerDriver> driver_;
   bool is_update_password_ui_enabled_;
+
+  // Filters to remove all and no results, respectively, in FilterResults.
+  NiceMock<MockStoreResultFilter> all_filter_;
+  NiceMock<MockStoreResultFilter> none_filter_;
   bool filter_all_results_;
 };
 
@@ -438,6 +445,47 @@ TEST_F(PasswordFormManagerTest, TestBlacklist) {
   EXPECT_TRUE(form_manager.IsBlacklisted());
   EXPECT_THAT(form_manager.blacklisted_matches(),
               ElementsAre(Pointee(actual_add_form)));
+}
+
+TEST_F(PasswordFormManagerTest, TestBlacklistMatching) {
+  observed_form()->origin = GURL("http://accounts.google.com/a/LoginAuth");
+  observed_form()->action = GURL("http://accounts.google.com/a/Login");
+  observed_form()->signon_realm = "http://accounts.google.com";
+  PasswordFormManager form_manager(nullptr, client(), kNoDriver,
+                                   *observed_form(), false);
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+
+  // Doesn't match because of PSL.
+  PasswordForm blacklisted_psl = *observed_form();
+  blacklisted_psl.original_signon_realm = "http://m.accounts.google.com";
+  blacklisted_psl.blacklisted_by_user = true;
+
+  // Doesn't match because of different origin.
+  PasswordForm blacklisted_not_match = *observed_form();
+  blacklisted_not_match.origin = GURL("http://google.com/a/LoginAuth");
+  blacklisted_not_match.blacklisted_by_user = true;
+
+  // Doesn't match because of different username element.
+  PasswordForm blacklisted_not_match2 = *observed_form();
+  blacklisted_not_match2.username_element = ASCIIToUTF16("Element");
+  blacklisted_not_match2.blacklisted_by_user = true;
+
+  PasswordForm blacklisted_match = *observed_form();
+  blacklisted_match.origin = GURL("http://accounts.google.com/a/LoginAuth1234");
+  blacklisted_match.blacklisted_by_user = true;
+
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(blacklisted_psl));
+  result.push_back(new PasswordForm(blacklisted_not_match));
+  result.push_back(new PasswordForm(blacklisted_not_match2));
+  result.push_back(new PasswordForm(blacklisted_match));
+  result.push_back(new PasswordForm(*saved_match()));
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+  EXPECT_TRUE(form_manager.IsBlacklisted());
+  EXPECT_THAT(form_manager.blacklisted_matches(),
+              ElementsAre(Pointee(blacklisted_match)));
+  EXPECT_EQ(1u, form_manager.best_matches().size());
+  EXPECT_EQ(*saved_match(), *form_manager.preferred_match());
 }
 
 TEST_F(PasswordFormManagerTest, AutofillBlacklisted) {
@@ -997,12 +1045,11 @@ TEST_F(PasswordFormManagerTest, TestSendNotBlacklistedMessage) {
 
   // Signing up on a previously visited site. Credentials are found in the
   // password store, but they are blacklisted. AllowPasswordGenerationForForm
-  // should not be called and no "not blacklisted" message sent.
+  // is still called.
   PasswordFormManager manager_blacklisted(password_manager(), client(),
                                           client()->driver(), *observed_form(),
                                           false);
-  EXPECT_CALL(*(client()->mock_driver()), AllowPasswordGenerationForForm(_))
-      .Times(0);
+  EXPECT_CALL(*(client()->mock_driver()), AllowPasswordGenerationForForm(_));
   manager_blacklisted.SimulateFetchMatchingLoginsFromPasswordStore();
   simulated_results.push_back(CreateSavedMatch(true));
   manager_blacklisted.OnGetPasswordStoreResults(simulated_results.Pass());

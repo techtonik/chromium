@@ -364,6 +364,8 @@
       'omnibox/browser/in_memory_url_index_types_unittest.cc',
       'omnibox/browser/keyword_provider_unittest.cc',
       'omnibox/browser/omnibox_field_trial_unittest.cc',
+      'omnibox/browser/omnibox_popup_model_unittest.cc',
+      'omnibox/browser/omnibox_view_unittest.cc',
       'omnibox/browser/scored_history_match_unittest.cc',
       'omnibox/browser/suggestion_answer_unittest.cc',
     ],
@@ -408,7 +410,10 @@
       'password_manager/core/browser/psl_matching_helper_unittest.cc',
       'password_manager/core/browser/statistics_table_unittest.cc',
       'password_manager/core/common/credential_manager_types_unittest.cc',
+      'password_manager/sync/browser/password_sync_util_unittest.cc',
       'password_manager/sync/browser/sync_store_result_filter_unittest.cc',
+      'password_manager/sync/browser/sync_username_test_base.cc',
+      'password_manager/sync/browser/sync_username_test_base.h',
     ],
     'policy_unittest_sources': [
       'policy/core/browser/android/android_combined_policy_provider_unittest.cc',
@@ -606,6 +611,7 @@
       'suggestions/suggestions_store_unittest.cc',
     ],
     'sync_driver_unittest_sources': [
+      'sync_driver/about_sync_util_unittest.cc',
       'sync_driver/data_type_manager_impl_unittest.cc',
       'sync_driver/device_info_data_type_controller_unittest.cc',
       'sync_driver/device_info_sync_service_unittest.cc',
@@ -618,9 +624,13 @@
       'sync_driver/sync_policy_handler_unittest.cc',
       'sync_driver/sync_prefs_unittest.cc',
       'sync_driver/sync_stopped_reporter_unittest.cc',
+      'sync_driver/sync_util_unittest.cc',
       'sync_driver/system_encryptor_unittest.cc',
       'sync_driver/tab_node_pool_unittest.cc',
       'sync_driver/ui_data_type_controller_unittest.cc',
+    ],
+    'tracing_unittest_sources': [
+      'tracing/trace_config_file_unittest.cc',
     ],
     'translate_unittest_sources': [
       'translate/core/browser/language_state_unittest.cc',
@@ -930,6 +940,7 @@
         'components.gyp:user_prefs_tracked_test_support',
         'components.gyp:variations',
         'components.gyp:variations_http_provider',
+        'components.gyp:version_info',
         'components.gyp:wallpaper',
         'components.gyp:web_resource',
         'components.gyp:web_resource_test_support',
@@ -1180,6 +1191,7 @@
             '<@(copresence_unittest_sources)',
             '<@(feedback_unittest_sources)',
             '<@(proximity_auth_unittest_sources)',
+            '<@(tracing_unittest_sources)',
           ],
           'sources!': [
             'variations/variations_request_scheduler_mobile_unittest.cc',
@@ -1199,6 +1211,7 @@
             'components.gyp:pref_registry_test_support',
             'components.gyp:proximity_auth',
             'components.gyp:proximity_auth_test_support',
+            'tracing.gyp:tracing',
           ],
         }],
         ['chromeos==1', {
