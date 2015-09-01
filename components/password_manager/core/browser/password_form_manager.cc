@@ -8,11 +8,8 @@
 #include <set>
 
 #include "base/metrics/histogram_macros.h"
-#include "base/metrics/user_metrics.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
-#include "base/strings/utf_string_conversions.h"
-#include "base/test/histogram_tester.h"
 #include "components/autofill/core/browser/autofill_manager.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/browser/validation.h"
@@ -64,6 +61,12 @@ bool DoesUsenameAndPasswordMatchCredentials(
 std::vector<std::string> SplitPathToSegments(const std::string& path) {
   return base::SplitString(path, "/", base::TRIM_WHITESPACE,
                            base::SPLIT_WANT_ALL);
+}
+
+// Return false iff the strings are neither empty nor equal.
+bool AreStringsEqualOrEmpty(const base::string16& s1,
+                            const base::string16& s2) {
+  return s1.empty() || s2.empty() || s1 == s2;
 }
 
 }  // namespace
@@ -349,7 +352,19 @@ void PasswordFormManager::OnRequestDone(
         logins_result.end());
   }
   logins_result =
-      client_->CreateStoreResultFilter()->FilterResults(logins_result.Pass());
+      client_->GetStoreResultFilter()->FilterResults(logins_result.Pass());
+
+  // Deal with blacklisted forms.
+  auto begin_blacklisted = std::partition(
+      logins_result.begin(), logins_result.end(),
+      [](PasswordForm* form) { return !form->blacklisted_by_user; });
+  for (auto it = begin_blacklisted; it != logins_result.end(); ++it) {
+    if (IsBlacklistMatch(**it)) {
+      blacklisted_matches_.push_back(*it);
+      *it = nullptr;
+    }
+  }
+  logins_result.erase(begin_blacklisted, logins_result.end());
 
   // Now compute scores for the remaining credentials in |login_result|.
   std::vector<uint32_t> credential_scores;
@@ -377,6 +392,7 @@ void PasswordFormManager::OnRequestDone(
     // Take ownership of the PasswordForm from the ScopedVector.
     scoped_ptr<PasswordForm> login(logins_result[i]);
     logins_result[i] = nullptr;
+    DCHECK(!login->blacklisted_by_user);
 
     if (credential_scores[i] < best_score) {
       // Empty path matches are most commonly imports from Firefox, and
@@ -389,7 +405,7 @@ void PasswordFormManager::OnRequestDone(
           observed_form_.scheme == PasswordForm::SCHEME_HTML &&
           base::StartsWith("/", login->origin.path(),
                            base::CompareCase::SENSITIVE) &&
-          credential_scores[i] > 0 && !login->blacklisted_by_user;
+          credential_scores[i] > 0;
       // Passwords generated on a signup form must show on a login form even if
       // there are better-matching saved credentials. TODO(gcasto): We don't
       // want to cut credentials that were saved on signup forms even if they
@@ -400,11 +416,6 @@ void PasswordFormManager::OnRequestDone(
 
       if (is_credential_protected)
         protected_credentials.push_back(login.Pass());
-      continue;
-    }
-
-    if (login->blacklisted_by_user) {
-      blacklisted_matches_.push_back(login.Pass());
       continue;
     }
 
@@ -442,12 +453,7 @@ void PasswordFormManager::OnRequestDone(
   UMA_HISTOGRAM_COUNTS("PasswordManager.NumPasswordsNotShown",
                        logins_result_size - best_matches_.size());
 
-  // Check to see if the user told us to ignore this site in the past.
-  if (best_matches_.empty()) {
-    DCHECK(!preferred_match_);
-    client_->PasswordAutofillWasBlocked(best_matches_);
-    manager_action_ = kManagerActionBlacklisted;
-  } else {
+  if (!best_matches_.empty()) {
     // It is possible we have at least one match but have no preferred_match_,
     // because a user may have chosen to 'Forget' the preferred match. So we
     // just pick the first one and whichever the user selects for submit will
@@ -608,12 +614,7 @@ void PasswordFormManager::UpdateLogin() {
 
   UpdateMetadataForUsage(pending_credentials_);
 
-  if (client_->IsSyncAccountCredential(
-          base::UTF16ToUTF8(pending_credentials_.username_value),
-          pending_credentials_.signon_realm)) {
-    base::RecordAction(
-        base::UserMetricsAction("PasswordManager_SyncCredentialUsed"));
-  }
+  client_->GetStoreResultFilter()->ReportFormUsed(pending_credentials_);
 
   // Check to see if this form is a candidate for password generation.
   SendAutofillVotes(observed_form_, &pending_credentials_);
@@ -901,6 +902,7 @@ void PasswordFormManager::CreatePendingCredentials() {
 
 uint32_t PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
   DCHECK_EQ(state_, MATCHING_PHASE);
+  DCHECK(!candidate.blacklisted_by_user);
   // For scoring of candidate login data:
   // The most important element that should match is the signon_realm followed
   // by the origin, the action, the password name, the submit button name, and
@@ -959,6 +961,28 @@ uint32_t PasswordFormManager::ScoreResult(const PasswordForm& candidate) const {
   }
 
   return score;
+}
+
+bool PasswordFormManager::IsBlacklistMatch(
+    const autofill::PasswordForm& blacklisted_form) const {
+  DCHECK(blacklisted_form.blacklisted_by_user);
+
+  if (blacklisted_form.IsPublicSuffixMatch())
+    return false;
+  if (blacklisted_form.origin.GetOrigin() != observed_form_.origin.GetOrigin())
+    return false;
+  if (observed_form_.scheme == PasswordForm::SCHEME_HTML) {
+    if (!AreStringsEqualOrEmpty(blacklisted_form.submit_element,
+                                observed_form_.submit_element))
+      return false;
+    if (!AreStringsEqualOrEmpty(blacklisted_form.password_element,
+                                observed_form_.password_element))
+      return false;
+    if (!AreStringsEqualOrEmpty(blacklisted_form.username_element,
+                                observed_form_.username_element))
+      return false;
+  }
+  return true;
 }
 
 void PasswordFormManager::DeleteEmptyUsernameCredentials() {

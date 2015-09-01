@@ -404,7 +404,7 @@ ManagePasswordsBubbleView::PendingView::PendingView(
       ui::ResourceBundle::SmallFont));
   never_button_ = new views::LabelButton(
       this,
-      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON1));
+      l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON));
   never_button_->SetStyle(views::Button::STYLE_BUTTON);
   never_button_->SetFontList(
       ui::ResourceBundle::GetSharedInstance().GetFontList(
@@ -923,6 +923,10 @@ void ManagePasswordsBubbleView::Close() {
 void ManagePasswordsBubbleView::OnWidgetClosing(views::Widget* /*widget*/) {
   if (anchor_view_)
     anchor_view_->SetActive(false);
+}
+
+bool ManagePasswordsBubbleView::ShouldShowCloseButton() const {
+  return model()->state() == password_manager::ui::PENDING_PASSWORD_STATE;
 }
 
 void ManagePasswordsBubbleView::Refresh() {

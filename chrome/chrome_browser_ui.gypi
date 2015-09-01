@@ -894,6 +894,8 @@
       'browser/ui/cocoa/bubble_view.mm',
       'browser/ui/cocoa/chrome_browser_window.h',
       'browser/ui/cocoa/chrome_browser_window.mm',
+      'browser/ui/cocoa/chrome_command_dispatcher_delegate.h',
+      'browser/ui/cocoa/chrome_command_dispatcher_delegate.mm',
       'browser/ui/cocoa/chrome_event_processing_window.h',
       'browser/ui/cocoa/chrome_event_processing_window.mm',
       'browser/ui/cocoa/clickhold_button_cell.h',
@@ -2649,6 +2651,8 @@
       'browser/ui/omnibox/chrome_omnibox_edit_controller.h',
       'browser/ui/omnibox/chrome_omnibox_navigation_observer.cc',
       'browser/ui/omnibox/chrome_omnibox_navigation_observer.h',
+      'browser/ui/omnibox/clipboard_utils.cc',
+      'browser/ui/omnibox/clipboard_utils.h',
     ],
     'chrome_browser_ui_plugin_sources': [
       'browser/ui/hung_plugin_tab_helper.cc',

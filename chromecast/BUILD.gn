@@ -33,6 +33,7 @@ group("chromecast_unittests") {
     # TODO(slan): Get this target building and comment it in.
     # "//chromecast/app:cast_shell_unittests",
     "//chromecast/base:cast_base_unittests",
+    "//chromecast/crypto:cast_crypto_unittests",
     "//chromecast/crash:cast_crash_unittests",
     "//chromecast/media:cast_media_unittests",
   ]
@@ -66,6 +67,7 @@ executable("cast_shell") {
   deps = [
     ":cast_shell_common",
     ":cast_shell_media",
+    "//build/config/sanitizers:deps",
     "//chromecast/app",
     "//content/public/app:both",
   ]

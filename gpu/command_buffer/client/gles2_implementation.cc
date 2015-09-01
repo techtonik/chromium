@@ -31,6 +31,8 @@
 #include "gpu/command_buffer/common/gles2_cmd_utils.h"
 #include "gpu/command_buffer/common/id_allocator.h"
 #include "gpu/command_buffer/common/trace_event.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_f.h"
 
 #if defined(GPU_CLIENT_DEBUG)
 #include "base/command_line.h"
@@ -1126,7 +1128,7 @@ bool GLES2Implementation::GetQueryObjectValueHelper(
     SetGLError(
         GL_INVALID_OPERATION,
         function_name,
-        "query active. Did you to call glEndQueryEXT?");
+        "query active. Did you call glEndQueryEXT?");
     return false;
   }
 
@@ -4911,6 +4913,10 @@ void GLES2Implementation::BeginQueryEXT(GLenum target, GLuint id) {
         return;
       }
       break;
+    case GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN:
+      if (capabilities_.major_version >= 3)
+        break;
+      // Fall through
     default:
       SetGLError(
           GL_INVALID_ENUM, "glBeginQueryEXT", "unknown query target");
@@ -5380,6 +5386,7 @@ bool ValidImageFormat(GLenum internalformat,
     case GL_R8:
     case GL_RGB:
     case GL_RGBA:
+    case GL_RGB_YCBCR_422_CHROMIUM:
     case GL_BGRA_EXT:
       return true;
     default:

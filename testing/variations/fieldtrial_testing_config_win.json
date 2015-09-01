@@ -1,4 +1,9 @@
 {
+    "AutomaticTabDiscarding": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "BrowserBlacklist": [
         {
             "group_name": "Enabled"
@@ -45,6 +50,11 @@
         }
     ],
     "InstanceID": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "IntelligentSessionRestore": [
         {
             "group_name": "Enabled"
         }

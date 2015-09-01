@@ -18,6 +18,7 @@
 #include "third_party/skia/include/gpu/GrPaint.h"
 #include "third_party/skia/include/gpu/GrTexture.h"
 #include "third_party/skia/include/gpu/GrTextureProvider.h"
+#include "ui/gfx/geometry/rect_f.h"
 
 // Skia internal format depends on a platform. On Android it is ABGR, on others
 // it is ARGB.
@@ -394,7 +395,7 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
 void SkCanvasVideoRenderer::Copy(const scoped_refptr<VideoFrame>& video_frame,
                                  SkCanvas* canvas,
                                  const Context3D& context_3d) {
-  Paint(video_frame, canvas, video_frame->visible_rect(), 0xff,
+  Paint(video_frame, canvas, gfx::RectF(video_frame->visible_rect()), 0xff,
         SkXfermode::kSrc_Mode, media::VIDEO_ROTATION_0, context_3d);
 }
 
@@ -411,33 +412,19 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
     NOTREACHED() << "Non YUV formats are not supported";
     return;
   }
-
   DCHECK_EQ(video_frame->stride(VideoFrame::kUPlane),
             video_frame->stride(VideoFrame::kVPlane));
-
-  const int y_shift =
-      (video_frame->format() == media::PIXEL_FORMAT_YV16) ? 0 : 1;
-  // Use the "left" and "top" of the destination rect to locate the offset
-  // in Y, U and V planes.
-  const size_t y_offset = (video_frame->stride(VideoFrame::kYPlane) *
-                           video_frame->visible_rect().y()) +
-                          video_frame->visible_rect().x();
-  // For format YV12, there is one U, V value per 2x2 block.
-  // For format YV16, there is one U, V value per 2x1 block.
-  const size_t uv_offset = (video_frame->stride(VideoFrame::kUPlane) *
-                            (video_frame->visible_rect().y() >> y_shift)) +
-                           (video_frame->visible_rect().x() >> 1);
 
   switch (video_frame->format()) {
     case PIXEL_FORMAT_YV12:
     case PIXEL_FORMAT_I420:
       if (CheckColorSpace(video_frame, COLOR_SPACE_JPEG)) {
         libyuv::J420ToARGB(
-            video_frame->data(VideoFrame::kYPlane) + y_offset,
+            video_frame->visible_data(VideoFrame::kYPlane),
             video_frame->stride(VideoFrame::kYPlane),
-            video_frame->data(VideoFrame::kUPlane) + uv_offset,
+            video_frame->visible_data(VideoFrame::kUPlane),
             video_frame->stride(VideoFrame::kUPlane),
-            video_frame->data(VideoFrame::kVPlane) + uv_offset,
+            video_frame->visible_data(VideoFrame::kVPlane),
             video_frame->stride(VideoFrame::kVPlane),
             static_cast<uint8*>(rgb_pixels),
             row_bytes,
@@ -453,9 +440,9 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
                            video_frame->visible_rect().height());
 #endif
       } else if (CheckColorSpace(video_frame, COLOR_SPACE_HD_REC709)) {
-        ConvertYUVToRGB32(video_frame->data(VideoFrame::kYPlane) + y_offset,
-                          video_frame->data(VideoFrame::kUPlane) + uv_offset,
-                          video_frame->data(VideoFrame::kVPlane) + uv_offset,
+        ConvertYUVToRGB32(video_frame->visible_data(VideoFrame::kYPlane),
+                          video_frame->visible_data(VideoFrame::kUPlane),
+                          video_frame->visible_data(VideoFrame::kVPlane),
                           static_cast<uint8*>(rgb_pixels),
                           video_frame->visible_rect().width(),
                           video_frame->visible_rect().height(),
@@ -464,11 +451,11 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
                           YV12HD);
       } else {
         LIBYUV_I420_TO_ARGB(
-            video_frame->data(VideoFrame::kYPlane) + y_offset,
+            video_frame->visible_data(VideoFrame::kYPlane),
             video_frame->stride(VideoFrame::kYPlane),
-            video_frame->data(VideoFrame::kUPlane) + uv_offset,
+            video_frame->visible_data(VideoFrame::kUPlane),
             video_frame->stride(VideoFrame::kUPlane),
-            video_frame->data(VideoFrame::kVPlane) + uv_offset,
+            video_frame->visible_data(VideoFrame::kVPlane),
             video_frame->stride(VideoFrame::kVPlane),
             static_cast<uint8*>(rgb_pixels),
             row_bytes,
@@ -478,11 +465,11 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
       break;
     case PIXEL_FORMAT_YV16:
       LIBYUV_I422_TO_ARGB(
-          video_frame->data(VideoFrame::kYPlane) + y_offset,
+          video_frame->visible_data(VideoFrame::kYPlane),
           video_frame->stride(VideoFrame::kYPlane),
-          video_frame->data(VideoFrame::kUPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kUPlane),
           video_frame->stride(VideoFrame::kUPlane),
-          video_frame->data(VideoFrame::kVPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kVPlane),
           video_frame->stride(VideoFrame::kVPlane),
           static_cast<uint8*>(rgb_pixels),
           row_bytes,
@@ -492,13 +479,13 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
 
     case PIXEL_FORMAT_YV12A:
       LIBYUV_I420ALPHA_TO_ARGB(
-          video_frame->data(VideoFrame::kYPlane) + y_offset,
+          video_frame->visible_data(VideoFrame::kYPlane),
           video_frame->stride(VideoFrame::kYPlane),
-          video_frame->data(VideoFrame::kUPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kUPlane),
           video_frame->stride(VideoFrame::kUPlane),
-          video_frame->data(VideoFrame::kVPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kVPlane),
           video_frame->stride(VideoFrame::kVPlane),
-          video_frame->data(VideoFrame::kAPlane) + y_offset,
+          video_frame->visible_data(VideoFrame::kAPlane),
           video_frame->stride(VideoFrame::kAPlane),
           static_cast<uint8*>(rgb_pixels),
           row_bytes,
@@ -508,11 +495,11 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
 
     case PIXEL_FORMAT_YV24:
       libyuv::I444ToARGB(
-          video_frame->data(VideoFrame::kYPlane) + y_offset,
+          video_frame->visible_data(VideoFrame::kYPlane),
           video_frame->stride(VideoFrame::kYPlane),
-          video_frame->data(VideoFrame::kUPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kUPlane),
           video_frame->stride(VideoFrame::kUPlane),
-          video_frame->data(VideoFrame::kVPlane) + uv_offset,
+          video_frame->visible_data(VideoFrame::kVPlane),
           video_frame->stride(VideoFrame::kVPlane),
           static_cast<uint8*>(rgb_pixels),
           row_bytes,
@@ -529,9 +516,14 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
 #endif
       break;
     case PIXEL_FORMAT_NV12:
+    case PIXEL_FORMAT_NV21:
+    case PIXEL_FORMAT_UYVY:
+    case PIXEL_FORMAT_YUY2:
     case PIXEL_FORMAT_ARGB:
     case PIXEL_FORMAT_XRGB:
-    case PIXEL_FORMAT_UYVY:
+    case PIXEL_FORMAT_RGB24:
+    case PIXEL_FORMAT_RGB32:
+    case PIXEL_FORMAT_MJPEG:
     case PIXEL_FORMAT_UNKNOWN:
       NOTREACHED();
   }

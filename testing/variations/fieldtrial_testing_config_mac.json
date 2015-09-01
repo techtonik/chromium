@@ -1,10 +1,20 @@
 {
+    "AutomaticTabDiscarding": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "CaptivePortalInterstitial": [
         {
             "group_name": "Enabled"
         }
     ],
     "InstanceID": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "IntelligentSessionRestore": [
         {
             "group_name": "Enabled"
         }

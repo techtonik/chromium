@@ -524,7 +524,7 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail('deqp/functional/gles3/shadercommonfunction.html', bug=483282)
     self.Fail('deqp/functional/gles3/shaderderivate.html', bug=483282)
     self.Fail('deqp/functional/gles3/shaderindexing.html', bug=483282)
-    self.Fail('deqp/functional/gles3/shaderloop.html', bug=483282)
+    self.Skip('deqp/functional/gles3/shaderloop.html', bug=483282)
     self.Fail('deqp/functional/gles3/shadermatrix.html', bug=483282)
     self.Fail('deqp/functional/gles3/shaderpackingfunction.html', bug=483282)
     self.Fail('deqp/functional/gles3/shaderprecision.html', bug=483282)
@@ -623,12 +623,10 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['mac'], bug=483282)
     self.Fail('conformance2/rendering/instanced-arrays.html',
         ['mac'], bug=483282)
-    self.Fail('conformance2/vertex_arrays/vertex-array-object.html',
+    self.Fail('deqp/functional/gles3/vertexarrayobject.html',
         ['mac'], bug=483282)
-
-    # Mac/AMD only.
     self.Fail('deqp/functional/gles3/shaderswitch.html',
-        ['mac', 'amd'], bug=483282)
+        ['mac'], bug=483282)
 
     # Linux only.
     self.Fail('deqp/functional/gles3/shaderswitch.html',
