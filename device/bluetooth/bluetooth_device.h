@@ -451,9 +451,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   // connection.
   virtual void DisconnectGatt() = 0;
 
-  // Calls pending callbacks for CreateGattConnection based on result of
+  // Calls any pending callbacks for CreateGattConnection based on result of
   // subclasses actions initiated in CreateGattConnectionImpl or related
-  // disconnection event.
+  // disconnection events. These may be called at any time, even multiple times,
+  // to ensure a change in platform state is correctly tracked.
   void DidConnectGatt();
   void DidFailToConnectGatt(ConnectErrorCode);
   void DidDisconnectGatt();
