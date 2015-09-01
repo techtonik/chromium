@@ -247,12 +247,18 @@ class CaptureTestRenderViewHost : public TestRenderViewHost {
   CaptureTestRenderViewHost(SiteInstance* instance,
                             RenderViewHostDelegate* delegate,
                             RenderWidgetHostDelegate* widget_delegate,
-                            int routing_id,
-                            int main_frame_routing_id,
+                            int32 routing_id,
+                            int32 surface_id,
+                            int32 main_frame_routing_id,
                             bool swapped_out,
                             CaptureTestSourceController* controller)
-      : TestRenderViewHost(instance, delegate, widget_delegate, routing_id,
-                           main_frame_routing_id, swapped_out),
+      : TestRenderViewHost(instance,
+                           delegate,
+                           widget_delegate,
+                           routing_id,
+                           surface_id,
+                           main_frame_routing_id,
+                           swapped_out),
         controller_(controller) {
     // Override the default view installed by TestRenderViewHost; we need
     // our special subclass which has mocked-out tab capture support.
@@ -306,12 +312,13 @@ class CaptureTestRenderViewHostFactory : public RenderViewHostFactory {
       SiteInstance* instance,
       RenderViewHostDelegate* delegate,
       RenderWidgetHostDelegate* widget_delegate,
-      int routing_id,
-      int main_frame_routing_id,
+      int32 routing_id,
+      int32 surface_id,
+      int32 main_frame_routing_id,
       bool swapped_out) override {
-    return new CaptureTestRenderViewHost(instance, delegate, widget_delegate,
-                                         routing_id, main_frame_routing_id,
-                                         swapped_out, controller_);
+    return new CaptureTestRenderViewHost(
+        instance, delegate, widget_delegate, routing_id, surface_id,
+        main_frame_routing_id, swapped_out, controller_);
   }
  private:
   CaptureTestSourceController* controller_;
@@ -353,9 +360,9 @@ class StubClient : public media::VideoCaptureDevice::Client {
 
   scoped_ptr<media::VideoCaptureDevice::Client::Buffer> ReserveOutputBuffer(
       const gfx::Size& dimensions,
-      media::VideoCapturePixelFormat format,
+      media::VideoPixelFormat format,
       media::VideoPixelStorage storage) override {
-    CHECK_EQ(format, media::VIDEO_CAPTURE_PIXEL_FORMAT_I420);
+    CHECK_EQ(format, media::PIXEL_FORMAT_I420);
     int buffer_id_to_drop = VideoCaptureBufferPool::kInvalidId;  // Ignored.
     const int buffer_id = buffer_pool_->ReserveForProducer(
         format, storage, dimensions, &buffer_id_to_drop);
@@ -419,7 +426,10 @@ class StubClient : public media::VideoCaptureDevice::Client {
       DCHECK(pool_.get());
     }
     int id() const override { return id_; }
-    size_t size() const override { return buffer_handle_->size(); }
+    gfx::Size dimensions() const override { return gfx::Size(); }
+    size_t mapped_size() const override {
+      return buffer_handle_->mapped_size();
+    }
     void* data(int plane) override { return buffer_handle_->data(plane); }
     ClientBuffer AsClientBuffer(int plane) override { return nullptr; }
 #if defined(OS_POSIX)
@@ -720,8 +730,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest,
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
   ASSERT_NO_FATAL_FAILURE(client_observer()->WaitForError());
   device()->StopAndDeAllocate();
@@ -739,8 +748,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest, WebContentsDestroyed) {
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
   // Do one capture to prove
   source()->SetSolidColor(SK_ColorRED);
@@ -767,8 +775,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest,
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
 
   // Make a point of not running the UI messageloop here.
@@ -789,8 +796,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest, StopWithRendererWorkToDo) {
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
 
   base::RunLoop().RunUntilIdle();
@@ -809,8 +815,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest, DeviceRestart) {
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
   base::RunLoop().RunUntilIdle();
   source()->SetSolidColor(SK_ColorRED);
@@ -848,8 +853,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest, GoesThroughAllTheMotions) {
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   device()->AllocateAndStart(capture_params, client_observer()->PassClient());
 
   for (int i = 0; i < 6; i++) {
@@ -899,8 +903,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest, BadFramesGoodFrames) {
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   // 1x1 is too small to process; we intend for this to result in an error.
   source()->SetCopyResultSize(1, 1);
   source()->SetSolidColor(SK_ColorRED);
@@ -932,8 +935,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest,
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   capture_params.resolution_change_policy =
       media::RESOLUTION_POLICY_FIXED_ASPECT_RATIO;
 
@@ -990,8 +992,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest,
   media::VideoCaptureParams capture_params;
   capture_params.requested_format.frame_size.SetSize(kTestWidth, kTestHeight);
   capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-  capture_params.requested_format.pixel_format =
-      media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+  capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
   capture_params.resolution_change_policy =
       media::RESOLUTION_POLICY_ANY_WITHIN_LIMIT;
 
@@ -1072,8 +1073,7 @@ TEST_F(MAYBE_WebContentsVideoCaptureDeviceTest,
     media::VideoCaptureParams capture_params;
     capture_params.requested_format.frame_size = oddball_size;
     capture_params.requested_format.frame_rate = kTestFramesPerSecond;
-    capture_params.requested_format.pixel_format =
-        media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+    capture_params.requested_format.pixel_format = media::PIXEL_FORMAT_I420;
     capture_params.resolution_change_policy = policy;
     StubClientObserver unused_observer;
     device()->AllocateAndStart(capture_params, unused_observer.PassClient());

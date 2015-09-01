@@ -70,7 +70,9 @@ group("both_gn_and_gyp") {
     "//net:net_unittests",
     "//skia:skia_unittests",
     "//sql:sql_unittests",
+    "//sync:sync_unit_tests",
     "//ui/base:ui_base_unittests",
+    "//ui/gfx:gfx_unittests",
     "//url:url_unittests",
   ]
 
@@ -141,7 +143,6 @@ group("both_gn_and_gyp") {
       "//ppapi/examples/video_effects",
       "//ppapi/examples/video_encode",
       "//printing:printing_unittests",
-      "//sync:sync_unit_tests",
       "//third_party/WebKit/Source/platform:heap_unittests",
       "//third_party/WebKit/Source/platform:platform_unittests",
       "//third_party/WebKit/Source/web:webkit_unit_tests",
@@ -164,7 +165,6 @@ group("both_gn_and_gyp") {
       "//ui/app_list:app_list_unittests",
       "//ui/display:display_unittests",
       "//ui/events:events_unittests",
-      "//ui/gfx:gfx_unittests",
       "//ui/gl:gl_unittests",
       "//ui/touch_selection:ui_touch_selection_unittests",
     ]

@@ -12,7 +12,7 @@ button {
   cursor: pointer;
 }
 
-input:focus, button:focus {
+button:focus {
   outline: 1px solid rgb(77, 144, 254);
 }
 
@@ -604,6 +604,13 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
   position: absolute;
   top: 0;
   z-index: 1;
+}
+
+.gallery > .toolbar .icon-button > files-toggle-ripple {
+  height: 28px;
+  left: 2px;
+  top: 2px;
+  width: 28px;
 }
 
 .gallery > .toolbar button.edit > .icon {

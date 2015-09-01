@@ -6,6 +6,8 @@ import("//build/config/features.gni")
 
 source_set("sync_driver") {
   sources = [
+    "about_sync_util.cc",
+    "about_sync_util.h",
     "backend_data_type_configurer.cc",
     "backend_data_type_configurer.h",
     "backend_migrator.cc",
@@ -75,12 +77,15 @@ source_set("sync_driver") {
     "sync_api_component_factory.h",
     "sync_client.cc",
     "sync_client.h",
+    "sync_driver_switches.cc",
+    "sync_driver_switches.h",
     "sync_error_controller.cc",
     "sync_error_controller.h",
     "sync_frontend.cc",
     "sync_frontend.h",
     "sync_prefs.cc",
     "sync_prefs.h",
+    "sync_service.cc",
     "sync_service.h",
     "sync_service_observer.cc",
     "sync_service_observer.h",
@@ -88,6 +93,8 @@ source_set("sync_driver") {
     "sync_service_utils.h",
     "sync_stopped_reporter.cc",
     "sync_stopped_reporter.h",
+    "sync_util.cc",
+    "sync_util.h",
     "system_encryptor.cc",
     "system_encryptor.h",
     "tab_node_pool.cc",
@@ -105,6 +112,7 @@ source_set("sync_driver") {
     "//components/os_crypt",
     "//components/sessions",
     "//components/signin/core/browser",
+    "//components/version_info",
     "//net",
     "//sync",
     "//third_party/cacheinvalidation",
@@ -169,6 +177,7 @@ source_set("test_support") {
 source_set("unit_tests") {
   testonly = true
   sources = [
+    "about_sync_util_unittest.cc",
     "data_type_manager_impl_unittest.cc",
     "device_info_data_type_controller_unittest.cc",
     "device_info_sync_service_unittest.cc",
@@ -181,6 +190,7 @@ source_set("unit_tests") {
     "sync_policy_handler_unittest.cc",
     "sync_prefs_unittest.cc",
     "sync_stopped_reporter_unittest.cc",
+    "sync_util_unittest.cc",
     "system_encryptor_unittest.cc",
     "tab_node_pool_unittest.cc",
     "ui_data_type_controller_unittest.cc",

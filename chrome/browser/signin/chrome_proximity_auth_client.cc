@@ -41,7 +41,7 @@ std::string ChromeProximityAuthClient::GetAuthenticatedUsername() const {
   // |profile_| has to be a signed-in profile with SigninManager already
   // created. Otherwise, just crash to collect stack.
   DCHECK(signin_manager);
-  return signin_manager->GetAuthenticatedUsername();
+  return signin_manager->GetAuthenticatedAccountInfo().email;
 }
 
 void ChromeProximityAuthClient::UpdateScreenlockState(ScreenlockState state) {
@@ -111,14 +111,25 @@ std::string ChromeProximityAuthClient::GetAccountId() {
 
 proximity_auth::CryptAuthEnrollmentManager*
 ChromeProximityAuthClient::GetCryptAuthEnrollmentManager() {
-  // TODO(tengs): Return the real manager instance once it is implemented in
-  // EasyUnlockService.
-  return nullptr;
+  EasyUnlockServiceRegular* easy_unlock_service = GetEasyUnlockServiceRegular();
+  if (!easy_unlock_service)
+    return nullptr;
+  return easy_unlock_service->GetCryptAuthEnrollmentManager();
 }
 
 proximity_auth::CryptAuthDeviceManager*
 ChromeProximityAuthClient::GetCryptAuthDeviceManager() {
-  // TODO(tengs): Return the real manager instance once it is implemented in
-  // EasyUnlockService.
-  return nullptr;
+  EasyUnlockServiceRegular* easy_unlock_service = GetEasyUnlockServiceRegular();
+  if (!easy_unlock_service)
+    return nullptr;
+  return easy_unlock_service->GetCryptAuthDeviceManager();
+}
+
+EasyUnlockServiceRegular*
+ChromeProximityAuthClient::GetEasyUnlockServiceRegular() {
+  EasyUnlockService* easy_unlock_service = EasyUnlockService::Get(profile_);
+  if (easy_unlock_service->GetType() == EasyUnlockService::TYPE_REGULAR)
+    return static_cast<EasyUnlockServiceRegular*>(easy_unlock_service);
+  else
+    return nullptr;
 }

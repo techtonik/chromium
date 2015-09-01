@@ -5677,18 +5677,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ASH_DISABLE_SCREEN_ORIENTATION_LOCK_DESCRIPTION" desc="Description for the flag which can be used to disable support for javascript locking rotation">
           Disables the ability for javascript to lock the screen orienation.
         </message>
-        <message name="IDS_FLAGS_ASH_ENABLE_SCREEN_ROTATION_ANIMATION_NAME" desc="Title for the flag which can be used to select screen rotation animations.">
-          Screen rotation animation.
-        </message>
-        <message name="IDS_FLAGS_ASH_ENABLE_SCREEN_ROTATION_ANIMATION_DESCRIPTION" desc="Description for the flag which can be used to select screen rotation animations.">
-          Experimental screen rotation animations.
-        </message>
-        <message name="IDS_ASH_SCREEN_ROTATION_ANIMATION_PARTIAL_ROTATION" desc="Screen rotation animation option.">
-          Partial Rotation
-        </message>
-        <message name="IDS_ASH_SCREEN_ROTATION_ANIMATION_FULL_ROTATION" desc="Screen rotation animation option.">
-          Full Rotation
-        </message>
         <message name="IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_NAME" desc="Title for the flag which enables a stable window order in overview mode.">
           Use a stable window order in overview.
         </message>
@@ -6035,6 +6023,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_PASSWORD_MANAGER_LINK_DESCRIPTION" desc="Description of the flag to enable showing a link to account central on password settings page">
         Show a link in the password manager settings page to manage your synced passwords online.
       </message>
+      <message name="IDS_PASSWORD_MANAGER_ACCOUNT_CHOOSER_TITLE_SMART_LOCK" desc="The title of the account chooser infobar for Smart Lock users.">
+        Choose an account from your <ph name="LINK_TEXT">$1<ex>Google Smart Lock</ex></ph>
+      </message>
+      <message name="IDS_PASSWORD_MANAGER_ACCOUNT_CHOOSER_TITLE" desc="The title of the password bubble when a credential should be chosen.">
+        Choose an account to login
+      </message>
       <message name="IDS_SAVE_PASSWORD" desc="The title of the save password bubble when a password can be saved.">
         Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for this site?
       </message>
@@ -6082,6 +6076,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ENABLE_ICON_NTP_DESCRIPTION" desc="Description for the flag to enable large icons on the NTP.">
         Enable the experimental New Tab page using large icons.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PUSH_API_BACKGROUND_MODE_NAME" desc="Name of the flag to enable background mode for the Push API.">
+        Enable Push API background mode
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PUSH_API_BACKGROUND_MODE_DESCRIPTION" desc="Description for the flag to enable background mode for the Push API.">
+        Enable background mode for the Push API. This allows Chrome to continue running after the last window is closed, and to launch at OS startup, if the Push API needs it.
       </message>
       <message name="IDS_FLAGS_ENABLE_STALE_WHILE_REVALIDATE_NAME" desc="Name of the flag to enable the stale-while-revalidate cache directive.">
         Enable the stale-while-revalidate cache directive
@@ -7380,9 +7380,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_PASSWORDS_EXCEPTIONS_WINDOW_TITLE" desc="Title for 'Passwords and exceptions dialog'">
         Passwords
       </message>
-      <message name="IDS_PASSWORDS_EXCEPTIONS_SMART_LOCK_WINDOW_TITLE" desc="Title for 'Passwords and exceptions dialog'">
-        Google Smart Lock for Passwords
-      </message>
       <message name="IDS_PASSWORDS_AUTO_SIGNIN_TITLE" desc="Title for 'Auto sign-in' checkbox in the password dialog">
         Auto Sign-in
       </message>
@@ -7452,25 +7449,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_PASSWORD_MANAGER_BLACKLIST_BUTTON" desc="Button text for the 'Save Password' infobar's 'Never remember for this site' option">
           Never for this site
         </message>
-        <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON1" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
+        <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
           Never
         </message>
-        <if expr="use_titlecase">
-          <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON2" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
-            No Thanks
-          </message>
-          <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON3" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
-            Don't Ask
-          </message>
-        </if>
-        <if expr="not use_titlecase">
-          <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON2" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
-            No thanks
-          </message>
-          <message name="IDS_PASSWORD_MANAGER_BUBBLE_BLACKLIST_BUTTON3" desc="Button text for the 'Save Password' bubble's 'Never remember for this site' option">
-            Don't ask
-          </message>
-        </if>
         <message name="IDS_PASSWORD_MANAGER_CANCEL_BUTTON" desc="Text for the 'Manage Passwords' bubble's 'Not now' option">
           Nope
         </message>
@@ -14763,6 +14744,9 @@ After you create a new supervised user, you can manage their settings at any tim
       <if expr="enable_notifications">
         <message name="IDS_PUSH_MESSAGING_GENERIC_NOTIFICATION_BODY" desc="Body text of an auto-generated notification informing the user that the site may have received an update in the background, in case the site did not satisfy the visible notification requirement itself.">
           This site has been updated in the background.
+        </message>
+        <message name="IDS_NOTIFICATIONS_BACKGROUND_SERVICE_NAME" desc="The name of the Notifications service that can run in the background">
+          Notifications
         </message>
       </if>
 

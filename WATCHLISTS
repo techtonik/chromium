@@ -305,6 +305,9 @@
                   'net/base/host_cache|' \
                   'net/dns/'
     },
+    'docs': {
+      'filepath': 'docs',
+    },
     'download': {
       'filepath': 'chrome/browser/download/|'\
                   'content/browser/download/',
@@ -905,6 +908,7 @@
     'auto_bisect': ['auto-bisect-reviews@chromium.org'],
     'autofill': ['bondd+autofillwatch@chromium.org',
                  'estade+watch@chromium.org',
+                 'jdonnelly+autofillwatch@chromium.org',
                  'rouslan+autofillwatch@chromium.org'],
     'automation': ['robertshield@chromium.org'],
     'background_sync': ['jkarlin+watch@chromium.org'],
@@ -974,6 +978,7 @@
                  'devtools-reviews@chromium.org'],
     'disk_cache': ['gavinp+disk@chromium.org'],
     'dns': ['mmenke@chromium.org'],
+    'docs': ['andybons@chromium.org', 'nodir@chromium.org'],
     'download_database': ['benjhayden+dwatch@chromium.org'],
     'download': ['benjhayden+dwatch@chromium.org', 'asanka@chromium.org'],
     'downloads_ext': ['benjhayden+dwatch@chromium.org'],

@@ -4508,8 +4508,6 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
     return getter_return_value_;
   }
 
-  bool IsExternalScrollActive() const override { return false; }
-
   void SetNeedsAnimate(const AnimationCallback&) override {
     needs_animate_ = true;
   }
@@ -8481,7 +8479,8 @@ class MockReclaimResourcesOutputSurface : public FakeOutputSurface {
  public:
   static scoped_ptr<MockReclaimResourcesOutputSurface> Create3d() {
     return make_scoped_ptr(new MockReclaimResourcesOutputSurface(
-        TestContextProvider::Create(), TestContextProvider::Create(), false));
+        TestContextProvider::Create(), TestContextProvider::CreateWorker(),
+        false));
   }
 
   MOCK_METHOD0(ForceReclaimResources, void());

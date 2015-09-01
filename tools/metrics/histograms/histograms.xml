@@ -2510,6 +2510,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="BackgroundMode.BackgroundModeEnabledPrefChanged"
+    enum="BooleanEnabled">
+  <owner>mvanouwerkerk@chromium.org</owner>
+  <summary>
+    Logged if BackgroundModeManager is running and listening for pref changes,
+    and the pref does indeed change. The new value is logged.
+  </summary>
+</histogram>
+
+<histogram name="BackgroundMode.MenuItemClick" enum="BackgroundModeMenuItem">
+  <owner>mvanouwerkerk@chromium.org</owner>
+  <summary>
+    Logged when an item in the system tray icon menu is clicked.
+  </summary>
+</histogram>
+
 <histogram name="BackgroundMode.OnStartup.AutoLaunchState"
     enum="AutoLaunchState">
   <owner>gab@chromium.org</owner>
@@ -13515,6 +13531,16 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="GoogleUpdate.InfoBar.InternalStorageSizeAvailable" units="MB">
+  <owner>yfriedman@chromium.org</owner>
+  <owner>dfalcantara@chromium.org</owner>
+  <owner>khushalsagar@chromium.org</owner>
+  <summary>
+    (Android-only) The amount of internal memory storage available on the user's
+    device when the InfoBar is shown.
+  </summary>
+</histogram>
+
 <histogram name="GoogleUpdate.InfoBar.TimeShown" units="milliseconds">
   <owner>yfriedman@chromium.org</owner>
   <owner>dfalcantara@chromium.org</owner>
@@ -13731,6 +13757,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     The time that the GPU process spends in initializing the GL surface, and
     collecting graphics information.
+  </summary>
+</histogram>
+
+<histogram name="GPU.ProgramCache.CacheHit" enum="BooleanSuccess">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    If a successfully linked program was found in the GPU program cache during a
+    program link call.
   </summary>
 </histogram>
 
@@ -17347,6 +17381,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Media.Session.Stop" enum="MediaSessionActionSource">
+  <owner>avayvod@chromium.org</owner>
+  <owner>mlamouri@chromium.org</owner>
+  <summary>
+    The number of times the user stopped a media session using other means than
+    the pause button on the page.
+  </summary>
+</histogram>
+
 <histogram name="Media.TimeToPipelineStarted" units="ms">
   <obsolete>
     Removed from code 2014/6/18.
@@ -17562,6 +17605,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Media.VideoFramePixelFormat" enum="VideoFramePixelFormat">
+  <obsolete>
+    Replaced by Media.VideoPixelFormatUnion 08/2015.
+  </obsolete>
   <owner>mcasas@chromium.org</owner>
   <owner>watk@chromium.org</owner>
   <summary>Pixel format used in HTML5 video. Emitted on video load.</summary>
@@ -17573,6 +17619,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </obsolete>
   <owner>scherkus@chromium.org</owner>
   <summary>Pixel format used in HTML5 video. Emitted on video load.</summary>
+</histogram>
+
+<histogram name="Media.VideoPixelFormatUnion" enum="VideoPixelFormatUnion">
+  <owner>mcasas@chromium.org</owner>
+  <owner>emircan@chromium.org</owner>
+  <summary>
+    Pixel format used in capture and HTML5 video. Emitted on video load.
+  </summary>
 </histogram>
 
 <histogram name="Media.VideoRenderer.CadenceChanges" units="changes">
@@ -28224,6 +28278,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="OfflinePages.DeletePageResult"
+    enum="OfflinePagesDeletePageResult">
+  <owner>jianli@chromium.org</owner>
+  <summary>Result of removing an offline copy for a page.</summary>
+</histogram>
+
 <histogram name="OfflinePages.LoadSuccess" enum="BooleanSuccess">
   <owner>jianli@chromium.org</owner>
   <summary>
@@ -28238,12 +28298,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="OfflinePages.PageSize" units="KB">
+  <owner>jianli@chromium.org</owner>
+  <summary>Size of the saved copy of an offline page.</summary>
+</histogram>
+
 <histogram name="OfflinePages.SavedPageCount" units="pages">
   <owner>jianli@chromium.org</owner>
   <summary>
     Number of saved pages restored from the offline pages metadata store when it
     is logged.
   </summary>
+</histogram>
+
+<histogram name="OfflinePages.SavePageResult" enum="OfflinePagesSavePageResult">
+  <owner>jianli@chromium.org</owner>
+  <summary>Result of saving an offline copy for a page.</summary>
 </histogram>
 
 <histogram name="OfflinePolicy.SuccessfulResourceLoadPercentage" units="%">
@@ -37793,12 +37863,33 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="SB2.RemoteCall.Result" enum="SB2RemoteCallsResult">
+<histogram name="SB2.RemoteCall.Result" enum="SB2RemoteCallResult">
   <owner>nparker@chromium.org</owner>
   <summary>
     Result of URL-classification API calls from Chrome via
-    RemoteSafeBrowsingApiHandler.  Logged from Java when the remote IPC returns
-    and is judged safe/not-safe, or hits a deadline.
+    RemoteSafeBrowsingApiHandler.  Logged after each URL is judged
+    safe/not-safe, or hits a deadline.
+  </summary>
+</histogram>
+
+<histogram name="SB2.RemoteCall.ThreatSubType.PotentiallyHarmfulApp"
+    enum="SB2RemoteCallThreatSubType">
+  <owner>nparker@chromium.org</owner>
+  <summary>
+    The threat sub-type annotated  for URLs classified as PHA via remote calls
+    through RemoteSafeBrowsingApiHandler. &quot;PHA&quot; classifications
+    generate &quot;malware&quot; interstitials.
+  </summary>
+</histogram>
+
+<histogram name="SB2.RemoteCall.ThreatSubType.SocialEngineering"
+    enum="SB2RemoteCallThreatSubType">
+  <owner>nparker@chromium.org</owner>
+  <summary>
+    The threat sub-type annotated returned for URLs classified as social
+    engineering via remote calls through RemoteSafeBrowsingApiHandler.
+    &quot;Social engineering&quot; classifications generate &quot;phishing&quot;
+    interstitials.
   </summary>
 </histogram>
 
@@ -51382,7 +51473,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of received bits per second for a received video stream. Recorded
-    when a stream is removed.
+    when a stream is removed. The total number of bytes is divided by the time
+    the video stream exists.
   </summary>
 </histogram>
 
@@ -51390,7 +51482,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent bits per second for a sent video stream. Recorded when a
-    stream is removed.
+    stream is removed. The total number of bytes is divided by the time the
+    video stream exists.
   </summary>
 </histogram>
 
@@ -51398,7 +51491,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of complete frames received per second for a received video
-    stream. Recorded when a stream is removed.
+    stream. Recorded when a stream is removed. The total number of frames is
+    divided by the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51406,7 +51500,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of decoded frames per second for a received video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of frames is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51462,7 +51557,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of received FEC bits per second for a received video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51470,7 +51566,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent FEC bits per second for a sent video stream. Recorded
-    when a stream is removed.
+    when a stream is removed. The total number of bytes is divided by the time
+    the video stream exists.
   </summary>
 </histogram>
 
@@ -51497,7 +51594,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of incoming frames per second for a sent video stream. Recorded
-    when a stream is removed.
+    when a stream is removed. The total number of frames is divided by the time
+    the video stream exists.
   </summary>
 </histogram>
 
@@ -51537,7 +51635,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of received media payload bits per second for a received video
-    stream. Recorded when a stream is removed.
+    stream. Recorded when a stream is removed. The total number of bytes is
+    divided by the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51545,7 +51644,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent media payload bits per second for a sent video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51572,7 +51672,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of received padding bits per second for a received video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51580,7 +51681,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent padding bits per second for a sent video stream. Recorded
-    when a stream is removed.
+    when a stream is removed. The total number of bytes is divided by the time
+    the video stream exists.
   </summary>
 </histogram>
 
@@ -51647,7 +51749,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent frames to the renderer per second for a received video
-    stream. Recorded when a stream is removed.
+    stream. Recorded when a stream is removed. The total number of frames is
+    divided by the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51655,7 +51758,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of retransmitted bits per second for a received video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51663,7 +51767,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of retransmitted bits per second for a sent video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51671,7 +51776,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of received bits over RTX per second for a received video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51679,7 +51785,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent bits over RTX per second for a sent video stream.
-    Recorded when a stream is removed.
+    Recorded when a stream is removed. The total number of bytes is divided by
+    the time the video stream exists.
   </summary>
 </histogram>
 
@@ -51687,7 +51794,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>asapersson@chromium.org</owner>
   <summary>
     The number of sent frames per second for a sent video stream. Recorded when
-    a stream is removed.
+    a stream is removed. The total number of frames is divided by the time the
+    video stream exists.
   </summary>
 </histogram>
 
@@ -52978,6 +53086,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="3" label="AUTO_LAUNCH_FOREGROUND_USELESS"/>
 </enum>
 
+<enum name="BackgroundModeMenuItem" type="int">
+  <int value="0" label="About"/>
+  <int value="1" label="Task manager"/>
+  <int value="2" label="Background client"/>
+  <int value="3" label="Let run in background"/>
+  <int value="4" label="Exit"/>
+</enum>
+
 <enum name="BackgroundSyncStatus" type="int">
   <int value="0" label="Action completed successfully"/>
   <int value="1" label="Back-end error"/>
@@ -53109,6 +53225,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="93" label="OBSOLETE_BDH_DUPLICATE_REQUEST_DEVICE_ID"/>
   <int value="94" label="CSDH_INVALID_ORIGIN"/>
   <int value="95" label="RDH_ILLEGAL_ORIGIN"/>
+  <int value="96" label="RDH_UNAUTHORIZED_HEADER_REQUEST"/>
 </enum>
 
 <enum name="BadMessageReasonExtensions" type="int">
@@ -53764,6 +53881,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </enum>
 
 <enum name="CapturePixelFormat" type="int">
+  <obsolete>
+    Deprecated as of 08/2015.
+  </obsolete>
   <int value="0" label="UNKNOWN"/>
   <int value="1" label="I420"/>
   <int value="2" label="YUY2"/>
@@ -60079,6 +60199,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="937" label="CSSAnimationsStackedNeutralKeyframe"/>
   <int value="938" label="ReadingCheckedInClickHandler"/>
   <int value="939" label="FlexboxIntrinsicSizeAlgorithmIsDifferent"/>
+  <int value="940" label="HTMLImportsHasStyleSheets"/>
+  <int value="941" label="WebkitTextInClipProperty"/>
+  <int value="942" label="WebkitTextInColorProperty"/>
 </enum>
 
 <enum name="FetchRequestMode" type="int">
@@ -63403,6 +63526,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1985025593" label="file-manager-enable-new-gallery"/>
   <int value="-1972383451" label="disable-pinch"/>
   <int value="-1963402827" label="enable-topchrome-md"/>
+  <int value="-1946595906" label="enable-push-api-background-mode"/>
   <int value="-1943507605" label="enable-new-video-renderer"/>
   <int value="-1941852572" label="floating-virtual-keyboard"/>
   <int value="-1940806558" label="enable-syncfs-directory-operation"/>
@@ -63675,6 +63799,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="455698038"
       label="disable-gesture-requirement-for-media-playback"/>
   <int value="458410433" label="disable-views-rect-based-targeting"/>
+  <int value="466248382" label="disable-push-api-background-mode"/>
   <int value="474743272" label="material-design-ink-drop"/>
   <int value="494733611" label="disable-drop-sync-credential"/>
   <int value="503245473" label="disable-translate-new-ux"/>
@@ -64854,7 +64979,8 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="MediaSessionActionSource" type="int">
-  <int value="0" label="MediaNotification"/>
+  <int value="0" label="Media Notification"/>
+  <int value="1" label="MediaSession (Android)"/>
 </enum>
 
 <enum name="MediaStreamRequestResult" type="int">
@@ -66036,6 +66162,24 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Didn't remove URL, too few suggestions in MV"/>
   <int value="2" label="Too few URLs, didn't flip tiles 1 and 8"/>
   <int value="3" label="Too few URLs, didn't flip tiles 1 and 4"/>
+</enum>
+
+<enum name="OfflinePagesDeletePageResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Cancelled"/>
+  <int value="2" label="Store failure"/>
+  <int value="3" label="Device failure"/>
+  <int value="4" label="Not found"/>
+</enum>
+
+<enum name="OfflinePagesSavePageResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Cancelled"/>
+  <int value="2" label="Device full"/>
+  <int value="3" label="Content unavailable"/>
+  <int value="4" label="Archive creation failed"/>
+  <int value="5" label="Store failure"/>
+  <int value="6" label="Already exists"/>
 </enum>
 
 <enum name="OfflineStatus" type="int">
@@ -69589,11 +69733,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="19" label="BLOOM_MISS_PREFIX_HIT"/>
 </enum>
 
-<enum name="SB2RemoteCallsResult" type="int">
+<enum name="SB2RemoteCallResult" type="int">
   <int value="0" label="INTERNAL_ERROR"/>
   <int value="1" label="TIMEOUT"/>
   <int value="2" label="SAFE"/>
   <int value="3" label="UNSAFE"/>
+  <int value="4" label="JSON_EMPTY"/>
+  <int value="5" label="JSON_FAILED_TO_PARSE"/>
+  <int value="6" label="JSON_UNKNOWN_THREAT"/>
+  <int value="7" label="UNSUPPORTED"/>
+</enum>
+
+<enum name="SB2RemoteCallThreatSubType" type="int">
+  <int value="0" label="No subtype added"/>
+  <int value="1" label="Landing URL"/>
+  <int value="2" label="Distribution URL"/>
+  <int value="3" label="Unknown"/>
 </enum>
 
 <enum name="SB2SideEffectFreeWhitelistStatus" type="int">
@@ -73179,6 +73334,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="VideoFramePixelFormat" type="int">
+  <obsolete>
+    Deprecated as of 08/2015. Substituted by VideoPixelFormatUnion.
+  </obsolete>
   <int value="0" label="UNKNOWN"/>
   <int value="1" label="YV12"/>
   <int value="2" label="I420"/>
@@ -73207,6 +73365,24 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="9" label="YV24"/>
   <int value="10" label="ARGB"/>
   <int value="11" label="YV12HD"/>
+</enum>
+
+<enum name="VideoPixelFormatUnion" type="int">
+  <int value="0" label="UNKNOWN"/>
+  <int value="1" label="I420"/>
+  <int value="2" label="YV12"/>
+  <int value="3" label="YV16"/>
+  <int value="4" label="YV12A"/>
+  <int value="5" label="YV24"/>
+  <int value="6" label="NV12"/>
+  <int value="7" label="NV21"/>
+  <int value="8" label="UYVY"/>
+  <int value="9" label="YUY2"/>
+  <int value="10" label="ARGB"/>
+  <int value="11" label="XRGB"/>
+  <int value="12" label="RGB24"/>
+  <int value="13" label="RGB32"/>
+  <int value="14" label="MJPEG"/>
 </enum>
 
 <enum name="VideoPlayerCastAPIExtensionStatus" type="int">

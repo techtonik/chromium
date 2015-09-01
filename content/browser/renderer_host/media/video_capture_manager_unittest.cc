@@ -48,6 +48,10 @@ class MockFrameObserver : public VideoCaptureControllerEventHandler {
   void OnBufferCreated(VideoCaptureControllerID id,
                        base::SharedMemoryHandle handle,
                        int length, int buffer_id) override {}
+  void OnBufferCreated2(VideoCaptureControllerID id,
+                        const std::vector<gfx::GpuMemoryBufferHandle>& handles,
+                        const gfx::Size& size,
+                        int buffer_id) override {}
   void OnBufferDestroyed(VideoCaptureControllerID id, int buffer_id) override {}
   void OnBufferReady(VideoCaptureControllerID id,
                      int buffer_id,
@@ -101,7 +105,7 @@ class VideoCaptureManagerTest : public testing::Test {
   VideoCaptureControllerID StartClient(int session_id, bool expect_success) {
     media::VideoCaptureParams params;
     params.requested_format = media::VideoCaptureFormat(
-        gfx::Size(320, 240), 30, media::VIDEO_CAPTURE_PIXEL_FORMAT_I420);
+        gfx::Size(320, 240), 30, media::PIXEL_FORMAT_I420);
 
     VideoCaptureControllerID client_id(next_client_id_++);
     base::RunLoop run_loop;

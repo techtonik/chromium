@@ -46,12 +46,18 @@
          disable_post_sub_buffers_for_onscreen_surfaces)     \
   GPU_OP(DISABLE_PROGRAM_CACHE,                              \
          disable_program_cache)                              \
+  GPU_OP(DISABLE_TEXTURE_STORAGE,                            \
+         disable_texture_storage)                            \
   GPU_OP(DISABLE_TIMESTAMP_QUERIES,                          \
          disable_timestamp_queries)                          \
   GPU_OP(ETC1_POWER_OF_TWO_ONLY,                             \
          etc1_power_of_two_only)                             \
   GPU_OP(EXIT_ON_CONTEXT_LOST,                               \
          exit_on_context_lost)                               \
+  GPU_OP(FORCE_CUBE_COMPLETE,                                \
+         force_cube_complete)                                \
+  GPU_OP(FORCE_CUBE_MAP_POSITIVE_X_ALLOCATION,               \
+         force_cube_map_positive_x_allocation)               \
   GPU_OP(FORCE_DISCRETE_GPU,                                 \
          force_discrete_gpu)                                 \
   GPU_OP(FORCE_GL_FINISH_AFTER_COMPOSITING,                  \

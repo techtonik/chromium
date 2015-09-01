@@ -36,6 +36,7 @@
 #include "components/plugins/common/plugins_switches.h"
 #include "components/proximity_auth/switches.h"
 #include "components/search/search_switches.h"
+#include "components/sync_driver/sync_driver_switches.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/user_metrics.h"
 #include "media/base/media_switches.h"
@@ -405,21 +406,6 @@ const Experiment::Choice kFillOnAccountSelectChoices[] = {
   { IDS_FLAGS_FILL_ON_ACCOUNT_SELECT_ENABLE_NO_HIGHLIGHTING,
     autofill::switches::kEnableFillOnAccountSelectNoHighlighting, "" },
 };
-
-#if defined(USE_ASH)
-const Experiment::Choice kAshScreenRotationAnimationChoices[] = {
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
-    ash::switches::kAshEnableScreenRotationAnimation,
-    "none" },
-  { IDS_ASH_SCREEN_ROTATION_ANIMATION_PARTIAL_ROTATION,
-    ash::switches::kAshEnableScreenRotationAnimation,
-    "partial-rotation" },
-  { IDS_ASH_SCREEN_ROTATION_ANIMATION_FULL_ROTATION,
-    ash::switches::kAshEnableScreenRotationAnimation,
-    "full-rotation" }
-};
-#endif
 
 #if defined(ENABLE_TOPCHROME_MD)
 const Experiment::Choice kTopChromeMaterialDesignChoices[] = {
@@ -1016,11 +1002,6 @@ const Experiment kExperiments[] = {
      kOsCrOS,
      SINGLE_VALUE_TYPE(ash::switches::kAshEnableMirroredScreen),
     },
-    {"ash-enable-screen-rotation-animations",
-     IDS_FLAGS_ASH_ENABLE_SCREEN_ROTATION_ANIMATION_NAME,
-     IDS_FLAGS_ASH_ENABLE_SCREEN_ROTATION_ANIMATION_DESCRIPTION,
-     kOsCrOS,
-     MULTI_VALUE_TYPE(kAshScreenRotationAnimationChoices)},
     {
      "ash-stable-overview-order",
      IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_NAME,
@@ -2078,6 +2059,14 @@ const Experiment kExperiments[] = {
       kOsWin,
       SINGLE_VALUE_TYPE(switches::kTraceExportEventsToETW)},
 #endif  // defined(OS_WIN)
+#if defined(ENABLE_BACKGROUND)
+    {"enable-push-api-background-mode",
+     IDS_FLAGS_ENABLE_PUSH_API_BACKGROUND_MODE_NAME,
+     IDS_FLAGS_ENABLE_PUSH_API_BACKGROUND_MODE_DESCRIPTION,
+     kOsMac | kOsWin | kOsLinux,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnablePushApiBackgroundMode,
+                               switches::kDisablePushApiBackgroundMode)},
+#endif  // defined(ENABLE_BACKGROUND)
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

@@ -1067,6 +1067,7 @@ if (is_ios || is_win || (is_linux && !is_chromeos)) {
       ]
       deps = [
         ":base",
+        "//build/config/sanitizers:deps",
         "//third_party/icu:icuuc",
       ]
     }
@@ -1077,6 +1078,7 @@ if (is_ios || is_win || (is_linux && !is_chromeos)) {
       ]
       deps = [
         ":base",
+        "//build/config/sanitizers:deps",
       ]
     }
   }
@@ -1189,6 +1191,9 @@ if (is_win) {
     libs = [
       "cfgmgr32.lib",
       "shell32.lib",
+    ]
+    deps = [
+      "//build/config/sanitizers:deps",
     ]
   }
 }
@@ -1596,6 +1601,14 @@ if (is_android) {
     ]
 
     DEPRECATED_java_in_dir = "android/java/src"
+    if (is_debug) {
+      java_files = [
+        "android/java/debug_src/org/chromium/base/IncrementalInstall.java",
+        "android/java/debug_src/org/chromium/base/Reflect.java",
+      ]
+    } else {
+      java_files = [ "android/java/release_src/org/chromium/base/IncrementalInstall.java" ]
+    }
 
     # A new version of NativeLibraries.java (with the actual correct values)
     # will be created when creating an apk.
