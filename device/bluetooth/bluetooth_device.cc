@@ -316,15 +316,15 @@ void BluetoothDevice::DidDisconnectGatt() {
 }
 
 void BluetoothDevice::IncrementGattConnectionReferenceCount() {
-  CHECK(gatt_connection_reference_count_ <
-        std::numeric_limits<decltype(gatt_connection_reference_count_)>::max());
   gatt_connection_reference_count_++;
+  CHECK(gatt_connection_reference_count_.IsValid());
 }
 
 void BluetoothDevice::DecrementGattConnectionReferenceCount() {
-  CHECK(gatt_connection_reference_count_ > 0);
   gatt_connection_reference_count_--;
-  if (gatt_connection_reference_count_ == 0)
+  auto count = gatt_connection_reference_count_.ValueOrDie();
+  CHECK(count >= 0);
+  if (count == 0)
     DisconnectGatt();
 }
 
