@@ -34,7 +34,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
 
   // Returns the Bluetooth address of the device that this connection is open
   // to.
-  std::string GetDeviceAddress() const;
+  const std::string& GetDeviceAddress() const;
 
   // Returns true if this GATT connection is open.
   virtual bool IsConnected();
@@ -52,7 +52,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   std::string device_address_;
 
  private:
-  bool owns_reference_for_connection_ = true;
+  bool owns_reference_for_connection_ = false;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnection);
 };
