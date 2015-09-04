@@ -52,7 +52,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   std::string device_address_;
 
  private:
-  bool already_decremented_connection_reference_on_device_ = false;
+  bool owns_reference_for_connection_ = true;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnection);
 };

@@ -29,15 +29,15 @@ std::string BluetoothGattConnection::GetDeviceAddress() const {
 }
 
 bool BluetoothGattConnection::IsConnected() {
-  return !already_decremented_connection_reference_on_device_ &&
+  return owns_reference_for_connection_ &&
          adapter_->GetDevice(device_address_)->IsGattConnected();
 }
 
 void BluetoothGattConnection::Disconnect() {
-  if (already_decremented_connection_reference_on_device_)
+  if (!owns_reference_for_connection_)
     return;
 
-  already_decremented_connection_reference_on_device_ = true;
+  owns_reference_for_connection_ = false;
   BluetoothDevice* device = adapter_->GetDevice(device_address_);
   if (device)
     device->DecrementGattConnectionReferenceCount();
