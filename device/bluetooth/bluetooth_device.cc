@@ -24,6 +24,7 @@ BluetoothDevice::BluetoothDevice(BluetoothAdapter* adapter)
 
 BluetoothDevice::~BluetoothDevice() {
   STLDeleteValues(&gatt_services_);
+  DidDisconnectGatt();
 }
 
 BluetoothDevice::ConnectionInfo::ConnectionInfo()
@@ -313,18 +314,24 @@ void BluetoothDevice::DidDisconnectGatt() {
                "create_gatt_connection_error_callbacks_ are pending.";
   }
   DidFailToConnectGatt(ERROR_FAILED);
+
+  // Mark all BluetoothGattConnection objects disconnected.
+  std::set<BluetoothGattConnection*> gatt_connections_copy(gatt_connections_);
+  for (auto callback : gatt_connections_copy) {
+    callback->Disconnect();
+  }
+  DCHECK(gatt_connections_.size() == 0);
 }
 
-void BluetoothDevice::IncrementGattConnectionReferenceCount() {
-  gatt_connection_reference_count_++;
-  CHECK(gatt_connection_reference_count_.IsValid());
+void BluetoothDevice::AddGattConnection(BluetoothGattConnection* connection) {
+  auto result = gatt_connections_.insert(connection);
+  DCHECK(result.second);  // Check insert happened; there was no duplicate.
 }
 
-void BluetoothDevice::DecrementGattConnectionReferenceCount() {
-  gatt_connection_reference_count_--;
-  auto count = gatt_connection_reference_count_.ValueOrDie();
-  CHECK(count >= 0);
-  if (count == 0)
+void BluetoothDevice::RemoveGattConnection(BluetoothGattConnection* connection) {
+  size_t erased_count = gatt_connections_.erase(connection);
+  DCHECK(erased_count);
+  if (gatt_connections_.size() == 0)
     DisconnectGatt();
 }
 

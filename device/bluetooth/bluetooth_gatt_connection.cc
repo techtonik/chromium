@@ -18,7 +18,7 @@ BluetoothGattConnection::BluetoothGattConnection(
   BluetoothDevice* device = adapter_->GetDevice(device_address_);
   if (device) {
     owns_reference_for_connection_ = true;
-    device->IncrementGattConnectionReferenceCount();
+    device->AddGattConnection(this);
   }
 }
 
@@ -34,7 +34,8 @@ bool BluetoothGattConnection::IsConnected() {
   if (!owns_reference_for_connection_)
     return false;
   BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  return device && device->IsGattConnected();
+  DCHECK(device && device->IsGattConnected());
+  return true;
 }
 
 void BluetoothGattConnection::Disconnect() {
@@ -44,7 +45,7 @@ void BluetoothGattConnection::Disconnect() {
   owns_reference_for_connection_ = false;
   BluetoothDevice* device = adapter_->GetDevice(device_address_);
   if (device)
-    device->DecrementGattConnectionReferenceCount();
+    device->RemoveGattConnection(this);
 }
 
 }  // namespace device

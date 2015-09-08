@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <set>
 
 #include "base/callback.h"
 #include "base/memory/ref_counted.h"
@@ -433,8 +434,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   static std::string CanonicalizeAddress(const std::string& address);
 
  protected:
-  // BluetoothGattConnection is a friend to call
-  // Inc/DecrementGattConnectionReferenceCount.
+  // BluetoothGattConnection is a friend to call Add/RemoveGattConnection.
   friend BluetoothGattConnection;
 
   BluetoothDevice(BluetoothAdapter* adapter);
@@ -460,10 +460,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   void DidFailToConnectGatt(ConnectErrorCode);
   void DidDisconnectGatt();
 
-  // Maintains GattConnection reference count. Called by friend class
-  // BluetoothGattConnection.
-  void IncrementGattConnectionReferenceCount();
-  void DecrementGattConnectionReferenceCount();
+  // Maintains GattConnection reference count by tracking friend class
+  // BluetoothGattConnection instances.
+  void AddGattConnection(BluetoothGattConnection*);
+  void RemoveGattConnection(BluetoothGattConnection*);
 
   // Clears the list of service data.
   void ClearServiceData();
@@ -480,9 +480,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   std::vector<GattConnectionCallback> create_gatt_connection_success_callbacks_;
   std::vector<ConnectErrorCallback> create_gatt_connection_error_callbacks_;
 
-  // Represents the number of BluetoothGattConnection objects keeping the
-  // Gatt connection alive to the device.
-  base::CheckedNumeric<uint32_t> gatt_connection_reference_count_ = 0;
+  // BluetoothGattConnection objects keeping the GATT connection alive.
+  std::set<BluetoothGattConnection*> gatt_connections_;
 
   // Mapping from the platform-specific GATT service identifiers to
   // BluetoothGattService objects.
