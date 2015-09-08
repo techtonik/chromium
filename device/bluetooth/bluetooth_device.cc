@@ -11,6 +11,7 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
+#include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_gatt_connection.h"
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "grit/bluetooth_strings.h"
@@ -23,6 +24,7 @@ BluetoothDevice::BluetoothDevice(BluetoothAdapter* adapter)
 
 BluetoothDevice::~BluetoothDevice() {
   STLDeleteValues(&gatt_services_);
+  DidDisconnectGatt();
 }
 
 BluetoothDevice::ConnectionInfo::ConnectionInfo()
@@ -304,21 +306,32 @@ void BluetoothDevice::DidFailToConnectGatt(ConnectErrorCode error) {
 }
 
 void BluetoothDevice::DidDisconnectGatt() {
-  // If pending calls to connect GATT existed, flush them to ensure a consistent
-  // state.
-  DidFailToConnectGatt(ERROR_UNKNOWN);
+  // Pending calls to connect GATT are not expected, if they were then
+  // DidFailToConnectGatt should be called. But in case callbacks exist
+  // flush them to ensure a consistent state.
+  if (create_gatt_connection_error_callbacks_.size() > 0) {
+    VLOG(1) << "Unexpected / unexplained DidDisconnectGatt call while "
+               "create_gatt_connection_error_callbacks_ are pending.";
+  }
+  DidFailToConnectGatt(ERROR_FAILED);
+
+  // Mark all BluetoothGattConnection objects disconnected.
+  std::set<BluetoothGattConnection*> gatt_connections_copy(gatt_connections_);
+  for (auto callback : gatt_connections_copy) {
+    callback->Disconnect();
+  }
+  DCHECK(gatt_connections_.size() == 0);
 }
 
-void BluetoothDevice::IncrementGattConnectionReferenceCount() {
-  CHECK(gatt_connection_reference_count_ <
-        std::numeric_limits<decltype(gatt_connection_reference_count_)>::max());
-  gatt_connection_reference_count_++;
+void BluetoothDevice::AddGattConnection(BluetoothGattConnection* connection) {
+  auto result = gatt_connections_.insert(connection);
+  DCHECK(result.second);  // Check insert happened; there was no duplicate.
 }
 
-void BluetoothDevice::DecrementGattConnectionReferenceCount() {
-  CHECK(gatt_connection_reference_count_ > 0);
-  gatt_connection_reference_count_--;
-  if (gatt_connection_reference_count_ == 0)
+void BluetoothDevice::RemoveGattConnection(BluetoothGattConnection* connection) {
+  size_t erased_count = gatt_connections_.erase(connection);
+  DCHECK(erased_count);
+  if (gatt_connections_.size() == 0)
     DisconnectGatt();
 }
 
