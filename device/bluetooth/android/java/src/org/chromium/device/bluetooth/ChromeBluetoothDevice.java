@@ -101,9 +101,9 @@ final class ChromeBluetoothDevice {
     // Implements BluetoothDeviceAndroid::CreateGattConnectionImpl.
     @CalledByNative
     private void createGattConnectionImpl(Context context) {
+        Log.i(TAG, "connectGatt");
         mBluetoothGatt =
-                mDevice.connectGatt(context, true /* autoConnect */, mBluetoothGattCallbackImpl);
-        Log.d(TAG, "connectGatt");
+                mDevice.connectGatt(context, false /* autoConnect */, mBluetoothGattCallbackImpl);
     }
 
     // Implements BluetoothDeviceAndroid::DisconnectGatt.
