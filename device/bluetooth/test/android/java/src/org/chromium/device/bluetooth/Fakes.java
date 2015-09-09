@@ -207,9 +207,9 @@ class Fakes {
         @Override
         public Wrappers.BluetoothGattWrapper connectGatt(Context context, boolean autoConnect,
                 Wrappers.BluetoothGattCallbackWrapper callback) {
-            if (mGattCallback != null) {
+            if (mGattCallback != null && mGattCallback != callback) {
                 throw new IllegalArgumentException(
-                        "FakeBluetoothDevice does not support multiple calls to connectGatt.");
+                        "Multiple callbacks provided to connectGatt unsupported.");
             }
             mGattCallback = callback;
             return new FakeBluetoothGatt();

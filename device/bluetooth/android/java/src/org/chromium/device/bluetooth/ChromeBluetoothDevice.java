@@ -31,11 +31,13 @@ final class ChromeBluetoothDevice {
     final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
+    BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
 
     private ChromeBluetoothDevice(
             long nativeBluetoothDeviceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
         mNativeBluetoothDeviceAndroid = nativeBluetoothDeviceAndroid;
         mDevice = deviceWrapper;
+        mBluetoothGattCallbackImpl = new BluetoothGattCallbackImpl();
         Log.v(TAG, "ChromeBluetoothDevice created.");
     }
 
@@ -99,8 +101,8 @@ final class ChromeBluetoothDevice {
     // Implements BluetoothDeviceAndroid::CreateGattConnectionImpl.
     @CalledByNative
     private void createGattConnectionImpl(Context context) {
-        mBluetoothGatt = mDevice.connectGatt(
-                    context, true /* autoConnect */, new BluetoothGattCallbackImpl());
+        mBluetoothGatt =
+                mDevice.connectGatt(context, true /* autoConnect */, mBluetoothGattCallbackImpl);
         Log.d(TAG, "connectGatt");
     }
 
