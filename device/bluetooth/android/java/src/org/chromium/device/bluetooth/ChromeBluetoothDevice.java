@@ -102,6 +102,8 @@ final class ChromeBluetoothDevice {
     @CalledByNative
     private void createGattConnectionImpl(Context context) {
         Log.i(TAG, "connectGatt");
+        // autoConnect set to false as under experimentation using autoConnect failed to complete
+        // connections.
         mBluetoothGatt =
                 mDevice.connectGatt(context, false /* autoConnect */, mBluetoothGattCallbackImpl);
     }
