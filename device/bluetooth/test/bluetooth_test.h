@@ -6,6 +6,7 @@
 #define DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_H_
 
 #include "base/memory/ref_counted.h"
+#include "base/memory/weak_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
@@ -95,6 +96,7 @@ class BluetoothTestBase : public testing::Test {
       BluetoothDevice::ERROR_UNKNOWN;
   int callback_count_ = 0;
   int error_callback_count_ = 0;
+  base::WeakPtrFactory<BluetoothTestBase> weak_factory_;
 };
 
 }  // namespace device

@@ -25,8 +25,7 @@ const std::string BluetoothTestBase::kTestUUIDGenericAttribute = "1801";
 const std::string BluetoothTestBase::kTestUUIDImmediateAlert = "1802";
 const std::string BluetoothTestBase::kTestUUIDLinkLoss = "1803";
 
-BluetoothTestBase::BluetoothTestBase() {
-}
+BluetoothTestBase::BluetoothTestBase() : weak_factory_(this) {}
 
 BluetoothTestBase::~BluetoothTestBase() {
 }
@@ -58,29 +57,30 @@ void BluetoothTestBase::ConnectErrorCallback(
 }
 
 base::Closure BluetoothTestBase::GetCallback() {
-  return base::Bind(&BluetoothTestBase::Callback, base::Unretained(this));
+  return base::Bind(&BluetoothTestBase::Callback, weak_factory_.GetWeakPtr());
 }
 
 BluetoothAdapter::DiscoverySessionCallback
 BluetoothTestBase::GetDiscoverySessionCallback() {
   return base::Bind(&BluetoothTestBase::DiscoverySessionCallback,
-                    base::Unretained(this));
+                    weak_factory_.GetWeakPtr());
 }
 
 BluetoothDevice::GattConnectionCallback
 BluetoothTestBase::GetGattConnectionCallback() {
   return base::Bind(&BluetoothTestBase::GattConnectionCallback,
-                    base::Unretained(this));
+                    weak_factory_.GetWeakPtr());
 }
 
 BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
-  return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
+  return base::Bind(&BluetoothTestBase::ErrorCallback,
+                    weak_factory_.GetWeakPtr());
 }
 
 BluetoothDevice::ConnectErrorCallback
 BluetoothTestBase::GetConnectErrorCallback() {
   return base::Bind(&BluetoothTestBase::ConnectErrorCallback,
-                    base::Unretained(this));
+                    weak_factory_.GetWeakPtr());
 }
 
 }  // namespace device
