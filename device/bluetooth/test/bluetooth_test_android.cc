@@ -59,7 +59,8 @@ void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
 
   Java_FakeBluetoothDevice_connectionStateChange(
       AttachCurrentThread(), device_android->GetJavaObject().obj(),
-      true /* success */, true /* connected */);
+      0,      // android.bluetooth.BluetoothGatt.GATT_SUCCESS
+      true);  // connected
 }
 
 }  // namespace device
