@@ -230,7 +230,7 @@ class Wrappers {
         public BluetoothGattWrapper connectGatt(
                 Context context, boolean autoConnect, BluetoothGattCallbackWrapper callback) {
             return new BluetoothGattWrapper(mDevice.connectGatt(
-                    context, autoConnect, new BluetoothGattCallbackWrapperCaller(callback)));
+                    context, autoConnect, new ForwardBluetoothGattCallbackToWrapper(callback)));
         }
 
         public String getAddress() {
@@ -270,17 +270,17 @@ class Wrappers {
     }
 
     /**
-     * Implements android.bluetooth.BluetoothGattCallback and passes calls through
-     * to a provided BluetoothGattCallback instance.
+     * Implements android.bluetooth.BluetoothGattCallback and forwards calls through
+     * to a provided BluetoothGattCallbackWrapper instance.
      *
      * This class is required so that Fakes can use BluetoothGattCallbackWrapper
      * without it extending from BluetoothGattCallback. Fakes must function even on
      * Android versions where BluetoothGattCallback class is not defined.
      */
-    static class BluetoothGattCallbackWrapperCaller extends BluetoothGattCallback {
+    static class ForwardBluetoothGattCallbackToWrapper extends BluetoothGattCallback {
         final BluetoothGattCallbackWrapper mWrapperCallback;
 
-        BluetoothGattCallbackWrapperCaller(BluetoothGattCallbackWrapper wrapperCallback) {
+        ForwardBluetoothGattCallbackToWrapper(BluetoothGattCallbackWrapper wrapperCallback) {
             mWrapperCallback = wrapperCallback;
         }
 
@@ -292,7 +292,7 @@ class Wrappers {
 
     /**
      * Wraps android.bluetooth.BluetoothGattCallback, being called by
-     * BluetoothGattCallbackWrapperCaller.
+     * ForwardBluetoothGattCallbackToWrapper.
      *
      * BluetoothGatt gatt parameters are omitted from methods as each call would
      * need to wrapp them in a BluetoothGattWrapper. That would be superfluous given
