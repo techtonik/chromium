@@ -210,6 +210,7 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
       case 0x00000000:  // GATT_SUCCESS
         return DidDisconnectGatt();
       default:
+        VLOG(1) << "Unhandled status: " << status;
         return DidFailToConnectGatt(ERROR_UNKNOWN);
     }
   }
