@@ -291,13 +291,12 @@ class Wrappers {
     }
 
     /**
-     * Wraps android.bluetooth.BluetoothGattCallback, being called by
-     * ForwardBluetoothGattCallbackToWrapper.
+     * Wraper alternative to android.bluetooth.BluetoothGattCallback allowing clients and Fakes to
+     * work on older SDK versions without having a dependency on the class not defined there.
      *
      * BluetoothGatt gatt parameters are omitted from methods as each call would
-     * need to wrapp them in a BluetoothGattWrapper. That would be superfluous given
-     * that the required initial call to BluetoothDeviceWrapper.connectGatt will
-     * return a BluetoothGattWrapper.
+     * need to wrap them in a BluetoothGattWrapper. Client code should cache the
+     * BluetoothGattWrapper provided on the initial BluetoothDeviceWrapper.connectGatt call.
      */
     abstract static class BluetoothGattCallbackWrapper {
         public abstract void onConnectionStateChange(int status, int newState);
