@@ -68,8 +68,11 @@ class BluetoothTestBase : public testing::Test {
   //      kTestDeviceAddress2.
   virtual void DiscoverLowEnergyDevice(int device_ordinal){};
 
-  // Simulate success of implementation details of CreateGattConnection.
+  // Simulates success of implementation details of CreateGattConnection.
   virtual void CompleteGattConnection(BluetoothDevice* device){};
+
+  // Simulates GattConnection disconnecting.
+  virtual void CompleteGattDisconnection(BluetoothDevice* device){};
 
   // Remove the device from the adapter and delete it.
   virtual void DeleteDevice(BluetoothDevice* device);

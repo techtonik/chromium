@@ -167,6 +167,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   BluetoothDevice* device = observer.last_device();
   std::string device_address = device->GetAddress();
 
+  // CreateGattConnection
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
@@ -209,6 +210,74 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   // Test GetDeviceAddress after device deleted.
   EXPECT_EQ(device_address, gatt_connections_[0]->GetDeviceAddress());
   EXPECT_EQ(device_address, gatt_connections_[1]->GetDeviceAddress());
+}
+#endif  // defined(OS_ANDROID)
+
+
+#if defined(OS_ANDROID)
+// BluetoothGattConnection with several connect / disconnects.
+TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  // Get a device.
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverLowEnergyDevice(3);
+  base::RunLoop().RunUntilIdle();
+  BluetoothDevice* device = observer.last_device();
+
+  // CreateGattConnection:
+  callback_count_ = error_callback_count_ = 0;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  CompleteGattConnection(device);
+  EXPECT_EQ(1, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+
+  // Become disconnected:
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(1, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_FALSE(gatt_connections_[0]->IsConnected());
+
+  // Be already connected, then CreateGattConnection:
+  callback_count_ = error_callback_count_ = 0;
+  CompleteGattConnection(device);
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  EXPECT_EQ(1, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+
+  // Disconnect all CreateGattConnection objects. But, don't yet simulate
+  // the device disconnecting.
+  callback_count_ = error_callback_count_ = 0;
+  for (auto connection : gatt_connections_)
+    connection->Disconnect();
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  EXPECT_EQ(1, callback_count_);  // Device is assumed still connected.
+  EXPECT_EQ(0, error_callback_count_);
+  callback_count_ = error_callback_count_ = 0;
+
+  // Actually disconnect:
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+  for (auto connection : gatt_connections_)
+    EXPECT_FALSE(connection->IsConnected());
+
+  // CreateGattConnection, but receive notice that device disconnected before
+  // it ever connects.
+  callback_count_ = error_callback_count_ = 0;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(1, error_callback_count_);
+  for (auto connection : gatt_connections_)
+    EXPECT_FALSE(connection->IsConnected());
 }
 #endif  // defined(OS_ANDROID)
 

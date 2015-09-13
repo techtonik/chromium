@@ -63,4 +63,14 @@ void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
       true);  // connected
 }
 
+void BluetoothTestAndroid::CompleteGattDisconnection(BluetoothDevice* device) {
+  BluetoothDeviceAndroid* device_android =
+      static_cast<BluetoothDeviceAndroid*>(device);
+
+  Java_FakeBluetoothDevice_connectionStateChange(
+      AttachCurrentThread(), device_android->GetJavaObject().obj(),
+      0,       // android.bluetooth.BluetoothGatt.GATT_SUCCESS
+      false);  // disconnected
+}
+
 }  // namespace device
