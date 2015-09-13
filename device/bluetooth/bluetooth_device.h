@@ -6,9 +6,9 @@
 #define DEVICE_BLUETOOTH_BLUETOOTH_DEVICE_H_
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
-#include <set>
 
 #include "base/callback.h"
 #include "base/memory/ref_counted.h"
