@@ -326,7 +326,8 @@ void BluetoothDevice::AddGattConnection(BluetoothGattConnection* connection) {
   DCHECK(result.second);  // Check insert happened; there was no duplicate.
 }
 
-void BluetoothDevice::RemoveGattConnection(BluetoothGattConnection* connection) {
+void BluetoothDevice::RemoveGattConnection(
+    BluetoothGattConnection* connection) {
   size_t erased_count = gatt_connections_.erase(connection);
   DCHECK(erased_count);
   if (gatt_connections_.size() == 0)
