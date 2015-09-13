@@ -15,11 +15,10 @@ BluetoothGattConnection::BluetoothGattConnection(
   DCHECK(adapter_.get());
   DCHECK(!device_address_.empty());
 
-  BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  if (device) {
+  device_ = adapter_->GetDevice(device_address_);
+  DCHECK(device_);
     owns_reference_for_connection_ = true;
-    device->AddGattConnection(this);
-  }
+    device_->AddGattConnection(this);
 }
 
 BluetoothGattConnection::~BluetoothGattConnection() {
@@ -33,8 +32,8 @@ const std::string& BluetoothGattConnection::GetDeviceAddress() const {
 bool BluetoothGattConnection::IsConnected() {
   if (!owns_reference_for_connection_)
     return false;
-  BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  DCHECK(device && device->IsGattConnected());
+  DCHECK(adapter_->GetDevice(device_address_));
+  DCHECK(device_->IsGattConnected());
   return true;
 }
 
@@ -43,9 +42,11 @@ void BluetoothGattConnection::Disconnect() {
     return;
 
   owns_reference_for_connection_ = false;
-  BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  if (device)
-    device->RemoveGattConnection(this);
+  device_->RemoveGattConnection(this);
+}
+
+void BluetoothGattConnection::InvalidateConnectionReference() {
+  owns_reference_for_connection_ = false;
 }
 
 }  // namespace device
