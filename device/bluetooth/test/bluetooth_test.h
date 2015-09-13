@@ -71,6 +71,9 @@ class BluetoothTestBase : public testing::Test {
   // Simulate success of implementation details of CreateGattConnection.
   virtual void CompleteGattConnection(BluetoothDevice* device){};
 
+  // Remove the device from the adapter and delete it.
+  virtual void DeleteDevice(BluetoothDevice* device);
+
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
   void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);

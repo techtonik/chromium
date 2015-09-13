@@ -173,6 +173,7 @@ void BluetoothDeviceAndroid::CancelPairing() {
 
 void BluetoothDeviceAndroid::Disconnect(const base::Closure& callback,
                                         const ErrorCallback& error_callback) {
+  // TODO(scheib): Also update unit tests for BluetoothGattConnection.
   NOTIMPLEMENTED();
 }
 

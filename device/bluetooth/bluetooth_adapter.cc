@@ -200,6 +200,13 @@ void BluetoothAdapter::DiscoverySessionBecameInactive(
   discovery_sessions_.erase(discovery_session);
 }
 
+void BluetoothAdapter::DeleteDeviceForTesting(const std::string& address) {
+  std::map<const std::string, BluetoothDevice*>::iterator device =
+      devices_.find(address);
+  devices_.erase(device);
+  delete device->second;
+}
+
 scoped_ptr<BluetoothDiscoveryFilter>
 BluetoothAdapter::GetMergedDiscoveryFilterHelper(
     const BluetoothDiscoveryFilter* masked_filter,
