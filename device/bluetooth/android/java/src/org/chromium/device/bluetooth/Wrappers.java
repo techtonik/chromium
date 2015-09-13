@@ -260,10 +260,6 @@ class Wrappers {
             mGatt = gatt;
         }
 
-        public boolean connect() {
-            return mGatt.connect();
-        }
-
         public void disconnect() {
             mGatt.disconnect();
         }

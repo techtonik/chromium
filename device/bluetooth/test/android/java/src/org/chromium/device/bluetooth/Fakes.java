@@ -243,14 +243,6 @@ class Fakes {
         }
 
         @Override
-        public boolean connect() {
-            // TODO test
-            // TODO test
-            // TODO test
-            return true;
-        }
-
-        @Override
         public void disconnect() {}
     }
 }
