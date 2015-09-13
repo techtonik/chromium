@@ -17,8 +17,8 @@ BluetoothGattConnection::BluetoothGattConnection(
 
   device_ = adapter_->GetDevice(device_address_);
   DCHECK(device_);
-    owns_reference_for_connection_ = true;
-    device_->AddGattConnection(this);
+  owns_reference_for_connection_ = true;
+  device_->AddGattConnection(this);
 }
 
 BluetoothGattConnection::~BluetoothGattConnection() {
