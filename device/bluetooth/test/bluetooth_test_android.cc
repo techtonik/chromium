@@ -63,6 +63,35 @@ void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
       true);  // connected
 }
 
+void BluetoothTestAndroid::FailGattConnection(
+    BluetoothDevice* device,
+    BluetoothDevice::ConnectErrorCode error) {
+  int android_error_value = 0;
+  switch (error) {  // Constants are from android.bluetooth.BluetoothGatt.
+    case BluetoothDevice::ERROR_FAILED:
+      android_error_value = 0x00000101;  // GATT_FAILURE
+      break;
+    case BluetoothDevice::ERROR_AUTH_FAILED:
+      android_error_value = 0x00000005;  // GATT_INSUFFICIENT_AUTHENTICATION
+      break;
+    case BluetoothDevice::ERROR_UNKNOWN:
+    case BluetoothDevice::ERROR_INPROGRESS:
+    case BluetoothDevice::ERROR_AUTH_CANCELED:
+    case BluetoothDevice::ERROR_AUTH_REJECTED:
+    case BluetoothDevice::ERROR_AUTH_TIMEOUT:
+    case BluetoothDevice::ERROR_UNSUPPORTED_DEVICE:
+      NOTREACHED() << "No translation for error code: " << error;
+  }
+
+  BluetoothDeviceAndroid* device_android =
+      static_cast<BluetoothDeviceAndroid*>(device);
+
+  Java_FakeBluetoothDevice_connectionStateChange(
+      AttachCurrentThread(), device_android->GetJavaObject().obj(),
+      android_error_value,
+      false);  // connected
+}
+
 void BluetoothTestAndroid::CompleteGattDisconnection(BluetoothDevice* device) {
   BluetoothDeviceAndroid* device_android =
       static_cast<BluetoothDeviceAndroid*>(device);

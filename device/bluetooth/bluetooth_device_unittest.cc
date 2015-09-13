@@ -213,7 +213,6 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
 }
 #endif  // defined(OS_ANDROID)
 
-
 #if defined(OS_ANDROID)
 // BluetoothGattConnection with several connect / disconnects.
 TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
@@ -228,10 +227,12 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
 
-  // CreateGattConnection:
+  // CreateGattConnection, & multiple connection s from platform only invoke
+  // callbacks once:
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
+  CompleteGattConnection(device);
   CompleteGattConnection(device);
   EXPECT_EQ(1, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
@@ -269,11 +270,23 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
     EXPECT_FALSE(connection->IsConnected());
 
   // CreateGattConnection, but receive notice that device disconnected before
-  // it ever connects.
+  // it ever connects:
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(1, error_callback_count_);
+  for (auto connection : gatt_connections_)
+    EXPECT_FALSE(connection->IsConnected());
+
+  // CreateGattConnection, but error connecting. Also, Multiple errors only
+  // invoke callbacks once:
+  callback_count_ = error_callback_count_ = 0;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  FailGattConnection(device, BluetoothDevice::ERROR_FAILED);
+  FailGattConnection(device, BluetoothDevice::ERROR_FAILED);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
   for (auto connection : gatt_connections_)

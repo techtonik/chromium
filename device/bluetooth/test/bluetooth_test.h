@@ -9,6 +9,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
+#include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
 #include "device/bluetooth/bluetooth_gatt_connection.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -70,6 +71,10 @@ class BluetoothTestBase : public testing::Test {
 
   // Simulates success of implementation details of CreateGattConnection.
   virtual void CompleteGattConnection(BluetoothDevice* device){};
+
+  // Simulates failure of CreateGattConnection with the given error code.
+  virtual void FailGattConnection(BluetoothDevice* device,
+                                  BluetoothDevice::ConnectErrorCode){};
 
   // Simulates GattConnection disconnecting.
   virtual void CompleteGattDisconnection(BluetoothDevice* device){};
