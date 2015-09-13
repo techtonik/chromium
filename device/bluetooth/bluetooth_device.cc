@@ -315,12 +315,10 @@ void BluetoothDevice::DidDisconnectGatt() {
   }
   DidFailToConnectGatt(ERROR_FAILED);
 
-  // Mark all BluetoothGattConnection objects disconnected.
-  std::set<BluetoothGattConnection*> gatt_connections_copy(gatt_connections_);
-  for (auto callback : gatt_connections_copy) {
-    callback->Disconnect();
+  // Invalidate all BluetoothGattConnection objects.
+  for (auto connection : gatt_connections_) {
+    connection->InvalidateConnectionReference();
   }
-  DCHECK(gatt_connections_.size() == 0);
 }
 
 void BluetoothDevice::AddGattConnection(BluetoothGattConnection* connection) {
