@@ -277,6 +277,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   CompleteGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
+  EXPECT_EQ(BluetoothDevice::ERROR_FAILED, last_connect_error_code_);
   for (auto connection : gatt_connections_)
     EXPECT_FALSE(connection->IsConnected());
 
@@ -285,10 +286,11 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  FailGattConnection(device, BluetoothDevice::ERROR_FAILED);
+  FailGattConnection(device, BluetoothDevice::ERROR_AUTH_FAILED);
   FailGattConnection(device, BluetoothDevice::ERROR_FAILED);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
+  EXPECT_EQ(BluetoothDevice::ERROR_AUTH_FAILED, last_connect_error_code_);
   for (auto connection : gatt_connections_)
     EXPECT_FALSE(connection->IsConnected());
 }
