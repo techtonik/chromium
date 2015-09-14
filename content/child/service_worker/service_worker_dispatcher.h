@@ -11,7 +11,7 @@
 #include "base/id_map.h"
 #include "base/memory/ref_counted.h"
 #include "base/strings/string16.h"
-#include "content/child/worker_task_runner.h"
+#include "content/public/child/worker_thread.h"
 #include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerError.h"
 #include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerProvider.h"
 #include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerRegistration.h"
@@ -48,8 +48,7 @@ struct ServiceWorkerVersionAttributes;
 // This class manages communication with the browser process about
 // registration of the service worker, exposed to renderer and worker
 // scripts through methods like navigator.registerServiceWorker().
-class CONTENT_EXPORT ServiceWorkerDispatcher
-    : public WorkerTaskRunner::Observer {
+class CONTENT_EXPORT ServiceWorkerDispatcher : public WorkerThread::Observer {
  public:
   typedef blink::WebServiceWorkerProvider::WebServiceWorkerRegistrationCallbacks
       WebServiceWorkerRegistrationCallbacks;
@@ -135,10 +134,10 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
       bool adopt_handle);
 
   // Returns a new registration filled in with version attributes.
-  scoped_ptr<WebServiceWorkerRegistrationImpl> CreateRegistration(
+  scoped_refptr<WebServiceWorkerRegistrationImpl> CreateRegistration(
       const ServiceWorkerRegistrationObjectInfo& info,
       const ServiceWorkerVersionAttributes& attrs);
-  scoped_ptr<WebServiceWorkerRegistrationImpl> AdoptRegistration(
+  scoped_refptr<WebServiceWorkerRegistrationImpl> AdoptRegistration(
       const ServiceWorkerRegistrationObjectInfo& info,
       const ServiceWorkerVersionAttributes& attrs);
 
@@ -180,8 +179,8 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
   friend class WebServiceWorkerImpl;
   friend class WebServiceWorkerRegistrationImpl;
 
-  // WorkerTaskRunner::Observer implementation.
-  void OnWorkerRunLoopStopped() override;
+  // WorkerThread::Observer implementation.
+  void WillStopCurrentWorkerThread() override;
 
   void OnAssociateRegistrationWithServiceWorker(
       int thread_id,
@@ -265,7 +264,7 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
   void RemoveServiceWorkerRegistration(
       int registration_handle_id);
 
-  scoped_ptr<WebServiceWorkerRegistrationImpl> CreateRegistrationInternal(
+  scoped_refptr<WebServiceWorkerRegistrationImpl> CreateRegistrationInternal(
       scoped_ptr<ServiceWorkerRegistrationHandleReference> handle_ref,
       const ServiceWorkerVersionAttributes& attrs,
       bool adopt_handle);

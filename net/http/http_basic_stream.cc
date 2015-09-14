@@ -67,23 +67,25 @@ bool HttpBasicStream::IsResponseBodyComplete() const {
   return parser()->IsResponseBodyComplete();
 }
 
-bool HttpBasicStream::CanFindEndOfResponse() const {
-  return parser()->CanFindEndOfResponse();
-}
-
 bool HttpBasicStream::IsConnectionReused() const {
   return parser()->IsConnectionReused();
 }
 
 void HttpBasicStream::SetConnectionReused() { parser()->SetConnectionReused(); }
 
-bool HttpBasicStream::IsConnectionReusable() const {
-  return parser()->IsConnectionReusable();
+bool HttpBasicStream::CanReuseConnection() const {
+  return parser()->CanReuseConnection();
 }
 
 int64 HttpBasicStream::GetTotalReceivedBytes() const {
   if (parser())
     return parser()->received_bytes();
+  return 0;
+}
+
+int64_t HttpBasicStream::GetTotalSentBytes() const {
+  if (parser())
+    return parser()->sent_bytes();
   return 0;
 }
 
@@ -101,8 +103,6 @@ void HttpBasicStream::GetSSLCertRequestInfo(
     SSLCertRequestInfo* cert_request_info) {
   parser()->GetSSLCertRequestInfo(cert_request_info);
 }
-
-bool HttpBasicStream::IsSpdyHttpStream() const { return false; }
 
 void HttpBasicStream::Drain(HttpNetworkSession* session) {
   HttpResponseBodyDrainer* drainer = new HttpResponseBodyDrainer(this);

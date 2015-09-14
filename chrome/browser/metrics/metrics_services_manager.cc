@@ -14,7 +14,6 @@
 #include "chrome/browser/metrics/chrome_metrics_service_client.h"
 #include "chrome/browser/metrics/metrics_reporting_state.h"
 #include "chrome/browser/metrics/variations/chrome_variations_service_client.h"
-#include "chrome/browser/metrics/variations/variations_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/browser_otr_state.h"
@@ -24,6 +23,7 @@
 #include "components/metrics/metrics_service.h"
 #include "components/metrics/metrics_state_manager.h"
 #include "components/rappor/rappor_service.h"
+#include "components/variations/service/variations_service.h"
 #include "content/public/browser/browser_thread.h"
 
 #if defined(OS_CHROMEOS)
@@ -62,11 +62,10 @@ rappor::RapporService* MetricsServicesManager::GetRapporService() {
   return rappor_service_.get();
 }
 
-chrome_variations::VariationsService*
-MetricsServicesManager::GetVariationsService() {
+variations::VariationsService* MetricsServicesManager::GetVariationsService() {
   DCHECK(thread_checker_.CalledOnValidThread());
   if (!variations_service_) {
-    variations_service_ = chrome_variations::VariationsService::Create(
+    variations_service_ = variations::VariationsService::Create(
         make_scoped_ptr(new ChromeVariationsServiceClient()), local_state_,
         GetMetricsStateManager(), switches::kDisableBackgroundNetworking);
   }

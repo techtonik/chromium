@@ -36,14 +36,11 @@
 # pylint: disable=R0201
 
 import logging
-import os
 import re
-import time
 
-from pylib import constants
+from devil.android import device_errors
+from devil.android.sdk import intent
 from pylib.base import base_test_result
-from pylib.device import device_errors
-from pylib.device import intent
 
 
 ResultType = base_test_result.ResultType

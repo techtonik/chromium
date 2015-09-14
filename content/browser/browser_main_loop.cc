@@ -241,6 +241,8 @@ static void GLibLogHandler(const gchar* log_domain,
     LOG(ERROR) << message << " (http://bugs.chromium.org/329991)";
   } else if (strstr(message, "Cannot do system-bus activation with no user")) {
     LOG(ERROR) << message << " (http://crbug.com/431005)";
+  } else if (strstr(message, "deprecated")) {
+    LOG(ERROR) << message;
   } else {
     LOG(DFATAL) << log_domain << ": " << message;
   }
@@ -469,10 +471,10 @@ void BrowserMainLoop::EarlyInitialization() {
   net::EnsureWinsockInit();
 #endif
 
-#if !defined(USE_OPENSSL)
+#if defined(USE_NSS_CERTS) || !defined(USE_OPENSSL)
   // We want to be sure to init NSPR on the main thread.
   crypto::EnsureNSPRInit();
-#endif  // !defined(USE_OPENSSL)
+#endif
 
 #if !defined(OS_IOS)
   if (parsed_command_line_.HasSwitch(switches::kRendererProcessLimit)) {
@@ -642,9 +644,7 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
     DOMStorageArea::EnableAggressiveCommitDelay();
   }
 
-  base::trace_event::MemoryDumpManager::GetInstance()->Initialize();
-
-  // Enable the dump providers.
+  // Enable memory-infra dump providers.
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       HostSharedBitmapManager::current());
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
@@ -659,14 +659,6 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
 }
 
 int BrowserMainLoop::PreCreateThreads() {
-  // Need to initialize in-process GpuDataManager before creating threads.
-  // It's unsafe to append the gpu command line switches to the global
-  // CommandLine::ForCurrentProcess object after threads are created.
-  // Also need to initialize before BrowserMainParts::PreCreateThreads, so
-  // BrowserMainParts has a hook to set GpuDataManager strings before
-  // starting Gpu process.
-  GpuDataManagerImpl::GetInstance()->Initialize();
-
   if (parts_) {
     TRACE_EVENT0("startup",
         "BrowserMainLoop::CreateThreads:PreCreateThreads");
@@ -708,6 +700,12 @@ int BrowserMainLoop::PreCreateThreads() {
     AVFoundationGlue::InitializeAVFoundation();
   }
 #endif
+
+  // 1) Need to initialize in-process GpuDataManager before creating threads.
+  // It's unsafe to append the gpu command line switches to the global
+  // CommandLine::ForCurrentProcess object after threads are created.
+  // 2) Must be after parts_->PreCreateThreads to pick up chrome://flags.
+  GpuDataManagerImpl::GetInstance()->Initialize();
 
 #if !defined(OS_IOS) && (!defined(GOOGLE_CHROME_BUILD) || defined(OS_ANDROID))
   // Single-process is an unsupported and not fully tested mode, so
@@ -1085,10 +1083,12 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
     TRACE_EVENT0("shutdown", "BrowserMainLoop::Subsystem:SensorService");
     DeviceInertialSensorService::GetInstance()->Shutdown();
   }
+#if !defined(OS_ANDROID)
   {
     TRACE_EVENT0("shutdown", "BrowserMainLoop::Subsystem:BatteryStatusService");
     device::BatteryStatusService::GetInstance()->Shutdown();
   }
+#endif
   {
     TRACE_EVENT0("shutdown", "BrowserMainLoop::Subsystem:DeleteDataSources");
     URLDataManager::DeleteDataSources();

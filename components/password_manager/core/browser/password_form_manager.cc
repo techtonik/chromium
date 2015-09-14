@@ -69,6 +69,19 @@ bool AreStringsEqualOrEmpty(const base::string16& s1,
   return s1.empty() || s2.empty() || s1 == s2;
 }
 
+bool DoesStringContainOnlyDigits(const base::string16& s) {
+  for (auto c : s) {
+    if (!base::IsAsciiDigit(c))
+      return false;
+  }
+  return true;
+}
+
+// Heuristics to determine that a string is very unlikely to be a username.
+bool IsProbablyNotUsername(const base::string16& s) {
+  return !s.empty() && DoesStringContainOnlyDigits(s) && s.size() < 3;
+}
+
 }  // namespace
 
 PasswordFormManager::PasswordFormManager(
@@ -92,6 +105,8 @@ PasswordFormManager::PasswordFormManager(
       password_manager_(password_manager),
       preferred_match_(nullptr),
       is_ignorable_change_password_form_(false),
+      is_possible_change_password_form_without_username_(
+          observed_form.IsPossibleChangePasswordFormWithoutUsername()),
       state_(PRE_MATCHING_PHASE),
       client_(client),
       manager_action_(kManagerActionNone),
@@ -237,7 +252,17 @@ void PasswordFormManager::ProvisionallySave(
     OtherPossibleUsernamesAction action) {
   DCHECK(state_ == MATCHING_PHASE || state_ == POST_MATCHING_PHASE) << state_;
   DCHECK_NE(RESULT_NO_MATCH, DoesManage(credentials));
-  provisionally_saved_form_.reset(new PasswordForm(credentials));
+
+  scoped_ptr<autofill::PasswordForm> mutable_provisionally_saved_form(
+      new PasswordForm(credentials));
+  if (credentials.IsPossibleChangePasswordForm() &&
+      !credentials.username_value.empty() &&
+      IsProbablyNotUsername(credentials.username_value)) {
+    mutable_provisionally_saved_form->username_value.clear();
+    mutable_provisionally_saved_form->username_element.clear();
+    is_possible_change_password_form_without_username_ = true;
+  }
+  provisionally_saved_form_ = mutable_provisionally_saved_form.Pass();
   other_possible_username_action_ = action;
 
   if (HasCompletedMatching())
@@ -630,30 +655,6 @@ void PasswordFormManager::UpdateLogin() {
     pending_credentials_.username_value = selected_username_;
     password_store->UpdateLoginWithPrimaryKey(pending_credentials_,
                                               old_primary_key);
-  } else if ((observed_form_.scheme == PasswordForm::SCHEME_HTML) &&
-             (observed_form_.origin.spec().length() >
-              observed_form_.signon_realm.length()) &&
-             (observed_form_.signon_realm ==
-              pending_credentials_.origin.spec())) {
-    // Note origin.spec().length > signon_realm.length implies the origin has a
-    // path, since signon_realm is a prefix of origin for HTML password forms.
-    //
-    // The user logged in successfully with one of our autofilled logins on a
-    // page with non-empty path, but the autofilled entry was initially saved/
-    // imported with an empty path. Rather than just mark this entry preferred,
-    // we create a more specific copy for this exact page and leave the "master"
-    // unchanged. This is to prevent the case where that master login is used
-    // on several sites (e.g site.com/a and site.com/b) but the user actually
-    // has a different preference on each site. For example, on /a, he wants the
-    // general empty-path login so it is flagged as preferred, but on /b he logs
-    // in with a different saved entry - we don't want to remove the preferred
-    // status of the former because upon return to /a it won't be the default-
-    // fill match.
-    // TODO(timsteele): Bug 1188626 - expire the master copies.
-    PasswordForm copy(pending_credentials_);
-    copy.origin = observed_form_.origin;
-    copy.action = observed_form_.action;
-    password_store->AddLogin(copy);
   } else if (observed_form_.new_password_element.empty() &&
              (pending_credentials_.password_element.empty() ||
               pending_credentials_.username_element.empty() ||
@@ -779,8 +780,8 @@ void PasswordFormManager::CreatePendingCredentials() {
       // the current origin and signon realm. This ensures that on the next
       // visit, a precise match is found.
       is_new_login_ = true;
-      user_action_ = password_overridden_ ? kUserActionChoosePslMatch
-                                          : kUserActionOverridePassword;
+      user_action_ = password_overridden_ ? kUserActionOverridePassword
+                                          : kUserActionChoosePslMatch;
 
       // Since this credential will not overwrite a previously saved credential,
       // username_value can be updated now.

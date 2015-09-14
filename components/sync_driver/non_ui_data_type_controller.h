@@ -11,21 +11,22 @@
 #include "base/compiler_specific.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
-#include "components/sync_driver/data_type_controller.h"
+#include "components/sync_driver/directory_data_type_controller.h"
 #include "components/sync_driver/shared_change_processor.h"
 
 namespace syncer {
 class SyncableService;
+struct UserShare;
 }
 
 namespace sync_driver {
 
 class SyncClient;
 
-class NonUIDataTypeController : public DataTypeController {
+class NonUIDataTypeController : public DirectoryDataTypeController {
  public:
   NonUIDataTypeController(
-      scoped_refptr<base::SingleThreadTaskRunner> ui_thread,
+      const scoped_refptr<base::SingleThreadTaskRunner>& ui_thread,
       const base::Closure& error_callback,
       SyncClient* sync_client);
 
@@ -125,6 +126,10 @@ class NonUIDataTypeController : public DataTypeController {
   void DisableImpl(const syncer::SyncError& error);
 
   SyncClient* const sync_client_;
+
+  // UserShare is stored in StartAssociating while on UI thread and
+  // passed to SharedChangeProcessor::Connect on the model thread.
+  syncer::UserShare* user_share_;
 
   // State of this datatype controller.
   State state_;

@@ -14,6 +14,7 @@
 #include "chrome/browser/chrome_process_singleton.h"
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/process_singleton.h"
+#include "chrome/browser/stack_sampling_configuration.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "content/public/browser/browser_main_parts.h"
 #include "content/public/common/main_function_params.h"
@@ -43,6 +44,11 @@ extern const char kMissingLocaleDataMessage[];
 
 namespace metrics {
 class TrackingSynchronizer;
+}
+
+namespace webusb {
+class WebUsbBrowserClient;
+class WebUsbDetector;
 }
 
 class ChromeBrowserMainParts : public content::BrowserMainParts {
@@ -138,11 +144,17 @@ class ChromeBrowserMainParts : public content::BrowserMainParts {
 #if !defined(OS_ANDROID) && !defined(OS_IOS)
   // A monitor for attributing power consumption to origins.
   scoped_ptr<ProcessPowerCollector> process_power_collector_;
+
+  scoped_ptr<webusb::WebUsbBrowserClient> webusb_browser_client_;
+  scoped_ptr<webusb::WebUsbDetector> webusb_detector_;
 #endif
 
   // Vector of additional ChromeBrowserMainExtraParts.
   // Parts are deleted in the inverse order they are added.
   std::vector<ChromeBrowserMainExtraParts*> chrome_extra_parts_;
+
+  // The configuration to use for the stack sampling profiler below.
+  StackSamplingConfiguration sampling_profiler_config_;
 
   // A profiler that periodically samples stack traces. Used to sample startup
   // behavior.

@@ -115,6 +115,8 @@ PrefMappingEntry kPrefMapping[] = {
 #if defined(ENABLE_WEBRTC)
     {"webRTCMultipleRoutesEnabled", prefs::kWebRTCMultipleRoutesEnabled,
      APIPermission::kPrivacy, APIPermission::kPrivacy},
+    {"webRTCNonProxiedUdpEnabled", prefs::kWebRTCNonProxiedUdpEnabled,
+     APIPermission::kPrivacy, APIPermission::kPrivacy},
 #endif
     // accessibilityFeatures.animationPolicy is available for
     // all platforms but the others from accessibilityFeatures
@@ -213,7 +215,7 @@ class NetworkPredictionTransformer : public PrefTransformerInterface {
 class PrefMapping {
  public:
   static PrefMapping* GetInstance() {
-    return Singleton<PrefMapping>::get();
+    return base::Singleton<PrefMapping>::get();
   }
 
   bool FindBrowserPrefForExtensionPref(const std::string& extension_pref,
@@ -253,7 +255,7 @@ class PrefMapping {
   }
 
  private:
-  friend struct DefaultSingletonTraits<PrefMapping>;
+  friend struct base::DefaultSingletonTraits<PrefMapping>;
 
   PrefMapping() {
     identity_transformer_.reset(new IdentityPrefTransformer());

@@ -8,8 +8,8 @@
 #include "components/view_manager/public/cpp/view_tree_connection.h"
 #include "components/view_manager/public/cpp/view_tree_delegate.h"
 #include "components/view_manager/public/interfaces/view_tree_host.mojom.h"
-#include "mandoline/tab/public/cpp/web_view.h"
-#include "mandoline/tab/public/interfaces/web_view.mojom.h"
+#include "components/web_view/public/cpp/web_view.h"
+#include "components/web_view/public/interfaces/web_view.mojom.h"
 #include "mandoline/ui/aura/aura_init.h"
 #include "mandoline/ui/desktop_ui/public/interfaces/omnibox.mojom.h"
 #include "mandoline/ui/desktop_ui/public/interfaces/view_embedder.mojom.h"
@@ -45,11 +45,13 @@ class BrowserWindow : public mojo::ViewTreeDelegate,
   BrowserWindow(mojo::ApplicationImpl* app,
                 mojo::ViewTreeHostFactory* host_factory,
                 BrowserManager* manager);
-  ~BrowserWindow() override;
 
   void LoadURL(const GURL& url);
+  void Close();
 
  private:
+  ~BrowserWindow() override;
+
   float DIPSToPixels(float value) const;
 
   // Overridden from mojo::ViewTreeDelegate:
@@ -63,6 +65,7 @@ class BrowserWindow : public mojo::ViewTreeDelegate,
   void TopLevelNavigate(mojo::URLRequestPtr request) override;
   void LoadingStateChanged(bool is_loading) override;
   void ProgressChanged(double progress) override;
+  void TitleChanged(const mojo::String& title) override;
 
   // Overridden from ViewEmbedder:
   void Embed(mojo::URLRequestPtr request) override;

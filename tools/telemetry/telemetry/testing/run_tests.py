@@ -15,8 +15,6 @@ from telemetry.internal.util import command_line
 from telemetry.testing import browser_test_case
 from telemetry.testing import options_for_unittests
 
-util.AddDirToPythonPath(util.GetTelemetryThirdPartyDir(), 'typ')
-
 import typ
 
 
@@ -127,12 +125,13 @@ class RunTestsCommand(command_line.OptparseCommand):
     runner.args.top_level_dir = args.top_level_dir
     runner.args.write_full_results_to = args.write_full_results_to
     runner.args.write_trace_to = args.write_trace_to
+    runner.args.list_only = args.list_only
 
     runner.args.path.append(util.GetUnittestDataDir())
 
     # Always print out these info for the ease of debugging.
     runner.args.timing = True
-    runner.args.verbose = 2
+    runner.args.verbose = 3
 
     runner.classifier = GetClassifier(args, possible_browser)
     runner.context = args

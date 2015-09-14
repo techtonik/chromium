@@ -38,6 +38,19 @@
 #include "extensions/common/extension_set.h"
 #endif
 
+#if defined(TOOLKIT_VIEWS)
+#include "ui/gfx/paint_vector_icon.h"
+#include "ui/gfx/vector_icons_public.h"
+#include "ui/native_theme/common_theme.h"
+#include "ui/native_theme/native_theme.h"
+#endif
+
+#if defined(OS_WIN)
+#include "chrome/grit/theme_resources.h"
+#include "ui/base/resource/material_design/material_design_controller.h"
+#include "ui/base/resource/resource_bundle.h"
+#endif
+
 using bookmarks::BookmarkModel;
 using bookmarks::BookmarkNode;
 
@@ -196,6 +209,15 @@ BookmarkShortcutDisposition GetBookmarkShortcutDisposition(Profile* profile) {
 #endif
   return BOOKMARK_SHORTCUT_DISPOSITION_UNCHANGED;
 }
+
+#if defined(TOOLKIT_VIEWS)
+gfx::ImageSkia GetFolderIcon(gfx::VectorIconId id) {
+  SkColor icon_color;
+  ui::CommonThemeGetSystemColor(ui::NativeTheme::kColorId_ChromeIconGrey,
+                                &icon_color);
+  return gfx::CreateVectorIcon(id, 16, icon_color);
+}
+#endif
 
 }  // namespace
 
@@ -480,5 +502,40 @@ bool IsValidBookmarkDropLocation(Profile* profile,
   // From another profile, always accept.
   return true;
 }
+
+#if defined(TOOLKIT_VIEWS)
+gfx::ImageSkia GetBookmarkFolderIcon() {
+#if defined(OS_WIN)
+  if (!ui::MaterialDesignController::IsModeMaterial()) {
+    return *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
+        IDR_BOOKMARK_BAR_FOLDER);
+  }
+#endif
+
+  return GetFolderIcon(gfx::VectorIconId::FOLDER);
+}
+
+gfx::ImageSkia GetBookmarkSupervisedFolderIcon() {
+#if defined(OS_WIN)
+  if (!ui::MaterialDesignController::IsModeMaterial()) {
+    return *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
+        IDR_BOOKMARK_BAR_FOLDER_SUPERVISED);
+  }
+#endif
+
+  return GetFolderIcon(gfx::VectorIconId::FOLDER_SUPERVISED);
+}
+
+gfx::ImageSkia GetBookmarkManagedFolderIcon() {
+#if defined(OS_WIN)
+  if (!ui::MaterialDesignController::IsModeMaterial()) {
+    return *ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
+        IDR_BOOKMARK_BAR_FOLDER_MANAGED);
+  }
+#endif
+
+  return GetFolderIcon(gfx::VectorIconId::FOLDER_MANAGED);
+}
+#endif
 
 }  // namespace chrome

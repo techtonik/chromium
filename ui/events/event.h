@@ -263,8 +263,6 @@ class EVENTS_EXPORT LocatedEvent : public Event {
   float x() const { return location_.x(); }
   float y() const { return location_.y(); }
   void set_location(const gfx::PointF& location) { location_ = location; }
-  // TODO(tdresser): Always return floating point location. See
-  // crbug.com/337824.
   gfx::Point location() const { return gfx::ToFlooredPoint(location_); }
   const gfx::PointF& location_f() const { return location_; }
   void set_root_location(const gfx::PointF& root_location) {
@@ -285,8 +283,6 @@ class EVENTS_EXPORT LocatedEvent : public Event {
   template <class T> void ConvertLocationToTarget(T* source, T* target) {
     if (!target || target == source)
       return;
-    // TODO(tdresser): Rewrite ConvertPointToTarget to use PointF. See
-    // crbug.com/337824.
     gfx::Point offset = gfx::ToFlooredPoint(location_);
     T::ConvertPointToTarget(source, target, &offset);
     gfx::Vector2d diff = gfx::ToFlooredPoint(location_) - offset;
@@ -463,7 +459,7 @@ class EVENTS_EXPORT MouseEvent : public LocatedEvent {
   void set_changed_button_flags(int flags) { changed_button_flags_ = flags; }
 
   // Event details common to MouseEvent and TouchEvent.
-  const PointerDetails& pointer_details() { return pointer_details_; }
+  const PointerDetails& pointer_details() const { return pointer_details_; }
   void set_pointer_details(const PointerDetails& details) {
     pointer_details_ = details;
   }
@@ -579,11 +575,6 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
   // A unique identifier for this event.
   uint32 unique_event_id() const { return unique_event_id_; }
 
-  // TODO(robert.bradford): Drop these shims.
-  float radius_x() const { return pointer_details_.radius_x(); }
-  float radius_y() const { return pointer_details_.radius_y(); }
-  float force() const { return pointer_details_.force(); }
-
   float rotation_angle() const { return rotation_angle_; }
 
   void set_may_cause_scrolling(bool causes) { may_cause_scrolling_ = causes; }
@@ -611,7 +602,7 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
   }
 
   // Event details common to MouseEvent and TouchEvent.
-  const PointerDetails& pointer_details() { return pointer_details_; }
+  const PointerDetails& pointer_details() const { return pointer_details_; }
 
  private:
   // Adjusts rotation_angle_ to within the acceptable range.

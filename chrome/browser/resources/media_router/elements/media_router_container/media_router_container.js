@@ -329,12 +329,13 @@ Polymer({
 
   /**
    * @param {!string} sinkId A sink ID.
-   * @return {string} The title value of the route associated with |sinkId|.
+   * @return {string} The description value of the route associated with
+   *     |sinkId|.
    * @private
    */
   computeRouteInSinkListValue_: function(sinkId, sinkToRouteMap) {
     var route = sinkToRouteMap[sinkId];
-    return route ? route.title : '';
+    return route ? route.description : '';
   },
 
   /**
@@ -354,6 +355,30 @@ Polymer({
    */
   computeSinkForCurrentRoute_: function(route) {
     return route ? this.sinkMap_[route.sinkId] : null;
+  },
+
+  /**
+   * @param {!media_router.Sink} sink The sink to determine an icon for.
+   * @return {string} The Polymer <iron-icon> icon to use. The format is
+   *     <iconset>:<icon>, where <iconset> is the set ID and <icon> is the name
+   *     of the icon. <iconset>: may be ommitted if <icon> is from the default
+   *     set.
+   * @private
+   */
+  computeSinkIcon_: function(sink) {
+    switch (sink.iconType) {
+      case media_router.SinkIconType.CAST:
+        // TODO(apacible): Update icon after UX discussion.
+        return 'hardware:tv';
+      case media_router.SinkIconType.CAST_AUDIO:
+        return 'hardware:speaker';
+      case media_router.SinkIconType.GENERIC:
+        return 'hardware:tv';
+      case media_router.SinkIconType.HANGOUT:
+        return 'communication:message';
+      default:
+        return 'hardware:tv';
+    }
   },
 
   /**
@@ -505,17 +530,9 @@ Polymer({
     // computed functions prematurely.
     var tempSinkToRouteMap = {};
 
-    for (var i = 0; i < this.routeList.length; i++) {
-      var route = this.routeList[i];
-      var existingRoute = tempSinkToRouteMap[route.sinkId];
+    // We expect that each route in |routeList| maps to a unique sink.
+    this.routeList.forEach(function(route) {
       this.routeMap_[route.id] = route;
-
-      // If we've already accounted for locality of a route that maps to the
-      // same sink, we don't need to check again. However, some routes that are
-      // not local may have local counterparts, so we want to check those.
-      if (existingRoute && existingRoute.isLocal)
-        continue;
-
       tempSinkToRouteMap[route.sinkId] = route;
 
       if (route.isLocal) {
@@ -525,7 +542,7 @@ Polymer({
         // |localRouteCount_| == 1, which implies it was only set once.
         localRoute = route;
       }
-    }
+    }, this);
 
     this.sinkToRouteMap_ = tempSinkToRouteMap;
     this.maybeShowRouteDetailsOnOpen_(localRoute);

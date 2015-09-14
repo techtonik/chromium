@@ -84,11 +84,16 @@ Background = function() {
     loadComplete: this.onLoadComplete,
     menuStart: this.onEventDefault,
     menuEnd: this.onEventDefault,
-    menuListValueChanged: this.onEventDefault,
     textChanged: this.onTextOrTextSelectionChanged,
     textSelectionChanged: this.onTextOrTextSelectionChanged,
     valueChanged: this.onValueChanged
   };
+
+  /**
+   * The object that speaks changes to an editable text field.
+   * @type {?cvox.ChromeVoxEditableTextBase}
+   */
+  this.editableTextHandler_ = null;
 
   chrome.automation.getDesktop(this.onGotDesktop);
 
@@ -271,10 +276,10 @@ Background.prototype = {
         predErrorMsg = 'no_previous_visited_link';
         break;
       case 'nextElement':
-        current = current.move(cursors.Unit.NODE, Dir.FORWARD);
+        current = current.move(cursors.Unit.DOM_NODE, Dir.FORWARD);
         break;
       case 'previousElement':
-        current = current.move(cursors.Unit.NODE, Dir.BACKWARD);
+        current = current.move(cursors.Unit.DOM_NODE, Dir.BACKWARD);
         break;
       case 'goToBeginning':
         var node =
@@ -453,6 +458,9 @@ Background.prototype = {
    * @param {Object} evt
    */
   onFocus: function(evt) {
+    // Invalidate any previous editable text handler state.
+    this.editableTextHandler = null;
+
     var node = evt.target;
 
     // It almost never makes sense to place focus directly on a rootWebArea.
@@ -469,6 +477,10 @@ Background.prototype = {
                                            AutomationPredicate.leaf);
       }
     }
+
+    if (evt.target.role == RoleType.textField)
+      this.createEditableTextHandlerIfNeeded_(evt.target);
+
     this.onEventDefault({target: node, type: 'focus'});
   },
 
@@ -531,23 +543,15 @@ Background.prototype = {
       this.currentRange_ = cursors.Range.fromNode(evt.target);
     }
 
+    this.createEditableTextHandlerIfNeeded_(evt.target);
     var textChangeEvent = new cvox.TextChangeEvent(
         evt.target.value,
         evt.target.textSelStart,
         evt.target.textSelEnd,
         true);  // triggered by user
-    if (!this.editableTextHandler ||
-        evt.target != this.currentRange_.start.node) {
-      this.editableTextHandler =
-          new cvox.ChromeVoxEditableTextBase(
-              textChangeEvent.value,
-              textChangeEvent.start,
-              textChangeEvent.end,
-              evt.target.state['protected'],
-              cvox.ChromeVox.tts);
-    }
 
-    this.editableTextHandler.changed(textChangeEvent);
+    this.editableTextHandler_.changed(textChangeEvent);
+
     new Output().withBraille(
             this.currentRange_, null, evt.type)
         .go();
@@ -580,6 +584,9 @@ Background.prototype = {
    * @param {chrome.automation.TreeChange} treeChange
    */
   onTreeChange: function(treeChange) {
+    if (this.mode_ === ChromeVoxMode.CLASSIC)
+      return;
+
     var node = treeChange.target;
     if (!node.containerLiveStatus)
       return;
@@ -738,6 +745,30 @@ Background.prototype = {
     if (selectionSpan) {
       var start = text.getSpanStart(selectionSpan);
       actionNode.setSelection(position - start, position - start);
+    }
+  },
+
+  /**
+   * Create an editable text handler for the given node if needed.
+   * @param {Object} node
+   */
+  createEditableTextHandlerIfNeeded_: function(node) {
+    if (!this.editableTextHandler_ || node != this.currentRange_.start.node) {
+      var start = node.textSelStart;
+      var end = node.textSelEnd;
+      if (start > end) {
+        var tempOffset = end;
+        end = start;
+        start = tempOffset;
+      }
+
+      this.editableTextHandler_ =
+          new cvox.ChromeVoxEditableTextBase(
+              node.value,
+              start,
+              end,
+              node.state.protected,
+              cvox.ChromeVox.tts);
     }
   }
 };

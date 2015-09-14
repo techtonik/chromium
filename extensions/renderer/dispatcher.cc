@@ -17,7 +17,6 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "base/synchronization/lock.h"
 #include "base/time/time.h"
 #include "base/values.h"
 #include "content/grit/content_resources.h"
@@ -91,6 +90,7 @@
 #include "extensions/renderer/v8_context_native_handler.h"
 #include "extensions/renderer/v8_helpers.h"
 #include "extensions/renderer/wake_event_page.h"
+#include "extensions/renderer/worker_script_context_set.h"
 #include "grit/extensions_renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
@@ -192,57 +192,13 @@ class ChromeNativeHandler : public ObjectBackedNativeHandler {
   }
 };
 
-class ServiceWorkerScriptContextSet {
- public:
-  ServiceWorkerScriptContextSet() {}
-  ~ServiceWorkerScriptContextSet() {}
-
-  void Insert(scoped_ptr<ScriptContext> context) {
-    base::AutoLock lock(lock_);
-    CHECK(FindScriptContext(context->v8_context()) == contexts_.end());
-    contexts_.push_back(context.Pass());
-  }
-
-  void Remove(v8::Local<v8::Context> v8_context) {
-    base::AutoLock lock(lock_);
-    ScriptContextList::iterator context_it = FindScriptContext(v8_context);
-    // TODO(kalman): It would be good to CHECK(context_it != contexts_.end())
-    // here, but service workers can be started before the extension has been
-    // installed. See the length comment explaining why this happens, and
-    // how to solve it, in DidInitializeServiceWorkerContextOnWorkerThread.
-    // This does need to be fixed eventually, but for now, at least don't crash.
-    if (context_it == contexts_.end())
-      return;
-    (*context_it)->Invalidate();
-    contexts_.erase(context_it);
-  }
-
- private:
-  using ScriptContextList = ScopedVector<ScriptContext>;
-
-  // Returns an iterator to the ScriptContext associated with |v8_context|, or
-  // contexts_.end() if not found.
-  ScriptContextList::iterator FindScriptContext(
-      v8::Local<v8::Context> v8_context) {
-    for (auto it = contexts_.begin(); it != contexts_.end(); ++it) {
-      if ((*it)->v8_context() == v8_context)
-        return it;
-    }
-    return contexts_.end();
-  }
-
-  ScriptContextList contexts_;
-
-  mutable base::Lock lock_;
-
-  DISALLOW_COPY_AND_ASSIGN(ServiceWorkerScriptContextSet);
-};
-
-base::LazyInstance<ServiceWorkerScriptContextSet>
-    g_service_worker_script_context_set = LAZY_INSTANCE_INITIALIZER;
+base::LazyInstance<WorkerScriptContextSet> g_worker_script_context_set =
+    LAZY_INSTANCE_INITIALIZER;
 
 }  // namespace
 
+// Note that we can't use Blink public APIs in the constructor becase Blink
+// is not initialized at the point we create Dispatcher.
 Dispatcher::Dispatcher(DispatcherDelegate* delegate)
     : delegate_(delegate),
       content_watcher_(new ContentWatcher()),
@@ -269,31 +225,7 @@ Dispatcher::Dispatcher(DispatcherDelegate* delegate)
   user_script_set_manager_observer_.Add(user_script_set_manager_.get());
   request_sender_.reset(new RequestSender(this));
   PopulateSourceMap();
-  WakeEventPage::Get()->Init(content::RenderThread::Get());
-
-  // chrome-extensions: and chrome-extensions-resource: schemes should be
-  // treated as secure because communication with them is entirely in the
-  // browser, so there is no danger of manipulation or eavesdropping on
-  // communication with them by third parties.
-  WebString extension_scheme(base::ASCIIToUTF16(kExtensionScheme));
-  blink::WebSecurityPolicy::registerURLSchemeAsSecure(extension_scheme);
-
-  WebString extension_resource_scheme(base::ASCIIToUTF16(
-      kExtensionResourceScheme));
-  blink::WebSecurityPolicy::registerURLSchemeAsSecure(
-      extension_resource_scheme);
-
-  // chrome-extension: and chrome-extension-resource: resources should be
-  // allowed to receive CORS requests.
-  WebSecurityPolicy::registerURLSchemeAsCORSEnabled(extension_scheme);
-  WebSecurityPolicy::registerURLSchemeAsCORSEnabled(extension_resource_scheme);
-
-  // chrome-extension: resources should bypass Content Security Policy checks
-  // when included in protected resources.
-  WebSecurityPolicy::registerURLSchemeAsBypassingContentSecurityPolicy(
-      extension_scheme);
-  WebSecurityPolicy::registerURLSchemeAsBypassingContentSecurityPolicy(
-      extension_resource_scheme);
+  WakeEventPage::Get()->Init(RenderThread::Get());
 }
 
 Dispatcher::~Dispatcher() {
@@ -400,6 +332,15 @@ void Dispatcher::DidInitializeServiceWorkerContextOnWorkerThread(
     const GURL& url) {
   const base::TimeTicks start_time = base::TimeTicks::Now();
 
+  if (!url.SchemeIs(kExtensionScheme) &&
+      !url.SchemeIs(kExtensionResourceScheme)) {
+    // Early-out if this isn't a chrome-extension:// or resource scheme,
+    // because looking up the extension registry is unnecessary if it's not.
+    // Checking this will also skip over hosted apps, which is the desired
+    // behavior - hosted app service workers are not our concern.
+    return;
+  }
+
   const Extension* extension =
       RendererExtensionRegistry::Get()->GetExtensionOrAppByURL(url);
 
@@ -430,8 +371,9 @@ void Dispatcher::DidInitializeServiceWorkerContextOnWorkerThread(
   ScriptContext* context = new ScriptContext(
       v8_context, nullptr, extension, Feature::SERVICE_WORKER_CONTEXT,
       extension, Feature::SERVICE_WORKER_CONTEXT);
+  context->set_url(url);
 
-  g_service_worker_script_context_set.Get().Insert(make_scoped_ptr(context));
+  g_worker_script_context_set.Get().Insert(make_scoped_ptr(context));
 
   v8::Isolate* isolate = context->isolate();
 
@@ -480,8 +422,11 @@ void Dispatcher::WillReleaseScriptContext(
 void Dispatcher::WillDestroyServiceWorkerContextOnWorkerThread(
     v8::Local<v8::Context> v8_context,
     const GURL& url) {
-  if (url.SchemeIs(kExtensionScheme))
-    g_service_worker_script_context_set.Get().Remove(v8_context);
+  if (url.SchemeIs(kExtensionScheme) ||
+      url.SchemeIs(kExtensionResourceScheme)) {
+    // See comment in DidInitializeServiceWorkerContextOnWorkerThread.
+    g_worker_script_context_set.Get().Remove(v8_context, url);
+  }
 }
 
 void Dispatcher::DidCreateDocumentElement(blink::WebLocalFrame* frame) {
@@ -877,10 +822,11 @@ bool Dispatcher::OnControlMessageReceived(const IPC::Message& message) {
   IPC_MESSAGE_HANDLER(ExtensionMsg_Loaded, OnLoaded)
   IPC_MESSAGE_HANDLER(ExtensionMsg_MessageInvoke, OnMessageInvoke)
   IPC_MESSAGE_HANDLER(ExtensionMsg_SetChannel, OnSetChannel)
-  IPC_MESSAGE_HANDLER(ExtensionMsg_SetFunctionNames, OnSetFunctionNames)
   IPC_MESSAGE_HANDLER(ExtensionMsg_SetScriptingWhitelist,
                       OnSetScriptingWhitelist)
   IPC_MESSAGE_HANDLER(ExtensionMsg_SetSystemFont, OnSetSystemFont)
+  IPC_MESSAGE_HANDLER(ExtensionMsg_SetWebViewPartitionID,
+                      OnSetWebViewPartitionID)
   IPC_MESSAGE_HANDLER(ExtensionMsg_ShouldSuspend, OnShouldSuspend)
   IPC_MESSAGE_HANDLER(ExtensionMsg_Suspend, OnSuspend)
   IPC_MESSAGE_HANDLER(ExtensionMsg_TransferBlobs, OnTransferBlobs)
@@ -903,10 +849,42 @@ bool Dispatcher::OnControlMessageReceived(const IPC::Message& message) {
 void Dispatcher::WebKitInitialized() {
   RenderThread::Get()->RegisterExtension(SafeBuiltins::CreateV8Extension());
 
+  // WebSecurityPolicy whitelists. They should be registered for both
+  // chrome-extension: and chrome-extension-resource.
+  using RegisterFunction = void (*)(const WebString&);
+  RegisterFunction register_functions[] = {
+      // Treat as secure because communication with them is entirely in the
+      // browser, so there is no danger of manipulation or eavesdropping on
+      // communication with them by third parties.
+      WebSecurityPolicy::registerURLSchemeAsSecure,
+      // As far as Blink is concerned, they should be allowed to receive CORS
+      // requests. At the Extensions layer, requests will actually be blocked
+      // unless overridden by the web_accessible_resources manifest key.
+      // TODO(kalman): See what happens with a service worker.
+      WebSecurityPolicy::registerURLSchemeAsCORSEnabled,
+      // Resources should bypass Content Security Policy checks when included in
+      // protected resources. TODO(kalman): What are "protected resources"?
+      WebSecurityPolicy::registerURLSchemeAsBypassingContentSecurityPolicy,
+      // Extension resources are HTTP-like and safe to expose to the fetch API.
+      // The rules for the fetch API are consistent with XHR.
+      WebSecurityPolicy::registerURLSchemeAsSupportingFetchAPI,
+      // Extension resources, when loaded as the top-level document, should
+      // bypass Blink's strict first-party origin checks.
+      WebSecurityPolicy::registerURLSchemeAsFirstPartyWhenTopLevel,
+  };
+
+  WebString extension_scheme(base::ASCIIToUTF16(kExtensionScheme));
+  WebString extension_resource_scheme(base::ASCIIToUTF16(
+      kExtensionResourceScheme));
+  for (RegisterFunction func : register_functions) {
+    func(extension_scheme);
+    func(extension_resource_scheme);
+  }
+
   // For extensions, we want to ensure we call the IdleHandler every so often,
   // even if the extension keeps up activity.
   if (set_idle_notifications_) {
-    forced_idle_timer_.reset(new base::RepeatingTimer<content::RenderThread>);
+    forced_idle_timer_.reset(new base::RepeatingTimer<RenderThread>);
     forced_idle_timer_->Start(
         FROM_HERE,
         base::TimeDelta::FromMilliseconds(kMaxExtensionIdleHandlerDelayMs),
@@ -1078,12 +1056,6 @@ void Dispatcher::OnSetChannel(int channel) {
   AddChannelSpecificFeatures();
 }
 
-void Dispatcher::OnSetFunctionNames(const std::vector<std::string>& names) {
-  function_names_.clear();
-  for (size_t i = 0; i < names.size(); ++i)
-    function_names_.insert(names[i]);
-}
-
 void Dispatcher::OnSetScriptingWhitelist(
     const ExtensionsClient::ScriptingWhitelist& extension_ids) {
   ExtensionsClient::Get()->SetScriptingWhitelist(extension_ids);
@@ -1093,6 +1065,12 @@ void Dispatcher::OnSetSystemFont(const std::string& font_family,
                                  const std::string& font_size) {
   system_font_family_ = font_family;
   system_font_size_ = font_size;
+}
+
+void Dispatcher::OnSetWebViewPartitionID(const std::string& partition_id) {
+  // |webview_partition_id_| cannot be changed once set.
+  CHECK(webview_partition_id_.empty() || webview_partition_id_ == partition_id);
+  webview_partition_id_ = partition_id;
 }
 
 void Dispatcher::OnShouldSuspend(const std::string& extension_id,
@@ -1449,7 +1427,7 @@ bool Dispatcher::IsRuntimeAvailableToContext(ScriptContext* context) {
        *RendererExtensionRegistry::Get()->GetMainThreadExtensionSet()) {
     ExternallyConnectableInfo* info = static_cast<ExternallyConnectableInfo*>(
         extension->GetManifestData(manifest_keys::kExternallyConnectable));
-    if (info && info->matches.MatchesURL(context->GetURL()))
+    if (info && info->matches.MatchesURL(context->url()))
       return true;
   }
   return false;
@@ -1461,13 +1439,13 @@ void Dispatcher::UpdateContentCapabilities(ScriptContext* context) {
        *RendererExtensionRegistry::Get()->GetMainThreadExtensionSet()) {
     const ContentCapabilitiesInfo& info =
         ContentCapabilitiesInfo::Get(extension.get());
-    if (info.url_patterns.MatchesURL(context->GetURL())) {
+    if (info.url_patterns.MatchesURL(context->url())) {
       APIPermissionSet new_permissions;
       APIPermissionSet::Union(permissions, info.permissions, &new_permissions);
       permissions = new_permissions;
     }
   }
-  context->SetContentCapabilities(permissions);
+  context->set_content_capabilities(permissions);
 }
 
 void Dispatcher::PopulateSourceMap() {

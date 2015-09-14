@@ -40,6 +40,8 @@ const size_t kBodyDataSize = arraysize(kBodyData);
 const base::StringPiece kBodyDataStringPiece(kBodyData, kBodyDataSize);
 
 static base::TimeDelta g_time_delta;
+static base::TimeTicks g_time_now;
+
 base::TimeTicks TheNearFuture() {
   return base::TimeTicks::Now() + g_time_delta;
 }
@@ -48,6 +50,10 @@ base::TimeTicks SlowReads() {
   g_time_delta +=
       base::TimeDelta::FromMilliseconds(2 * kYieldAfterDurationMilliseconds);
   return base::TimeTicks::Now() + g_time_delta;
+}
+
+base::TimeTicks InstantaneousReads() {
+  return g_time_now;
 }
 
 }  // namespace
@@ -115,6 +121,7 @@ class SpdySessionTest : public PlatformTest,
 
   void SetUp() override {
     g_time_delta = base::TimeDelta();
+    g_time_now = base::TimeTicks::Now();
     session_deps_.net_log = log_.bound().net_log();
   }
 
@@ -1252,7 +1259,7 @@ TEST_P(SpdySessionTest, OnSettings) {
   int seq = 0;
   std::vector<MockWrite> writes;
   scoped_ptr<SpdyFrame> settings_ack(spdy_util_.ConstructSpdySettingsAck());
-  if (GetParam() >= kProtoHTTP2MinimumVersion) {
+  if (GetParam() == kProtoHTTP2) {
     writes.push_back(CreateMockWrite(*settings_ack, ++seq));
   }
 
@@ -1449,8 +1456,7 @@ TEST_P(SpdySessionTest, SendInitialDataOnNewSession) {
   scoped_ptr<SpdyFrame> settings_frame(
       spdy_util_.ConstructSpdySettings(settings));
   std::vector<MockWrite> writes;
-  if ((GetParam() >= kProtoHTTP2MinimumVersion) &&
-      (GetParam() <= kProtoHTTP2MaximumVersion)) {
+  if (GetParam() == kProtoHTTP2) {
     writes.push_back(
         MockWrite(ASYNC,
                   kHttp2ConnectionHeaderPrefix,
@@ -2455,6 +2461,7 @@ TEST_P(SpdySessionTest, CancelTwoStalledCreateStream) {
 // the available data without yielding.
 TEST_P(SpdySessionTest, ReadDataWithoutYielding) {
   session_deps_.host_resolver->set_synchronous_mode(true);
+  session_deps_.time_func = InstantaneousReads;
 
   BufferedSpdyFramer framer(spdy_util_.spdy_version(), false);
 
@@ -2605,6 +2612,7 @@ TEST_P(SpdySessionTest, TestYieldingSlowReads) {
 // return ERR_IO_PENDING during socket reads).
 TEST_P(SpdySessionTest, TestYieldingDuringReadData) {
   session_deps_.host_resolver->set_synchronous_mode(true);
+  session_deps_.time_func = InstantaneousReads;
 
   BufferedSpdyFramer framer(spdy_util_.spdy_version(), false);
 
@@ -2698,6 +2706,7 @@ TEST_P(SpdySessionTest, TestYieldingDuringReadData) {
 // async read, and rest of the data synchronously.
 TEST_P(SpdySessionTest, TestYieldingDuringAsyncReadData) {
   session_deps_.host_resolver->set_synchronous_mode(true);
+  session_deps_.time_func = InstantaneousReads;
 
   BufferedSpdyFramer framer(spdy_util_.spdy_version(), false);
 
@@ -3394,7 +3403,7 @@ TEST_P(SpdySessionTest, SessionFlowControlInactiveStream) {
 // (including optional pad length and padding) is.
 TEST_P(SpdySessionTest, SessionFlowControlPadding) {
   // Padding only exists in HTTP/2.
-  if (GetParam() < kProtoHTTP2MinimumVersion)
+  if (GetParam() < kProtoHTTP2)
     return;
 
   session_deps_.host_resolver->set_synchronous_mode(true);

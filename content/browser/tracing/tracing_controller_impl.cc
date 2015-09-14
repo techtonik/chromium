@@ -59,7 +59,8 @@ TracingControllerImpl::TracingControllerImpl()
       is_recording_(TraceLog::GetInstance()->IsEnabled()),
       is_monitoring_(false),
       is_power_tracing_(false) {
-  base::trace_event::MemoryDumpManager::GetInstance()->SetDelegate(this);
+  base::trace_event::MemoryDumpManager::GetInstance()->Initialize(
+      this /* delegate */, true /* is_coordinator */);
 
   // Deliberately leaked, like this class.
   base::FileTracing::SetProvider(new FileTracingProviderImpl);
@@ -846,17 +847,13 @@ void TracingControllerImpl::RequestGlobalMemoryDump(
     tmf->SendProcessMemoryDumpRequest(args);
 }
 
-bool TracingControllerImpl::IsCoordinatorProcess() const {
-  return true;
-}
-
 uint64 TracingControllerImpl::GetTracingProcessId() const {
   return ChildProcessHost::kBrowserTracingProcessId;
 }
 
 void TracingControllerImpl::AddTraceMessageFilterObserver(
     TraceMessageFilterObserver* observer) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   trace_message_filter_observers_.AddObserver(observer);
 
   for (auto& filter : trace_message_filters_)

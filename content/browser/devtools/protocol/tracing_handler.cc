@@ -99,7 +99,7 @@ void TracingHandler::SetClient(scoped_ptr<Client> client) {
 }
 
 void TracingHandler::Detached() {
-  if (IsRecording())
+  if (did_initiate_recording_)
     DisableRecording(scoped_refptr<TracingController::TraceDataSink>());
 }
 
@@ -122,14 +122,6 @@ void TracingHandler::OnTraceComplete() {
 void TracingHandler::OnTraceToStreamComplete(const std::string& stream_handle) {
   client_->TracingComplete(
       TracingCompleteParams::Create()->set_stream(stream_handle));
-}
-
-Response TracingHandler::Start(DevToolsCommandId command_id,
-                               const std::string* categories,
-                               const std::string* options,
-                               const double* buffer_usage_reporting_interval) {
-  return Start(command_id, categories, options, buffer_usage_reporting_interval,
-               nullptr);
 }
 
 Response TracingHandler::Start(DevToolsCommandId command_id,
@@ -167,7 +159,7 @@ Response TracingHandler::Start(DevToolsCommandId command_id,
 }
 
 Response TracingHandler::End(DevToolsCommandId command_id) {
-  if (!IsRecording())
+  if (!did_initiate_recording_)
     return Response::InternalError("Tracing is not started");
 
   scoped_refptr<TracingController::TraceDataSink> proxy;
@@ -219,10 +211,9 @@ Response TracingHandler::RequestMemoryDump(DevToolsCommandId command_id) {
   if (!IsRecording())
     return Response::InternalError("Tracing is not started");
 
-  base::trace_event::MemoryDumpArgs dump_args = {
-      base::trace_event::MemoryDumpArgs::LevelOfDetail::HIGH};
   base::trace_event::MemoryDumpManager::GetInstance()->RequestGlobalDump(
-      base::trace_event::MemoryDumpType::EXPLICITLY_TRIGGERED, dump_args,
+      base::trace_event::MemoryDumpType::EXPLICITLY_TRIGGERED,
+      base::trace_event::MemoryDumpLevelOfDetail::DETAILED,
       base::Bind(&TracingHandler::OnMemoryDumpFinished,
                  weak_factory_.GetWeakPtr(), command_id));
   return Response::OK();

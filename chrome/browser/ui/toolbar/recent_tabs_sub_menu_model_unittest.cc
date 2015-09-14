@@ -11,6 +11,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/run_loop.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/sessions/chrome_tab_restore_service_client.h"
 #include "chrome/browser/sessions/persistent_tab_restore_service.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
@@ -19,6 +20,7 @@
 #include "chrome/browser/sync/sessions/sessions_sync_manager.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_tabstrip.h"
+#include "chrome/browser/ui/sync/browser_synced_window_delegates_getter.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/toolbar/recent_tabs_builder_test_helper.h"
 #include "chrome/common/chrome_switches.h"
@@ -123,10 +125,10 @@ class RecentTabsSubMenuModelTest
                       sync_pb::SyncEnums_DeviceType_TYPE_LINUX,
                       "device_id")) {
     manager_.reset(new browser_sync::SessionsSyncManager(
-        &testing_profile_,
-        local_device_.get(),
-        scoped_ptr<browser_sync::LocalSessionEventRouter>(
-            new DummyRouter())));
+        &testing_profile_, local_device_.get(),
+        scoped_ptr<browser_sync::LocalSessionEventRouter>(new DummyRouter()),
+        scoped_ptr<browser_sync::SyncedWindowDelegatesGetter>(
+            new browser_sync::BrowserSyncedWindowDelegatesGetter())));
     manager_->MergeDataAndStartSyncing(
         syncer::SESSIONS,
         syncer::SyncDataList(),
@@ -143,7 +145,9 @@ class RecentTabsSubMenuModelTest
   static scoped_ptr<KeyedService> GetTabRestoreService(
       content::BrowserContext* browser_context) {
     return make_scoped_ptr(new PersistentTabRestoreService(
-        Profile::FromBrowserContext(browser_context), NULL));
+        make_scoped_ptr(new ChromeTabRestoreServiceClient(
+            Profile::FromBrowserContext(browser_context))),
+        nullptr));
   }
 
   sync_driver::OpenTabsUIDelegate* GetOpenTabsDelegate() {

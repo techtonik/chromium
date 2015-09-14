@@ -5,9 +5,9 @@
 #ifndef CONTENT_COMMON_GPU_GPU_CHANNEL_H_
 #define CONTENT_COMMON_GPU_GPU_CHANNEL_H_
 
-#include <deque>
 #include <string>
 
+#include "base/containers/hash_tables.h"
 #include "base/containers/scoped_ptr_hash_map.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
@@ -19,6 +19,7 @@
 #include "content/common/gpu/gpu_command_buffer_stub.h"
 #include "content/common/gpu/gpu_memory_manager.h"
 #include "content/common/gpu/gpu_result_codes.h"
+#include "content/common/gpu/gpu_stream_priority.h"
 #include "content/common/message_router.h"
 #include "gpu/command_buffer/service/valuebuffer_manager.h"
 #include "ipc/ipc_sync_channel.h"
@@ -35,6 +36,7 @@ class WaitableEvent;
 
 namespace gpu {
 class PreemptionFlag;
+class SyncPointManager;
 union ValueState;
 class ValueStateMap;
 namespace gles2 {
@@ -43,13 +45,13 @@ class SubscriptionRefSet;
 }
 
 namespace IPC {
-class AttachmentBroker;
 class MessageFilter;
 }
 
 namespace content {
 class GpuChannelManager;
 class GpuChannelMessageFilter;
+class GpuChannelMessageQueue;
 class GpuJpegDecodeAccelerator;
 class GpuWatchdog;
 
@@ -70,13 +72,13 @@ class CONTENT_EXPORT GpuChannel
              int client_id,
              uint64_t client_tracing_id,
              bool software,
-             bool allow_future_sync_points);
+             bool allow_future_sync_points,
+             bool allow_real_time_streams);
   ~GpuChannel() override;
 
   // Initializes the IPC channel. Caller takes ownership of the client FD in
   // the returned handle and is responsible for closing it.
-  virtual IPC::ChannelHandle Init(base::WaitableEvent* shutdown_event,
-                                  IPC::AttachmentBroker* attachment_broker);
+  virtual IPC::ChannelHandle Init(base::WaitableEvent* shutdown_event);
 
   // Get the GpuChannelManager that owns this channel.
   GpuChannelManager* gpu_channel_manager() const {
@@ -144,9 +146,6 @@ class CONTENT_EXPORT GpuChannel
 
   gpu::PreemptionFlag* GetPreemptionFlag();
 
-  bool handle_messages_scheduled() const { return handle_messages_scheduled_; }
-  uint64 messages_processed() const { return messages_processed_; }
-
   // If |preemption_flag->IsSet()|, any stub on this channel
   // should stop issuing GL commands. Setting this to NULL stops deferral.
   void SetPreemptByFlag(
@@ -154,8 +153,8 @@ class CONTENT_EXPORT GpuChannel
 
   void CacheShader(const std::string& key, const std::string& shader);
 
-  virtual void AddFilter(IPC::MessageFilter* filter);
-  virtual void RemoveFilter(IPC::MessageFilter* filter);
+  void AddFilter(IPC::MessageFilter* filter);
+  void RemoveFilter(IPC::MessageFilter* filter);
 
   uint64 GetMemoryUsage();
 
@@ -175,6 +174,13 @@ class CONTENT_EXPORT GpuChannel
     return pending_valuebuffer_state_.get();
   }
 
+  // Visible for testing.
+  GpuChannelMessageFilter* filter() const { return filter_.get(); }
+
+  uint32_t GetCurrentOrderNum() const { return current_order_num_; }
+  uint32_t GetProcessedOrderNum() const { return processed_order_num_; }
+  uint32_t GetUnprocessedOrderNum() const;
+
  protected:
   // The message filter on the io thread.
   scoped_refptr<GpuChannelMessageFilter> filter_;
@@ -183,7 +189,27 @@ class CONTENT_EXPORT GpuChannel
   base::ScopedPtrHashMap<int32, scoped_ptr<GpuCommandBufferStub>> stubs_;
 
  private:
+  class StreamState {
+   public:
+    StreamState(int32 id, GpuStreamPriority priority);
+    ~StreamState();
+
+    int32 id() const { return id_; }
+    GpuStreamPriority priority() const { return priority_; }
+
+    void AddRoute(int32 route_id);
+    void RemoveRoute(int32 route_id);
+    bool HasRoute(int32 route_id) const;
+    bool HasRoutes() const;
+
+   private:
+    int32 id_;
+    GpuStreamPriority priority_;
+    base::hash_set<int32> routes_;
+  };
+
   friend class GpuChannelMessageFilter;
+  friend class GpuChannelMessageQueue;
 
   void OnDestroy();
 
@@ -200,8 +226,8 @@ class CONTENT_EXPORT GpuChannel
   void OnDestroyCommandBuffer(int32 route_id);
   void OnCreateJpegDecoder(int32 route_id, IPC::Message* reply_msg);
 
-  // Decrement the count of unhandled IPC messages and defer preemption.
-  void MessageProcessed();
+  // Update processed order number and defer preemption.
+  void MessageProcessed(uint32_t order_number);
 
   // The lifetime of objects of this class is managed by a GpuChannelManager.
   // The GpuChannelManager destroy all the GpuChannels that they own when they
@@ -216,8 +242,6 @@ class CONTENT_EXPORT GpuChannel
   // Used to implement message routing functionality to CommandBuffer objects
   MessageRouter router_;
 
-  uint64 messages_processed_;
-
   // Whether the processing of IPCs on this channel is stalled and we should
   // preempt other GpuChannels.
   scoped_refptr<gpu::PreemptionFlag> preempting_flag_;
@@ -226,7 +250,7 @@ class CONTENT_EXPORT GpuChannel
   // commands (via their GpuScheduler) when preempted_flag_->IsSet()
   scoped_refptr<gpu::PreemptionFlag> preempted_flag_;
 
-  std::deque<IPC::Message*> deferred_messages_;
+  scoped_refptr<GpuChannelMessageQueue> message_queue_;
 
   // The id of the client who is on the other side of the channel.
   int client_id_;
@@ -253,12 +277,20 @@ class CONTENT_EXPORT GpuChannel
   gpu::gles2::DisallowedFeatures disallowed_features_;
   GpuWatchdog* watchdog_;
   bool software_;
-  bool handle_messages_scheduled_;
-  IPC::Message* currently_processing_message_;
+
+  // Current IPC order number being processed.
+  uint32_t current_order_num_;
+
+  // Last finished IPC order number.
+  uint32_t processed_order_num_;
 
   size_t num_stubs_descheduled_;
 
+  // Map of stream id to stream state.
+  base::hash_map<int32, StreamState> streams_;
+
   bool allow_future_sync_points_;
+  bool allow_real_time_streams_;
 
   // Member variables should appear before the WeakPtrFactory, to ensure
   // that any WeakPtrs to Controller are invalidated before its members
@@ -266,6 +298,101 @@ class CONTENT_EXPORT GpuChannel
   base::WeakPtrFactory<GpuChannel> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(GpuChannel);
+};
+
+// This filter does three things:
+// - it counts and timestamps each message forwarded to the channel
+//   so that we can preempt other channels if a message takes too long to
+//   process. To guarantee fairness, we must wait a minimum amount of time
+//   before preempting and we limit the amount of time that we can preempt in
+//   one shot (see constants above).
+// - it handles the GpuCommandBufferMsg_InsertSyncPoint message on the IO
+//   thread, generating the sync point ID and responding immediately, and then
+//   posting a task to insert the GpuCommandBufferMsg_RetireSyncPoint message
+//   into the channel's queue.
+// - it generates mailbox names for clients of the GPU process on the IO thread.
+class GpuChannelMessageFilter : public IPC::MessageFilter {
+ public:
+  GpuChannelMessageFilter(
+      scoped_refptr<GpuChannelMessageQueue> message_queue,
+      gpu::SyncPointManager* sync_point_manager,
+      scoped_refptr<base::SingleThreadTaskRunner> task_runner,
+      bool future_sync_points);
+
+  // IPC::MessageFilter implementation.
+  void OnFilterAdded(IPC::Sender* sender) override;
+  void OnFilterRemoved() override;
+  void OnChannelConnected(int32 peer_pid) override;
+  void OnChannelError() override;
+  void OnChannelClosing() override;
+  bool OnMessageReceived(const IPC::Message& message) override;
+
+  void AddChannelFilter(scoped_refptr<IPC::MessageFilter> filter);
+  void RemoveChannelFilter(scoped_refptr<IPC::MessageFilter> filter);
+
+  void OnMessageProcessed();
+
+  void SetPreemptingFlagAndSchedulingState(gpu::PreemptionFlag* preempting_flag,
+                                           bool a_stub_is_descheduled);
+
+  void UpdateStubSchedulingState(bool a_stub_is_descheduled);
+
+  bool Send(IPC::Message* message);
+
+ protected:
+  ~GpuChannelMessageFilter() override;
+
+ private:
+  enum PreemptionState {
+    // Either there's no other channel to preempt, there are no messages
+    // pending processing, or we just finished preempting and have to wait
+    // before preempting again.
+    IDLE,
+    // We are waiting kPreemptWaitTimeMs before checking if we should preempt.
+    WAITING,
+    // We can preempt whenever any IPC processing takes more than
+    // kPreemptWaitTimeMs.
+    CHECKING,
+    // We are currently preempting (i.e. no stub is descheduled).
+    PREEMPTING,
+    // We would like to preempt, but some stub is descheduled.
+    WOULD_PREEMPT_DESCHEDULED,
+  };
+
+  void UpdatePreemptionState();
+
+  void TransitionToIdleIfCaughtUp();
+  void TransitionToIdle();
+  void TransitionToWaiting();
+  void TransitionToChecking();
+  void TransitionToPreempting();
+  void TransitionToWouldPreemptDescheduled();
+
+  PreemptionState preemption_state_;
+
+  // Maximum amount of time that we can spend in PREEMPTING.
+  // It is reset when we transition to IDLE.
+  base::TimeDelta max_preemption_time_;
+
+  // The message_queue_ is used to handle messages on the main thread.
+  scoped_refptr<GpuChannelMessageQueue> message_queue_;
+  IPC::Sender* sender_;
+  base::ProcessId peer_pid_;
+  gpu::SyncPointManager* sync_point_manager_;
+  scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
+  scoped_refptr<gpu::PreemptionFlag> preempting_flag_;
+  std::vector<scoped_refptr<IPC::MessageFilter>> channel_filters_;
+
+  // This timer is created and destroyed on the IO thread.
+  scoped_ptr<base::OneShotTimer<GpuChannelMessageFilter>> timer_;
+
+  bool a_stub_is_descheduled_;
+
+  // True if this channel can create future sync points.
+  bool future_sync_points_;
+
+  // This number is only ever incremented/read on the IO thread.
+  static uint32_t global_order_counter_;
 };
 
 }  // namespace content

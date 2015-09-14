@@ -27,20 +27,6 @@ class MockUsbDeviceHandle : public UsbDeviceHandle {
                      size_t length,
                      unsigned int timeout,
                      const TransferCallback& callback));
-  MOCK_METHOD6(BulkTransfer,
-               void(UsbEndpointDirection direction,
-                    uint8 endpoint,
-                    scoped_refptr<net::IOBuffer> buffer,
-                    size_t length,
-                    unsigned int timeout,
-                    const TransferCallback& callback));
-  MOCK_METHOD6(InterruptTransfer,
-               void(UsbEndpointDirection direction,
-                    uint8 endpoint,
-                    scoped_refptr<net::IOBuffer> buffer,
-                    size_t length,
-                    unsigned int timeout,
-                    const TransferCallback& callback));
   MOCK_METHOD8(IsochronousTransfer,
                void(UsbEndpointDirection direction,
                     uint8 endpoint,
@@ -48,6 +34,13 @@ class MockUsbDeviceHandle : public UsbDeviceHandle {
                     size_t length,
                     unsigned int packets,
                     unsigned int packet_length,
+                    unsigned int timeout,
+                    const TransferCallback& callback));
+  MOCK_METHOD6(GenericTransfer,
+               void(UsbEndpointDirection direction,
+                    uint8 endpoint,
+                    scoped_refptr<net::IOBuffer> buffer,
+                    size_t length,
                     unsigned int timeout,
                     const TransferCallback& callback));
   MOCK_METHOD1(ResetDevice, void(const ResultCallback& callback));

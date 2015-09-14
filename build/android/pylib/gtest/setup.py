@@ -9,12 +9,11 @@ import logging
 import os
 import sys
 
+from devil.android import device_utils
 from pylib import constants
-
 from pylib.base import base_setup
 from pylib.base import base_test_result
 from pylib.base import test_dispatcher
-from pylib.device import device_utils
 from pylib.gtest import gtest_test_instance
 from pylib.gtest import test_package_apk
 from pylib.gtest import test_package_exe
@@ -106,7 +105,7 @@ def _GetTests(test_options, test_package, devices):
         return results, None
     return TestListerRunner(test_options, device, test_package)
 
-  results, _no_retry = test_dispatcher.RunTests(
+  results, _ = test_dispatcher.RunTests(
       ['gtest_list_tests'], TestListerRunnerFactory, devices)
   tests = []
   for r in results.GetAll():

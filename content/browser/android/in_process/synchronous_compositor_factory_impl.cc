@@ -19,12 +19,12 @@
 #include "content/gpu/in_process_gpu_thread.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/gpu_data_manager.h"
+#include "content/public/common/content_switches.h"
 #include "content/renderer/gpu/frame_swap_message_queue.h"
 #include "content/renderer/render_thread_impl.h"
 #include "gpu/blink/webgraphicscontext3d_in_process_command_buffer_impl.h"
 #include "gpu/command_buffer/client/gl_in_process_context.h"
 #include "gpu/command_buffer/common/gles2_cmd_utils.h"
-#include "gpu/command_buffer/service/gpu_switches.h"
 #include "ui/gl/android/surface_texture.h"
 #include "ui/gl/gl_surface.h"
 #include "ui/gl/gl_surface_stub.h"
@@ -146,10 +146,13 @@ class SynchronousCompositorFactoryImpl::VideoContextProvider
 };
 
 SynchronousCompositorFactoryImpl::SynchronousCompositorFactoryImpl()
-    : record_full_layer_(true),
-      use_ipc_command_buffer_(false),
+    : use_ipc_command_buffer_(false),
       num_hardware_compositors_(0) {
-  SynchronousCompositorFactory::SetInstance(this);
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSingleProcess)) {
+    // TODO(boliu): Figure out how to deal with this more nicely.
+    SynchronousCompositorFactory::SetInstance(this);
+  }
 }
 
 SynchronousCompositorFactoryImpl::~SynchronousCompositorFactoryImpl() {}
@@ -157,11 +160,6 @@ SynchronousCompositorFactoryImpl::~SynchronousCompositorFactoryImpl() {}
 scoped_refptr<base::SingleThreadTaskRunner>
 SynchronousCompositorFactoryImpl::GetCompositorTaskRunner() {
   return BrowserThread::GetMessageLoopProxyForThread(BrowserThread::UI);
-}
-
-bool
-SynchronousCompositorFactoryImpl::RecordFullLayer() {
-  return record_full_layer_;
 }
 
 scoped_ptr<cc::OutputSurface>
@@ -173,14 +171,6 @@ SynchronousCompositorFactoryImpl::CreateOutputSurface(
       CreateContextProviderForCompositor(surface_id, RENDER_COMPOSITOR_CONTEXT);
   scoped_refptr<cc::ContextProvider> worker_context =
       CreateContextProviderForCompositor(0, RENDER_WORKER_CONTEXT);
-  if (!worker_context->BindToCurrentThread())
-    worker_context = nullptr;
-  if (worker_context) {
-    worker_context->SetupLock();
-    // Detach from thread to allow context to be destroyed on a
-    // different thread without being used.
-    worker_context->DetachFromThread();
-  }
 
   return make_scoped_ptr(new SynchronousCompositorOutputSurface(
       onscreen_context, worker_context, routing_id, frame_swap_message_queue));
@@ -352,11 +342,6 @@ SynchronousCompositorFactoryImpl::GpuThreadService() {
         android_view_service_->sync_point_manager());
   }
   return gpu_thread_service_;
-}
-
-void SynchronousCompositorFactoryImpl::SetRecordFullDocument(
-    bool record_full_document) {
-  record_full_layer_ = record_full_document;
 }
 
 void SynchronousCompositorFactoryImpl::SetUseIpcCommandBuffer() {

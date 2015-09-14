@@ -5,6 +5,7 @@
 #include "chrome/browser/ui/passwords/manage_passwords_bubble_model.h"
 
 #include "base/command_line.h"
+#include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -23,6 +24,7 @@
 #include "components/password_manager/core/browser/password_bubble_experiment.h"
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/password_manager/core/common/credential_manager_types.h"
+#include "components/password_manager/core/common/password_manager_pref_names.h"
 #include "components/password_manager/core/common/password_manager_ui.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "content/public/browser/browser_thread.h"
@@ -119,8 +121,8 @@ ManagePasswordsBubbleModel::ManagePasswordsBubbleModel(
     title_ = l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_CHOOSE_TITLE);
   } else if (state_ == password_manager::ui::AUTO_SIGNIN_STATE) {
     // There is no title.
-  } else {
-    title_ = l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_TITLE);
+  } else if (state_ == password_manager::ui::MANAGE_STATE) {
+    UpdateManageStateTitle();
   }
 
   if (state_ == password_manager::ui::CONFIRMATION_STATE) {
@@ -202,6 +204,13 @@ void ManagePasswordsBubbleModel::OnBubbleShown(
 }
 
 void ManagePasswordsBubbleModel::OnBubbleHidden() {
+  if (state_ == password_manager::ui::PENDING_PASSWORD_STATE) {
+    Profile* profile = GetProfile();
+    if (profile && IsSmartLockBrandingEnabled(profile)) {
+      profile->GetPrefs()->SetBoolean(
+          password_manager::prefs::kWasSavePrompFirstRunExperienceShown, true);
+    }
+  }
   ManagePasswordsUIController* manage_passwords_ui_controller =
       web_contents() ?
           ManagePasswordsUIController::FromWebContents(web_contents())
@@ -341,6 +350,16 @@ bool ManagePasswordsBubbleModel::ShouldShowMultipleAccountUpdateUI() const {
   return controller->ShouldShowMultipleAccountUpdateUI();
 }
 
+bool ManagePasswordsBubbleModel::ShouldShowGoogleSmartLockWelcome() const {
+  Profile* profile = GetProfile();
+  if (IsSmartLockBrandingEnabled(profile)) {
+    PrefService* prefs = profile->GetPrefs();
+    return !prefs->GetBoolean(
+        password_manager::prefs::kWasSavePrompFirstRunExperienceShown);
+  }
+  return false;
+}
+
 // static
 int ManagePasswordsBubbleModel::UsernameFieldWidth() {
   return GetFieldWidth(USERNAME_FIELD);
@@ -358,6 +377,11 @@ void ManagePasswordsBubbleModel::UpdatePendingStateTitle() {
       IsSmartLockBrandingEnabled(GetProfile()),
       state_ == password_manager::ui::PENDING_PASSWORD_UPDATE_STATE, &title_,
       &title_brand_link_range_);
+}
+
+void ManagePasswordsBubbleModel::UpdateManageStateTitle() {
+  GetManagePasswordsDialogTitleText(web_contents()->GetVisibleURL(), origin(),
+                                    &title_);
 }
 
 password_manager::metrics_util::UpdatePasswordSubmissionEvent

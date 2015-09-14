@@ -64,6 +64,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
       {APIPermission::kBrailleDisplayPrivate, "brailleDisplayPrivate",
        APIPermissionInfo::kFlagCannotBeOptional},
       {APIPermission::kBrowsingData, "browsingData"},
+      {APIPermission::kCertificateProvider, "certificateProvider"},
       {APIPermission::kContentSettings, "contentSettings"},
       {APIPermission::kContextMenus, "contextMenus"},
       {APIPermission::kCookie, "cookies"},
@@ -244,7 +245,6 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
       {APIPermission::kPointerLock, "pointerLock"},
       {APIPermission::kCastStreaming, "cast.streaming"},
       {APIPermission::kBrowser, "browser"},
-      {APIPermission::kInterceptAllKeys, "app.window.interceptAllKeys"},
       {APIPermission::kLauncherSearchProvider, "launcherSearchProvider"},
 
       // Settings override permissions.

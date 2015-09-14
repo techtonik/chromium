@@ -32,6 +32,9 @@ config("media_config") {
   if (use_cras) {
     defines += [ "USE_CRAS" ]
   }
+  if (proprietary_codecs && enable_hevc_demuxing) {
+    defines += [ "ENABLE_HEVC_DEMUXING" ]
+  }
 }
 
 config("media_implementation") {
@@ -323,6 +326,21 @@ component("media") {
         "filters/ffmpeg_aac_bitstream_converter.h",
         "filters/ffmpeg_h264_to_annex_b_bitstream_converter.cc",
         "filters/ffmpeg_h264_to_annex_b_bitstream_converter.h",
+      ]
+    }
+  }
+
+  if (proprietary_codecs && enable_hevc_demuxing) {
+    sources += [
+      "filters/h265_parser.cc",
+      "filters/h265_parser.h",
+      "formats/mp4/hevc.cc",
+      "formats/mp4/hevc.h",
+    ]
+    if (media_use_ffmpeg) {
+      sources += [
+        "filters/ffmpeg_h265_to_annex_b_bitstream_converter.cc",
+        "filters/ffmpeg_h265_to_annex_b_bitstream_converter.h",
       ]
     }
   }
@@ -686,6 +704,9 @@ test("media_unittests") {
         "filters/ffmpeg_h264_to_annex_b_bitstream_converter_unittest.cc",
       ]
     }
+    if (enable_hevc_demuxing) {
+      sources += [ "filters/h265_parser_unittest.cc" ]
+    }
   }
 
   if (is_mac || is_ios) {
@@ -772,6 +793,8 @@ component("shared_memory_support") {
   sources = [
     "audio/audio_parameters.cc",
     "audio/audio_parameters.h",
+    "audio/point.cc",
+    "audio/point.h",
     "base/audio_bus.cc",
     "base/audio_bus.h",
     "base/channel_layout.cc",
@@ -787,6 +810,7 @@ component("shared_memory_support") {
   ]
   deps = [
     "//base",
+    "//ui/gfx/geometry",
   ]
 }
 

@@ -33,7 +33,6 @@ class ChildMemoryDumpManagerDelegateImpl
   void RequestGlobalMemoryDump(
       const base::trace_event::MemoryDumpRequestArgs& args,
       const base::trace_event::MemoryDumpCallback& callback) override;
-  bool IsCoordinatorProcess() const override;
   uint64 GetTracingProcessId() const override;
 
   void SetChildTraceMessageFilter(ChildTraceMessageFilter* ctmf);
@@ -53,7 +52,8 @@ class ChildMemoryDumpManagerDelegateImpl
   friend class ChildTraceMessageFilter;
 
  private:
-  friend struct DefaultSingletonTraits<ChildMemoryDumpManagerDelegateImpl>;
+  friend struct base::DefaultSingletonTraits<
+      ChildMemoryDumpManagerDelegateImpl>;
 
   ChildMemoryDumpManagerDelegateImpl();
   ~ChildMemoryDumpManagerDelegateImpl() override;

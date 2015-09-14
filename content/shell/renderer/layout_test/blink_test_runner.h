@@ -96,6 +96,10 @@ class BlinkTestRunner : public RenderViewObserver,
   void SetDeviceScaleFactor(float factor) override;
   void SetDeviceColorProfile(const std::string& name) override;
   void SetBluetoothMockDataSet(const std::string& name) override;
+  void SetBluetoothManualChooser() override;
+  std::vector<std::string> GetBluetoothManualChooserEvents() override;
+  void SendBluetoothManualChooserEvent(const std::string& event,
+                                       const std::string& argument) override;
   void SetGeofencingMockProvider(bool service_available) override;
   void ClearGeofencingMockProvider() override;
   void SetGeofencingMockPosition(double latitude, double longitude) override;
@@ -124,10 +128,6 @@ class BlinkTestRunner : public RenderViewObserver,
                      const GURL& origin,
                      const GURL& embedding_origin) override;
   void ResetPermissions() override;
-  scoped_refptr<cc::TextureLayer> CreateTextureLayerForMailbox(
-      cc::TextureLayerClient* client) override;
-  blink::WebLayer* InstantiateWebLayer(
-      scoped_refptr<cc::TextureLayer> layer) override;
   cc::SharedBitmapManager* GetSharedBitmapManager() override;
   void DispatchBeforeInstallPromptEvent(
       int request_id,

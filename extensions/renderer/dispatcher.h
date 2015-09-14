@@ -69,10 +69,6 @@ class Dispatcher : public content::RenderProcessObserver,
   explicit Dispatcher(DispatcherDelegate* delegate);
   ~Dispatcher() override;
 
-  const std::set<std::string>& function_names() const {
-    return function_names_;
-  }
-
   const ScriptContextSet& script_context_set() const {
     return *script_context_set_;
   }
@@ -82,6 +78,8 @@ class Dispatcher : public content::RenderProcessObserver,
   ContentWatcher* content_watcher() { return content_watcher_.get(); }
 
   RequestSender* request_sender() { return request_sender_.get(); }
+
+  const std::string& webview_partition_id() { return webview_partition_id_; }
 
   void OnRenderFrameCreated(content::RenderFrame* render_frame);
 
@@ -168,11 +166,11 @@ class Dispatcher : public content::RenderProcessObserver,
                        const base::ListValue& args,
                        bool user_gesture);
   void OnSetChannel(int channel);
-  void OnSetFunctionNames(const std::vector<std::string>& names);
   void OnSetScriptingWhitelist(
       const ExtensionsClient::ScriptingWhitelist& extension_ids);
   void OnSetSystemFont(const std::string& font_family,
                        const std::string& font_size);
+  void OnSetWebViewPartitionID(const std::string& partition_id);
   void OnShouldSuspend(const std::string& extension_id, uint64 sequence_id);
   void OnSuspend(const std::string& extension_id);
   void OnTransferBlobs(const std::vector<std::string>& blob_uuids);
@@ -275,9 +273,6 @@ class Dispatcher : public content::RenderProcessObserver,
   // not idle, to ensure that IdleHandle gets called eventually.
   scoped_ptr<base::RepeatingTimer<content::RenderThread> > forced_idle_timer_;
 
-  // All declared function names.
-  std::set<std::string> function_names_;
-
   // The extensions and apps that are active in this process.
   ExtensionIdSet active_extension_ids_;
 
@@ -306,6 +301,11 @@ class Dispatcher : public content::RenderProcessObserver,
 
   // Status of webrequest usage.
   bool webrequest_used_;
+
+  // The WebView partition ID associated with this process's storage partition,
+  // if this renderer is a WebView guest render process. Otherwise, this will be
+  // empty.
+  std::string webview_partition_id_;
 
   DISALLOW_COPY_AND_ASSIGN(Dispatcher);
 };

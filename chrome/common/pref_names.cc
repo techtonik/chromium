@@ -1196,8 +1196,8 @@ const char kWebRTCMultipleRoutesEnabled[] = "webrtc.multiple_routes_enabled";
 // unless it goes through a proxy (i.e RETURN when it's available).  If no UDP
 // proxy is configured, it will not send UDP.  If true, WebRTC will send UDP
 // regardless of whether or not a proxy is configured.
-const char kWebRTCNonProxiedUdpTransportEnabled[] =
-    "webrtc.nonproxied_udp_transport_enabled";
+const char kWebRTCNonProxiedUdpEnabled[] =
+    "webrtc.nonproxied_udp_enabled";
 #endif
 
 // *************** LOCAL STATE ***************
@@ -1268,9 +1268,18 @@ const char kStabilityPageLoadCount[] =
 const char kStabilityRendererCrashCount[] =
     "user_experience_metrics.stability.renderer_crash_count";
 
+// Number of times a renderer process failed to launch since the last report.
+const char kStabilityRendererFailedLaunchCount[] =
+    "user_experience_metrics.stability.renderer_failed_launch_count";
+
 // Number of times an extension renderer process crashed since the last report.
 const char kStabilityExtensionRendererCrashCount[] =
     "user_experience_metrics.stability.extension_renderer_crash_count";
+
+// Number of times an extension renderer process failed to launch since the last
+// report.
+const char kStabilityExtensionRendererFailedLaunchCount[] =
+    "user_experience_metrics.stability.extension_renderer_failed_launch_count";
 
 // This is the location of a list of dictionaries of plugin stability stats.
 const char kStabilityPluginStats[] =
@@ -1357,6 +1366,10 @@ const char kBrowserWindowPlacementPopup[] = "browser.window_placement_popup";
 // A collection of position, size, and other data relating to the task
 // manager window to restore on startup.
 const char kTaskManagerWindowPlacement[] = "task_manager.window_placement";
+
+// The most recent stored column visibility of the task manager table to be
+// restored on startup.
+const char kTaskManagerColumnVisibility[] = "task_manager.column_visibility";
 
 // A collection of position, size, and other data relating to app windows to
 // restore on startup.
@@ -1488,6 +1501,15 @@ const char kNtpCollapsedSyncPromo[] = "ntp.collapsed_sync_promo";
 
 // Which page should be visible on the new tab page v4
 const char kNtpShownPage[] = "ntp.shown_page";
+
+#if defined(OS_ANDROID)
+// Ordered list of website suggestions shown on the new tab page that will allow
+// retaining the order even if the suggestions change over time.
+const char kNTPSuggestionsURL[] = "ntp.suggestions_url";
+
+// Whether the suggestion was derived from personal data.
+const char kNTPSuggestionsIsPersonal[] = "ntp.suggestions_is_personal";
+#endif
 
 // A private RSA key for ADB handshake.
 const char kDevToolsAdbKey[] = "devtools.adb_key";

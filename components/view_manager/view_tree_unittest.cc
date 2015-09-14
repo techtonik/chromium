@@ -52,7 +52,8 @@ class TestViewTreeClient : public mojo::ViewTreeClient {
   void OnEmbed(uint16_t connection_id,
                ViewDataPtr root,
                mojo::ViewTreePtr tree,
-               mojo::Id focused_view_id) override {
+               mojo::Id focused_view_id,
+               uint32_t access_policy) override {
     // TODO(sky): add test coverage of |focused_view_id|.
     tracker_.OnEmbed(connection_id, root.Pass());
   }
@@ -214,6 +215,7 @@ class TestDisplayManager : public DisplayManager {
   void SchedulePaint(const ServerView* view, const gfx::Rect& bounds) override {
   }
   void SetViewportSize(const gfx::Size& size) override {}
+  void SetTitle(const base::string16& title) override {}
   const mojo::ViewportMetrics& GetViewportMetrics() override {
     return display_metrices_;
   }
@@ -290,6 +292,9 @@ class ViewTreeTest : public testing::Test {
   TestViewTreeClient* wm_client() { return wm_client_; }
 
   TestViewTreeHostConnection* host_connection() { return host_connection_; }
+  DisplayManagerDelegate* display_manager_delegate() {
+    return host_connection()->view_tree_host();
+  }
 
  protected:
   // testing::Test:
@@ -324,206 +329,6 @@ class ViewTreeTest : public testing::Test {
   DISALLOW_COPY_AND_ASSIGN(ViewTreeTest);
 };
 
-namespace {
-
-const ServerView* GetFirstCloned(const ServerView* view) {
-  for (const ServerView* child : view->GetChildren()) {
-    if (child->id() == ClonedViewId())
-      return child;
-  }
-  return nullptr;
-}
-
-// Provides common setup for animation tests. Creates the following views:
-// 0,1 (the root, provided by view manager)
-//   1,1 the second connection is embedded here (view owned by wm_connection()).
-//     2,1 bounds=1,2 11x22
-//       2,2 bounds=2,3 6x7
-//         2,3 bounds=3,4 6x7
-// CloneAndAnimate() is invoked for 2,2.
-void SetUpAnimate1(ViewTreeTest* test, ViewId* embed_view_id) {
-  *embed_view_id = ViewId(test->wm_connection()->id(), 1);
-  EXPECT_EQ(ERROR_CODE_NONE, test->wm_connection()->CreateView(*embed_view_id));
-  EXPECT_TRUE(test->wm_connection()->SetViewVisibility(*embed_view_id, true));
-  EXPECT_TRUE(test->wm_connection()->AddView(*(test->wm_connection()->root()),
-                                             *embed_view_id));
-  mojo::URLRequestPtr request(mojo::URLRequest::New());
-  test->wm_connection()->Embed(*embed_view_id, request.Pass());
-  ViewTreeImpl* connection1 =
-      test->connection_manager()->GetConnectionWithRoot(*embed_view_id);
-  ASSERT_TRUE(connection1 != nullptr);
-  ASSERT_NE(connection1, test->wm_connection());
-
-  const ViewId child1(connection1->id(), 1);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child1));
-  const ViewId child2(connection1->id(), 2);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child2));
-  const ViewId child3(connection1->id(), 3);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child3));
-
-  ServerView* v1 = connection1->GetView(child1);
-  v1->SetVisible(true);
-  v1->SetBounds(gfx::Rect(1, 2, 11, 22));
-  ServerView* v2 = connection1->GetView(child2);
-  v2->SetVisible(true);
-  v2->SetBounds(gfx::Rect(2, 3, 6, 7));
-  ServerView* v3 = connection1->GetView(child3);
-  v3->SetVisible(true);
-  v3->SetBounds(gfx::Rect(3, 4, 6, 7));
-
-  EXPECT_TRUE(connection1->AddView(*embed_view_id, child1));
-  EXPECT_TRUE(connection1->AddView(child1, child2));
-  EXPECT_TRUE(connection1->AddView(child2, child3));
-
-  TestViewTreeClient* connection1_client = test->last_view_tree_client();
-  connection1_client->tracker()->changes()->clear();
-  test->wm_client()->tracker()->changes()->clear();
-  EXPECT_TRUE(test->connection_manager()->CloneAndAnimate(child2));
-  EXPECT_TRUE(connection1_client->tracker()->changes()->empty());
-  EXPECT_TRUE(test->wm_client()->tracker()->changes()->empty());
-
-  // We cloned v2. The cloned view ends up as a sibling of it.
-  const ServerView* cloned_view = GetFirstCloned(connection1->GetView(child1));
-  ASSERT_TRUE(cloned_view);
-  // |cloned_view| should have one and only one cloned child (corresponds to
-  // |child3|).
-  ASSERT_EQ(1u, cloned_view->GetChildren().size());
-  EXPECT_TRUE(cloned_view->GetChildren()[0]->id() == ClonedViewId());
-
-  // Cloned views should match the bounds of the view they were cloned from.
-  EXPECT_EQ(v2->bounds(), cloned_view->bounds());
-  EXPECT_EQ(v3->bounds(), cloned_view->GetChildren()[0]->bounds());
-
-  // Cloned views are owned by the ConnectionManager and shouldn't be returned
-  // from ViewTreeImpl::GetView.
-  EXPECT_TRUE(connection1->GetView(ClonedViewId()) == nullptr);
-  EXPECT_TRUE(test->wm_connection()->GetView(ClonedViewId()) == nullptr);
-}
-
-}  // namespace
-
-// Verifies ViewTree::GetViewTree() doesn't return cloned views.
-TEST_F(ViewTreeTest, ConnectionsCantSeeClonedViews) {
-  ViewId embed_view_id;
-  EXPECT_NO_FATAL_FAILURE(SetUpAnimate1(this, &embed_view_id));
-
-  ViewTreeImpl* connection1 =
-      connection_manager()->GetConnectionWithRoot(embed_view_id);
-
-  const ViewId child1(connection1->id(), 1);
-  const ViewId child2(connection1->id(), 2);
-  const ViewId child3(connection1->id(), 3);
-
-  // Verify the root doesn't see any cloned views.
-  std::vector<const ServerView*> views(
-      wm_connection()->GetViewTree(*wm_connection()->root()));
-  ASSERT_EQ(5u, views.size());
-  ASSERT_TRUE(views[0]->id() == *wm_connection()->root());
-  ASSERT_TRUE(views[1]->id() == embed_view_id);
-  ASSERT_TRUE(views[2]->id() == child1);
-  ASSERT_TRUE(views[3]->id() == child2);
-  ASSERT_TRUE(views[4]->id() == child3);
-
-  // Verify connection1 doesn't see any cloned views.
-  std::vector<const ServerView*> v1_views(
-      connection1->GetViewTree(embed_view_id));
-  ASSERT_EQ(4u, v1_views.size());
-  ASSERT_TRUE(v1_views[0]->id() == embed_view_id);
-  ASSERT_TRUE(v1_views[1]->id() == child1);
-  ASSERT_TRUE(v1_views[2]->id() == child2);
-  ASSERT_TRUE(v1_views[3]->id() == child3);
-}
-
-TEST_F(ViewTreeTest, ClonedViewsPromotedOnConnectionClose) {
-  ViewId embed_view_id;
-  EXPECT_NO_FATAL_FAILURE(SetUpAnimate1(this, &embed_view_id));
-
-  // Destroy connection1, which should force the cloned view to become a child
-  // of where it was embedded (the embedded view still exists).
-  connection_manager()->OnConnectionError(last_client_connection());
-
-  ServerView* embed_view = wm_connection()->GetView(embed_view_id);
-  ASSERT_TRUE(embed_view != nullptr);
-  const ServerView* cloned_view = GetFirstCloned(embed_view);
-  ASSERT_TRUE(cloned_view);
-  ASSERT_EQ(1u, cloned_view->GetChildren().size());
-  EXPECT_TRUE(cloned_view->GetChildren()[0]->id() == ClonedViewId());
-
-  // Because the cloned view changed parents its bounds should have changed.
-  EXPECT_EQ(gfx::Rect(3, 5, 6, 7), cloned_view->bounds());
-  // The bounds of the cloned child should not have changed though.
-  EXPECT_EQ(gfx::Rect(3, 4, 6, 7), cloned_view->GetChildren()[0]->bounds());
-}
-
-TEST_F(ViewTreeTest, ClonedViewsPromotedOnHide) {
-  ViewId embed_view_id;
-  EXPECT_NO_FATAL_FAILURE(SetUpAnimate1(this, &embed_view_id));
-
-  ViewTreeImpl* connection1 =
-      connection_manager()->GetConnectionWithRoot(embed_view_id);
-
-  // Hide the parent of the cloned view, which should force the cloned view to
-  // become a sibling of the parent.
-  const ServerView* view_to_hide =
-      connection1->GetView(ViewId(connection1->id(), 1));
-  ASSERT_TRUE(connection1->SetViewVisibility(view_to_hide->id(), false));
-
-  const ServerView* cloned_view = GetFirstCloned(view_to_hide->parent());
-  ASSERT_TRUE(cloned_view);
-  ASSERT_EQ(1u, cloned_view->GetChildren().size());
-  EXPECT_TRUE(cloned_view->GetChildren()[0]->id() == ClonedViewId());
-  EXPECT_EQ(2u, cloned_view->parent()->GetChildren().size());
-  EXPECT_TRUE(cloned_view->parent()->GetChildren()[1] == cloned_view);
-}
-
-// Clone and animate on a tree with more depth. Basically that of
-// SetUpAnimate1() but cloning 2,1.
-TEST_F(ViewTreeTest, CloneAndAnimateLargerDepth) {
-  const ViewId embed_view_id(wm_connection()->id(), 1);
-  EXPECT_EQ(ERROR_CODE_NONE, wm_connection()->CreateView(embed_view_id));
-  EXPECT_TRUE(wm_connection()->SetViewVisibility(embed_view_id, true));
-  EXPECT_TRUE(
-      wm_connection()->AddView(*(wm_connection()->root()), embed_view_id));
-  mojo::URLRequestPtr request(mojo::URLRequest::New());
-  wm_connection()->Embed(embed_view_id, request.Pass());
-  ViewTreeImpl* connection1 =
-      connection_manager()->GetConnectionWithRoot(embed_view_id);
-  ASSERT_TRUE(connection1 != nullptr);
-  ASSERT_NE(connection1, wm_connection());
-
-  const ViewId child1(connection1->id(), 1);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child1));
-  const ViewId child2(connection1->id(), 2);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child2));
-  const ViewId child3(connection1->id(), 3);
-  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child3));
-
-  ServerView* v1 = connection1->GetView(child1);
-  v1->SetVisible(true);
-  connection1->GetView(child2)->SetVisible(true);
-  connection1->GetView(child3)->SetVisible(true);
-
-  EXPECT_TRUE(connection1->AddView(embed_view_id, child1));
-  EXPECT_TRUE(connection1->AddView(child1, child2));
-  EXPECT_TRUE(connection1->AddView(child2, child3));
-
-  TestViewTreeClient* connection1_client = last_view_tree_client();
-  connection1_client->tracker()->changes()->clear();
-  wm_client()->tracker()->changes()->clear();
-  EXPECT_TRUE(connection_manager()->CloneAndAnimate(child1));
-  EXPECT_TRUE(connection1_client->tracker()->changes()->empty());
-  EXPECT_TRUE(wm_client()->tracker()->changes()->empty());
-
-  // We cloned v1. The cloned view ends up as a sibling of it.
-  const ServerView* cloned_view = GetFirstCloned(v1->parent());
-  ASSERT_TRUE(cloned_view);
-  // |cloned_view| should have a child and its child should have a child.
-  ASSERT_EQ(1u, cloned_view->GetChildren().size());
-  const ServerView* cloned_view_child = cloned_view->GetChildren()[0];
-  EXPECT_EQ(1u, cloned_view_child->GetChildren().size());
-  EXPECT_TRUE(cloned_view_child->id() == ClonedViewId());
-}
-
 // Verifies focus correctly changes on pointer events.
 TEST_F(ViewTreeTest, FocusOnPointer) {
   const ViewId embed_view_id(wm_connection()->id(), 1);
@@ -555,11 +360,10 @@ TEST_F(ViewTreeTest, FocusOnPointer) {
   connection1_client->tracker()->changes()->clear();
   wm_client()->tracker()->changes()->clear();
 
-  connection_manager()->OnEvent(host_connection()->view_tree_host(),
-                                CreatePointerDownEvent(21, 22));
-  // Focus should go to child1. This results in notifying both the window
+  display_manager_delegate()->OnEvent(CreatePointerDownEvent(21, 22));
+  // Focus should go to child1. This result in notifying both the window
   // manager and client connection being notified.
-  EXPECT_EQ(v1, connection_manager()->GetFocusedView());
+  EXPECT_EQ(v1, connection1->GetHost()->GetFocusedView());
   ASSERT_GE(wm_client()->tracker()->changes()->size(), 1u);
   EXPECT_EQ("Focused id=2,1",
             ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
@@ -568,18 +372,16 @@ TEST_F(ViewTreeTest, FocusOnPointer) {
       "Focused id=2,1",
       ChangesToDescription1(*connection1_client->tracker()->changes())[0]);
 
-  connection_manager()->OnEvent(host_connection()->view_tree_host(),
-                                CreatePointerUpEvent(21, 22));
+  display_manager_delegate()->OnEvent(CreatePointerUpEvent(21, 22));
   wm_client()->tracker()->changes()->clear();
   connection1_client->tracker()->changes()->clear();
 
   // Press outside of the embedded view. Focus should go to the root. Notice
   // the client1 doesn't see who has focus as the focused view (root) isn't
   // visible to it.
-  connection_manager()->OnEvent(host_connection()->view_tree_host(),
-                                CreatePointerDownEvent(61, 22));
+  display_manager_delegate()->OnEvent(CreatePointerDownEvent(61, 22));
   EXPECT_EQ(host_connection()->view_tree_host()->root_view(),
-            connection_manager()->GetFocusedView());
+            host_connection()->view_tree_host()->GetFocusedView());
   ASSERT_GE(wm_client()->tracker()->changes()->size(), 1u);
   EXPECT_EQ("Focused id=0,2",
             ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
@@ -588,21 +390,62 @@ TEST_F(ViewTreeTest, FocusOnPointer) {
       "Focused id=null",
       ChangesToDescription1(*connection1_client->tracker()->changes())[0]);
 
-  connection_manager()->OnEvent(host_connection()->view_tree_host(),
-                                CreatePointerUpEvent(21, 22));
+  display_manager_delegate()->OnEvent(CreatePointerUpEvent(21, 22));
   wm_client()->tracker()->changes()->clear();
   connection1_client->tracker()->changes()->clear();
 
   // Press in the same location. Should not get a focus change event (only input
   // event).
-  connection_manager()->OnEvent(host_connection()->view_tree_host(),
-                                CreatePointerDownEvent(61, 22));
+  display_manager_delegate()->OnEvent(CreatePointerDownEvent(61, 22));
   EXPECT_EQ(host_connection()->view_tree_host()->root_view(),
-            connection_manager()->GetFocusedView());
+            host_connection()->view_tree_host()->GetFocusedView());
   ASSERT_EQ(wm_client()->tracker()->changes()->size(), 1u);
   EXPECT_EQ("InputEvent view=0,2 event_action=4",
             ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
   EXPECT_TRUE(connection1_client->tracker()->changes()->empty());
+}
+
+TEST_F(ViewTreeTest, BasicInputEventTarget) {
+  const ViewId embed_view_id(wm_connection()->id(), 1);
+  EXPECT_EQ(ERROR_CODE_NONE, wm_connection()->CreateView(embed_view_id));
+  EXPECT_TRUE(wm_connection()->SetViewVisibility(embed_view_id, true));
+  EXPECT_TRUE(
+      wm_connection()->AddView(*(wm_connection()->root()), embed_view_id));
+  host_connection()->view_tree_host()->root_view()->SetBounds(
+      gfx::Rect(0, 0, 100, 100));
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  wm_connection()->Embed(embed_view_id, request.Pass());
+  ViewTreeImpl* connection1 =
+      connection_manager()->GetConnectionWithRoot(embed_view_id);
+  ASSERT_TRUE(connection1 != nullptr);
+  ASSERT_NE(connection1, wm_connection());
+
+  connection_manager()
+      ->GetView(embed_view_id)
+      ->SetBounds(gfx::Rect(0, 0, 50, 50));
+
+  const ViewId child1(connection1->id(), 1);
+  EXPECT_EQ(ERROR_CODE_NONE, connection1->CreateView(child1));
+  EXPECT_TRUE(connection1->AddView(embed_view_id, child1));
+  ServerView* v1 = connection1->GetView(child1);
+  v1->SetVisible(true);
+  v1->SetBounds(gfx::Rect(20, 20, 20, 20));
+
+  TestViewTreeClient* embed_connection = last_view_tree_client();
+  embed_connection->tracker()->changes()->clear();
+  wm_client()->tracker()->changes()->clear();
+
+  // Send an event to |v1|. |embed_connection| should get the event, not
+  // |wm_client|, since |v1| lives inside an embedded view.
+  display_manager_delegate()->OnEvent(CreatePointerDownEvent(21, 22));
+  ASSERT_EQ(1u, wm_client()->tracker()->changes()->size());
+  EXPECT_EQ("Focused id=2,1",
+            ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
+  ASSERT_EQ(2u, embed_connection->tracker()->changes()->size());
+  EXPECT_EQ("Focused id=2,1",
+            ChangesToDescription1(*embed_connection->tracker()->changes())[0]);
+  EXPECT_EQ("InputEvent view=2,1 event_action=4",
+            ChangesToDescription1(*embed_connection->tracker()->changes())[1]);
 }
 
 }  // namespace view_manager

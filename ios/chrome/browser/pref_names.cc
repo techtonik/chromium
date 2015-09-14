@@ -9,11 +9,13 @@ namespace prefs {
 
 // Preferences in ios::prefs:: must have the same value as the corresponding
 // preference on desktop.
-// These preferences must not be registered by //ios code.
 // See chrome/common/pref_names.cc for a detailed description of each
 // preference.
 
 const char kAcceptLanguages[] = "intl.accept_languages";
+const char kDefaultCharset[] = "intl.charset_default";
+const char kEnableDoNotTrack[] = "enable_do_not_track";
+const char kHttpServerProperties[] = "net.http_server_properties";
 const char kSavingBrowserHistoryDisabled[] = "history.saving_disabled";
 const char kSearchSuggestEnabled[] = "search.suggest_enabled";
 
@@ -69,37 +71,40 @@ const char kNetworkPredictionWifiOnly[] = "ios.dns_prefetching.wifi_only";
 const char kNtpShownBookmarksFolder[] = "ntp.shown_bookmarks_folder";
 
 // True if the memory debugging tools should be visible.
-extern const char kShowMemoryDebuggingTools[] =
-    "ios.memory.show_debugging_tools";
+const char kShowMemoryDebuggingTools[] = "ios.memory.show_debugging_tools";
 
 // User preferred speech input language for voice search.
 const char kVoiceSearchLocale[] = "ios.speechinput.voicesearch_locale";
 
 // Boolean which indicates if TTS after voice search is enabled.
-extern const char kVoiceSearchTTS[] = "ios.speechinput.voicesearch_tts";
+const char kVoiceSearchTTS[] = "ios.speechinput.voicesearch_tts";
 
 // List which contains the last known list of accounts.
-extern const char kSigninLastAccounts[] = "ios.signin.last_accounts";
+const char kSigninLastAccounts[] = "ios.signin.last_accounts";
+
+// Boolean which indicates if the pref which contains the last known list of
+// accounts was migrated to use account ids instead of emails.
+const char kSigninLastAccountsMigrated[] = "ios.signin.last_accounts_migrated";
 
 // String which contains the user id of the user signed in with shared
 // authentication.
-extern const char kSigninSharedAuthenticationUserId[] =
+const char kSigninSharedAuthenticationUserId[] =
     "ios.signin.shared_authentication_user_id";
 
 // Boolean which indicates if user should be prompted to sign in again
 // when a new tab is created.
-extern const char kSigninShouldPromptForSigninAgain[] =
+const char kSigninShouldPromptForSigninAgain[] =
     "ios.signin.should_prompt_for_signin_again";
 
 // Integer which indicates whether the user has authorized using geolocation
 // for Omnibox queries or the progress towards soliciting the user's
 // authorization.
-extern const char kOmniboxGeolocationAuthorizationState[] =
+const char kOmniboxGeolocationAuthorizationState[] =
     "ios.omnibox.geolocation_authorization_state";
 
 // String which contains the application version when we last showed the
 // authorization alert.
-extern const char kOmniboxGeolocationLastAuthorizationAlertVersion[] =
+const char kOmniboxGeolocationLastAuthorizationAlertVersion[] =
     "ios.omnibox.geolocation_last_authorization_alert_version";
 
 }  // namespace prefs

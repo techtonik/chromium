@@ -114,7 +114,7 @@ class MemoryUsageCache {
  public:
   // Retrieves the Singleton.
   static MemoryUsageCache* GetInstance() {
-    return Singleton<MemoryUsageCache>::get();
+    return base::Singleton<MemoryUsageCache>::get();
   }
 
   MemoryUsageCache() : memory_value_(0) { Init(); }
@@ -1144,12 +1144,15 @@ blink::WebGestureCurve* BlinkPlatformImpl::createFlingAnimationCurve(
 
 void BlinkPlatformImpl::didStartWorkerRunLoop() {
   WorkerTaskRunner* worker_task_runner = WorkerTaskRunner::Instance();
-  worker_task_runner->OnWorkerRunLoopStarted();
+  worker_task_runner->DidStartWorkerRunLoop();
 }
 
 void BlinkPlatformImpl::didStopWorkerRunLoop() {
+  // TODO(kalman): blink::Platform::didStopWorkerRunLoop should be called
+  // willStopWorkerRunLoop, because at this point the run loop hasn't been
+  // stopped. WillStopWorkerRunLoop is the correct name.
   WorkerTaskRunner* worker_task_runner = WorkerTaskRunner::Instance();
-  worker_task_runner->OnWorkerRunLoopStopped();
+  worker_task_runner->WillStopWorkerRunLoop();
 }
 
 blink::WebCrypto* BlinkPlatformImpl::crypto() {
@@ -1369,6 +1372,16 @@ WebString BlinkPlatformImpl::domCodeStringFromEnum(int dom_code) {
 int BlinkPlatformImpl::domEnumFromCodeString(const WebString& code) {
   return static_cast<int>(ui::KeycodeConverter::CodeStringToDomCode(
       code.utf8().data()));
+}
+
+WebString BlinkPlatformImpl::domKeyStringFromEnum(int dom_key) {
+  return WebString::fromUTF8(ui::KeycodeConverter::DomKeyToKeyString(
+      static_cast<ui::DomKey>(dom_key)));
+}
+
+int BlinkPlatformImpl::domKeyEnumFromString(const WebString& key_string) {
+  return static_cast<int>(
+      ui::KeycodeConverter::KeyStringToDomKey(key_string.utf8().data()));
 }
 
 }  // namespace content

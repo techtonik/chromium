@@ -45,6 +45,7 @@ scoped_ptr<base::ListValue> SinksToValue(
     const MediaSink& sink = sink_with_cast_modes.sink;
     sink_val->SetString("id", sink.id());
     sink_val->SetString("name", sink.name());
+    sink_val->SetInteger("iconType", sink.icon_type());
     sink_val->SetBoolean("isLaunching", sink.is_launching());
 
     scoped_ptr<base::ListValue> cast_modes_val(new base::ListValue);
@@ -63,8 +64,8 @@ scoped_ptr<base::DictionaryValue> RouteToValue(
   scoped_ptr<base::DictionaryValue> dictionary(new base::DictionaryValue);
 
   dictionary->SetString("id", route.media_route_id());
-  dictionary->SetString("sinkId", route.media_sink().id());
-  dictionary->SetString("title", route.description());
+  dictionary->SetString("sinkId", route.media_sink_id());
+  dictionary->SetString("description", route.description());
   dictionary->SetBoolean("isLocal", route.is_local());
 
   const std::string& custom_path = route.custom_controller_path();
@@ -101,11 +102,9 @@ scoped_ptr<base::ListValue> CastModesToValue(const CastModeSet& cast_modes,
   for (const MediaCastMode& cast_mode : cast_modes) {
     scoped_ptr<base::DictionaryValue> cast_mode_val(new base::DictionaryValue);
     cast_mode_val->SetInteger("type", cast_mode);
-    cast_mode_val->SetString("title",
-                             MediaCastModeToTitle(cast_mode, source_host));
-    cast_mode_val->SetString("host", source_host);
     cast_mode_val->SetString(
         "description", MediaCastModeToDescription(cast_mode, source_host));
+    cast_mode_val->SetString("host", source_host);
     value->Append(cast_mode_val.release());
   }
 

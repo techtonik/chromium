@@ -10,8 +10,8 @@
 #include "components/view_manager/public/cpp/view_observer.h"
 #include "components/view_manager/public/cpp/view_tree_delegate.h"
 #include "components/view_manager/public/interfaces/view_tree_host.mojom.h"
-#include "mandoline/tab/public/cpp/web_view.h"
-#include "mandoline/tab/public/interfaces/web_view.mojom.h"
+#include "components/web_view/public/cpp/web_view.h"
+#include "components/web_view/public/interfaces/web_view.mojom.h"
 // TODO(beng): move this file somewhere common.
 #include "mandoline/ui/desktop_ui/public/interfaces/launch_handler.mojom.h"
 #include "mojo/application/public/cpp/application_delegate.h"
@@ -57,6 +57,7 @@ class PhoneBrowserApplicationDelegate :
   void TopLevelNavigate(mojo::URLRequestPtr request) override;
   void LoadingStateChanged(bool is_loading) override;
   void ProgressChanged(double progress) override;
+  void TitleChanged(const mojo::String& title) override;
 
   // Overridden from mojo::InterfaceFactory<LaunchHandler>:
   void Create(mojo::ApplicationConnection* connection,
@@ -65,6 +66,7 @@ class PhoneBrowserApplicationDelegate :
   mojo::ApplicationImpl* app_;
   mojo::ViewTreeHostPtr host_;
 
+  mojo::View* root_;
   mojo::View* content_;
   web_view::WebView web_view_;
 

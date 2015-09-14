@@ -40,6 +40,7 @@
 #include "media/base/media_keys.h"
 #include "media/base/media_log.h"
 #include "media/base/media_switches.h"
+#include "media/base/timestamp_constants.h"
 #include "media/base/video_frame.h"
 #include "media/blink/webcontentdecryptionmodule_impl.h"
 #include "media/blink/webmediaplayer_delegate.h"
@@ -828,6 +829,9 @@ void WebMediaPlayerAndroid::OnPlaybackComplete() {
 void WebMediaPlayerAndroid::OnBufferingUpdate(int percentage) {
   buffered_[0].end = duration() * percentage / 100;
   did_loading_progress_ = true;
+
+  if (percentage == 100 && network_state_ < WebMediaPlayer::NetworkStateLoaded)
+    UpdateNetworkState(WebMediaPlayer::NetworkStateLoaded);
 }
 
 void WebMediaPlayerAndroid::OnSeekRequest(const base::TimeDelta& time_to_seek) {

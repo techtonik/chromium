@@ -14,23 +14,23 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/histogram_tester.h"
+#include "base/test/simple_test_clock.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/interstitials/security_interstitial_page_test_utils.h"
-#include "chrome/browser/net/certificate_error_reporter.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ssl/cert_logger.pb.h"
+#include "chrome/browser/ssl/bad_clock_blocking_page.h"
 #include "chrome/browser/ssl/cert_report_helper.h"
 #include "chrome/browser/ssl/cert_verifier_browser_test.h"
-#include "chrome/browser/ssl/certificate_error_report.h"
 #include "chrome/browser/ssl/certificate_reporting_test_utils.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
 #include "chrome/browser/ssl/common_name_mismatch_handler.h"
 #include "chrome/browser/ssl/connection_security.h"
 #include "chrome/browser/ssl/ssl_blocking_page.h"
+#include "chrome/browser/ssl/ssl_error_classification.h"
 #include "chrome/browser/ssl/ssl_error_handler.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -47,6 +47,7 @@
 #include "components/variations/variations_associated_data.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/cert_store.h"
 #include "content/public/browser/interstitial_page.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
@@ -83,7 +84,6 @@
 
 using base::ASCIIToUTF16;
 using chrome_browser_interstitials::SecurityInterstitialIDNTest;
-using chrome_browser_net::CertificateErrorReporter;
 using content::InterstitialPage;
 using content::NavigationController;
 using content::NavigationEntry;
@@ -237,6 +237,26 @@ class SSLInterstitialTimerObserver {
 
   DISALLOW_COPY_AND_ASSIGN(SSLInterstitialTimerObserver);
 };
+
+// Checks that two SSLStatuses will result in the same security UI: that
+// is, the cert ids can differ as long as they refer to the same cert,
+// and otherwise SSLStatus::Equals() must be true.
+void CheckSSLStatusesEquals(const content::SSLStatus& one,
+                            const content::SSLStatus& two) {
+  content::CertStore* cert_store = content::CertStore::GetInstance();
+  scoped_refptr<net::X509Certificate> cert1;
+  scoped_refptr<net::X509Certificate> cert2;
+  cert_store->RetrieveCert(one.cert_id, &cert1);
+  cert_store->RetrieveCert(two.cert_id, &cert2);
+  EXPECT_TRUE(cert1 && cert2);
+  EXPECT_TRUE(cert1->Equals(cert2.get()));
+
+  SSLStatus one_without_cert_id = one;
+  one_without_cert_id.cert_id = 0;
+  SSLStatus two_without_cert_id = two;
+  two_without_cert_id.cert_id = 0;
+  EXPECT_TRUE(one_without_cert_id.Equals(two_without_cert_id));
+}
 
 }  // namespace
 
@@ -777,6 +797,26 @@ IN_PROC_BROWSER_TEST_F(SSLUITestIgnoreLocalhostCertErrors,
   base::string16 expected_title = base::ASCIIToUTF16("This script has loaded");
   ui_test_utils::GetCurrentTabTitle(browser(), &title);
   EXPECT_EQ(title, expected_title);
+}
+
+IN_PROC_BROWSER_TEST_F(SSLUITest, TestHTTPSErrorCausedByClock) {
+  ASSERT_TRUE(https_server_expired_.Start());
+
+  // Set up the build and current clock times to be more than a year apart.
+  scoped_ptr<base::SimpleTestClock> mock_clock(new base::SimpleTestClock());
+  mock_clock->SetNow(base::Time::NowFromSystemTime());
+  mock_clock->Advance(base::TimeDelta::FromDays(367));
+  SSLErrorHandler::SetClockForTest(mock_clock.get());
+  SSLErrorClassification::SetBuildTimeForTesting(
+      base::Time::NowFromSystemTime());
+
+  ui_test_utils::NavigateToURL(browser(), https_server_expired_.GetURL("/"));
+  WebContents* clock_tab = browser()->tab_strip_model()->GetActiveWebContents();
+  content::WaitForInterstitialAttach(clock_tab);
+  InterstitialPage* clock_interstitial = clock_tab->GetInterstitialPage();
+  ASSERT_TRUE(clock_interstitial);
+  EXPECT_EQ(BadClockBlockingPage::kTypeForTesting,
+            clock_interstitial->GetDelegateForTesting()->GetTypeForTesting());
 }
 
 // Visits a page with https error and then goes back using Browser::GoBack.
@@ -2334,6 +2374,84 @@ IN_PROC_BROWSER_TEST_F(SSLUITest, BadCertFollowedByGoodCert) {
                                https_server_.GetURL("files/ssl/google.html"));
   ASSERT_FALSE(tab->GetInterstitialPage());
   EXPECT_FALSE(state->HasAllowException(https_server_host));
+}
+
+// Tests that the SSLStatus of a navigation entry for an SSL
+// interstitial matches the navigation entry once the interstitial is
+// clicked through. https://crbug.com/529456
+IN_PROC_BROWSER_TEST_F(SSLUITest,
+                       SSLStatusMatchesOnInterstitialAndAfterProceed) {
+  ASSERT_TRUE(https_server_expired_.Start());
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(tab);
+
+  ui_test_utils::NavigateToURL(
+      browser(), https_server_expired_.GetURL("files/ssl/google.html"));
+  content::WaitForInterstitialAttach(tab);
+  EXPECT_TRUE(tab->ShowingInterstitialPage());
+
+  content::NavigationEntry* entry = tab->GetController().GetActiveEntry();
+  ASSERT_TRUE(entry);
+  content::SSLStatus interstitial_ssl_status = entry->GetSSL();
+
+  ProceedThroughInterstitial(tab);
+  EXPECT_FALSE(tab->ShowingInterstitialPage());
+  entry = tab->GetController().GetActiveEntry();
+  ASSERT_TRUE(entry);
+
+  content::SSLStatus after_interstitial_ssl_status = entry->GetSSL();
+  ASSERT_NO_FATAL_FAILURE(CheckSSLStatusesEquals(after_interstitial_ssl_status,
+                                                 interstitial_ssl_status));
+}
+
+// As above, but for a bad clock interstitial. Tests that a clock
+// interstitial's SSLStatus matches the SSLStatus of the HTTPS page
+// after proceeding through a normal SSL interstitial.
+IN_PROC_BROWSER_TEST_F(SSLUITest,
+                       SSLStatusMatchesonClockInterstitialAndAfterProceed) {
+  ASSERT_TRUE(https_server_expired_.Start());
+  WebContents* tab = browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(tab);
+
+  // Set up the build and current clock times to be more than a year apart.
+  base::SimpleTestClock mock_clock;
+  mock_clock.SetNow(base::Time::NowFromSystemTime());
+  mock_clock.Advance(base::TimeDelta::FromDays(367));
+  SSLErrorHandler::SetClockForTest(&mock_clock);
+  SSLErrorClassification::SetBuildTimeForTesting(
+      base::Time::NowFromSystemTime());
+
+  ui_test_utils::NavigateToURL(browser(), https_server_expired_.GetURL("/"));
+  content::WaitForInterstitialAttach(tab);
+  InterstitialPage* clock_interstitial = tab->GetInterstitialPage();
+  ASSERT_TRUE(clock_interstitial);
+  EXPECT_EQ(BadClockBlockingPage::kTypeForTesting,
+            clock_interstitial->GetDelegateForTesting()->GetTypeForTesting());
+
+  // Grab the SSLStatus on the clock interstitial.
+  content::NavigationEntry* entry = tab->GetController().GetActiveEntry();
+  ASSERT_TRUE(entry);
+  content::SSLStatus clock_interstitial_ssl_status = entry->GetSSL();
+
+  // Put the clock back to normal, trigger a normal SSL interstitial,
+  // and proceed through it.
+  mock_clock.SetNow(base::Time::NowFromSystemTime());
+  ui_test_utils::NavigateToURL(browser(), https_server_expired_.GetURL("/"));
+  content::WaitForInterstitialAttach(tab);
+  InterstitialPage* ssl_interstitial = tab->GetInterstitialPage();
+  ASSERT_TRUE(ssl_interstitial);
+  EXPECT_EQ(SSLBlockingPage::kTypeForTesting,
+            ssl_interstitial->GetDelegateForTesting()->GetTypeForTesting());
+  ProceedThroughInterstitial(tab);
+  EXPECT_FALSE(tab->ShowingInterstitialPage());
+
+  // Grab the SSLStatus from the page and check that it is the same as
+  // on the clock interstitial.
+  entry = tab->GetController().GetActiveEntry();
+  ASSERT_TRUE(entry);
+  content::SSLStatus after_interstitial_ssl_status = entry->GetSSL();
+  ASSERT_NO_FATAL_FAILURE(CheckSSLStatusesEquals(
+      after_interstitial_ssl_status, clock_interstitial_ssl_status));
 }
 
 class CommonNameMismatchBrowserTest : public CertVerifierBrowserTest {

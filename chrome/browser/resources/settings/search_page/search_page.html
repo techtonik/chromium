@@ -1,5 +1,4 @@
 <link rel="import" href="chrome://resources/polymer/v1_0/polymer/polymer.html">
-<link rel="import" href="chrome://resources/polymer/v1_0/more-routing/more-routing.html">
 <link rel="import" href="chrome://resources/polymer/v1_0/neon-animation/neon-animatable.html">
 <link rel="import" href="chrome://resources/cr_elements/v1_0/cr_button/cr_button.html">
 <link rel="import" href="chrome://md-settings/checkbox/checkbox.html">
@@ -11,8 +10,9 @@
       href="chrome://md-settings/settings_page/settings_page.css">
   <link rel="import" type="css" href="search_page.css">
   <template>
-    <cr-settings-animated-pages id="pages" in-subpage="{{inSubpage}}">
-      <neon-animatable id="main">
+    <cr-settings-animated-pages id="pages" current-route="{{currentRoute}}"
+        section="search">
+      <neon-animatable id="">
         <p i18n-content="searchExplanation"></p>
 
         <div class="search-engines">
@@ -35,12 +35,12 @@
           <h2 i18n-content="searchEnginesLabel"></h2>
         </div>
         <cr-settings-search-engines-page></cr-settings-search-engines-page>
-        <cr-button class="search-engines-subpage"
+        <cr-button class="search-engines-advanced"
             i18n-content="advancedPageTitle"
-            on-tap="onSearchEnginesSubpageTap_" raised>
+            on-tap="onSearchEnginesAdvancedTap_" raised>
         </cr-button>
       </neon-animatable>
-      <neon-animatable id="search-engines-subpage">
+      <neon-animatable id="search-engines-advanced">
         <!-- This sub-subpage is purely a placeholder to provide an example. -->
         <div class="subheader">
           <paper-icon-button icon="arrow-back" on-tap="onBackTap_">

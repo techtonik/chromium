@@ -9,11 +9,6 @@
       'type': 'none',
       'dependencies': [ 'chrome_initial', ],
       'conditions': [
-        ['OS=="linux" and clang_type_profiler==1', {
-          'dependencies!': [
-            '<(DEPTH)/base/allocator/allocator.gyp:type_profiler',
-          ],
-        }],
         ['OS == "win"', {
           'actions': [
             {
@@ -366,14 +361,8 @@
               # This postbuid step is responsible for creating the following
               # helpers:
               #
-              # For unofficial Chromium branding, Chromium Helper EH.app and
-              # Chromium Helper NP.app are created from Chromium Helper.app.
-              # For official Google Chrome branding, Google Chrome Helper
-              # EH.app and Google Chrome Helper NP.app are created from
-              # Google Chrome Helper.app.
-              #
-              # The EH helper is marked for an executable heap. The NP helper
-              # is marked for no PIE (ASLR).
+              # Currently no helpers are produced (crbug.com/520680), but
+              # more will be added soon (crbug.com/497190).
               #
               # Normally, applications shipping as part of offical builds with
               # Google Chrome branding have dsymutil (dwarf-with-dsym,

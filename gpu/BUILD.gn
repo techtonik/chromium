@@ -49,6 +49,45 @@ component("gpu") {
   ]
 }
 
+# GYP version: //gpu/gpu.gyp:command_buffer_gles2
+shared_library("command_buffer_gles2") {
+  sources = [
+    # TODO(hendrikw): Move egl out of gles2_conform_support.
+    "gles2_conform_support/egl/config.cc",
+    "gles2_conform_support/egl/config.h",
+    "gles2_conform_support/egl/display.cc",
+    "gles2_conform_support/egl/display.h",
+    "gles2_conform_support/egl/egl.cc",
+    "gles2_conform_support/egl/surface.cc",
+    "gles2_conform_support/egl/surface.h",
+  ]
+
+  deps = [
+    "//base",
+    "//gpu/command_buffer/client:gles2_c_lib",
+    "//gpu/command_buffer/client:gles2_implementation",
+    "//gpu/command_buffer/service",
+    "//ui/gl:gl",
+  ]
+
+  if (!is_component_build) {
+    deps += [
+      "//gpu/command_buffer/client:client_sources",
+      "//gpu/command_buffer/client:gles2_cmd_helper_sources",
+    ]
+  }
+
+  defines = [
+    "COMMAND_BUFFER_GLES_LIB_SUPPORT_ONLY",
+    "EGLAPIENTRY=",
+  ]
+  if (current_os == "win") {
+    defines += [ "EGLAPI=__declspec(dllexport)" ]
+  } else {
+    defines += [ "EGLAPI=__attribute__((visibility(\"default\")))" ]
+  }
+}
+
 source_set("test_support") {
   testonly = true
   sources = [
@@ -295,50 +334,15 @@ test("gpu_perftests") {
 group("angle_unittests_run") {
   testonly = true
   deps = [
-    ":angle_unittests",
+    "//third_party/angle/src/tests:angle_unittests",
   ]
 }
 
-test("angle_unittests") {
-  sources = [
-    "angle_unittest_main.cc",
-  ]
-
-  deps = [
-    "//base",
-    "//base/test:test_support",
-    "//base/third_party/dynamic_annotations",
-    "//testing/gmock",
-    "//testing/gtest",
-    "//third_party/angle:translator_static",
-  ]
-}
-
-#
 # TODO(GYP): Delete this after we've converted everything to GN.
 # The _run targets exist only for compatibility w/ GYP.
 group("angle_end2end_tests_run") {
   testonly = true
   deps = [
-    ":angle_end2end_tests",
-  ]
-}
-
-test("angle_end2end_tests") {
-  sources = [
-    # TODO(crbug.com/519778): Use this instead when angle actually works.
-    # For now, this creates an empty stub binary that will at least
-    # run properly on the bots.
-    # "angle_end2end_tests_main.cc",
-    "//base/test/run_all_unittests.cc",
-  ]
-
-  deps = [
-    "//base/test:test_support",
-    "//testing/gmock",
-    "//testing/gtest",
-
-    # TODO(crbug.com/519778): This needs to be implemented.
-    # "//third_party/angle:end_to_end_tests",
+    "//third_party/angle/src/tests:angle_end2end_tests",
   ]
 }

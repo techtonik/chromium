@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Chromium Authors. All rights reserved.
+// Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -10,7 +10,7 @@
 
 #include "base/base_export.h"
 #include "base/gtest_prod_util.h"
-#include "base/trace_event/memory_dump_provider.h"
+#include "base/trace_event/memory_dump_request_args.h"
 #include "base/values.h"
 
 namespace base {
@@ -40,7 +40,7 @@ class BASE_EXPORT TraceConfig {
   // "memory-infra" category is enabled.
   struct MemoryDumpTriggerConfig {
     uint32 periodic_interval_ms;
-    MemoryDumpArgs::LevelOfDetail level_of_detail;
+    MemoryDumpLevelOfDetail level_of_detail;
   };
 
   typedef std::vector<MemoryDumpTriggerConfig> MemoryDumpConfig;

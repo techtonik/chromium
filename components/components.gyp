@@ -16,6 +16,7 @@
     'bookmarks.gypi',
     'bubble.gypi',
     'captive_portal.gypi',
+    'certificate_reporting.gypi',
     'cloud_devices.gypi',
     'component_updater.gypi',
     'compression.gypi',
@@ -24,6 +25,7 @@
     'cronet.gypi',
     'crx_file.gypi',
     'data_reduction_proxy.gypi',
+    'data_use_measurement.gypi',
     'device_event_log.gypi',
     'dom_distiller.gypi',
     'domain_reliability.gypi',
@@ -100,6 +102,7 @@
         'app_modal.gypi',
         'browsing_data.gypi',
         'cdm.gypi',
+        'certificate_transparency.gypi',
         'crash.gypi',
         'devtools_discovery.gypi',
         'devtools_http_handler.gypi',
@@ -126,6 +129,7 @@
         'feedback.gypi',
         'proximity_auth.gypi',
         'storage_monitor.gypi',
+        'webusb.gypi',
       ]
     }],
     ['chromeos == 1', {

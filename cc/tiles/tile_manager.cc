@@ -33,8 +33,8 @@ const bool kUseColorEstimator = true;
 
 DEFINE_SCOPED_UMA_HISTOGRAM_AREA_TIMER(
     ScopedRasterTaskTimer,
-    "Compositing.RasterTask.RasterUs",
-    "Compositing.RasterTask.RasterPixelsPerMs");
+    "Compositing.%s.RasterTask.RasterUs",
+    "Compositing.%s.RasterTask.RasterPixelsPerMs");
 
 class RasterTaskImpl : public RasterTask {
  public:
@@ -56,7 +56,8 @@ class RasterTaskImpl : public RasterTask {
       const base::Callback<void(const RasterSource::SolidColorAnalysis&, bool)>&
           reply,
       ImageDecodeTask::Vector* dependencies)
-      : RasterTask(resource, dependencies),
+      : RasterTask(dependencies),
+        resource_(resource),
         raster_source_(raster_source),
         content_rect_(content_rect),
         invalid_content_rect_(invalid_content_rect),
@@ -93,13 +94,10 @@ class RasterTaskImpl : public RasterTask {
   void ScheduleOnOriginThread(TileTaskClient* client) override {
     DCHECK(!raster_buffer_);
     raster_buffer_ = client->AcquireBufferForRaster(
-        resource(), resource_content_id_, previous_content_id_);
+        resource_, resource_content_id_, previous_content_id_);
   }
   void CompleteOnOriginThread(TileTaskClient* client) override {
     client->ReleaseBufferForRaster(raster_buffer_.Pass());
-  }
-  void RunReplyOnOriginThread() override {
-    DCHECK(!raster_buffer_);
     reply_.Run(analysis_, !HasFinishedRunning());
   }
 
@@ -133,6 +131,7 @@ class RasterTaskImpl : public RasterTask {
                              contents_scale_, include_images);
   }
 
+  const Resource* resource_;
   RasterSource::SolidColorAnalysis analysis_;
   scoped_refptr<RasterSource> raster_source_;
   gfx::Rect content_rect_;
@@ -678,12 +677,12 @@ scoped_refptr<RasterTask> TileManager::CreateRasterTask(
 
   // Create and queue all image decode tasks that this tile depends on.
   ImageDecodeTask::Vector decode_tasks;
-  std::vector<skia::PositionPixelRef> pixel_refs;
-  prioritized_tile.raster_source()->GatherPixelRefs(
-      tile->enclosing_layer_rect(), &pixel_refs);
-  for (const skia::PositionPixelRef& pixel_ref : pixel_refs) {
-    decode_tasks.push_back(image_decode_controller_.GetTaskForPixelRef(
-        pixel_ref, tile->layer_id(), prepare_tiles_count_));
+  std::vector<skia::PositionImage> images;
+  prioritized_tile.raster_source()->GatherDiscardableImages(
+      tile->enclosing_layer_rect(), &images);
+  for (const skia::PositionImage& image : images) {
+    decode_tasks.push_back(image_decode_controller_.GetTaskForImage(
+        image, tile->layer_id(), prepare_tiles_count_));
   }
 
   return make_scoped_refptr(new RasterTaskImpl(

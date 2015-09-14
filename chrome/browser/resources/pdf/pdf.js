@@ -227,7 +227,7 @@ function PDFViewer(browserApi) {
   // Set up the ZoomManager.
   this.zoomManager_ = new ZoomManager(
       this.viewport_, this.browserApi_.setZoom.bind(this.browserApi_),
-      this.browserApi_.getDefaultZoom());
+      this.browserApi_.getInitialZoom());
   this.browserApi_.addZoomEventListener(
       this.zoomManager_.onBrowserZoomChange.bind(this.zoomManager_));
 
@@ -553,6 +553,7 @@ PDFViewer.prototype = {
         if (this.isMaterial_) {
           this.materialToolbar_.docLength =
               this.documentDimensions_.pageDimensions.length;
+          this.toolbarManager_.enableToolbars();
         } else {
           this.pageIndicator_.initialFadeIn();
           this.toolbar_.initialFadeIn();

@@ -27,14 +27,14 @@ class TabRestoreServiceFactory : public BrowserContextKeyedServiceFactory {
   static TabRestoreServiceFactory* GetInstance();
 
  private:
-  friend struct DefaultSingletonTraits<TabRestoreServiceFactory>;
+  friend struct base::DefaultSingletonTraits<TabRestoreServiceFactory>;
 
   TabRestoreServiceFactory();
   ~TabRestoreServiceFactory() override;
 
   // BrowserContextKeyedServiceFactory:
   KeyedService* BuildServiceInstanceFor(
-      content::BrowserContext* profile) const override;
+      content::BrowserContext* browser_context) const override;
   bool ServiceIsNULLWhileTesting() const override;
 };
 

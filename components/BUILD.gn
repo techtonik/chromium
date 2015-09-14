@@ -28,6 +28,7 @@ group("all_components") {
     "//components/cdm/browser",
     "//components/cdm/common",
     "//components/cdm/renderer",
+    "//components/certificate_reporting",
     "//components/cloud_devices/common",
     "//components/chrome_apps",
     "//components/component_updater",
@@ -134,22 +135,17 @@ group("all_components") {
     "//components/web_cache/renderer",
     "//components/web_modal",
     "//components/web_resource",
-    "//components/webcrypto",
     "//components/webdata/common",
     "//components/wifi",
     "//components/wifi_sync",
   ]
-
-  if (!is_android) {
-    # TODO(agrieve): Add to main deps list once compile errors are resolved.
-    deps += [ "//components/devtools_service" ]
-  }
 
   if (!is_android && !is_ios) {
     deps += [
       "//components/audio_modem",
       "//components/proximity_auth",
       "//components/proximity_auth/cryptauth",
+      "//components/webusb",
     ]
   }
 
@@ -254,12 +250,14 @@ group("all_components") {
     deps += [
       "//components/app_modal",
       "//components/browsing_data",
+      "//components/certificate_transparency",
       "//components/guest_view/browser",
       "//components/guest_view/common",
       "//components/guest_view/renderer",
       "//components/safe_json",
       "//components/scheduler",
       "//components/test_runner",
+      "//components/webcrypto",
     ]
   }
 
@@ -309,6 +307,7 @@ test("components_unittests") {
     "//components/bookmarks/managed:unit_tests",
     "//components/bubble:unit_tests",
     "//components/captive_portal:unit_tests",
+    "//components/certificate_transparency:unit_tests",
     "//components/cloud_devices/common:unit_tests",
     "//components/component_updater:unit_tests",
     "//components/content_settings/core/browser:unit_tests",
@@ -374,6 +373,7 @@ test("components_unittests") {
     "//components/upload_list:unit_tests",
     "//components/user_prefs/tracked:unit_tests",
     "//components/variations:unit_tests",
+    "//components/variations/service:unit_tests",
     "//components/wallpaper:unit_tests",
     "//components/web_resource:unit_tests",
     "//components/webcrypto:unit_tests",
@@ -422,6 +422,7 @@ test("components_unittests") {
       "//components/sessions:unit_tests",
       "//components/storage_monitor:unit_tests",
       "//components/tracing:unit_tests",
+      "//components/webusb:unit_tests",
     ]
   }
 
@@ -460,6 +461,7 @@ test("components_unittests") {
       "//components/power:unit_tests",
       "//components/safe_json:unit_tests",
       "//components/scheduler:unit_tests",
+      "//components/test_runner:test_runner",
       "//components/ui/zoom:unit_tests",
       "//components/visitedlink/test:unit_tests",
       "//components/web_cache/browser:unit_tests",

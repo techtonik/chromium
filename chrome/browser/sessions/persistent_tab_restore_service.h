@@ -12,15 +12,15 @@
 #include "base/memory/scoped_ptr.h"
 #include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_helper.h"
-
-class Profile;
+#include "components/sessions/core/tab_restore_service_client.h"
 
 // Tab restore service that persists data on disk.
 class PersistentTabRestoreService : public TabRestoreService {
  public:
   // Does not take ownership of |time_factory|.
-  PersistentTabRestoreService(Profile* profile,
-                              TimeFactory* time_factory);
+  PersistentTabRestoreService(
+      scoped_ptr<sessions::TabRestoreServiceClient> client,
+      TimeFactory* time_factory);
 
   ~PersistentTabRestoreService() override;
 
@@ -34,12 +34,12 @@ class PersistentTabRestoreService : public TabRestoreService {
   const Entries& entries() const override;
   std::vector<content::WebContents*> RestoreMostRecentEntry(
       TabRestoreServiceDelegate* delegate,
-      chrome::HostDesktopType host_desktop_type) override;
+      int host_desktop_type) override;
   Tab* RemoveTabEntryById(SessionID::id_type id) override;
   std::vector<content::WebContents*> RestoreEntryById(
       TabRestoreServiceDelegate* delegate,
       SessionID::id_type id,
-      chrome::HostDesktopType host_desktop_type,
+      int host_desktop_type,
       WindowOpenDisposition disposition) override;
   void LoadTabsFromLastSession() override;
   bool IsLoaded() const override;
@@ -55,6 +55,7 @@ class PersistentTabRestoreService : public TabRestoreService {
   Entries* mutable_entries();
   void PruneEntries();
 
+  scoped_ptr<sessions::TabRestoreServiceClient> client_;
   scoped_ptr<Delegate> delegate_;
   TabRestoreServiceHelper helper_;
 

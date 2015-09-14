@@ -35,7 +35,6 @@ class PrefRegistrySimple;
 class PrefService;
 class Profile;
 class ProfileManager;
-class PromoResourceService;
 class SafeBrowsingService;
 class StatusTray;
 class WatchDogThread;
@@ -43,7 +42,7 @@ class WatchDogThread;
 class WebRtcLogUploader;
 #endif
 
-namespace chrome_variations {
+namespace variations {
 class VariationsService;
 }
 
@@ -100,6 +99,10 @@ namespace safe_browsing {
 class ClientSideDetectionService;
 }
 
+namespace web_resource {
+class PromoResourceService;
+}
+
 // NOT THREAD SAFE, call only from the main thread.
 // These functions shouldn't return NULL unless otherwise noted.
 class BrowserProcess {
@@ -126,8 +129,8 @@ class BrowserProcess {
   virtual ProfileManager* profile_manager() = 0;
   virtual PrefService* local_state() = 0;
   virtual net::URLRequestContextGetter* system_request_context() = 0;
-  virtual chrome_variations::VariationsService* variations_service() = 0;
-  virtual PromoResourceService* promo_resource_service() = 0;
+  virtual variations::VariationsService* variations_service() = 0;
+  virtual web_resource::PromoResourceService* promo_resource_service() = 0;
 
   virtual BrowserProcessPlatformPart* platform_part() = 0;
 

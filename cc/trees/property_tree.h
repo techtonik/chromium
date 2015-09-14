@@ -9,7 +9,7 @@
 
 #include "base/basictypes.h"
 #include "cc/base/cc_export.h"
-#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/scroll_offset.h"
 #include "ui/gfx/transform.h"
 
@@ -322,6 +322,7 @@ class CC_EXPORT TransformTree final : public PropertyTree<TransformNode> {
                                   TransformNode* target_node);
   void UpdateAnimationProperties(TransformNode* node,
                                  TransformNode* parent_node);
+  void UndoSnapping(TransformNode* node);
   void UpdateSnapping(TransformNode* node);
   void UpdateNodeAndAncestorsHaveIntegerTranslations(
       TransformNode* node,

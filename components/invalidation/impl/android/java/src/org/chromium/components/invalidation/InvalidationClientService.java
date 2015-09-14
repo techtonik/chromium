@@ -61,7 +61,7 @@ public class InvalidationClientService extends AndroidListener {
     @VisibleForTesting
     static final int CLIENT_TYPE = ClientType.CHROME_SYNC_ANDROID;
 
-    private static final String TAG = "InvalidationClientService";
+    private static final String TAG = "cr.invalidation";
 
     /**
      * Whether the underlying notification client has been started. This boolean is updated when a
@@ -211,7 +211,7 @@ public class InvalidationClientService extends AndroidListener {
                 account, invalidAuthToken, getOAuth2ScopeWithType(),
                 new AccountManagerHelper.GetAuthTokenCallback() {
                     @Override
-                    public void tokenAvailable(String token) {
+                    public void tokenAvailable(String token, boolean isTransientError) {
                         if (token != null) {
                             setAuthToken(InvalidationClientService.this.getApplicationContext(),
                                     pendingIntent, token, getOAuth2ScopeWithType());
@@ -446,7 +446,7 @@ public class InvalidationClientService extends AndroidListener {
     void requestSyncFromContentResolver(
             Bundle bundle, Account account, String contractAuthority) {
         Log.d(TAG, "Request sync: " + account + " / " + contractAuthority + " / "
-                + bundle.keySet());
+                + new PendingInvalidation(bundle).toDebugString());
         ContentResolver.requestSync(account, contractAuthority, bundle);
     }
 

@@ -27,7 +27,6 @@
       '../extensions/browser/api/app_window/app_window_apitest.cc',
       '../extensions/browser/api/bluetooth/bluetooth_apitest.cc',
       '../extensions/browser/api/bluetooth/bluetooth_private_apitest.cc',
-      '../extensions/browser/api/bluetooth_low_energy/bluetooth_low_energy_apitest.cc',
       '../extensions/browser/api/cast_channel/cast_channel_apitest.cc',
       '../extensions/browser/api/runtime/runtime_apitest.cc',
       '../extensions/browser/api/serial/serial_apitest.cc',
@@ -121,6 +120,8 @@
       'browser/extensions/api/autofill_private/autofill_private_apitest.cc',
       'browser/extensions/api/automation/automation_apitest.cc',
       'browser/extensions/api/autotest_private/autotest_private_apitest.cc',
+      'browser/extensions/api/bluetooth_low_energy/bluetooth_low_energy_apitest.cc',
+      'browser/extensions/api/bluetooth_low_energy/bluetooth_low_energy_apitest_chromeos.cc',
       'browser/extensions/api/bookmark_manager_private/bookmark_manager_private_apitest.cc',
       'browser/extensions/api/bookmarks/bookmark_apitest.cc',
       'browser/extensions/api/braille_display_private/braille_display_private_apitest.cc',
@@ -261,6 +262,7 @@
       'browser/extensions/extension_view_host_factory_browsertest.cc',
       'browser/extensions/extension_websocket_apitest.cc',
       'browser/extensions/extension_webui_apitest.cc',
+      'browser/extensions/fetch_apitest.cc',
       'browser/extensions/gpu_browsertest.cc',
       'browser/extensions/hotword_browsertest.cc',
       'browser/extensions/isolated_app_browsertest.cc',
@@ -449,6 +451,7 @@
       'browser/ui/ash/multi_user/multi_user_window_manager_test.h',
       'browser/ui/ash/shelf_browsertest.cc',
       'browser/ui/ash/system_tray_delegate_chromeos_browsertest_chromeos.cc',
+      'browser/ui/ash/system_tray_tray_cast_browsertest_chromeos.cc',
       'browser/ui/ash/volume_controller_browsertest_chromeos.cc',
       'browser/ui/autofill/autofill_dialog_controller_browsertest.cc',
       'browser/ui/autofill/autofill_dialog_view_tester.h',
@@ -503,7 +506,6 @@
       'browser/ui/extensions/extension_message_bubble_browsertest.h',
       'browser/ui/extensions/hosted_app_browsertest.cc',
       'browser/ui/find_bar/find_bar_host_browsertest.cc',
-      'browser/ui/global_error/global_error_service_browsertest.cc',
       'browser/ui/location_bar/location_bar_browsertest.cc',
       'browser/ui/login/login_prompt_browsertest.cc',
       'browser/ui/native_window_tracker_browsertest.cc',
@@ -613,6 +615,7 @@
     ],
     # Cross-platform views browser tests ready for toolkit-views on Mac.
     'chrome_browser_tests_views_sources': [
+      'browser/ui/global_error/global_error_service_browsertest.cc',
       'browser/ui/views/extensions/extension_uninstall_dialog_view_browsertest.cc',
       'browser/ui/views/frame/browser_non_client_frame_view_ash_browsertest.cc',
       'browser/ui/views/frame/browser_window_property_manager_browsertest_win.cc',
@@ -644,8 +647,8 @@
       'browser/ui/views/frame/browser_view_browsertest.cc',
       'browser/ui/views/location_bar/zoom_bubble_view_browsertest.cc',
       'browser/ui/views/media_router/media_router_ui_browsertest.cc',
+      'browser/ui/views/new_task_manager_view_browsertest.cc',
       'browser/ui/views/profiles/avatar_menu_button_browsertest.cc',
-      'browser/ui/views/profiles/profile_chooser_view_browsertest.cc',
       'browser/ui/views/toolbar/browser_actions_container_browsertest.cc',
       'browser/ui/views/toolbar/toolbar_view_browsertest.cc',
       'browser/ui/views/translate/translate_bubble_view_browsertest.cc',
@@ -664,7 +667,6 @@
       'browser/chromeos/customization/customization_wallpaper_downloader_browsertest.cc',
       'browser/chromeos/device/input_service_proxy_browsertest.cc',
       'browser/chromeos/drive/drive_integration_service_browsertest.cc',
-      'browser/chromeos/drive/drive_notification_manager_factory_browsertest.cc',
       'browser/chromeos/extensions/accessibility_features_apitest.cc',
       'browser/chromeos/extensions/echo_private_apitest.cc',
       'browser/chromeos/extensions/file_manager/file_browser_handler_api_test.cc',
@@ -798,10 +800,16 @@
       'browser/chromeos/system/device_disabling_browsertest.cc',
       'browser/chromeos/system/tray_accessibility_browsertest.cc',
       'browser/download/notification/download_notification_browsertest.cc',
+      'browser/drive/drive_notification_manager_factory_browsertest.cc',
+      'browser/extensions/api/certificate_provider/certificate_provider_apitest.cc',
       'browser/extensions/api/vpn_provider/vpn_provider_apitest.cc',
       'browser/ui/webui/options/chromeos/accounts_options_browsertest.cc',
       'browser/ui/webui/options/chromeos/guest_mode_options_ui_browsertest.cc',
       'browser/ui/webui/options/chromeos/shared_options_browsertest.cc',
+    ],
+    'chrome_browser_tests_views_non_cros_or_mac_sources': [
+      # This should be brought up on OSX Views but not CrOS.
+      'browser/ui/views/profiles/profile_chooser_view_browsertest.cc',
     ],
     'chrome_browser_tests_policy_sources': [
       'browser/policy/cloud/cloud_policy_browsertest.cc',
@@ -974,7 +982,6 @@
       'browser/apps/app_shim/app_shim_interactive_uitest_mac.mm',
       'browser/apps/app_shim/app_shim_quit_interactive_uitest_mac.mm',
       'browser/apps/app_window_interactive_uitest.cc',
-      'browser/apps/app_window_intercept_all_keys_uitest.cc',
       'browser/apps/guest_view/web_view_interactive_browsertest.cc',
       'browser/autofill/autofill_interactive_uitest.cc',
       'browser/autofill/autofill_uitest_util.cc',
@@ -2043,6 +2050,7 @@
         '../components/components.gyp:autofill_content_risk_proto',
         '../components/components.gyp:autofill_content_test_support',
         '../components/components.gyp:captive_portal_test_support',
+        '../components/components.gyp:certificate_reporting',
         '../components/components.gyp:dom_distiller_content_browser',
         '../components/components.gyp:dom_distiller_test_support',
         '../components/components.gyp:guest_view_test_support',
@@ -2147,6 +2155,12 @@
         },
       },
       'conditions': [
+        ['chromeos==1 and use_openssl==1', {
+          'dependencies': [
+            '../third_party/boringssl/boringssl.gyp:boringssl',
+          ]
+         }
+        ],
         [ 'cld_version==2', {
           'dependencies': [
             # Because the browser_tests use translate, they need CLD data.
@@ -2449,6 +2463,12 @@
         }],
         ['toolkit_views==1 and OS!="mac"', {
           'sources': [ '<@(chrome_browser_tests_views_non_mac_sources)' ],
+        }],
+        ['toolkit_views==1 and OS!="mac" and chromeos == 0', {
+          # A temporary define to make it easier to remove CrOS dependencies on
+          # avatar button code. TODO(estade): remove.
+          'defines': [ 'FRAME_AVATAR_BUTTON=1', ],
+          'sources': [ '<@(chrome_browser_tests_views_non_cros_or_mac_sources)' ],
         }],
         ['OS!="android" and OS!="ios"', {
           'sources': [
@@ -3012,33 +3032,6 @@
   'conditions': [
     ['OS == "android"', {
       'targets': [
-        {
-          # GN: //chrome/android:chrome_shell_test_apk
-          'target_name': 'chrome_shell_test_apk',
-          'type': 'none',
-          'dependencies': [
-            'chrome_java',
-            'chrome_shell_apk_java',
-            'chrome_java_test_support',
-            '../base/base.gyp:base',
-            '../base/base.gyp:base_java_test_support',
-            '../content/content_shell_and_tests.gyp:content_java_test_support',
-            '../testing/android/on_device_instrumentation.gyp:broker_java',
-            '../testing/android/on_device_instrumentation.gyp:require_driver_apk',
-          ],
-          'variables': {
-            'apk_name': 'ChromeShellTest',
-            'java_in_dir': 'android/shell/javatests',
-            'additional_src_dirs': ['android/javatests_shell/src'],
-            'is_test_apk': 1,
-            'test_type': 'instrumentation',
-            'isolate_file': 'chrome_shell_test_apk.isolate',
-          },
-          'includes': [
-            '../build/java_apk.gypi',
-            '../build/android/test_runner.gypi',
-          ],
-        },
         {
           # GN: //chrome/android:chrome_junit_tests
           'target_name': 'chrome_junit_tests',

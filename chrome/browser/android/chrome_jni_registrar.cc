@@ -70,6 +70,7 @@
 #include "chrome/browser/android/rlz/revenue_stats.h"
 #include "chrome/browser/android/shortcut_helper.h"
 #include "chrome/browser/android/signin/account_management_screen_helper.h"
+#include "chrome/browser/android/signin/account_tracker_service_android.h"
 #include "chrome/browser/android/signin/signin_manager_android.h"
 #include "chrome/browser/android/tab/thumbnail_tab_helper_android.h"
 #include "chrome/browser/android/tab_android.h"
@@ -79,6 +80,7 @@
 #include "chrome/browser/android/warmup_manager.h"
 #include "chrome/browser/android/web_contents_factory.h"
 #include "chrome/browser/android/webapps/add_to_homescreen_dialog_helper.h"
+#include "chrome/browser/android/webapps/webapp_registry.h"
 #include "chrome/browser/autofill/android/personal_data_manager_android.h"
 #include "chrome/browser/dom_distiller/dom_distiller_service_factory_android.h"
 #include "chrome/browser/dom_distiller/tab_utils_android.h"
@@ -93,6 +95,7 @@
 #include "chrome/browser/notifications/notification_ui_manager_android.h"
 #include "chrome/browser/password_manager/credential_android.h"
 #include "chrome/browser/permissions/permission_update_infobar_delegate_android.h"
+#include "chrome/browser/platform_util.h"
 #include "chrome/browser/prerender/external_prerender_handler_android.h"
 #include "chrome/browser/profiles/profile_android.h"
 #include "chrome/browser/search_engines/template_url_service_android.h"
@@ -111,6 +114,7 @@
 #include "chrome/browser/ui/android/autofill/card_unmask_prompt_view_android.h"
 #include "chrome/browser/ui/android/autofill/credit_card_scanner_view_android.h"
 #include "chrome/browser/ui/android/autofill/password_generation_popup_view_android.h"
+#include "chrome/browser/ui/android/bluetooth_chooser_android.h"
 #include "chrome/browser/ui/android/certificate_viewer_android.h"
 #include "chrome/browser/ui/android/chrome_http_auth_handler.h"
 #include "chrome/browser/ui/android/connection_info_popup_android.h"
@@ -173,6 +177,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"AccessibilityUtils", AccessibilityUtil::Register},
     {"AccountChooserInfoBar", RegisterAccountChooserInfoBar},
     {"AccountManagementScreenHelper", AccountManagementScreenHelper::Register},
+    {"AccountTrackerService", AccountTrackerServiceAndroid::Register},
     {"AddToHomescreenDialogHelper",
      AddToHomescreenDialogHelper::RegisterAddToHomescreenDialogHelper},
     {"AfterStartupTaskUtils", RegisterAfterStartupTaskUtilsJNI},
@@ -195,6 +200,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      autofill::AutofillPopupViewAndroid::RegisterAutofillPopupViewAndroid},
     {"AutofillProfileBridge", autofill::RegisterAutofillProfileBridge},
     {"AutoSigninSnackbarController", RegisterAutoSigninSnackbarController},
+    {"BluetoothChooserAndroid", BluetoothChooserAndroid::Register},
     {"BookmarksBridge", BookmarksBridge::RegisterBookmarksBridge},
     {"CardUnmaskPrompt", autofill::CardUnmaskPromptViewAndroid::Register},
     {"CertificateViewer", RegisterCertificateViewer},
@@ -278,6 +284,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"OmniboxUrlEmphasizer",
      OmniboxUrlEmphasizer::RegisterOmniboxUrlEmphasizer},
     {"OmniboxViewUtil", OmniboxViewUtil::RegisterOmniboxViewUtil},
+    {"PlatformUtil", platform_util::RegisterPlatformUtil},
     {"PartnerBookmarksReader",
      PartnerBookmarksReader::RegisterPartnerBookmarksReader},
     {"PasswordGenerationPopup",
@@ -327,6 +334,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"Variations", variations::android::RegisterVariations},
     {"VariationsSession", chrome::android::RegisterVariationsSession},
     {"WarmupManager", RegisterWarmupManager},
+    {"WebappRegistry", WebappRegistry::RegisterWebappRegistry},
     {"WebContentsFactory", RegisterWebContentsFactory},
     {"WebsitePreferenceBridge", RegisterWebsitePreferenceBridge},
     {"WebsiteSettingsPopupAndroid",

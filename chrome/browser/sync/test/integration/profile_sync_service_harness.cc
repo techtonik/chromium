@@ -29,7 +29,6 @@
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager_base.h"
 #include "components/sync_driver/about_sync_util.h"
-#include "components/sync_driver/data_type_controller.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "sync/internal_api/public/base/progress_marker_map.h"
 #include "sync/internal_api/public/util/sync_string_conversions.h"
@@ -59,7 +58,7 @@ class BackendInitializeChecker : public SingleClientStatusChangeChecker {
   bool IsExitConditionSatisfied() override {
     if (service()->backend_mode() != ProfileSyncService::SYNC)
       return false;
-    if (service()->backend_initialized())
+    if (service()->IsBackendInitialized())
       return true;
     // Backend initialization is blocked by an auth error.
     if (HasAuthError(service()))
@@ -256,7 +255,7 @@ bool ProfileSyncServiceHarness::AwaitBackendInitialization() {
     return false;
   }
 
-  if (!service()->backend_initialized()) {
+  if (!service()->IsBackendInitialized()) {
     LOG(ERROR) << "Service backend not initialized.";
     return false;
   }
@@ -306,7 +305,7 @@ std::string ProfileSyncServiceHarness::GenerateFakeOAuth2RefreshTokenString() {
 }
 
 bool ProfileSyncServiceHarness::IsSyncDisabled() const {
-  return !service()->setup_in_progress() &&
+  return !service()->IsSetupInProgress() &&
          !service()->HasSyncSetupCompleted();
 }
 

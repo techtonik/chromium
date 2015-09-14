@@ -25,6 +25,7 @@
 #include "net/quic/quic_crypto_stream.h"
 #include "net/quic/quic_http_stream.h"
 #include "net/quic/quic_protocol.h"
+#include "net/ssl/ssl_config_service.h"
 
 namespace net {
 
@@ -74,7 +75,7 @@ class NET_EXPORT_PRIVATE QuicStreamRequest {
 
   void set_stream(scoped_ptr<QuicHttpStream> stream);
 
-  const std::string origin_host() const { return origin_host_; }
+  const std::string& origin_host() const { return origin_host_; }
 
   PrivacyMode privacy_mode() const { return privacy_mode_; }
 
@@ -98,6 +99,7 @@ class NET_EXPORT_PRIVATE QuicStreamRequest {
 // QuicChromiumClientSessions.
 class NET_EXPORT_PRIVATE QuicStreamFactory
     : public NetworkChangeNotifier::IPAddressObserver,
+      public SSLConfigService::Observer,
       public CertDatabase::Observer {
  public:
   QuicStreamFactory(
@@ -195,6 +197,11 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   // Until the servers support roaming, close all connections when the local
   // IP address changes.
   void OnIPAddressChanged() override;
+
+  // SSLConfigService::Observer methods:
+
+  // We perform the same flushing as described above when SSL settings change.
+  void OnSSLConfigChanged() override;
 
   // CertDatabase::Observer methods:
 

@@ -88,25 +88,6 @@
       ],
     },
     {
-      # GN version: //components/metrics:gpu
-      'target_name': 'metrics_gpu',
-      'type': 'static_library',
-      'include_dirs': [
-        '..',
-      ],
-      'dependencies': [
-        '../base/base.gyp:base',
-        '../content/content.gyp:content_browser',
-        '../ui/gfx/gfx.gyp:gfx',
-        'component_metrics_proto',
-        'metrics',
-      ],
-      'sources': [
-        'metrics/gpu/gpu_metrics_provider.cc',
-        'metrics/gpu/gpu_metrics_provider.h',
-      ],
-    },
-    {
       # GN version: //components/metrics:net
       'target_name': 'metrics_net',
       'type': 'static_library',
@@ -118,6 +99,7 @@
         '../net/net.gyp:net',
         '../url/url.gyp:url_lib',
         'component_metrics_proto',
+        'data_use_measurement_core',
         'metrics',
       ],
       'sources': [
@@ -129,32 +111,6 @@
         'metrics/net/wifi_access_point_info_provider.h',
         'metrics/net/wifi_access_point_info_provider_chromeos.cc',
         'metrics/net/wifi_access_point_info_provider_chromeos.h',
-      ],
-    },
-    {
-      # GN version: //components/metrics:profiler
-      'target_name': 'metrics_profiler',
-      'type': 'static_library',
-      'include_dirs': [
-        '..',
-      ],
-      'dependencies': [
-        '../content/content.gyp:content_browser',
-        '../content/content.gyp:content_common',
-        'component_metrics_proto',
-        'metrics',
-        'variations',
-      ],
-      'export_dependent_settings': [
-        'component_metrics_proto',
-      ],
-      'sources': [
-        'metrics/profiler/profiler_metrics_provider.cc',
-        'metrics/profiler/profiler_metrics_provider.h',
-        'metrics/profiler/tracking_synchronizer.cc',
-        'metrics/profiler/tracking_synchronizer.h',
-        'metrics/profiler/tracking_synchronizer_observer.cc',
-        'metrics/profiler/tracking_synchronizer_observer.h',
       ],
     },
     {
@@ -225,5 +181,54 @@
         },
       ],
     }],
+    ['OS!="ios"', {
+      'targets': [
+        {
+          # GN version: //components/metrics:gpu
+          'target_name': 'metrics_gpu',
+          'type': 'static_library',
+          'include_dirs': [
+            '..',
+          ],
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../content/content.gyp:content_browser',
+            '../ui/gfx/gfx.gyp:gfx',
+            'component_metrics_proto',
+            'metrics',
+          ],
+          'sources': [
+            'metrics/gpu/gpu_metrics_provider.cc',
+            'metrics/gpu/gpu_metrics_provider.h',
+          ],
+        },
+        {
+          # GN version: //components/metrics:profiler
+          'target_name': 'metrics_profiler',
+          'type': 'static_library',
+          'include_dirs': [
+            '..',
+          ],
+          'dependencies': [
+            '../content/content.gyp:content_browser',
+            '../content/content.gyp:content_common',
+            'component_metrics_proto',
+            'metrics',
+            'variations',
+          ],
+          'export_dependent_settings': [
+            'component_metrics_proto',
+          ],
+          'sources': [
+            'metrics/profiler/profiler_metrics_provider.cc',
+            'metrics/profiler/profiler_metrics_provider.h',
+            'metrics/profiler/tracking_synchronizer.cc',
+            'metrics/profiler/tracking_synchronizer.h',
+            'metrics/profiler/tracking_synchronizer_observer.cc',
+            'metrics/profiler/tracking_synchronizer_observer.h',
+          ],
+        },
+      ],
+    }]
   ],
 }

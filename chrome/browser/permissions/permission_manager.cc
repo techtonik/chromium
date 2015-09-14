@@ -64,6 +64,10 @@ ContentSettingsType PermissionTypeToContentSetting(PermissionType permission) {
     case PermissionType::MIDI:
       // This will hit the NOTREACHED below.
       break;
+    case PermissionType::AUDIO_CAPTURE:
+      return CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC;
+    case PermissionType::VIDEO_CAPTURE:
+      return CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA;
     case PermissionType::NUM:
       // This will hit the NOTREACHED below.
       break;
@@ -165,8 +169,7 @@ void PermissionManager::RequestPermission(
   int render_frame_id = render_frame_host->GetRoutingID();
   const PermissionRequestID request(render_process_id,
                                     render_frame_id,
-                                    request_id,
-                                    requesting_origin);
+                                    request_id);
 
   context->RequestPermission(
       web_contents, request, requesting_origin, user_gesture,
@@ -191,8 +194,7 @@ void PermissionManager::CancelPermissionRequest(
   int render_frame_id = render_frame_host->GetRoutingID();
   const PermissionRequestID request(render_process_id,
                                     render_frame_id,
-                                    request_id,
-                                    requesting_origin);
+                                    request_id);
 
   context->CancelPermissionRequest(web_contents, request);
 }
@@ -219,9 +221,8 @@ PermissionStatus PermissionManager::GetPermissionStatus(
   if (!context)
     return content::PERMISSION_STATUS_DENIED;
 
-  return ContentSettingToPermissionStatus(
-      context->GetPermissionStatus(requesting_origin.GetOrigin(),
-                                   embedding_origin.GetOrigin()));
+  return ContentSettingToPermissionStatus(context->GetPermissionStatus(
+      requesting_origin.GetOrigin(), embedding_origin.GetOrigin()));
 }
 
 void PermissionManager::RegisterPermissionUsage(PermissionType permission,

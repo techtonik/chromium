@@ -94,10 +94,12 @@ class TaskManager {
                            SelectionAdaptsToSorting);
   FRIEND_TEST_ALL_PREFIXES(TaskManagerWindowControllerTest,
                            EnsureNewPrimarySortColumn);
+  FRIEND_TEST_ALL_PREFIXES(TaskManagerWindowControllerTest,
+                           EnsureOneColumnVisible);
 
   // Obtain an instance via GetInstance().
   TaskManager();
-  friend struct DefaultSingletonTraits<TaskManager>;
+  friend struct base::DefaultSingletonTraits<TaskManager>;
 
   ~TaskManager();
 

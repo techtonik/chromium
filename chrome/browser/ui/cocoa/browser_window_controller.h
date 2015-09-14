@@ -58,11 +58,10 @@ namespace extensions {
 class Command;
 }
 
-@interface BrowserWindowController :
-  TabWindowController<NSUserInterfaceValidations,
-                      BookmarkBarControllerDelegate,
-                      ViewResizer,
-                      TabStripControllerDelegate> {
+@interface BrowserWindowController
+    : TabWindowController<BookmarkBarControllerDelegate,
+                          ViewResizer,
+                          TabStripControllerDelegate> {
  @private
   // The ordering of these members is important as it determines the order in
   // which they are destroyed. |browser_| needs to be destroyed last as most of
@@ -429,12 +428,14 @@ class Command;
 // invoked causes all fullscreen modes to exit.
 //
 // ----------------------------------------------------------------------------
-// There are 2 "styles" of omnibox sliding.
+// There are 3 "styles" of omnibox sliding.
 // + OMNIBOX_TABS_PRESENT: Both the omnibox and the tabstrip are present.
 // Moving the cursor to the top causes the menubar to appear, and everything
 // else to slide down.
 // + OMNIBOX_TABS_HIDDEN: Both tabstrip and omnibox are hidden. Moving cursor
 // to top shows tabstrip, omnibox, and menu bar.
+// + OMNIBOX_TABS_NONE: Both tabstrip and omnibox are hidden. Moving cursor
+// to top causes the menubar to appear, but not the tabstrip and omnibox.
 //
 // The omnibox sliding styles are used in conjunction with the fullscreen APIs.
 // There is exactly 1 sliding style active at a time. The sliding is mangaged
@@ -498,9 +499,6 @@ class Command;
 // Toggles fullscreen mode.  Meant to be called by Lion windows when they enter
 // or exit Lion fullscreen mode.  Must not be called on Snow Leopard or earlier.
 - (void)handleLionToggleFullscreen;
-
-// The title of the fullscreen menu item in the menu bar.
-- (NSString*)titleForFullscreenMenuItem;
 
 // Enters Browser/Appkit Fullscreen.
 // If |withToolbar| is NO, the tab strip and toolbar are hidden

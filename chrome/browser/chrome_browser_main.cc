@@ -13,6 +13,7 @@
 #include "base/command_line.h"
 #include "base/debug/crash_logging.h"
 #include "base/debug/debugger.h"
+#include "base/feature_list.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/metrics/field_trial.h"
@@ -64,7 +65,6 @@
 #include "chrome/browser/metrics/field_trial_synchronizer.h"
 #include "chrome/browser/metrics/metrics_services_manager.h"
 #include "chrome/browser/metrics/thread_watcher.h"
-#include "chrome/browser/metrics/variations/variations_service.h"
 #include "chrome/browser/nacl_host/nacl_browser_delegate_impl.h"
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/net/crl_set_fetcher.h"
@@ -125,6 +125,7 @@
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "components/variations/net/variations_http_header_provider.h"
 #include "components/variations/pref_names.h"
+#include "components/variations/service/variations_service.h"
 #include "components/variations/variations_associated_data.h"
 #include "components/variations/variations_switches.h"
 #include "components/version_info/version_info.h"
@@ -236,6 +237,11 @@
 #if defined(USE_AURA)
 #include "ui/aura/env.h"
 #endif  // defined(USE_AURA)
+
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
+#include "chrome/browser/chrome_webusb_browser_client.h"
+#include "components/webusb/webusb_detector.h"
+#endif
 
 using content::BrowserThread;
 
@@ -544,16 +550,6 @@ void LaunchDevToolsHandlerIfNeeded(const base::CommandLine& command_line) {
   }
 }
 
-base::StackSamplingProfiler::SamplingParams GetStartupSamplingParams() {
-  // Sample at 10Hz for 30 seconds.
-  base::StackSamplingProfiler::SamplingParams params;
-  params.initial_delay = base::TimeDelta::FromMilliseconds(0);
-  params.bursts = 1;
-  params.samples_per_burst = 300;
-  params.sampling_interval = base::TimeDelta::FromMilliseconds(100);
-  return params;
-}
-
 }  // namespace
 
 namespace chrome_browser {
@@ -584,7 +580,7 @@ ChromeBrowserMainParts::ChromeBrowserMainParts(
       browser_field_trials_(parameters.command_line),
       sampling_profiler_(
           base::PlatformThread::CurrentId(),
-          GetStartupSamplingParams(),
+          sampling_profiler_config_.GetSamplingParams(),
           metrics::CallStackProfileMetricsProvider::GetProfilerCallback(
               metrics::CallStackProfileMetricsProvider::Params(
                   metrics::CallStackProfileMetricsProvider::PROCESS_STARTUP,
@@ -594,12 +590,8 @@ ChromeBrowserMainParts::ChromeBrowserMainParts(
       notify_result_(ProcessSingleton::PROCESS_NONE),
       local_state_(NULL),
       restart_last_session_(false) {
-  const version_info::Channel channel = chrome::GetChannel();
-  if (channel == version_info::Channel::UNKNOWN ||
-      channel == version_info::Channel::CANARY ||
-      channel == version_info::Channel::DEV) {
+  if (sampling_profiler_config_.IsProfilerEnabled())
     sampling_profiler_.Start();
-  }
 
   // If we're running tests (ui_task is non-null).
   if (parameters.ui_task)
@@ -664,8 +656,7 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
 #if defined(FIELDTRIAL_TESTING_ENABLED)
   if (!command_line->HasSwitch(switches::kDisableFieldTrialTestingConfig) &&
       !command_line->HasSwitch(switches::kForceFieldTrials) &&
-      !command_line->HasSwitch(
-          chrome_variations::switches::kVariationsServerURL))
+      !command_line->HasSwitch(variations::switches::kVariationsServerURL))
     chrome_variations::AssociateDefaultFieldTrialConfig();
 #endif  // defined(FIELDTRIAL_TESTING_ENABLED)
 
@@ -680,10 +671,19 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
                   << " list specified.";
     metrics->AddSyntheticTrialObserver(provider);
   }
-  chrome_variations::VariationsService* variations_service =
+
+  scoped_ptr<base::FeatureList> feature_list(new base::FeatureList);
+  feature_list->InitializeFromCommandLine(
+      command_line->GetSwitchValueASCII(switches::kEnableFeatures),
+      command_line->GetSwitchValueASCII(switches::kDisableFeatures));
+
+  variations::VariationsService* variations_service =
       browser_process_->variations_service();
   if (variations_service)
     variations_service->CreateTrialsFromSeed();
+
+  // TODO(asvitkine): Pass |feature_list| to CreateTrialsFromSeed() above.
+  base::FeatureList::SetInstance(feature_list.Pass());
 
   // This must be called after |local_state_| is initialized.
   browser_field_trials_.SetupFieldTrials();
@@ -726,6 +726,10 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
       // Don't enable instrumentation.
       break;
   }
+
+  // Register a synthetic field trial for the sampling profiler configuration
+  // that was already chosen.
+  sampling_profiler_config_.RegisterSyntheticFieldTrial();
 }
 
 // ChromeBrowserMainParts: |SetupMetricsAndFieldTrials()| related --------------
@@ -1005,24 +1009,22 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
     if (!master_prefs_->variations_seed.empty() ||
         !master_prefs_->compressed_variations_seed.empty()) {
       if (!master_prefs_->variations_seed.empty()) {
-        local_state_->SetString(chrome_variations::prefs::kVariationsSeed,
+        local_state_->SetString(variations::prefs::kVariationsSeed,
                                 master_prefs_->variations_seed);
       }
       if (!master_prefs_->compressed_variations_seed.empty()) {
-        local_state_->SetString(
-            chrome_variations::prefs::kVariationsCompressedSeed,
-            master_prefs_->compressed_variations_seed);
+        local_state_->SetString(variations::prefs::kVariationsCompressedSeed,
+                                master_prefs_->compressed_variations_seed);
       }
       if (!master_prefs_->variations_seed_signature.empty()) {
-        local_state_->SetString(
-            chrome_variations::prefs::kVariationsSeedSignature,
-            master_prefs_->variations_seed_signature);
+        local_state_->SetString(variations::prefs::kVariationsSeedSignature,
+                                master_prefs_->variations_seed_signature);
       }
       // Set the variation seed date to the current system time. If the user's
       // clock is incorrect, this may cause some field trial expiry checks to
       // not do the right thing until the next seed update from the server,
       // when this value will be updated.
-      local_state_->SetInt64(chrome_variations::prefs::kVariationsSeedDate,
+      local_state_->SetInt64(variations::prefs::kVariationsSeedDate,
                              base::Time::Now().ToInternalValue());
     }
 
@@ -1150,13 +1152,15 @@ void ChromeBrowserMainParts::PreBrowserStart() {
   // On CrOS, it is always enabled. On other platforms, it's behind a flag for
   // now.
 #if defined(OS_CHROMEOS)
-  g_browser_process->GetOomPriorityManager()->Start();
+  g_browser_process->GetOomPriorityManager()->Start(false);
 #elif defined(OS_WIN) || defined(OS_MACOSX)
   const std::string group_name =
       base::FieldTrialList::FindFullName("AutomaticTabDiscarding");
   if (parsed_command_line().HasSwitch(switches::kEnableTabDiscarding) ||
       base::StartsWith(group_name, "Enabled", base::CompareCase::SENSITIVE)) {
-    g_browser_process->GetOomPriorityManager()->Start();
+    bool enabled_once = base::StartsWith(group_name, "Enabled_Once",
+                                         base::CompareCase::SENSITIVE);
+    g_browser_process->GetOomPriorityManager()->Start(enabled_once);
   }
 #endif
 }
@@ -1178,6 +1182,15 @@ void ChromeBrowserMainParts::PostBrowserStart() {
       base::Bind(&WebRtcLogUtil::DeleteOldWebRtcLogFilesForAllProfiles),
       base::TimeDelta::FromMinutes(1));
 #endif  // defined(ENABLE_WEBRTC)
+
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableWebUsbNotifications)) {
+    webusb_browser_client_.reset(new ChromeWebUsbBrowserClient());
+    webusb_detector_.reset(
+        new webusb::WebUsbDetector(webusb_browser_client_.get()));
+  }
+#endif
 
   // At this point, StartupBrowserCreator::Start has run creating initial
   // browser windows and tabs, but no progress has been made in loading
@@ -1608,7 +1621,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
     RegisterComponentsForUpdate();
 
 #if defined(OS_ANDROID)
-  chrome_variations::VariationsService* variations_service =
+  variations::VariationsService* variations_service =
       browser_process_->variations_service();
   if (variations_service) {
     // Just initialize the policy prefs service here. Variations seed fetching
@@ -1677,7 +1690,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
     // RequestLanguageList
     if (parameters().ui_task == NULL) {
       // Request new variations seed information from server.
-      chrome_variations::VariationsService* variations_service =
+      variations::VariationsService* variations_service =
           browser_process_->variations_service();
       if (variations_service)
         variations_service->PerformPreMainMessageLoopStartup();
@@ -1774,6 +1787,11 @@ void ChromeBrowserMainParts::PostMainMessageLoopRun() {
   // Remove observers attached to D-Bus clients before DbusThreadManager is
   // shut down.
   process_power_collector_.reset();
+
+#if !defined(OS_IOS)
+  webusb_detector_.reset();
+  webusb_browser_client_.reset();
+#endif
 
   for (size_t i = 0; i < chrome_extra_parts_.size(); ++i)
     chrome_extra_parts_[i]->PostMainMessageLoopRun();

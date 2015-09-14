@@ -99,12 +99,12 @@ void InitializeRedirection() {
 }  // namespace
 
 static void Init(JNIEnv* env,
-                 jclass clazz,
-                 jobject activity,
-                 jstring mojo_shell_path,
-                 jobjectArray jparameters,
-                 jstring j_local_apps_directory,
-                 jstring j_tmp_dir) {
+                 const JavaParamRef<jclass>& clazz,
+                 const JavaParamRef<jobject>& activity,
+                 const JavaParamRef<jstring>& mojo_shell_path,
+                 const JavaParamRef<jobjectArray>& jparameters,
+                 const JavaParamRef<jstring>& j_local_apps_directory,
+                 const JavaParamRef<jstring>& j_tmp_dir) {
   g_main_activiy.Get().Reset(env, activity);
 
   // Setting the TMPDIR environment variable so that applications can use it.
@@ -114,8 +114,7 @@ static void Init(JNIEnv* env,
              base::android::ConvertJavaStringToUTF8(env, j_tmp_dir).c_str(), 1);
   DCHECK_EQ(return_value, 0);
 
-  base::android::ScopedJavaLocalRef<jobject> scoped_activity(env, activity);
-  base::android::InitApplicationContext(env, scoped_activity);
+  base::android::InitApplicationContext(env, activity);
 
   std::vector<std::string> parameters;
   parameters.push_back(
@@ -155,7 +154,7 @@ static void Init(JNIEnv* env,
   gfx::GLSurface::InitializeOneOff();
 }
 
-static void Start(JNIEnv* env, jclass clazz) {
+static void Start(JNIEnv* env, const JavaParamRef<jclass>& clazz) {
 #if defined(MOJO_SHELL_DEBUG_URL)
   base::CommandLine::ForCurrentProcess()->AppendArg(MOJO_SHELL_DEBUG_URL);
   // Sleep for 5 seconds to give the debugger a chance to attach.
@@ -166,7 +165,9 @@ static void Start(JNIEnv* env, jclass clazz) {
   context->RunCommandLineApplication(base::Bind(ExitShell));
 }
 
-static void AddApplicationURL(JNIEnv* env, jclass clazz, jstring jurl) {
+static void AddApplicationURL(JNIEnv* env,
+                              const JavaParamRef<jclass>& clazz,
+                              const JavaParamRef<jstring>& jurl) {
   base::CommandLine::ForCurrentProcess()->AppendArg(
       base::android::ConvertJavaStringToUTF8(env, jurl));
 }
