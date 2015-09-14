@@ -582,9 +582,10 @@ RenderFrameImpl* RenderFrameImpl::CreateMainFrame(RenderViewImpl* render_view,
 // static
 void RenderFrameImpl::CreateFrame(
     int routing_id,
+    int proxy_routing_id,
+    int opener_routing_id,
     int parent_routing_id,
     int previous_sibling_routing_id,
-    int proxy_routing_id,
     const FrameReplicationState& replicated_state,
     CompositorDependencies* compositor_deps,
     const FrameMsg_NewFrame_WidgetParams& widget_params) {
@@ -625,6 +626,9 @@ void RenderFrameImpl::CreateFrame(
   }
   render_frame->SetWebFrame(web_frame);
   CHECK_IMPLIES(parent_routing_id == MSG_ROUTING_NONE, !web_frame->parent());
+
+  WebFrame* opener = ResolveOpener(opener_routing_id, nullptr);
+  web_frame->setOpener(opener);
 
   if (widget_params.routing_id != MSG_ROUTING_NONE) {
     CHECK(SiteIsolationPolicy::AreCrossProcessFramesPossible());
@@ -3478,6 +3482,12 @@ void RenderFrameImpl::didRunInsecureContent(
       GURL(origin.toString().utf8()));
 }
 
+void RenderFrameImpl::didChangePerformanceTiming() {
+  FOR_EACH_OBSERVER(RenderFrameObserver,
+                    observers_,
+                    DidChangePerformanceTiming());
+}
+
 void RenderFrameImpl::didAbortLoading(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
 #if defined(ENABLE_PLUGINS)
@@ -4017,7 +4027,8 @@ void RenderFrameImpl::SendDidCommitProvisionalLoad(
     // the same zoom settings.
     HostZoomLevels::iterator host_zoom =
         render_view_->host_zoom_levels_.find(GURL(request.url()));
-    if (render_view_->webview()->mainFrame()->document().isPluginDocument()) {
+    if (render_view_->webview()->mainFrame()->isWebLocalFrame() &&
+        render_view_->webview()->mainFrame()->document().isPluginDocument()) {
       // Reset the zoom levels for plugins.
       render_view_->webview()->setZoomLevel(0);
     } else {
@@ -4731,9 +4742,14 @@ WebMediaPlayer* RenderFrameImpl::CreateWebMediaPlayerForMediaStream(
       (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0;
   UMA_HISTOGRAM_BOOLEAN("Platform.WebRtcNEONFound", found_neon);
 #endif  // defined(OS_ANDROID) && defined(ARCH_CPU_ARMEL)
-  return new WebMediaPlayerMS(frame_, client, weak_factory_.GetWeakPtr(),
-                              new RenderMediaLog(),
-                              CreateRendererFactory());
+  scoped_refptr<base::SingleThreadTaskRunner>  compositor_task_runner =
+      RenderThreadImpl::current()->compositor_task_runner();
+  if (!compositor_task_runner.get())
+    compositor_task_runner = base::MessageLoop::current()->task_runner();
+  return new WebMediaPlayerMS(
+      frame_, client, weak_factory_.GetWeakPtr(), new RenderMediaLog(),
+      CreateRendererFactory(),
+      compositor_task_runner);
 #else
   return NULL;
 #endif  // defined(ENABLE_WEBRTC)

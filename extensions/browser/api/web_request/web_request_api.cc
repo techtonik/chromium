@@ -159,15 +159,28 @@ bool IsRequestFromExtension(const net::URLRequest* request,
   if (!info)
     return false;
 
-  return extension_info_map->process_map().Contains(info->GetChildID());
+  const std::set<std::string> extension_ids =
+      extension_info_map->process_map().GetExtensionsInProcess(
+          info->GetChildID());
+  if (extension_ids.empty())
+    return false;
+
+  // Treat hosted apps as normal web pages (crbug.com/526413).
+  for (const std::string& extension_id : extension_ids) {
+    const Extension* extension =
+        extension_info_map->extensions().GetByID(extension_id);
+    if (extension && !extension->is_hosted_app())
+      return true;
+  }
+  return false;
 }
 
 void ExtractRequestRoutingInfo(const net::URLRequest* request,
                                int* render_process_host_id,
                                int* routing_id) {
-  if (!request->GetUserData(NULL))
-    return;
   const ResourceRequestInfo* info = ResourceRequestInfo::ForRequest(request);
+  if (!info)
+    return;
   *render_process_host_id = info->GetChildID();
   *routing_id = info->GetRouteID();
 }
@@ -193,10 +206,10 @@ void ExtractRequestInfoDetails(const net::URLRequest* request,
                                int* render_process_host_id,
                                int* routing_id,
                                ResourceType* resource_type) {
-  if (!request->GetUserData(NULL))
+  const ResourceRequestInfo* info = ResourceRequestInfo::ForRequest(request);
+  if (!info)
     return;
 
-  const ResourceRequestInfo* info = ResourceRequestInfo::ForRequest(request);
   *frame_id = info->GetRenderFrameID();
   *is_main_frame = info->IsMainFrame();
   *parent_frame_id = info->GetParentRenderFrameID();
@@ -699,7 +712,7 @@ ExtensionWebRequestEventRouter::RequestFilter::~RequestFilter() {
 
 // static
 ExtensionWebRequestEventRouter* ExtensionWebRequestEventRouter::GetInstance() {
-  return Singleton<ExtensionWebRequestEventRouter>::get();
+  return base::Singleton<ExtensionWebRequestEventRouter>::get();
 }
 
 ExtensionWebRequestEventRouter::ExtensionWebRequestEventRouter()

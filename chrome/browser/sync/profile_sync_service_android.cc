@@ -12,7 +12,6 @@
 #include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/metrics/field_trial.h"
 #include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
@@ -114,10 +113,6 @@ void ProfileSyncServiceAndroid::OnStateChanged() {
 
 jboolean ProfileSyncServiceAndroid::IsPassphrasePrompted(JNIEnv* env,
                                                          jobject obj) {
-  const std::string group_name =
-      base::FieldTrialList::FindFullName("LimitSyncPassphrasePrompt");
-  if (group_name != "Enabled")
-    return false;
   return sync_prefs_->IsPassphrasePrompted();
 }
 
@@ -183,24 +178,24 @@ jint ProfileSyncServiceAndroid::GetAuthError(JNIEnv* env, jobject) {
 jboolean ProfileSyncServiceAndroid::IsEncryptEverythingEnabled(
     JNIEnv* env, jobject) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return sync_service_->EncryptEverythingEnabled();
+  return sync_service_->IsEncryptEverythingEnabled();
 }
 
-jboolean ProfileSyncServiceAndroid::IsSyncInitialized(JNIEnv* env, jobject) {
+jboolean ProfileSyncServiceAndroid::IsBackendInitialized(JNIEnv* env, jobject) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return sync_service_->backend_initialized();
+  return sync_service_->IsBackendInitialized();
 }
 
 jboolean ProfileSyncServiceAndroid::IsFirstSetupInProgress(
     JNIEnv* env, jobject) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return sync_service_->FirstSetupInProgress();
+  return sync_service_->IsFirstSetupInProgress();
 }
 
 jboolean ProfileSyncServiceAndroid::IsEncryptEverythingAllowed(
     JNIEnv* env, jobject obj) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return sync_service_->EncryptEverythingAllowed();
+  return sync_service_->IsEncryptEverythingAllowed();
 }
 
 jboolean ProfileSyncServiceAndroid::IsPassphraseRequired(JNIEnv* env, jobject) {
@@ -211,29 +206,7 @@ jboolean ProfileSyncServiceAndroid::IsPassphraseRequired(JNIEnv* env, jobject) {
 jboolean ProfileSyncServiceAndroid::IsPassphraseRequiredForDecryption(
     JNIEnv* env, jobject obj) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  // In case of CUSTOM_PASSPHRASE we always sync passwords. Prompt the user for
-  // a passphrase if cryptographer has any pending keys.
-  if (sync_service_->GetPassphraseType() == syncer::CUSTOM_PASSPHRASE) {
-    return !IsCryptographerReady(env, obj);
-  }
-  if (sync_service_->IsPassphraseRequiredForDecryption()) {
-    // Passwords datatype should never prompt for a passphrase, except when
-    // user is using a custom passphrase. Do not prompt for a passphrase if
-    // passwords are the only encrypted datatype. This prevents a temporary
-    // notification for passphrase  when PSS has not completed configuring
-    // DataTypeManager, after configuration password datatype shall be disabled.
-    const syncer::ModelTypeSet encrypted_types =
-        sync_service_->GetEncryptedDataTypes();
-    return !encrypted_types.Equals(syncer::ModelTypeSet(syncer::PASSWORDS));
-  }
-  return false;
-}
-
-jboolean ProfileSyncServiceAndroid::IsPassphraseRequiredForExternalType(
-    JNIEnv* env, jobject) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return
-      sync_service_->passphrase_required_reason() == syncer::REASON_DECRYPTION;
+  return sync_service_->IsPassphraseRequiredForDecryption();
 }
 
 jboolean ProfileSyncServiceAndroid::IsUsingSecondaryPassphrase(
@@ -464,7 +437,7 @@ ProfileSyncServiceAndroid*
           AttachCurrentThread()));
 }
 
-static jlong Init(JNIEnv* env, jobject obj) {
+static jlong Init(JNIEnv* env, const JavaParamRef<jobject>& obj) {
   ProfileSyncServiceAndroid* profile_sync_service_android =
       new ProfileSyncServiceAndroid(env, obj);
   profile_sync_service_android->Init();

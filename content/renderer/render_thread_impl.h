@@ -433,6 +433,7 @@ class CONTENT_EXPORT RenderThreadImpl
  private:
   // ChildThread
   bool OnControlMessageReceived(const IPC::Message& msg) override;
+  void OnProcessBackgrounded(bool backgrounded) override;
 
   // GpuChannelHostFactory implementation:
   bool IsMainThread() override;
@@ -447,8 +448,9 @@ class CONTENT_EXPORT RenderThreadImpl
 
   void OnCreateNewFrame(FrameMsg_NewFrame_Params params);
   void OnCreateNewFrameProxy(int routing_id,
-                             int parent_routing_id,
                              int render_view_routing_id,
+                             int opener_routing_id,
+                             int parent_routing_id,
                              const FrameReplicationState& replicated_state);
   void OnSetZoomLevelForCurrentURL(const std::string& scheme,
                                    const std::string& host,

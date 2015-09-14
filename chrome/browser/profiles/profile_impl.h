@@ -107,7 +107,7 @@ class ProfileImpl : public Profile {
   ExtensionSpecialStoragePolicy* GetExtensionSpecialStoragePolicy() override;
   PrefService* GetPrefs() override;
   const PrefService* GetPrefs() const override;
-  chrome::ChromeZoomLevelPrefs* GetZoomLevelPrefs() override;
+  ChromeZoomLevelPrefs* GetZoomLevelPrefs() override;
   PrefService* GetOffTheRecordPrefs() override;
   net::URLRequestContextGetter* GetRequestContextForExtensions() override;
   net::SSLConfigService* GetSSLConfigService() override;
@@ -233,7 +233,6 @@ class ProfileImpl : public Profile {
 #endif
   scoped_ptr<NetPrefObserver> net_pref_observer_;
   scoped_ptr<SSLConfigServiceManager> ssl_config_service_manager_;
-  scoped_refptr<HostContentSettingsMap> host_content_settings_map_;
   scoped_refptr<ShortcutsBackend> shortcuts_backend_;
 
   // Exit type the last time the profile was opened. This is set only once from

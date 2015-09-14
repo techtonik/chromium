@@ -156,6 +156,8 @@
       'browser/android/history_report/usage_reports_buffer_backend.h',
       'browser/android/history_report/usage_reports_buffer_service.cc',
       'browser/android/history_report/usage_reports_buffer_service.h',
+      'browser/android/hung_renderer_infobar_delegate.cc',
+      'browser/android/hung_renderer_infobar_delegate.h',
       'browser/android/intent_helper.cc',
       'browser/android/intent_helper.h',
       'browser/android/intercept_download_resource_throttle.cc',
@@ -231,6 +233,8 @@
       'browser/android/shortcut_info.h',
       'browser/android/signin/account_management_screen_helper.cc',
       'browser/android/signin/account_management_screen_helper.h',
+      'browser/android/signin/account_tracker_service_android.cc',
+      'browser/android/signin/account_tracker_service_android.h',
       'browser/android/signin/signin_manager_android.cc',
       'browser/android/signin/signin_manager_android.h',
       'browser/android/tab/thumbnail_tab_helper_android.cc',
@@ -257,6 +261,8 @@
       'browser/android/webapps/add_to_homescreen_dialog_helper.h',
       'browser/android/webapps/single_tab_mode_tab_helper.cc',
       'browser/android/webapps/single_tab_mode_tab_helper.h',
+      'browser/android/webapps/webapp_registry.cc',
+      'browser/android/webapps/webapp_registry.h',
       'browser/app_controller_mac.h',
       'browser/app_controller_mac.mm',
       'browser/app_icon_win.cc',
@@ -442,8 +448,6 @@
       'browser/download/download_prefs.h',
       'browser/download/download_query.cc',
       'browser/download/download_query.h',
-      'browser/download/download_request_infobar_delegate.cc',
-      'browser/download/download_request_infobar_delegate.h',
       'browser/download/download_request_limiter.cc',
       'browser/download/download_request_limiter.h',
       'browser/download/download_resource_throttle.cc',
@@ -612,14 +616,20 @@
       'browser/media/media_device_id_salt.h',
       'browser/media/media_permission.cc',
       'browser/media/media_permission.h',
+      'browser/media/media_stream_camera_permission_context_factory.cc',
+      'browser/media/media_stream_camera_permission_context_factory.h',
       'browser/media/media_stream_capture_indicator.cc',
       'browser/media/media_stream_capture_indicator.h',
+      'browser/media/media_stream_device_permission_context.cc',
+      'browser/media/media_stream_device_permission_context.h',
       'browser/media/media_stream_device_permissions.cc',
       'browser/media/media_stream_device_permissions.h',
       'browser/media/media_stream_devices_controller.cc',
       'browser/media/media_stream_devices_controller.h',
       'browser/media/media_stream_infobar_delegate.cc',
       'browser/media/media_stream_infobar_delegate.h',
+      'browser/media/media_stream_mic_permission_context_factory.cc',
+      'browser/media/media_stream_mic_permission_context_factory.h',
       'browser/media/media_url_constants.cc',
       'browser/media/media_url_constants.h',
       'browser/media/midi_permission_context.cc',
@@ -799,6 +809,8 @@
       'browser/speech/tts_platform.cc',
       'browser/speech/tts_platform.h',
       'browser/speech/tts_win.cc',
+      'browser/stack_sampling_configuration.cc',
+      'browser/stack_sampling_configuration.h',
       'browser/status_icons/status_icon.cc',
       'browser/status_icons/status_icon.h',
       'browser/status_icons/status_icon_menu_model.cc',
@@ -841,8 +853,6 @@
       'browser/thumbnails/thumbnailing_context.h',
       'browser/tracing/background_tracing_field_trial.cc',
       'browser/tracing/background_tracing_field_trial.h',
-      'browser/tracing/chrome_tracing_delegate.cc',
-      'browser/tracing/chrome_tracing_delegate.h',
       'browser/tracing/crash_service_uploader.cc',
       'browser/tracing/crash_service_uploader.h',
       'browser/tracing/navigation_tracing.cc',
@@ -861,6 +871,8 @@
       'browser/web_data_service_factory.h',
     ],
     'chrome_browser_android_sources': [
+      'browser/download/download_request_infobar_delegate.cc',
+      'browser/download/download_request_infobar_delegate.h',
       'browser/media/protected_media_identifier_infobar_delegate.cc',
       'browser/media/protected_media_identifier_infobar_delegate.h',
       'browser/media/protected_media_identifier_permission_context.cc',
@@ -882,8 +894,6 @@
       'browser/signin/oauth2_token_service_delegate_android.cc',
       'browser/signin/oauth2_token_service_delegate_android.h',
       'browser/ssl/ssl_add_certificate_android.cc',
-      'browser/web_resource/notification_promo_mobile_ntp.cc',
-      'browser/web_resource/notification_promo_mobile_ntp.h',
     ],
     # Cross-platform Ash sources.
     'chrome_browser_ash_sources': [
@@ -923,13 +933,6 @@
       'browser/renderer_host/pepper/pepper_platform_verification_message_filter.cc',
       'browser/renderer_host/pepper/pepper_platform_verification_message_filter.h',
     ],
-    # Used everywhere but ChromeOS.
-    'chrome_browser_non_chromeos_sources': [
-      'browser/signin/signin_global_error.cc',
-      'browser/signin/signin_global_error.h',
-      'browser/signin/signin_global_error_factory.cc',
-      'browser/signin/signin_global_error_factory.h',
-    ],
     # Everything but Android, iOS, and CrOS.
     'chrome_browser_desktop_sources': [
       'browser/platform_util.cc',
@@ -943,6 +946,10 @@
       'browser/signin/cross_device_promo.h',
       'browser/signin/cross_device_promo_factory.cc',
       'browser/signin/cross_device_promo_factory.h',
+      'browser/signin/signin_global_error.cc',
+      'browser/signin/signin_global_error.h',
+      'browser/signin/signin_global_error_factory.cc',
+      'browser/signin/signin_global_error_factory.h',
     ],
     # Miscellaneous files that were brought up on iOS before the decision not
     # to use chrome/ for iOS. These, plus a few of the directory-specific
@@ -956,7 +963,6 @@
       'browser/browser_process.h',
       'browser/browser_process_platform_part_base.cc',
       'browser/browser_process_platform_part_base.h',
-      'browser/password_manager/password_manager_util_ios.mm',
     ],
     # Desktop Linux and ChromeOS.
     'chrome_browser_linux_sources': [
@@ -986,6 +992,8 @@
       'browser/media_galleries/fileapi/iphoto_data_provider.h',
       'browser/media_galleries/fileapi/iphoto_file_util.cc',
       'browser/media_galleries/fileapi/iphoto_file_util.h',
+      'browser/password_manager/password_manager_util_mac.h',
+      'browser/password_manager/password_manager_util_mac.mm',
     ],
     # Android and iOS, not CrOS.
     'chrome_browser_mobile_sources': [
@@ -1018,6 +1026,8 @@
       'browser/chrome_device_client.h',
       'browser/chrome_process_singleton.cc',
       'browser/chrome_process_singleton.h',
+      'browser/chrome_webusb_browser_client.cc',
+      'browser/chrome_webusb_browser_client.h',
       'browser/component_updater/widevine_cdm_component_installer.cc',
       'browser/component_updater/widevine_cdm_component_installer.h',
       'browser/custom_home_pages_table_model.cc',
@@ -1046,8 +1056,6 @@
       'browser/download/download_shelf.h',
       'browser/download/download_shelf_context_menu.cc',
       'browser/download/download_shelf_context_menu.h',
-      'browser/download/notification/download_group_notification.cc',
-      'browser/download/notification/download_group_notification.h',
       'browser/download/notification/download_item_notification.cc',
       'browser/download/notification/download_item_notification.h',
       'browser/download/notification/download_notification.cc',
@@ -1268,6 +1276,10 @@
       'browser/sync/glue/synced_tab_delegate_desktop.cc',
       'browser/sync/sync_ui_util.cc',
       'browser/sync/sync_ui_util.h',
+      'browser/tracing/chrome_tracing_delegate.cc',
+      'browser/tracing/chrome_tracing_delegate.h',
+      'browser/usb/web_usb_permission_provider.cc',
+      'browser/usb/web_usb_permission_provider.h',
     ],
     'chrome_browser_win_sources': [
       'browser/browser_process_platform_part_aurawin.cc',
@@ -1285,6 +1297,8 @@
       'browser/hang_monitor/hung_window_detector.h',
       'browser/metro_viewer/chrome_metro_viewer_process_host_aurawin.cc',
       'browser/metro_viewer/chrome_metro_viewer_process_host_aurawin.h',
+      'browser/password_manager/password_manager_util_win.cc',
+      'browser/password_manager/password_manager_util_win.h',
       'browser/renderer_context_menu/spellchecker_submenu_observer_hunspell.cc',
     ],
     'chrome_browser_non_win_sources': [
@@ -1419,6 +1433,8 @@
       'browser/content_settings/chrome_content_settings_utils.h',
       'browser/content_settings/cookie_settings_factory.cc',
       'browser/content_settings/cookie_settings_factory.h',
+      'browser/content_settings/host_content_settings_map_factory.cc',
+      'browser/content_settings/host_content_settings_map_factory.h',
       'browser/content_settings/local_shared_objects_container.cc',
       'browser/content_settings/local_shared_objects_container.h',
       'browser/content_settings/tab_specific_content_settings.cc',
@@ -1709,6 +1725,7 @@
       'android/java/src/org/chromium/chrome/browser/autofill/CreditCardScanner.java',
       'android/java/src/org/chromium/chrome/browser/autofill/PasswordGenerationPopupBridge.java',
       'android/java/src/org/chromium/chrome/browser/autofill/PersonalDataManager.java',
+      'android/java/src/org/chromium/chrome/browser/BluetoothChooserDialog.java',
       'android/java/src/org/chromium/chrome/browser/BookmarksBridge.java',
       'android/java/src/org/chromium/chrome/browser/bookmark/EditBookmarkHelper.java',
       'android/java/src/org/chromium/chrome/browser/banners/AppBannerManager.java',
@@ -1773,6 +1790,7 @@
       'android/java/src/org/chromium/chrome/browser/omnibox/OmniboxPrerender.java',
       'android/java/src/org/chromium/chrome/browser/omnibox/OmniboxUrlEmphasizer.java',
       'android/java/src/org/chromium/chrome/browser/omnibox/OmniboxViewUtil.java',
+      'android/java/src/org/chromium/chrome/browser/PlatformUtil.java',
       'android/java/src/org/chromium/chrome/browser/partnerbookmarks/PartnerBookmarksReader.java',
       'android/java/src/org/chromium/chrome/browser/password_manager/Credential.java',
       'android/java/src/org/chromium/chrome/browser/PasswordUIView.java',
@@ -1791,6 +1809,7 @@
       'android/java/src/org/chromium/chrome/browser/SSLClientCertificateRequest.java',
       'android/java/src/org/chromium/chrome/browser/search_engines/TemplateUrlService.java',
       'android/java/src/org/chromium/chrome/browser/signin/AccountManagementScreenHelper.java',
+      'android/java/src/org/chromium/chrome/browser/signin/AccountTrackerService.java',
       'android/java/src/org/chromium/chrome/browser/signin/OAuth2TokenService.java',
       'android/java/src/org/chromium/chrome/browser/signin/SigninManager.java',
       'android/java/src/org/chromium/chrome/browser/snackbar/smartlockautosignin/AutoSigninSnackbarController.java',
@@ -1822,6 +1841,7 @@
       'android/java/src/org/chromium/chrome/browser/ssl/ConnectionSecurity.java',
       'android/java/src/org/chromium/chrome/browser/toolbar/ToolbarModel.java',
       'android/java/src/org/chromium/chrome/browser/webapps/AddToHomescreenDialogHelper.java',
+      'android/java/src/org/chromium/chrome/browser/webapps/WebappRegistry.java',
     ],
     'chrome_browser_mdns_sources': [
       'browser/local_discovery/privet_traffic_detector.cc',
@@ -1879,8 +1899,6 @@
       'browser/metrics/variations/generated_resources_map_lookup.cc',
       'browser/metrics/variations/variations_registry_syncer_win.cc',
       'browser/metrics/variations/variations_registry_syncer_win.h',
-      'browser/metrics/variations/variations_service.cc',
-      'browser/metrics/variations/variations_service.h',
     ],
     'chrome_browser_nacl_sources': [
       'browser/nacl_host/nacl_browser_delegate_impl.cc',
@@ -1891,8 +1909,6 @@
     'chrome_browser_net_sources': [
       'browser/net/async_dns_field_trial.cc',
       'browser/net/async_dns_field_trial.h',
-      'browser/net/certificate_error_reporter.cc',
-      'browser/net/certificate_error_reporter.h',
       'browser/net/chrome_cookie_notification_details.h',
       'browser/net/chrome_extensions_network_delegate.cc',
       'browser/net/chrome_extensions_network_delegate.h',
@@ -2041,10 +2057,6 @@
     'chrome_browser_password_manager_sources': [
       'browser/password_manager/chrome_password_manager_client.cc',
       'browser/password_manager/chrome_password_manager_client.h',
-      'browser/password_manager/password_manager_util_android.cc',
-      'browser/password_manager/password_manager_util_linux.cc',
-      'browser/password_manager/password_manager_util_mac.mm',
-      'browser/password_manager/password_manager_util_win.cc',
       'browser/password_manager/password_store_factory.cc',
       'browser/password_manager/password_store_factory.h',
       'browser/password_manager/password_store_mac.cc',
@@ -2274,6 +2286,8 @@
       'browser/prefs/pref_service_syncable_factory.cc',
       'browser/prefs/pref_service_syncable_factory.h',
       'browser/prefs/pref_service_syncable_observer.h',
+      'browser/prefs/pref_service_syncable_util.cc',
+      'browser/prefs/pref_service_syncable_util.h',
       'browser/prefs/profile_pref_store_manager.cc',
       'browser/prefs/profile_pref_store_manager.h',
       'browser/prefs/session_startup_pref.cc',
@@ -2508,6 +2522,9 @@
       'browser/safe_browsing/incident_reporting/module_integrity_verifier_win.h',
       'browser/safe_browsing/incident_reporting/off_domain_inclusion_detector.cc',
       'browser/safe_browsing/incident_reporting/off_domain_inclusion_detector.h',
+      'browser/safe_browsing/incident_reporting/platform_state_store.cc',
+      'browser/safe_browsing/incident_reporting/platform_state_store.h',
+      'browser/safe_browsing/incident_reporting/platform_state_store_win.cc',
       'browser/safe_browsing/incident_reporting/preference_validation_delegate.cc',
       'browser/safe_browsing/incident_reporting/preference_validation_delegate.h',
       'browser/safe_browsing/incident_reporting/resource_request_detector.cc',
@@ -2628,8 +2645,10 @@
       'browser/services/gcm/instance_id/instance_id_profile_service_factory.h',
     ],
     'chrome_browser_session_sources': [
-      'browser/sessions/base_session_service_delegate_impl.cc',
-      'browser/sessions/base_session_service_delegate_impl.h',
+      'browser/sessions/chrome_tab_restore_service_client.cc',
+      'browser/sessions/chrome_tab_restore_service_client.h',
+      'browser/sessions/session_common_utils.cc',
+      'browser/sessions/session_common_utils.h',
       'browser/sessions/session_data_deleter.cc',
       'browser/sessions/session_data_deleter.h',
       'browser/sessions/session_restore_android.cc',
@@ -2732,8 +2751,6 @@
       'browser/ssl/bad_clock_blocking_page.h',
       'browser/ssl/cert_report_helper.cc',
       'browser/ssl/cert_report_helper.h',
-      'browser/ssl/certificate_error_report.cc',
-      'browser/ssl/certificate_error_report.h',
       'browser/ssl/chrome_ssl_host_state_delegate.cc',
       'browser/ssl/chrome_ssl_host_state_delegate.h',
       'browser/ssl/chrome_ssl_host_state_delegate_factory.cc',
@@ -2895,9 +2912,10 @@
       'browser/sync/glue/synced_tab_delegate.cc',
       'browser/sync/glue/synced_tab_delegate_android.cc',
       'browser/sync/glue/synced_tab_delegate_android.h',
-      'browser/sync/glue/synced_window_delegate.h',
       'browser/sync/glue/synced_window_delegate_android.cc',
       'browser/sync/glue/synced_window_delegate_android.h',
+      'browser/sync/glue/synced_window_delegates_getter_android.cc',
+      'browser/sync/glue/synced_window_delegates_getter_android.h',
       'browser/sync/glue/typed_url_change_processor.cc',
       'browser/sync/glue/typed_url_change_processor.h',
       'browser/sync/glue/typed_url_data_type_controller.cc',
@@ -2918,8 +2936,6 @@
       'browser/sync/sessions/session_data_type_controller.h',
       'browser/sync/sessions/sessions_sync_manager.cc',
       'browser/sync/sessions/sessions_sync_manager.h',
-      'browser/sync/sessions/synced_window_delegates_getter.cc',
-      'browser/sync/sessions/synced_window_delegates_getter.h',
       'browser/sync/startup_controller.cc',
       'browser/sync/startup_controller.h',
       'browser/sync/supervised_user_signin_manager_wrapper.cc',
@@ -3054,12 +3070,8 @@
       'browser/undo/bookmark_undo_service_factory.h',
     ],
     'chrome_browser_web_resource_sources': [
-      'browser/web_resource/notification_promo.cc',
-      'browser/web_resource/notification_promo.h',
       'browser/web_resource/notification_promo_helper.cc',
       'browser/web_resource/notification_promo_helper.h',
-      'browser/web_resource/promo_resource_service.cc',
-      'browser/web_resource/promo_resource_service.h',
     ],
     'chrome_browser_webrtc_sources': [
       # TODO(brettw) should webrtc_log_list.cc go here?
@@ -3095,7 +3107,6 @@
         # NOTE: New dependencies should generally be added in the OS!="ios"
         # dependencies block below, rather than here.
         'browser_ui',
-        'cert_logger_proto',
         'chrome_resources.gyp:chrome_extra_resources',
         'chrome_resources.gyp:chrome_resources',
         'chrome_resources.gyp:chrome_strings',
@@ -3103,7 +3114,6 @@
         'chrome_resources.gyp:platform_locale_settings',
         'chrome_resources.gyp:theme_resources',
         'common',
-        'encrypted_cert_logger_proto',
         'probe_message_proto',
         '../components/components.gyp:autofill_core_browser',
         '../components/components.gyp:bookmarks_browser',
@@ -3118,6 +3128,7 @@
         '../components/components.gyp:content_settings_core_common',
         '../components/components.gyp:crx_file',
         '../components/components.gyp:data_reduction_proxy_core_browser',
+        '../components/components.gyp:data_use_measurement_core',
         '../components/components.gyp:domain_reliability',
         '../components/components.gyp:enhanced_bookmarks',
         '../components/components.gyp:favicon_base',
@@ -3131,9 +3142,7 @@
         '../components/components.gyp:instance_id',
         '../components/components.gyp:invalidation_impl',
         '../components/components.gyp:metrics',
-        '../components/components.gyp:metrics_gpu',
         '../components/components.gyp:metrics_net',
-        '../components/components.gyp:metrics_profiler',
         '../components/components.gyp:navigation_metrics',
         '../components/components.gyp:network_time',
         '../components/components.gyp:offline_pages',
@@ -3233,15 +3242,21 @@
             '../components/components.gyp:about_handler',
             '../components/components.gyp:autofill_content_browser',
             '../components/components.gyp:browsing_data',
+            '../components/components.gyp:certificate_reporting',
             '../components/components.gyp:data_reduction_proxy_content_browser',
+            '../components/components.gyp:data_use_measurement_content',
             '../components/components.gyp:devtools_discovery',
             '../components/components.gyp:devtools_http_handler',
             '../components/components.gyp:dom_distiller_content_browser',
+            '../components/components.gyp:error_page_common',
             '../components/components.gyp:favicon_content',
             '../components/components.gyp:guest_view_browser',
             '../components/components.gyp:history_content_browser',
             '../components/components.gyp:keyed_service_content',
             '../components/components.gyp:navigation_interception',
+            '../components/components.gyp:network_hints_common',
+            '../components/components.gyp:metrics_gpu',
+            '../components/components.gyp:metrics_profiler',
             '../components/components.gyp:packed_ct_ev_whitelist',
             '../components/components.gyp:password_manager_content_browser',
             '../components/components.gyp:password_manager_sync_browser',
@@ -3261,6 +3276,7 @@
             '../components/components.gyp:web_modal',
             '../components/components.gyp:web_resource',
             '../content/app/resources/content_resources.gyp:content_resources',
+            '../gpu/gpu.gyp:gpu',
             '../media/media.gyp:media',
             '../media/mojo/interfaces/mojo_bindings.gyp:platform_verification_api',
             '../mojo/mojo_base.gyp:mojo_application_base',
@@ -3492,6 +3508,13 @@
               'dependencies': [
                 'safe_browsing_proto',
               ],
+              'conditions': [
+                ['OS=="win"', {
+                  'dependencies': [
+                    'incident_reporting_state_store_data_proto',
+                  ],
+                }],
+              ],
             }],
             ['safe_browsing == 3', {
               'sources': [ '<@(chrome_browser_safe_browsing_mobile_extended_sources)' ],
@@ -3530,8 +3553,6 @@
             '../components/components.gyp:user_manager',
             '../ui/chromeos/ui_chromeos.gyp:ui_chromeos_resources',
           ],
-        }, {  # Non-ChromeOS.
-          'sources': [ '<@(chrome_browser_non_chromeos_sources)' ],
         }],
         ['use_cups==1', {
           'dependencies': [
@@ -3640,6 +3661,7 @@
           'sources': [ '<@(chrome_browser_non_mobile_sources)' ],
           'dependencies': [
             '../components/components.gyp:feedback_component',
+            '../components/components.gyp:webusb',
             '../device/core/core.gyp:device_core',
             '../device/devices_app/devices_app.gyp:devices_app_public_cpp',
             '../device/devices_app/devices_app.gyp:devices_app_public_cpp_factory',
@@ -3878,32 +3900,6 @@
       ],
     },
     {
-      # Protobuf compiler / generator for the certificate error reporting
-      # protocol buffer.
-      # GN version: //chrome/browser/ssl:cert_logger_proto
-      'target_name': 'cert_logger_proto',
-      'type': 'static_library',
-      'sources': [ 'browser/ssl/cert_logger.proto', ],
-      'variables': {
-        'proto_in_dir': 'browser/ssl',
-        'proto_out_dir': 'chrome/browser/ssl',
-      },
-      'includes': [ '../build/protoc.gypi', ],
-    },
-    {
-      # Protobuf compiler / generator for the encrypted certificate
-      #  reports protocol buffer.
-      # GN version: //chrome/browser/net:encrypted_cert_logger_proto
-      'target_name': 'encrypted_cert_logger_proto',
-      'type': 'static_library',
-      'sources': [ 'browser/net/encrypted_cert_logger.proto', ],
-      'variables': {
-        'proto_in_dir': 'browser/net',
-        'proto_out_dir': 'chrome/browser/net',
-      },
-      'includes': [ '../build/protoc.gypi', ],
-    },
-    {
       # Protobuf compiler / generator for Probe Message.
       # GN version: //chrome/browser/net:probe_message_proto
       'target_name': 'probe_message_proto',
@@ -3953,6 +3949,19 @@
         'proto_out_dir': 'chrome/browser/safe_browsing',
       },
       'includes': [ '../build/protoc.gypi' ]
+    },
+    {
+      # Protobuf compiler / generator for the safebrowsing incident reporting
+      # service state store data protocol buffer.
+      # GN version: //chrome/browser/safe_browsing/incident_reporting:state_store_data_proto
+      'target_name': 'incident_reporting_state_store_data_proto',
+      'type': 'static_library',
+      'sources': [ 'browser/safe_browsing/incident_reporting/state_store_data.proto' ],
+      'variables': {
+        'proto_in_dir': 'browser/safe_browsing/incident_reporting',
+        'proto_out_dir': 'chrome/browser/safe_browsing/incident_reporting',
+      },
+      'includes': [ '../build/protoc.gypi' ],
     },
   ],
   'conditions': [

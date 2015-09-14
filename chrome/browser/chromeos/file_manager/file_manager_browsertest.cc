@@ -179,7 +179,17 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
         TestParameter(NOT_IN_GUEST_MODE,
                       "copyFromDirectoryTreeWithKeyboardShortcut"),
         TestParameter(IN_GUEST_MODE,
-                      "copyFromDirectoryTreeWithKeyboardShortcut")));
+                      "copyFromDirectoryTreeWithKeyboardShortcut"),
+        TestParameter(NOT_IN_GUEST_MODE, "cutFromDirectoryTreeWithContextMenu"),
+        TestParameter(IN_GUEST_MODE, "cutFromDirectoryTreeWithContextMenu"),
+        TestParameter(NOT_IN_GUEST_MODE,
+                      "cutFromDirectoryTreeWithKeyboardShortcut"),
+        TestParameter(IN_GUEST_MODE,
+                      "cutFromDirectoryTreeWithKeyboardShortcut"),
+        TestParameter(NOT_IN_GUEST_MODE,
+                      "pasteIntoFolderFromDirectoryTreeWithContextMenu"),
+        TestParameter(IN_GUEST_MODE,
+                      "pasteIntoFolderFromDirectoryTreeWithContextMenu")));
 
 // Fails on official build. http://crbug.com/429294
 #if defined(DISABLE_SLOW_FILESAPP_TESTS) || defined(OFFICIAL_BUILD)
@@ -351,8 +361,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE, "sortColumns"),
                       TestParameter(IN_GUEST_MODE, "sortColumns")));
 
-// http://crbug.com/508949
-#if defined(MEMORY_SANITIZER)
+#if defined(DISABLE_SLOW_FILESAPP_TESTS)
 #define MAYBE_TabIndex DISABLED_TabIndex
 #else
 #define MAYBE_TabIndex TabIndex
@@ -372,8 +381,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE, "tabindexFocus")));
 
-// http://crbug.com/508949
-#if defined(MEMORY_SANITIZER)
+#if defined(DISABLE_SLOW_FILESAPP_TESTS)
 #define MAYBE_TabindexFocusDownloads DISABLED_TabindexFocusDownloads
 #else
 #define MAYBE_TabindexFocusDownloads TabindexFocusDownloads
@@ -398,10 +406,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
                                     "tabindexFocusDirectorySelected")));
 
 // Fails on official cros trunk build. http://crbug.com/480491
-#if defined(OFFICIAL_BUILD)
-#define MAYBE_TabindexOpenDialog DISABLED_TabindexOpenDialog
-#elif defined(MEMORY_SANITIZER)
-// http://crbug.com/508949
+#if defined(DISABLE_SLOW_FILESAPP_TESTS) || defined(OFFICIAL_BUILD)
 #define MAYBE_TabindexOpenDialog DISABLED_TabindexOpenDialog
 #else
 #define MAYBE_TabindexOpenDialog TabindexOpenDialog
@@ -415,10 +420,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
         TestParameter(IN_GUEST_MODE, "tabindexOpenDialogDownloads")));
 
 // Fails on official build. http://crbug.com/482121.
-#if defined(OFFICIAL_BUILD)
-#define MAYBE_TabindexSaveFileDialog DISABLED_TabindexSaveFileDialog
-#elif defined(MEMORY_SANITIZER)
-// http://crbug.com/508949
+#if defined(DISABLE_SLOW_FILESAPP_TESTS) || defined(OFFICIAL_BUILD)
 #define MAYBE_TabindexSaveFileDialog DISABLED_TabindexSaveFileDialog
 #else
 #define MAYBE_TabindexSaveFileDialog TabindexSaveFileDialog
@@ -481,8 +483,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
                       TestParameter(IN_GUEST_MODE, "showGridViewDownloads"),
                       TestParameter(NOT_IN_GUEST_MODE, "showGridViewDrive")));
 
-// http://crbug.com/508949
-#if defined(MEMORY_SANITIZER)
+#if defined(DISABLE_SLOW_FILESAPP_TESTS)
 #define MAYBE_Providers DISABLED_Providers
 #else
 #define MAYBE_Providers Providers

@@ -807,7 +807,7 @@ TEST(PictureLayerTilingTest, ViewportDistanceWithScale) {
                                          settings);
   tiling->set_resolution(HIGH_RESOLUTION);
   gfx::Rect viewport_in_content_space =
-      gfx::ToEnclosedRect(gfx::ScaleRect(viewport, 0.25f));
+      gfx::ScaleToEnclosedRect(viewport, 0.25f);
 
   tiling->ComputeTilePriorityRects(viewport, 1.f, 1.0, Occlusion());
   auto prioritized_tiles = tiling->UpdateAndGetAllPrioritizedTilesForTesting();
@@ -882,8 +882,7 @@ TEST(PictureLayerTilingTest, ViewportDistanceWithScale) {
 
   // Move the viewport down 40 pixels.
   viewport = gfx::Rect(0, 40, 100, 100);
-  viewport_in_content_space =
-      gfx::ToEnclosedRect(gfx::ScaleRect(viewport, 0.25f));
+  viewport_in_content_space = gfx::ScaleToEnclosedRect(viewport, 0.25f);
   gfx::Rect skewport = tiling->ComputeSkewport(2.0, viewport_in_content_space);
 
   // Compute the soon border.
@@ -1797,8 +1796,8 @@ TEST_F(PictureLayerTilingIteratorTest, GiantRect) {
   float contents_scale = 1.f;
 
   client_.SetTileSize(tile_size);
-  scoped_refptr<FakePicturePileImpl> pile =
-      FakePicturePileImpl::CreatePile(tile_size, layer_size, filled);
+  scoped_refptr<FakePicturePileImpl> pile = FakePicturePileImpl::CreatePile(
+      tile_size, layer_size, gfx::Rect(), filled);
   tiling_ = TestablePictureLayerTiling::Create(
       PENDING_TREE, contents_scale, pile, &client_, LayerTreeSettings());
 

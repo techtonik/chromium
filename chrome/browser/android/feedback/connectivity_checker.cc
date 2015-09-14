@@ -164,11 +164,11 @@ void ConnectivityChecker::OnTimeout() {
 }  // namespace
 
 void CheckConnectivity(JNIEnv* env,
-                       jclass clazz,
-                       jobject j_profile,
-                       jstring j_url,
+                       const JavaParamRef<jclass>& clazz,
+                       const JavaParamRef<jobject>& j_profile,
+                       const JavaParamRef<jstring>& j_url,
                        jlong j_timeout_ms,
-                       jobject j_callback) {
+                       const JavaParamRef<jobject>& j_callback) {
   Profile* profile = ProfileAndroid::FromProfileAndroid(j_profile);
   if (!profile) {
     PostCallback(env, j_callback, CONNECTIVITY_CHECK_RESULT_ERROR);
@@ -183,11 +183,13 @@ void CheckConnectivity(JNIEnv* env,
   // This object will be deleted when the connectivity check has completed.
   ConnectivityChecker* connectivity_checker = new ConnectivityChecker(
       profile, url, base::TimeDelta::FromMilliseconds(j_timeout_ms),
-      base::android::ScopedJavaLocalRef<jobject>(env, j_callback));
+      j_callback);
   connectivity_checker->StartAsyncCheck();
 }
 
-jboolean IsUrlValid(JNIEnv* env, jclass clazz, jstring j_url) {
+jboolean IsUrlValid(JNIEnv* env,
+                    const JavaParamRef<jclass>& clazz,
+                    const JavaParamRef<jstring>& j_url) {
   GURL url(base::android::ConvertJavaStringToUTF8(env, j_url));
   return url.is_valid();
 }

@@ -11,6 +11,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "media/base/decoder_buffer.h"
+#include "media/base/video_decoder_config.h"
 #include "media/base/video_util.h"
 
 namespace media {
@@ -154,6 +155,10 @@ static VideoCodec CodecIDToVideoCodec(AVCodecID codec_id) {
   switch (codec_id) {
     case AV_CODEC_ID_H264:
       return kCodecH264;
+#if defined(ENABLE_HEVC_DEMUXING)
+    case AV_CODEC_ID_HEVC:
+      return kCodecHEVC;
+#endif
     case AV_CODEC_ID_THEORA:
       return kCodecTheora;
     case AV_CODEC_ID_MPEG4:
@@ -172,6 +177,10 @@ AVCodecID VideoCodecToCodecID(VideoCodec video_codec) {
   switch (video_codec) {
     case kCodecH264:
       return AV_CODEC_ID_H264;
+#if defined(ENABLE_HEVC_DEMUXING)
+    case kCodecHEVC:
+      return AV_CODEC_ID_HEVC;
+#endif
     case kCodecTheora:
       return AV_CODEC_ID_THEORA;
     case kCodecMPEG4:

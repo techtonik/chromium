@@ -12,6 +12,7 @@
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "chrome/browser/certificate_viewer.h"
 #include "chrome/browser/file_select_helper.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
@@ -527,6 +528,22 @@ void DevToolsWindow::InspectElement(
     window->inspect_element_start_time_ = start_time;
 }
 
+// static
+content::DevToolsExternalAgentProxyDelegate*
+DevToolsWindow::CreateWebSocketAPIChannel(const std::string& path) {
+  if (path.find("/devtools/frontend_api") != 0)
+    return nullptr;
+  DevToolsWindows* instances = g_instances.Pointer();
+  if (g_instances == nullptr)
+    return nullptr;
+  for (DevToolsWindow* window : *instances) {
+    auto result = window->bindings_->CreateWebSocketAPIChannel();
+    if (result)
+      return result;
+  }
+  return nullptr;
+}
+
 void DevToolsWindow::ScheduleShow(const DevToolsToggleAction& action) {
   if (life_stage_ == kLoadCompleted) {
     Show(action);
@@ -842,6 +859,12 @@ WebContents* DevToolsWindow::OpenURLFromTab(
   content::NavigationController::LoadURLParams load_url_params(params.url);
   main_web_contents_->GetController().LoadURLWithParams(load_url_params);
   return main_web_contents_;
+}
+
+void DevToolsWindow::ShowCertificateViewer(int certificate_id) {
+  ::ShowCertificateViewerByID(
+      is_docked_ ? GetInspectedWebContents() : main_web_contents_,
+      nullptr, certificate_id);
 }
 
 void DevToolsWindow::ActivateContents(WebContents* contents) {

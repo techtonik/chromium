@@ -7,7 +7,7 @@
 #include "base/deferred_sequenced_task_runner.h"
 #include "base/message_loop/message_loop.h"
 #include "base/thread_task_runner_handle.h"
-#include "sync/engine/model_type_sync_proxy_impl.h"
+#include "sync/engine/model_type_processor_impl.h"
 #include "sync/internal_api/public/base/model_type.h"
 #include "sync/sessions/model_type_registry.h"
 #include "sync/test/engine/fake_model_worker.h"
@@ -16,8 +16,6 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace syncer {
-
-using syncer_v2::ModelTypeSyncProxyImpl;
 
 class ModelTypeRegistryTest : public ::testing::Test {
  public:
@@ -145,8 +143,10 @@ TEST_F(ModelTypeRegistryTest, SetEnabledDirectoryTypes_OffAndOn) {
 }
 
 TEST_F(ModelTypeRegistryTest, NonBlockingTypes) {
-  ModelTypeSyncProxyImpl themes_sync_proxy(syncer::THEMES);
-  ModelTypeSyncProxyImpl sessions_sync_proxy(syncer::SESSIONS);
+  syncer_v2::ModelTypeProcessorImpl themes_sync_proxy(
+      syncer::THEMES, base::WeakPtr<syncer_v2::ModelTypeStore>());
+  syncer_v2::ModelTypeProcessorImpl sessions_sync_proxy(
+      syncer::SESSIONS, base::WeakPtr<syncer_v2::ModelTypeStore>());
   scoped_refptr<base::DeferredSequencedTaskRunner> task_runner =
       new base::DeferredSequencedTaskRunner(
           base::ThreadTaskRunnerHandle::Get());
@@ -176,8 +176,10 @@ TEST_F(ModelTypeRegistryTest, NonBlockingTypes) {
 }
 
 TEST_F(ModelTypeRegistryTest, NonBlockingTypesWithDirectoryTypes) {
-  ModelTypeSyncProxyImpl themes_sync_proxy(syncer::THEMES);
-  ModelTypeSyncProxyImpl sessions_sync_proxy(syncer::SESSIONS);
+  syncer_v2::ModelTypeProcessorImpl themes_sync_proxy(
+      syncer::THEMES, base::WeakPtr<syncer_v2::ModelTypeStore>());
+  syncer_v2::ModelTypeProcessorImpl sessions_sync_proxy(
+      syncer::SESSIONS, base::WeakPtr<syncer_v2::ModelTypeStore>());
   scoped_refptr<base::DeferredSequencedTaskRunner> task_runner =
       new base::DeferredSequencedTaskRunner(
           base::ThreadTaskRunnerHandle::Get());
@@ -224,10 +226,12 @@ TEST_F(ModelTypeRegistryTest, NonBlockingTypesWithDirectoryTypes) {
 }
 
 TEST_F(ModelTypeRegistryTest, DeletionOrdering) {
-  scoped_ptr<ModelTypeSyncProxyImpl> themes_sync_proxy(
-      new ModelTypeSyncProxyImpl(syncer::THEMES));
-  scoped_ptr<ModelTypeSyncProxyImpl> sessions_sync_proxy(
-      new ModelTypeSyncProxyImpl(syncer::SESSIONS));
+  scoped_ptr<syncer_v2::ModelTypeProcessorImpl> themes_sync_proxy(
+      new syncer_v2::ModelTypeProcessorImpl(
+          syncer::THEMES, base::WeakPtr<syncer_v2::ModelTypeStore>()));
+  scoped_ptr<syncer_v2::ModelTypeProcessorImpl> sessions_sync_proxy(
+      new syncer_v2::ModelTypeProcessorImpl(
+          syncer::SESSIONS, base::WeakPtr<syncer_v2::ModelTypeStore>()));
   scoped_refptr<base::DeferredSequencedTaskRunner> task_runner =
       new base::DeferredSequencedTaskRunner(
           base::ThreadTaskRunnerHandle::Get());

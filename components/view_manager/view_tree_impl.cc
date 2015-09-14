@@ -10,6 +10,7 @@
 #include "components/view_manager/default_access_policy.h"
 #include "components/view_manager/display_manager.h"
 #include "components/view_manager/server_view.h"
+#include "components/view_manager/view_tree_host_impl.h"
 #include "components/view_manager/window_manager_access_policy.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
 #include "mojo/converters/ime/ime_type_converters.h"
@@ -42,10 +43,14 @@ ViewTreeImpl::ViewTreeImpl(
   ServerView* view = GetView(root_id);
   CHECK(view);
   root_.reset(new ViewId(root_id));
-  if (view->GetRoot() == view)
+  if (view->GetRoot() == view) {
     access_policy_.reset(new WindowManagerAccessPolicy(id_, this));
-  else
+    is_embed_root_ = true;
+  } else {
     access_policy_.reset(new DefaultAccessPolicy(id_, this));
+    is_embed_root_ = (view->get_and_clear_pending_access_policy() &
+                      ViewTree::ACCESS_POLICY_EMBED_ROOT) != 0;
+  }
 }
 
 ViewTreeImpl::~ViewTreeImpl() {
@@ -59,14 +64,18 @@ void ViewTreeImpl::Init(mojo::ViewTreeClient* client, mojo::ViewTreePtr tree) {
   if (root_.get())
     GetUnknownViewsFrom(GetView(*root_), &to_send);
 
-  const ServerView* focused_view = connection_manager_->GetFocusedView();
+  // TODO(beng): verify that host can actually be nullptr here.
+  ViewTreeHostImpl* host = GetHost();
+  const ServerView* focused_view = host ? host->GetFocusedView() : nullptr;
   if (focused_view)
     focused_view = access_policy_->GetViewForFocusChange(focused_view);
   const mojo::Id focused_view_transport_id(
       ViewIdToTransportId(focused_view ? focused_view->id() : ViewId()));
 
   client->OnEmbed(id_, ViewToViewData(to_send.front()), tree.Pass(),
-                  focused_view_transport_id);
+                  focused_view_transport_id,
+                  is_embed_root_ ? ViewTree::ACCESS_POLICY_EMBED_ROOT
+                                 : ViewTree::ACCESS_POLICY_DEFAULT);
 }
 
 const ServerView* ViewTreeImpl::GetView(const ViewId& id) const {
@@ -81,12 +90,21 @@ bool ViewTreeImpl::IsRoot(const ViewId& id) const {
   return root_.get() && *root_ == id;
 }
 
+ViewTreeHostImpl* ViewTreeImpl::GetHost() {
+  return root_.get() ?
+      connection_manager_->GetViewTreeHostByView(GetView(*root_)) : nullptr;
+}
+
 void ViewTreeImpl::OnWillDestroyViewTreeImpl(
     ViewTreeImpl* connection) {
   if (creator_id_ == connection->id())
     creator_id_ = kInvalidConnectionId;
-  if (connection->root_ && connection->root_->connection_id == id_ &&
-      view_map_.count(connection->root_->view_id) > 0) {
+  const ServerView* connection_root =
+      connection->root_ ? connection->GetView(*connection->root_) : nullptr;
+  if (connection_root &&
+      ((connection_root->id().connection_id == id_ &&
+        view_map_.count(connection_root->id().view_id) > 0) ||
+       (is_embed_root_ && IsViewKnown(connection_root)))) {
     client()->OnEmbeddedAppDisconnected(
         ViewIdToTransportId(*connection->root_));
   }
@@ -137,12 +155,16 @@ bool ViewTreeImpl::SetViewVisibility(const ViewId& view_id, bool visible) {
 }
 
 bool ViewTreeImpl::Embed(const ViewId& view_id,
-                         mojo::ViewTreeClientPtr client) {
+                         mojo::ViewTreeClientPtr client,
+                         mojo::ConnectionSpecificId* connection_id) {
+  *connection_id = kInvalidConnectionId;
   if (!client.get() || !CanEmbed(view_id))
     return false;
   PrepareForEmbed(view_id);
-  ::ignore_result(
-      connection_manager_->EmbedAtView(id_, view_id, client.Pass()));
+  ViewTreeImpl* new_connection =
+      connection_manager_->EmbedAtView(id_, view_id, client.Pass());
+  if (is_embed_root_)
+    *connection_id = new_connection->id();
   return true;
 }
 
@@ -618,37 +640,56 @@ void ViewTreeImpl::SetViewTextInputState(
     view->SetTextInputState(state.To<ui::TextInputState>());
 }
 
-void ViewTreeImpl::SetImeVisibility(uint32_t view_id,
+void ViewTreeImpl::SetImeVisibility(Id transport_view_id,
                                     bool visible,
                                     mojo::TextInputStatePtr state) {
-  ServerView* view = GetView(ViewIdFromTransportId(view_id));
+  ServerView* view = GetView(ViewIdFromTransportId(transport_view_id));
   bool success = view && access_policy_->CanSetViewTextInputState(view);
   if (success) {
     if (!state.is_null())
       view->SetTextInputState(state.To<ui::TextInputState>());
-    connection_manager_->SetImeVisibility(view, visible);
+
+    ViewTreeHostImpl* host = GetHost();
+    if (host)
+      host->SetImeVisibility(view, visible);
   }
 }
 
-void ViewTreeImpl::SetEmbedRoot() {
-  is_embed_root_ = true;
+void ViewTreeImpl::SetAccessPolicy(Id transport_view_id,
+                                   uint32 policy_bitmask) {
+  const ViewId view_id(ViewIdFromTransportId(transport_view_id));
+  ServerView* view = GetView(view_id);
+  if (!view)
+    return;
+
+  ViewTreeImpl* existing_owner =
+      connection_manager_->GetConnectionWithRoot(view_id);
+  if (existing_owner)
+    return;  // Only allow changing the access policy when nothing is embedded.
+
+  if (access_policy_->CanSetAccessPolicy(view))
+    view->set_pending_access_policy(policy_bitmask);
 }
 
 void ViewTreeImpl::Embed(mojo::Id transport_view_id,
                          mojo::ViewTreeClientPtr client,
-                         const mojo::Callback<void(bool)>& callback) {
-  callback.Run(Embed(ViewIdFromTransportId(transport_view_id), client.Pass()));
+                         const EmbedCallback& callback) {
+  mojo::ConnectionSpecificId connection_id = kInvalidConnectionId;
+  const bool result = Embed(ViewIdFromTransportId(transport_view_id),
+                            client.Pass(), &connection_id);
+  callback.Run(result, connection_id);
 }
 
-void ViewTreeImpl::SetFocus(uint32_t view_id,
-                            const SetFocusCallback& callback) {
+void ViewTreeImpl::SetFocus(uint32_t view_id) {
   ServerView* view = GetView(ViewIdFromTransportId(view_id));
-  bool success = view && view->IsDrawn() && access_policy_->CanSetFocus(view);
-  if (success) {
+  // TODO(beng): consider shifting non-policy drawn check logic to VTH's
+  //             FocusController.
+  if (view && view->IsDrawn() && access_policy_->CanSetFocus(view)) {
     ConnectionManager::ScopedChange change(this, connection_manager_, false);
-    connection_manager_->SetFocusedView(view);
+    ViewTreeHostImpl* host = GetHost();
+    if (host)
+      host->SetFocusedView(view);
   }
-  callback.Run(success);
 }
 
 bool ViewTreeImpl::IsRootForAccessPolicy(const ViewId& id) const {

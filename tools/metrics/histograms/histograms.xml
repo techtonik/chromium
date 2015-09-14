@@ -639,6 +639,26 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Ash.Accelerators.Deprecated.LockScreen"
+    enum="DeprecatedAcceleratorUsage">
+  <owner>afakhry@chromium.org</owner>
+  <summary>
+    The lock screen action has two accelerators:   - Ctrl+Shift+L which is
+    deprecated.   - Search+L which is new. This histogram shows the number of
+    times each accelerator (deprecated and new) is used.
+  </summary>
+</histogram>
+
+<histogram name="Ash.Accelerators.Deprecated.ShowTaskManager"
+    enum="DeprecatedAcceleratorUsage">
+  <owner>afakhry@chromium.org</owner>
+  <summary>
+    Opening the task manager has two accelerators:   - Shift+Esc which is
+    deprecated.   - Search+Esc which is new. This histogram shows the number of
+    times each accelerator (deprecated and new) is used.
+  </summary>
+</histogram>
+
 <histogram name="Ash.ActiveTouchPoints">
   <owner>kuscher@google.com</owner>
   <owner>rbyers@chromium.org</owner>
@@ -1016,6 +1036,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>girard@chromium.org</owner>
   <summary>
     The total time that TouchView is not active during a session.
+  </summary>
+</histogram>
+
+<histogram name="Ash.Wallpaper.CustomLayout" enum="WallpaperLayout">
+  <owner>xdai@chromium.org</owner>
+  <summary>
+    The custom wallpaper layout type. Recorded when the user sets a new custom
+    wallpaper or changes the existing custom wallpaper's layout.
   </summary>
 </histogram>
 
@@ -2154,6 +2182,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Tracks whether Autofill is enabled when Chrome launches.</summary>
 </histogram>
 
+<histogram name="Autofill.KeyboardAccessoryButtonsIOS"
+    enum="AutofillKeyboardAccessoryButtonsIOS">
+  <owner>bondd@chromium.org</owner>
+  <summary>
+    [iOS] Measures the frequency of button presses on the iOS Autofill keyboard
+    accessory.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.MacAddressBook" enum="AutofillMacAddressBook">
   <obsolete>
     Deprecated as of 8/2015.
@@ -2425,6 +2462,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>The usefulness of Autofill server information.</summary>
 </histogram>
 
+<histogram name="Autofill.ServerResponseHasDataForForm"
+    enum="BooleanHadPredictions">
+  <owner>mathp@chromium.org</owner>
+  <summary>
+    Tracks whether Autofill server had at least some prediction data for a given
+    form at query response time.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.StoredProfileCount">
   <owner>isherman@chromium.org</owner>
   <summary>
@@ -2507,6 +2553,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Measures the frequency of various events in the Autofill user interaction
     flow.  By comparing frequencies, we can compute several interesting
     &quot;user happiness&quot; metrics.
+  </summary>
+</histogram>
+
+<histogram name="BackgroundMode.BackgroundApplicationsCount">
+  <owner>atwilson@chromium.org</owner>
+  <owner>mvanouwerkerk@chromium.org</owner>
+  <summary>
+    The number of background applications (extensions) for a profile that were
+    loaded after the profile was registered with the BackgroundModeManager.
   </summary>
 </histogram>
 
@@ -3092,6 +3147,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="BrowserRenderProcessHost.ChildLaunchFailures"
+    enum="RendererType">
+  <owner>wfh@chromium.org</owner>
+  <summary>Count of renderer process launch failures grouped by type.</summary>
+</histogram>
+
 <histogram name="BrowserRenderProcessHost.DisconnectedAlive"
     enum="RendererType">
   <owner>wfh@chromium.org</owner>
@@ -3099,6 +3160,72 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Count of renderer process crashes that we miscounted because we took the
     exit code too early. Grouped by type.
   </summary>
+</histogram>
+
+<histogram name="Bubbles.Close.Accepted" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>An open bubble was closed because the user accepted it.</summary>
+</histogram>
+
+<histogram name="Bubbles.Close.Canceled" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>
+    An open bubble was closed because the user didn't accept it.
+  </summary>
+</histogram>
+
+<histogram name="Bubbles.Close.FocusLost" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>An open bubble was closed because of a focus change.</summary>
+</histogram>
+
+<histogram name="Bubbles.Close.Forced" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>An open bubble was forced to close.</summary>
+</histogram>
+
+<histogram name="Bubbles.Close.FullscreenToggled" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>
+    An open bubble was dismissed because fullscreen was toggled.
+  </summary>
+</histogram>
+
+<histogram name="Bubbles.Close.Navigated" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>
+    An open bubble was dismissed because the page was navigated.
+  </summary>
+</histogram>
+
+<histogram name="Bubbles.Close.TabDetached" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>An open bubble was closed because a tab was detached.</summary>
+</histogram>
+
+<histogram name="Bubbles.Close.TabSwitched" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>An open bubble was closed because a tab was switched.</summary>
+</histogram>
+
+<histogram name="Bubbles.Close.UserDismissed" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>
+    An open bubble was dismissed by the user without making a decission.
+  </summary>
+</histogram>
+
+<histogram name="Bubbles.DisplayTime.All" units="milliseconds">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>
+    Log the amount of time any bubble was visible. Only bubbles that are shown
+    will have a visible time.
+  </summary>
+</histogram>
+
+<histogram name="Bubbles.NeverShown" enum="BubbleType">
+  <owner>hcarmona@chromium.org</owner>
+  <summary>A bubble was given to the bubble manager but not shown.</summary>
 </histogram>
 
 <histogram name="Canvas.ContextType" enum="CanvasContextType">
@@ -3774,8 +3901,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="ChromeOS.MemoryPressureLevel"
-    enum="ChromeOSMemoryPressureLevel">
+<histogram name="ChromeOS.MemoryPressureLevel" enum="MemoryPressureLevel">
   <owner>xdai@chromium.org</owner>
   <summary>
     The memory pressure level in ChromeOS, which is recorded periodically (once
@@ -4226,6 +4352,69 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Number of tries before successful ping. 99 means giving up.</summary>
 </histogram>
 
+<histogram
+    name="Compositing.Browser.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when display list recording source is updated (in a
+    browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.DisplayListRecordingSource.UpdateUs"
+    units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a display list, in microseconds.
+    Recorded when display list is updated (in a browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.PictureMemoryUsageKb" units="KB">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Total estimated memory used by SkPictures in the layer tree, in kilobytes.
+    Recorded once per frame, before the frame is drawn (in a browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.PicturePile.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when picture pile is updated (in a browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.PicturePile.UpdateUs" units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a picture pile, in microseconds.
+    Recorded when picture pile is updated (in a browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.RasterTask.RasterPixelsPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Rasterized area, in pixels, divided by rasterization time, in milliseconds,
+    of a compositor rasterization task. Recorded after the task finishes (in a
+    browser process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Browser.RasterTask.RasterUs" units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent completing a compositor rasterization task, in microseconds.
+    Recorded after the task finishes (in a browser process).
+  </summary>
+</histogram>
+
 <histogram name="Compositing.CopyFromSurfaceTime" units="ms">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -4244,6 +4433,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 <histogram
     name="Compositing.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs"
     units="pixels/ms">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Area of invalidated content, in pixels, divided by update (i.e. record), in
@@ -4253,6 +4446,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Compositing.DisplayListRecordingSource.UpdateUs"
     units="microseconds">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Time spent updating (i.e. recording) a display list, in microseconds.
@@ -4269,6 +4466,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Compositing.PictureMemoryUsageKb" units="KB">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Total estimated memory used by SkPictures in the layer tree, in kilobytes.
@@ -4278,6 +4479,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Compositing.PicturePile.UpdateInvalidatedAreaPerMs"
     units="pixels/ms">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Area of invalidated content, in pixels, divided by update (i.e. record), in
@@ -4286,6 +4491,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Compositing.PicturePile.UpdateUs" units="microseconds">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Time spent updating (i.e. recording) a picture pile, in microseconds.
@@ -4294,6 +4503,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Compositing.RasterTask.RasterPixelsPerMs" units="pixels/ms">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Rasterized area, in pixels, divided by rasterization time, in milliseconds,
@@ -4302,10 +4515,78 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Compositing.RasterTask.RasterUs" units="microseconds">
+  <obsolete>
+    Deprecated 09/2015, replaced by similar metrics under Compositing.Renderer
+    and Compositing.Browser, depending on which process it occurs in.
+  </obsolete>
   <owner>paint-dev@chromium.org</owner>
   <summary>
     Time spent completing a compositor rasterization task, in microseconds.
     Recorded after the task finishes.
+  </summary>
+</histogram>
+
+<histogram
+    name="Compositing.Renderer.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when display list recording source is updated (in a
+    renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.DisplayListRecordingSource.UpdateUs"
+    units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a display list, in microseconds.
+    Recorded when display list is updated (in a renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.PictureMemoryUsageKb" units="KB">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Total estimated memory used by SkPictures in the layer tree, in kilobytes.
+    Recorded once per frame, before the frame is drawn (in a renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.PicturePile.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when picture pile is updated (in a renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.PicturePile.UpdateUs"
+    units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a picture pile, in microseconds.
+    Recorded when picture pile is updated (in a renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.RasterTask.RasterPixelsPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Rasterized area, in pixels, divided by rasterization time, in milliseconds,
+    of a compositor rasterization task. Recorded after the task finishes (in a
+    renderer process).
+  </summary>
+</histogram>
+
+<histogram name="Compositing.Renderer.RasterTask.RasterUs" units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent completing a compositor rasterization task, in microseconds.
+    Recorded after the task finishes (in a renderer process).
   </summary>
 </histogram>
 
@@ -4753,6 +5034,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.Shutdown.NumberOfCookiesDeleted">
+  <obsolete>
+    Deprecated as of 9/2015. The associated experiment was flawed.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     The number of session cookies deleted on shutdown. This metric is emitted
@@ -4761,6 +5045,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.Shutdown.TimeSpentDeletingCookies" units="ms">
+  <obsolete>
+    Deprecated as of 9/2015. The associated experiment was flawed.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     The amount of time required to delete session cookies on shutdown. This
@@ -5648,6 +5935,30 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="DataUse.MessageSize" units="bytes">
+  <owner>amohammadkhan@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The request and reponse size of the messages exchanged by a service. It is
+    logged when the URLReqeust of a service is completed. The service name is
+    added as a suffix to this histogram name.
+  </summary>
+</histogram>
+
+<histogram name="DataUse.MessageSize.AllServices" enum="DataUseServices">
+  <owner>amohammadkhan@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The request and reponse size of the messages exchanged by all the services.
+    Whenever a URLRequest of a service is completed, the number of exchanged
+    bytes is logged in this histogram. The buckets in this histogram are
+    services, so it makes it possible to compare the use of different services
+    in different conditions. Different conditions are added as suffixes to this
+    histogram. If the OS is not Android all the requests are considered
+    foreground.
+  </summary>
+</histogram>
+
 <histogram name="DataUse.Sync.Download.Bytes" enum="SyncModelTypes">
   <owner>amohammadkhan@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
@@ -5693,6 +6004,26 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Number of uploaded entities of different data types in Sync service for sent
     commits. Updated when a commit message is sent to sync server.
+  </summary>
+</histogram>
+
+<histogram name="DataUse.TrafficSize.System" units="bytes">
+  <owner>amohammadkhan@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The total data use of Chrome's services. There is no ResourceRequestInfo
+    attached to these requests. If the OS is not Android all the requests are
+    considered foreground.
+  </summary>
+</histogram>
+
+<histogram name="DataUse.TrafficSize.User" units="bytes">
+  <owner>amohammadkhan@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The total amount of data use of Chrome for user traffic. This traffic has
+    content::ResourceRequestInfo attached to its request. If the OS is not
+    Android all the requests are considered foreground.
   </summary>
 </histogram>
 
@@ -5908,10 +6239,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Diagnostics.Recovery.SQLiteIntegrityArchivedHistory"
     enum="DiagnosticsResult">
+  <obsolete>
+    Removed as of Jun 2014: we no longer have an archived database.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Shows the success and failure rates of the SQLiteIntegrityArchivedHistory
-    recovery step that runs on recovery startups.  The recovery step attempts to
+    recovery step that runs on recovery startups. The recovery step attempts to
     guarantee the SQLiteIntegrityArchivedHistory test, which checks the
     integrity of the Archived History database, would pass on the next startup.
   </summary>
@@ -6127,6 +6461,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Diagnostics.Test.SQLiteIntegrityArchivedHistory"
     enum="DiagnosticsResult">
+  <obsolete>
+    Removed as of Jun 2014: we no longer have an archived database.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Shows the success and failure rates of the SQLiteIntegrityArchivedHistory
@@ -13975,12 +14312,31 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram
+    name="History.ClearBrowsingData.PasswordsDeletion.AdditionalDatatypesCount">
+  <owner>msramek@chromium.org</owner>
+  <summary>
+    Recorded when the user deletes their passwords in the ClearBrowsingData
+    dialog. Counts how many other data types were selected for deletion.
+  </summary>
+</histogram>
+
 <histogram name="History.ClearBrowsingData.UserDeletedCookieOrCache"
     enum="CookieOrCacheDeletion">
   <owner>msramek@chromium.org</owner>
   <summary>
     Recorded when the user deletes their browsing data. Shows whether cookies
     and/or cache were among the selected data types.
+  </summary>
+</histogram>
+
+<histogram name="History.ClearBrowsingData.UserDeletedCookieOrCacheFromDialog"
+    enum="CookieOrCacheDeletion">
+  <owner>msramek@chromium.org</owner>
+  <summary>
+    Recorded when the user deletes their browsing data manually from the
+    ClearBrowsingData dialog. Shows whether cookies and/or cache were among the
+    selected data types.
   </summary>
 </histogram>
 
@@ -16596,6 +16952,27 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Bits per channel of HTML5 audio sample data.</summary>
 </histogram>
 
+<histogram name="Media.AudioCapturerAudioGlitches" enum="AudioGlitchResult">
+  <owner>grunell@chromium.org</owner>
+  <summary>
+    Whether input audio glitches due to input audio read verifications that
+    missed dealine are detected. Sampled when a low-latency input audio stream
+    is destructed.
+  </summary>
+</histogram>
+
+<histogram name="Media.AudioCapturerMissedReadDeadline" units="%">
+  <owner>grunell@chromium.org</owner>
+  <summary>
+    The percentage of input audio read verifications that missed its realtime
+    deadline. The read verification ensures that data is not overwritten in the
+    shared ring buffer on the browser/renderer boundary before read by the other
+    side. Missing the deadline means that the reading side hasn't read data in
+    time and we had to drop audio input data. Reported at the destruction of
+    low-latency audio input stream.
+  </summary>
+</histogram>
+
 <histogram name="Media.AudioChannelLayout" enum="ChannelLayout">
   <owner>dalecurtis@chromium.org</owner>
   <summary>Audio channel layout in HTML5 media.</summary>
@@ -16701,6 +17078,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Media.AudioTrackProcessingStates"
     enum="AudioTrackProcessingStates">
+  <owner>grunell@chromium.org</owner>
   <summary>
     State of the media stream audio track processing, sampled once during the
     life time of a MediaStreamAudioProcessor.
@@ -18070,9 +18448,17 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 <histogram name="Memory.PressureLevel" enum="MemoryPressureLevel">
   <owner>chrisha@chromium.org</owner>
   <summary>
-    The memory pressure level, which is recorded periodically (once per second).
-    This is used to show the relative time that systems spend in each of the
-    memory pressure states.
+    The memory pressure level, which is recorded periodically. This shows the
+    cumulative number of seconds that systems spend in each of the memory
+    pressure states.
+  </summary>
+</histogram>
+
+<histogram name="Memory.PressureLevelChanges" enum="MemoryPressureLevelChanges">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    The number of pressure level state changes for each possible pairwise state
+    change.
   </summary>
 </histogram>
 
@@ -22094,7 +22480,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>bengr@chromium.org</owner>
   <summary>
     The difference between the size specified in the X-Original-Content-Length
-    header and the size of teh response body. This is zero if the
+    header and the size of the response body. This is zero if the
     X-Original-Content-Length header is not present in the response.
   </summary>
 </histogram>
@@ -29831,6 +30217,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Pepper.SecureOrigin.MediaStreamRequest" enum="BooleanSecure">
+  <owner>raymes@chromium.org</owner>
+  <summary>
+    Whether a Pepper media stream request (mic/cam access) comes from a plugin
+    in a secure or an insecure origin.
+  </summary>
+</histogram>
+
 <histogram name="PerformanceMonitor.AverageCPU" units="PercentCPUUsage">
   <owner>oysteine@chromium.org</owner>
   <summary>
@@ -33295,6 +33689,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Precache.Fetch.FailureReasons">
+  <owner>twifkak@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    A bit vector of reasons why the precache fetch failed to start. Bit values
+    are documented in the FailureReason Java enum.
+  </summary>
+</histogram>
+
 <histogram name="Precache.Fetch.PercentCompleted" units="percentage">
   <owner>twifkak@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
@@ -35571,6 +35974,17 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     The amount by which GPU latency was underestimated in a particular frame (0
     if the latency was perfectly predicted or overestimated).
+  </summary>
+</histogram>
+
+<histogram name="Renderer.Hung.MobileInfoBar.UserEvent"
+    enum="MobileHungRendererInfoBarEvent">
+  <owner>jdduke@chromium.org</owner>
+  <summary>
+    Android: Records the terminal event associated with a hung renderer infobar.
+    This includes both the explicit user actions as well as implicit dismissals,
+    e.g., when the renderer regains responsiveness before the infobar is
+    interactively dismissed.
   </summary>
 </histogram>
 
@@ -38333,6 +38747,16 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="SBClientPhishing.ClientModelDownloadResponseOrErrorCode"
+    enum="CombinedHttpResponseAndNetErrorCode">
+  <owner>vakh@google.com</owner>
+  <summary>
+    Response or error codes from the SafeBrowsing service. Logged after a
+    request for the client side model finishes to capture the response code or
+    the error code for that HTTP request.
+  </summary>
+</histogram>
+
 <histogram name="SBClientPhishing.ClientModelStatus"
     enum="SBClientPhishingClientModelStatus">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
@@ -38589,21 +39013,21 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.BLAHashTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The elapsed time to compute the hash of a blacklisted module.
   </summary>
 </histogram>
 
 <histogram name="SBIRS.BLASignatureTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The elapsed time to validate the signature of a blacklisted module.
   </summary>
 </histogram>
 
 <histogram name="SBIRS.DiscardedIncident" enum="IncidentType">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident discarded by the safe browsing incident reporting
     service as a result of profile or service destruction.
@@ -38611,22 +39035,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.DownloadMetadata.DeleteSuccess" enum="BooleanSuccess">
-  <owner>grt@chromium.org</owner>
+  <owner>caitkp@chromium.org</owner>
   <summary>The result of deleting a profile's download metadata file.</summary>
 </histogram>
 
 <histogram name="SBIRS.DownloadMetadata.ReadResult" enum="MetadataReadResult">
-  <owner>grt@chromium.org</owner>
+  <owner>caitkp@chromium.org</owner>
   <summary>The result of reading a profile's download metadata file.</summary>
 </histogram>
 
 <histogram name="SBIRS.DownloadMetadata.WriteResult" enum="MetadataWriteResult">
-  <owner>grt@chromium.org</owner>
+  <owner>caitkp@chromium.org</owner>
   <summary>The result of writing a profile's download metadata file.</summary>
 </histogram>
 
 <histogram name="SBIRS.DroppedIncident" enum="IncidentType">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident given to the safe browsing incident reporting service
     but dropped as a result of not participating in safe browsing.
@@ -38634,7 +39058,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.EnvCollectionTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The elapsed time to collect environmental data for a safe browsing incident
     report.
@@ -38642,7 +39066,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.FindDownloadedBinaryTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The elapsed time to find the most recent binary download from all loaded
     profiles when creating a safe browsing incident report.
@@ -38650,7 +39074,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.Incident" enum="IncidentType">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident included in an incident report by the safe browsing
     incident reporting service.
@@ -38658,7 +39082,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.IncidentCount">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The number of incidents collated into a single safe browsing incident
     report.
@@ -38666,7 +39090,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.InterIncidentTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The elapsed time between two successive incidents collated into the same
     incident report by the safe browsing incident reporting service.
@@ -38674,7 +39098,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.NoDownloadIncident" enum="IncidentType">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident pruned by the safe browsing incident reporting service
     as a result of not having a matching binary download.
@@ -38682,7 +39106,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.PrunedIncident" enum="IncidentType">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident pruned from a report in the safe browsing incident
     reporting service as a result of having previously been reported.
@@ -38690,7 +39114,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.PruneRatio" units="percentage">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <obsolete>
     Deprecated 08/2015.
   </obsolete>
@@ -38700,8 +39124,21 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="SBIRS.ReceivedIncident" enum="IncidentType">
+<histogram name="SBIRS.PSSDataStoreSize" units="bytes">
   <owner>grt@google.com</owner>
+  <summary>
+    The size, in bytes, of a profile's platform state store. This hisogram is
+    logged on each write, which always replaces any previous contents.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.PSSLoadResult" enum="PlatformStateStoreLoadResult">
+  <owner>grt@google.com</owner>
+  <summary>The result of loading data from the platform state store.</summary>
+</histogram>
+
+<histogram name="SBIRS.ReceivedIncident" enum="IncidentType">
+  <owner>caitkp@google.com</owner>
   <summary>
     The type of incident received by the safe browsing incident reporting
     service.
@@ -38709,20 +39146,56 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBIRS.ReportPayloadSize" units="bytes">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>The size, in bytes, of a safe browsing incident report.</summary>
 </histogram>
 
 <histogram name="SBIRS.ReportUploadTime" units="milliseconds">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>The elapsed time to upload a safe browsing incident report.</summary>
 </histogram>
 
+<histogram name="SBIRS.StateStoreInitResult" enum="StateStoreInitResult">
+  <owner>proberge@google.com</owner>
+  <summary>
+    The result of initializing the state store and comparing the preferences to
+    the platform-specific state store.
+  </summary>
+</histogram>
+
 <histogram name="SBIRS.UploadResult" enum="ReportProcessingResult">
-  <owner>grt@google.com</owner>
+  <owner>caitkp@google.com</owner>
   <summary>
     The result of an attempted report upload by the safe browsing incident
     reporting service.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.VerifyBinaryIntegrity.0" units="milliseconds">
+  <owner>caitkp@google.com</owner>
+  <summary>
+    The elapsed time to verify the binary integrity of chrome.exe.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.VerifyBinaryIntegrity.1" units="milliseconds">
+  <owner>caitkp@google.com</owner>
+  <summary>
+    The elapsed time to verify the binary integrity of chrome.dll.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.VerifyBinaryIntegrity.2" units="milliseconds">
+  <owner>caitkp@google.com</owner>
+  <summary>
+    The elapsed time to verify the binary integrity of chrome_child.dll.
+  </summary>
+</histogram>
+
+<histogram name="SBIRS.VerifyBinaryIntegrity.3" units="milliseconds">
+  <owner>caitkp@google.com</owner>
+  <summary>
+    The elapsed time to verify the binary integrity of chrome_elf.dll.
   </summary>
 </histogram>
 
@@ -43336,6 +43809,39 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="SiteIsolation.IsolateExtensionsProcessCountEstimate">
+  <owner>nick@chromium.org</owner>
+  <summary>
+    The upper bound of the predicted renderer process count if we isolated only
+    Chrome extensions, subject to the process limit.  Recorded once per UMA
+    ping.
+  </summary>
+</histogram>
+
+<histogram name="SiteIsolation.IsolateExtensionsProcessCountLowerBound">
+  <owner>nick@chromium.org</owner>
+  <summary>
+    The lower bound of the predicted renderer process count if we isolated only
+    Chrome extensions, subject to the process limit. Recorded once per UMA ping.
+  </summary>
+</histogram>
+
+<histogram name="SiteIsolation.IsolateExtensionsProcessCountNoLimit">
+  <owner>nick@chromium.org</owner>
+  <summary>
+    The predicted renderer process count if we isolated only Chrome extensions
+    and if there were no process limit.  Recorded once per UMA ping.
+  </summary>
+</histogram>
+
+<histogram name="SiteIsolation.IsolateExtensionsTotalProcessCountEstimate">
+  <owner>nick@chromium.org</owner>
+  <summary>
+    The predicted total process count if we isolated only Chrome extensions,
+    subject to the process limit.  Recorded once per UMA ping.
+  </summary>
+</histogram>
+
 <histogram name="SiteIsolation.IsolateHttpsSitesProcessCountEstimate">
   <owner>creis@chromium.org</owner>
   <summary>
@@ -46681,6 +47187,16 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     an event for every tab switch, split into two groups, whether it was a
     discarded tab not. We also get an event whenever a tab gets discarded as
     well as when a tab that's playing audio gets discarded.
+  </summary>
+</histogram>
+
+<histogram name="Tab.Discarding.DiscardCount" units="Discards">
+  <owner>georgesak@chromium.org</owner>
+  <summary>
+    Metric to track the number of discards tabs have gone through. Each time a
+    tab is discarded, this histogram is recorded. Therefore, this metric is
+    cumulative, ie. as a tab gets discarded over and over, it gets a hit in each
+    bin (1, 2, 3...).
   </summary>
 </histogram>
 
@@ -52947,6 +53463,17 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="3" label="Network error"/>
 </enum>
 
+<enum name="AutofillKeyboardAccessoryButtonsIOS" type="int">
+  <int value="0" label="Forms loaded"/>
+  <int value="1" label="Submitted form"/>
+  <int value="2" label="Close button pressed"/>
+  <int value="3" label="Close button pressed (once)"/>
+  <int value="4" label="Next button pressed"/>
+  <int value="5" label="Next button pressed (once)"/>
+  <int value="6" label="Previous button pressed"/>
+  <int value="7" label="Previous button pressed (once)"/>
+</enum>
+
 <enum name="AutofillMacAddressBook" type="int">
   <int value="0" label="Showed popup entry"/>
   <int value="1" label="Selected popup entry"/>
@@ -53207,8 +53734,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="75" label="FAMF_APPEND_SHARED_MEMORY_TO_STREAM"/>
   <int value="76" label="IDBDH_CAN_READ_FILE"/>
   <int value="77" label="IDBDH_GET_OR_TERMINATE"/>
-  <int value="78" label="RMF_SET_COOKIE_BAD_ORIGIN"/>
-  <int value="79" label="RMF_GET_COOKIES_BAD_ORIGIN"/>
+  <int value="78" label="RFMF_SET_COOKIE_BAD_ORIGIN"/>
+  <int value="79" label="RFMF_GET_COOKIES_BAD_ORIGIN"/>
   <int value="80" label="SWDH_GET_REGISTRATIONS_NO_HOST"/>
   <int value="81" label="SWDH_GET_REGISTRATIONS_INVALID_ORIGIN"/>
   <int value="82" label="ARH_UNAUTHORIZED_URL"/>
@@ -53572,6 +54099,11 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1" label="Had phone number."/>
 </enum>
 
+<enum name="BooleanHadPredictions" type="int">
+  <int value="0" label="No predictions"/>
+  <int value="1" label="Has predictions"/>
+</enum>
+
 <enum name="BooleanHandshakeConfirmed" type="int">
   <int value="0" label="Handshake not confirmed"/>
   <int value="1" label="Handshake confirmed"/>
@@ -53814,6 +54346,11 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="3" label="HTTP_STREAM_FACTORY_IMPL_JOB_MAIN"/>
 </enum>
 
+<enum name="BubbleType" type="int">
+  <int value="0" label="Unknown Bubble"/>
+  <int value="1" label="Mock Bubble"/>
+</enum>
+
 <enum name="CacheResult" type="int">
   <int value="0" label="MEMORY_CACHE_HIT"/>
   <int value="1" label="DISK_CACHE_HIT"/>
@@ -54031,12 +54568,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="0" label="Unknown"/>
   <int value="1" label="Network"/>
   <int value="2" label="Periodic"/>
-</enum>
-
-<enum name="ChromeOSMemoryPressureLevel" type="int">
-  <int value="0" label="No memory pressure"/>
-  <int value="1" label="Medium memory pressure"/>
-  <int value="2" label="High memory pressure"/>
 </enum>
 
 <enum name="ChromeOSPlatformVerificationExpiryStatus" type="int">
@@ -55197,6 +55728,24 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
       label="Arrived at settings menu by another path: entered on, exited on"/>
 </enum>
 
+<enum name="DataUseServices" type="int">
+  <int value="0" label="Not Tagged"/>
+  <int value="1" label="Suggestions"/>
+  <int value="2" label="Translate"/>
+  <int value="3" label="Sync"/>
+  <int value="4" label="Omnibox"/>
+  <int value="5" label="Invalidation"/>
+  <int value="6" label="Rappor"/>
+  <int value="7" label="Variations"/>
+  <int value="8" label="UMA"/>
+  <int value="9" label="Domain Reliability"/>
+  <int value="10" label="Profile Downloader"/>
+  <int value="11" label="Google URL Tracker"/>
+  <int value="12" label="Autofill"/>
+  <int value="13" label="Policy"/>
+  <int value="14" label="Spell Checker"/>
+</enum>
+
 <enum name="DecodedImageType" type="int">
   <int value="0" label="kImageUnknown"/>
   <int value="1" label="kImageJPEG"/>
@@ -55234,6 +55783,11 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Echo Cancellation likely fails unless user is using headset.
   </int>
   <int value="3" label="Invalid delays">Insufficient amount of data.</int>
+</enum>
+
+<enum name="DeprecatedAcceleratorUsage" type="int">
+  <int value="0" label="Deprecated key accelerator is used"/>
+  <int value="1" label="New key accelerator is used"/>
 </enum>
 
 <enum name="DesktopCaptureCounters" type="int">
@@ -55357,7 +55911,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="10" label="Path User Data Test"/>
   <int value="11" label="Version Test"/>
   <int value="12" label="SQLite Integrity App Cache Test"/>
-  <int value="13" label="SQLite Integrity Archived History Test"/>
+  <int value="13" label="SQLite Integrity Archived History Test (obsolete)"/>
   <int value="14" label="SQLite Integrity Cookie Test"/>
   <int value="15" label="SQLite Integrity Database Tracker Test"/>
   <int value="16" label="SQLite Integrity History Test"/>
@@ -57527,13 +58081,19 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="375" label="GUEST_VIEW_INTERNAL_ON_RESIZE"/>
   <int value="376" label="LANGUAGE_SETTINGS_PRIVATE_ON_INPUT_METHOD_ADDED"/>
   <int value="377" label="LANGUAGE_SETTINGS_PRIVATE_ON_INPUT_METHOD_REMOVED"/>
-  <int value="379"
+  <int value="378"
       label="LANGUAGE_SETTINGS_PRIVATE_ON_SPELLCHECK_DICTIONARIES_CHANGED"/>
-  <int value="380"
+  <int value="379"
       label="LANGUAGE_SETTINGS_PRIVATE_ON_CUSTOM_DICTIONARY_CHANGED"/>
-  <int value="381" label="CAST_DEVICES_PRIVATE_ON_UPDATE_DEVICES_REQUESTED"/>
-  <int value="382" label="CAST_DEVICES_PRIVATE_ON_START_CAST"/>
-  <int value="383" label="CAST_DEVICES_PRIVATE_ON_STOP_CAST"/>
+  <int value="380" label="CAST_DEVICES_PRIVATE_ON_UPDATE_DEVICES_REQUESTED"/>
+  <int value="381" label="CAST_DEVICES_PRIVATE_ON_START_CAST"/>
+  <int value="382" label="CAST_DEVICES_PRIVATE_ON_STOP_CAST"/>
+  <int value="383" label="CERTIFICATEPROVIDER_ON_CERTIFICATES_REQUESTED"/>
+  <int value="384" label="CERTIFICATEPROVIDER_ON_SIGN_DIGEST_REQUESTED"/>
+  <int value="385" label="WEB_VIEW_INTERNAL_ON_AUTH_REQUIRED"/>
+  <int value="386" label="WEB_VIEW_INTERNAL_ON_BEFORE_REDIRECT"/>
+  <int value="387" label="WEB_VIEW_INTERNAL_ON_ERROR_OCCURRED"/>
+  <int value="388" label="WEB_VIEW_INTERNAL_ON_SEND_HEADERS"/>
 </enum>
 
 <enum name="ExtensionFileWriteResult" type="int">
@@ -58499,7 +59059,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="924" label="HOTWORDPRIVATE_GETLOCALIZEDSTRINGS"/>
   <int value="925" label="HOTWORDPRIVATE_SETAUDIOHISTORYENABLED"/>
   <int value="926" label="HOTWORDPRIVATE_GETAUDIOHISTORYENABLED"/>
-  <int value="927" label="APP_CURRENTWINDOWINTERNAL_SETINTERCEPTALLKEYS"/>
+  <int value="927"
+      label="DELETED_APP_CURRENTWINDOWINTERNAL_SETINTERCEPTALLKEYS"/>
   <int value="928" label="LAUNCHERPAGE_PUSHSUBPAGE"/>
   <int value="929" label="LAUNCHERPAGE_SHOW"/>
   <int value="930" label="AUTOTESTPRIVATE_SETTOUCHPADSENSITIVITY"/>
@@ -58656,6 +59217,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1076" label="SYSTEM_DISPLAY_ENABLEUNIFIEDDESKTOP"/>
   <int value="1077" label="BROWSINGDATA_REMOVECACHESTORAGE"/>
   <int value="1078" label="VIRTUALKEYBOARDPRIVATE_SETKEYBOARDSTATE"/>
+  <int value="1079" label="VIRTUALKEYBOARDPRIVATE_SETHOTRODKEYBOARD"/>
+  <int value="1080" label="CERTIFICATEPROVIDERINTERNAL_REPORTSIGNATURE"/>
+  <int value="1081" label="CERTIFICATEPROVIDERINTERNAL_REPORTCERTIFICATES"/>
+  <int value="1082" label="BLUETOOTHPRIVATE_PAIR"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -58852,7 +59417,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="75" label="kHosts3ReadOnly"/>
   <int value="76" label="kHosts4OrMoreReadOnly"/>
   <int value="77" label="kHostsAllReadOnly"/>
-  <int value="78" label="kInterceptAllKeys"/>
+  <int value="78" label="kDeleted_InterceptAllKeys"/>
   <int value="79" label="kSettingsPrivate"/>
   <int value="80" label="kPrinterProvider"/>
   <int value="81" label="kSearchEnginesPrivate"/>
@@ -58958,7 +59523,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="91" label="kInlineInstallPrivate"/>
   <int value="92" label="kInput"/>
   <int value="93" label="kInputMethodPrivate"/>
-  <int value="94" label="kInterceptAllKeys"/>
+  <int value="94" label="kDeleted_InterceptAllKeys"/>
   <int value="95" label="kLauncherSearchProvider"/>
   <int value="96" label="kLocation"/>
   <int value="97" label="kLogPrivate"/>
@@ -61713,6 +62278,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="12" label="prflx_host"/>
   <int value="13" label="prflx_srflx"/>
   <int value="14" label="prflx_relay"/>
+  <int value="15" label="host(private)_host(private)"/>
+  <int value="16" label="host(private)_host(public)"/>
+  <int value="17" label="host(public)_host(private)"/>
+  <int value="18" label="host(public)_host(public)"/>
 </enum>
 
 <enum name="IceConnectionStates" type="int">
@@ -62263,6 +62832,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="-69316526" label="fa-t-i0-und">Persian transliteration</int>
   <int value="2215666" label="xkb:jp::jpn">Japanese keyboard</int>
   <int value="28549849" label="xkb:pt::por">Portuguese keyboard</int>
+  <int value="60054916" label="xkb:fo::fao">Faroese keyboard</int>
   <int value="87135772" label="xkb:fr::fra">French keyboard</int>
   <int value="150803493" label="vkd_ta_phone">Tamil keyboard (Phonetic)</int>
   <int value="193122406" label="xkb:gr::gre">Greek keyboard</int>
@@ -62313,6 +62883,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1391164751" label="vkd_ne_phone">Nepali keyboard (Phonetic)</int>
   <int value="1409029247" label="xkb:ca::fra">Canadian French keyboard</int>
   <int value="1486336701" label="zh-hant-t-i0-und">Zhuyin input method</int>
+  <int value="1643737979" label="xkb:fr:bepo:fra">French Bepo keyboard</int>
   <int value="1683010298" label="xkb:is::ice">Icelandic keyboard</int>
   <int value="1698488657" label="ar-t-i0-und">Arabic transliteration</int>
   <int value="1718072990" label="xkb:us::eng">US keyboard</int>
@@ -62322,6 +62893,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1763643144" label="xkb:lt::lit">Lithuanian keyboard</int>
   <int value="1772226972" label="ur-t-i0-und">Urdu transliteration</int>
   <int value="1847701260" label="xkb:pl::pol">Polish keyboard</int>
+  <int value="1851658441" label="xkb:hu:qwerty:hun">
+    Hungarian QWERTY keyboard
+  </int>
   <int value="1882667893" label="xkb:us:colemak:eng">US Colemak keyboard</int>
   <int value="1925299009" label="xkb:br::por">Brazilian keyboard</int>
   <int value="1934249765" label="vkd_th_pattajoti">
@@ -63510,6 +64084,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2097515669" label="disable-cast"/>
   <int value="-2083195884" label="enable-firewall-hole-punching"/>
   <int value="-2077268643" label="disable-device-enumeration"/>
+  <int value="-2075807193" label="enable-webusb-on-any-origin"/>
   <int value="-2075725205" label="disable-new-zip-unpacker"/>
   <int value="-2067166422" label="enable-slimming-paint-v2"/>
   <int value="-2063352474" label="enable-new-task-manager"/>
@@ -63558,6 +64133,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1746767834" label="ssl-interstitial-v2-gray"/>
   <int value="-1740519217" label="disable-software-rasterizer"/>
   <int value="-1735643253" label="enable-display-list-2d-canvas"/>
+  <int value="-1729926412" label="enable-webusb-notifications"/>
   <int value="-1725507605" label="enable-web-midi"/>
   <int value="-1719833926" label="disable-answers-in-suggest"/>
   <int value="-1716654100" label="tab-capture-downscale-quality"/>
@@ -63857,6 +64433,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="952558794" label="enable-remote-assistance"/>
   <int value="980396200" label="enable-new-korean-ime"/>
   <int value="1002585107" label="emphasize-titles-in-omnibox-dropdown"/>
+  <int value="1007444341" label="enable-prefixed-encrypted-media"/>
   <int value="1019857902"
       label="disable-hide-inactive-stacked-tab-close-buttons"/>
   <int value="1022992701" label="enable-origin-chip-always"/>
@@ -63951,6 +64528,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1661925474" label="silent-debugger-extension-api"/>
   <int value="1668611601" label="enable-encrypted-media"/>
   <int value="1694854500" label="disable-save-password-bubble"/>
+  <int value="1696139514" label="enable-ble-advertising-in-apps"/>
   <int value="1723601083" label="enable-app-window-controls"/>
   <int value="1730236697" label="force-device-scale-factor"/>
   <int value="1731522433" label="enable-offer-store-unmasked-wallet-cards"/>
@@ -65016,6 +65594,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Critical memory pressure"/>
 </enum>
 
+<enum name="MemoryPressureLevelChanges" type="int">
+  <int value="0" label="No pressure to moderate pressure"/>
+  <int value="1" label="No pressure to critical pressure"/>
+  <int value="2" label="Moderate pressure to critical pressure"/>
+  <int value="3" label="Critical pressure to moderate pressure"/>
+  <int value="4" label="Critical pressure to no pressure"/>
+  <int value="5" label="Moderate pressure to no pressure"/>
+</enum>
+
 <enum name="MetadataReadResult" type="int">
   <int value="0" label="Success"/>
   <int value="1" label="Open failure"/>
@@ -65116,6 +65703,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Accept default account"/>
   <int value="3" label="Accept another account"/>
   <int value="4" label="No thanks"/>
+</enum>
+
+<enum name="MobileHungRendererInfoBarEvent" type="int">
+  <int value="0" label="Clicked the 'Wait' button"/>
+  <int value="1" label="Clicked the 'Kill' button"/>
+  <int value="2" label="Clicked the 'X' (close) button)"/>
+  <int value="3" label="Infobar dismissed after renderer became responsive"/>
+  <int value="4" label="Infobar dismissed after tab closed"/>
 </enum>
 
 <enum name="MobileSessionShutdownType" type="int">
@@ -67559,6 +68154,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="PERMISSION_PROTECTED_MEDIA_IDENTIFIER"/>
   <int value="6" label="PERMISSION_MIDI"/>
   <int value="7" label="PERMISSION_DURABLE_STORAGE"/>
+  <int value="8" label="PERMISSION_AUDIO_CAPTURE"/>
+  <int value="9" label="PERMISSION_VIDEO_CAPTURE"/>
 </enum>
 
 <enum name="PhotoEditorFileType" type="int">
@@ -67648,6 +68245,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Service Worker error"/>
   <int value="3" label="event.waitUntil promise rejected"/>
   <int value="4" label="Database error"/>
+</enum>
+
+<enum name="PlatformStateStoreLoadResult" type="int">
+  <int value="0" label="SUCCESS"/>
+  <int value="1" label="CLEARED_DATA">
+    Platform data cleared for new profile.
+  </int>
+  <int value="2" label="CLEARED_NO_DATA">
+    Empty platform data cleared for new profile.
+  </int>
+  <int value="3" label="DATA_CLEAR_FAILED">
+    Failed to clear data for new profile.
+  </int>
+  <int value="4" label="OPEN_FAILED">Failed to open data store.</int>
+  <int value="5" label="READ_FAILED">Failed to read from data store.</int>
+  <int value="6" label="PARSE_ERROR">Data could not be parsed.</int>
 </enum>
 
 <enum name="PluginAvailabilityStatus" type="int">
@@ -70378,6 +70991,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="15" label="SERVICE_WORKER_ERROR_SCRIPT_EVALUATE_FAILED"/>
   <int value="16" label="SERVICE_WORKER_ERROR_DISK_CACHE"/>
   <int value="17" label="SERVICE_WORKER_ERROR_REDUNDANT"/>
+  <int value="18" label="SERVICE_WORKER_ERROR_DISALLOWED"/>
 </enum>
 
 <enum name="ServiceWorkerStopStatus" type="int">
@@ -71769,6 +72383,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="WWW_MISMATCH_FOUND"/>
   <int value="6" label="WWW_MISMATCH_URL_AVAILABLE"/>
   <int value="7" label="WWW_MISMATCH_URL_NOT_AVAILABLE"/>
+  <int value="8" label="SHOW_BAD_CLOCK"/>
 </enum>
 
 <enum name="SSLErrorTypes" type="int">
@@ -71917,6 +72532,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="7" label="Connected"/>
   <int value="8" label="Closed"/>
   <int value="9" label="Failed"/>
+</enum>
+
+<enum name="StateStoreInitResult" type="int">
+  <int value="0"
+      label="Kept pref: platform-specific store non-existent or not
+             supported."/>
+  <int value="1" label="Erased pref: platform-specific store was empty"/>
+  <int value="2" label="Overwrote pref: platform-specific store differed"/>
+  <int value="3" label="No pref change: was equal to platform-specific store"/>
 </enum>
 
 <enum name="SuggestAppsDialogCloseReason" type="int">
@@ -73383,6 +74007,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="12" label="RGB24"/>
   <int value="13" label="RGB32"/>
   <int value="14" label="MJPEG"/>
+  <int value="15" label="MT21"/>
 </enum>
 
 <enum name="VideoPlayerCastAPIExtensionStatus" type="int">
@@ -73580,6 +74205,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="9" label="Verify CVV"/>
   <int value="10" label="Invalid form field"/>
   <int value="11" label="Require phone number"/>
+</enum>
+
+<enum name="WallpaperLayout" type="int">
+  <int value="0" label="Center"/>
+  <int value="1" label="Center Cropped"/>
+  <int value="2" label="Stretch"/>
+  <int value="3" label="Tile"/>
 </enum>
 
 <enum name="WallpaperType" type="int">
@@ -74753,6 +75385,39 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Fallback" label="Fallback data reduction proxy"/>
   <affected-histogram
       name="DataReductionProxy.RequestCompletionErrorCodes.MainFrame"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="DataUse.Dimensions" separator=".">
+  <suffix name="Upstream.Background.NotCellular"/>
+  <suffix name="Upstream.Background.Cellular"/>
+  <suffix name="Upstream.Foreground.NotCellular"/>
+  <suffix name="Upstream.Foreground.Cellular"/>
+  <suffix name="Downstream.Background.NotCellular"/>
+  <suffix name="Downstream.Background.Cellular"/>
+  <suffix name="Downstream.Foreground.NotCellular"/>
+  <suffix name="Downstream.Foreground.Cellular"/>
+  <affected-histogram name="DataUse.MessageSize.AllServices"/>
+  <affected-histogram name="DataUse.TrafficSize.System"/>
+  <affected-histogram name="DataUse.TrafficSize.User"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="DataUse.Service.Types" separator=".">
+  <suffix name="NotTagged"/>
+  <suffix name="Suggestions"/>
+  <suffix name="Translate"/>
+  <suffix name="Sync"/>
+  <suffix name="Omnibox"/>
+  <suffix name="Invalidation"/>
+  <suffix name="Rappor"/>
+  <suffix name="Variations"/>
+  <suffix name="UMA"/>
+  <suffix name="DomainReliability"/>
+  <suffix name="ProfileDownloader"/>
+  <suffix name="GoogleURLTracker"/>
+  <suffix name="Autofill"/>
+  <suffix name="Policy"/>
+  <suffix name="SpellChecker"/>
+  <affected-histogram name="DataUse.MessageSize"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="DefaultAppsExperiment">

@@ -15,7 +15,6 @@ import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Pair;
-import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -60,6 +59,7 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     private ImageView mSecurityButton;
     private ImageButton mCustomActionButton;
     private int mSecurityIconType;
+    private boolean mShouldShowTitle;
     private boolean mUseDarkColors;
     private ImageButton mCloseButton;
 
@@ -76,7 +76,8 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        setBackground(new ColorDrawable(getResources().getColor(R.color.default_primary_color)));
+        setBackground(new ColorDrawable(
+                ApiCompatibilityUtils.getColor(getResources(), R.color.default_primary_color)));
         mUrlBar = (UrlBar) findViewById(R.id.url_bar);
         mUrlBar.setHint("");
         mUrlBar.setDelegate(this);
@@ -88,9 +89,9 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
         mSecurityButton = (ImageButton) findViewById(R.id.security_button);
         mSecurityIconType = ConnectionSecurityLevel.NONE;
         mCustomActionButton = (ImageButton) findViewById(R.id.action_button);
+        mCustomActionButton.setOnLongClickListener(this);
         mCloseButton = (ImageButton) findViewById(R.id.close_button);
         mCloseButton.setOnLongClickListener(this);
-        mCustomActionButton.setOnLongClickListener(this);
         mAnimDelegate = new CustomTabToolbarAnimationDelegate(mSecurityButton, mTitleUrlContainer);
     }
 
@@ -186,11 +187,8 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
 
     @Override
     public void setShowTitle(boolean showTitle) {
-        int titleVisibility = showTitle ? VISIBLE : GONE;
-        int urlTextSizeId = showTitle
-                ? R.dimen.custom_tabs_url_text_size : R.dimen.location_bar_url_text_size;
-        mTitleBar.setVisibility(titleVisibility);
-        mUrlBar.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimension(urlTextSizeId));
+        mShouldShowTitle = showTitle;
+        if (mShouldShowTitle) mAnimDelegate.prepareTitleAnim(mUrlBar, mTitleBar);
     }
 
     @Override
@@ -200,6 +198,13 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
             mTitleBar.setText("");
             return;
         }
+
+        // It takes some time to parse the title of the webcontent, and before that Tab#getTitle
+        // always return the url. We postpone the title animation until the title is authentic.
+        if (mShouldShowTitle && !TextUtils.equals(currentTab.getTitle(), currentTab.getUrl())) {
+            mAnimDelegate.startTitleAnimation(getContext());
+        }
+
         mTitleBar.setText(currentTab.getTitle());
     }
 
@@ -270,8 +275,8 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
     public void updateVisualsForState() {
         Resources resources = getResources();
         updateSecurityIcon(getSecurityLevel());
-        ColorStateList colorStateList = resources.getColorStateList(mUseDarkColors
-                ? R.color.dark_mode_tint : R.color.light_mode_tint);
+        ColorStateList colorStateList = ApiCompatibilityUtils.getColorStateList(resources,
+                mUseDarkColors ? R.color.dark_mode_tint : R.color.light_mode_tint);
         mMenuButton.setTint(colorStateList);
         if (mCloseButton.getDrawable() instanceof TintedDrawable) {
             ((TintedDrawable) mCloseButton.getDrawable()).setTint(colorStateList);
@@ -281,15 +286,17 @@ public class CustomTabToolbar extends ToolbarLayout implements LocationBar,
         }
         mUrlBar.setUseDarkTextColors(mUseDarkColors);
 
-        int titleTextColor = mUseDarkColors ? resources.getColor(R.color.url_emphasis_default_text)
-                : resources.getColor(R.color.url_emphasis_light_default_text);
+        int titleTextColor = mUseDarkColors
+                ? ApiCompatibilityUtils.getColor(resources, R.color.url_emphasis_default_text)
+                : ApiCompatibilityUtils.getColor(resources,
+                        R.color.url_emphasis_light_default_text);
         mTitleBar.setTextColor(titleTextColor);
 
         if (getProgressBar() != null) {
             int progressBarBackgroundColorResource = mUseDarkColors
                     ? R.color.progress_bar_background : R.color.progress_bar_background_white;
             getProgressBar().setBackgroundColor(
-                    getResources().getColor(progressBarBackgroundColorResource));
+                    ApiCompatibilityUtils.getColor(resources, progressBarBackgroundColorResource));
         }
     }
 

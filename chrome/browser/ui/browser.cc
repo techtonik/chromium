@@ -131,6 +131,7 @@
 #include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/browser/ui/tab_helpers.h"
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
+#include "chrome/browser/ui/tabs/tab_discard_state.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_utils.h"
@@ -1031,7 +1032,7 @@ void Browser::ActiveTabChanged(WebContents* old_contents,
   exclusive_access_manager_->OnTabDetachedFromView(old_contents);
 
   // Discarded tabs always get reloaded.
-  if (tab_strip_model_->IsTabDiscarded(index)) {
+  if (TabDiscardState::IsDiscarded(new_contents)) {
     LOG(WARNING) << "Reloading discarded tab at " << index;
     static int reload_count = 0;
     UMA_HISTOGRAM_CUSTOM_COUNTS(
@@ -1324,13 +1325,15 @@ content::SecurityStyle Browser::GetSecurityStyle(
     security_style_explanations->broken_explanations.push_back(
         content::SecurityStyleExplanation(
             l10n_util::GetStringUTF8(IDS_BROKEN_SHA1),
-            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1_DESCRIPTION)));
+            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1_DESCRIPTION),
+            security_info.cert_id));
   } else if (security_info.sha1_deprecation_status ==
              connection_security::DEPRECATED_SHA1_WARNING) {
     security_style_explanations->warning_explanations.push_back(
         content::SecurityStyleExplanation(
             l10n_util::GetStringUTF8(IDS_WARNING_SHA1),
-            l10n_util::GetStringUTF8(IDS_WARNING_SHA1_DESCRIPTION)));
+            l10n_util::GetStringUTF8(IDS_WARNING_SHA1_DESCRIPTION),
+            security_info.cert_id));
   }
 
   security_style_explanations->ran_insecure_content =
@@ -1351,7 +1354,8 @@ content::SecurityStyle Browser::GetSecurityStyle(
     content::SecurityStyleExplanation explanation(
         l10n_util::GetStringUTF8(IDS_CERTIFICATE_CHAIN_ERROR),
         l10n_util::GetStringFUTF8(
-            IDS_CERTIFICATE_CHAIN_ERROR_DESCRIPTION_FORMAT, error_string));
+            IDS_CERTIFICATE_CHAIN_ERROR_DESCRIPTION_FORMAT, error_string),
+        security_info.cert_id);
 
     if (net::IsCertStatusMinorError(security_info.cert_status))
       security_style_explanations->warning_explanations.push_back(explanation);
@@ -1367,11 +1371,20 @@ content::SecurityStyle Browser::GetSecurityStyle(
           content::SecurityStyleExplanation(
               l10n_util::GetStringUTF8(IDS_VALID_SERVER_CERTIFICATE),
               l10n_util::GetStringUTF8(
-                  IDS_VALID_SERVER_CERTIFICATE_DESCRIPTION)));
+                  IDS_VALID_SERVER_CERTIFICATE_DESCRIPTION),
+              security_info.cert_id));
     }
   }
 
   return security_info.security_style;
+}
+
+void Browser::ShowCertificateViewerInDevTools(
+    content::WebContents* web_contents, int cert_id) {
+  DevToolsWindow* devtools_window =
+      DevToolsWindow::GetInstanceForInspectedWebContents(web_contents);
+  if (devtools_window)
+    devtools_window->ShowCertificateViewer(cert_id);
 }
 
 bool Browser::IsMouseLocked() const {
@@ -1739,6 +1752,17 @@ bool Browser::IsFullscreenForTabOrPending(
     const WebContents* web_contents) const {
   return exclusive_access_manager_->fullscreen_controller()
       ->IsFullscreenForTabOrPending(web_contents);
+}
+
+blink::WebDisplayMode Browser::GetDisplayMode(
+    const WebContents* web_contents) const {
+  if (window_->IsFullscreen())
+    return blink::WebDisplayModeFullscreen;
+
+  if (is_type_popup())
+    return blink::WebDisplayModeStandalone;
+
+  return blink::WebDisplayModeBrowser;
 }
 
 void Browser::RegisterProtocolHandler(WebContents* web_contents,

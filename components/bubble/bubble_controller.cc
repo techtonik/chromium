@@ -21,15 +21,31 @@ BubbleController::~BubbleController() {
 }
 
 bool BubbleController::CloseBubble(BubbleCloseReason reason) {
+  DCHECK(thread_checker_.CalledOnValidThread());
   return manager_->CloseBubble(this->AsWeakPtr(), reason);
+}
+
+bool BubbleController::UpdateBubbleUi() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  if (!bubble_ui_)
+    return false;
+  return delegate_->UpdateBubbleUi(bubble_ui_.get());
+}
+
+std::string BubbleController::GetName() const {
+  return delegate_->GetName();
+}
+
+base::TimeDelta BubbleController::GetVisibleTime() const {
+  return base::TimeTicks::Now() - show_time_;
 }
 
 void BubbleController::Show() {
   DCHECK(!bubble_ui_);
-  bubble_ui_ = delegate_->BuildBubbleUI();
+  bubble_ui_ = delegate_->BuildBubbleUi();
   DCHECK(bubble_ui_);
-  bubble_ui_->Show();
-  // TODO(hcarmona): log that bubble was shown.
+  bubble_ui_->Show(AsWeakPtr());
+  show_time_ = base::TimeTicks::Now();
 }
 
 void BubbleController::UpdateAnchorPosition() {
@@ -42,7 +58,6 @@ bool BubbleController::ShouldClose(BubbleCloseReason reason) {
   if (delegate_->ShouldClose(reason) || reason == BUBBLE_CLOSE_FORCED) {
     bubble_ui_->Close();
     bubble_ui_.reset();
-    // TODO(hcarmona): log that bubble was hidden.
     return true;
   }
   return false;

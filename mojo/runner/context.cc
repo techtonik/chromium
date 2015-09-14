@@ -37,6 +37,7 @@
 #include "mojo/services/tracing/public/interfaces/tracing.mojom.h"
 #include "mojo/shell/application_loader.h"
 #include "mojo/shell/application_manager.h"
+#include "mojo/shell/connect_to_application_params.h"
 #include "mojo/shell/switches.h"
 #include "mojo/util/filename_util.h"
 #include "url/gurl.h"
@@ -191,13 +192,14 @@ void InitDevToolsServiceIfNeeded(shell::ApplicationManager* manager,
   }
 
   ServiceProviderPtr devtools_service_provider;
-  URLRequestPtr request(URLRequest::New());
-  request->url = "mojo:devtools_service";
-  manager->ConnectToApplication(nullptr, request.Pass(), std::string(),
-                                GURL("mojo:shell"),
-                                GetProxy(&devtools_service_provider), nullptr,
-                                shell::GetPermissiveCapabilityFilter(),
-                                base::Closure(), shell::EmptyConnectCallback());
+  scoped_ptr<shell::ConnectToApplicationParams> params(
+      new shell::ConnectToApplicationParams);
+  params->set_originator_identity(shell::Identity(GURL("mojo:shell")));
+  params->set_originator_filter(shell::GetPermissiveCapabilityFilter());
+  params->SetURLInfo(GURL("mojo:devtools_service"));
+  params->set_services(GetProxy(&devtools_service_provider));
+  params->set_filter(shell::GetPermissiveCapabilityFilter());
+  manager->ConnectToApplication(params.Pass());
 
   devtools_service::DevToolsCoordinatorPtr devtools_coordinator;
   devtools_service_provider->ConnectToService(
@@ -313,8 +315,8 @@ bool Context::Init() {
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From("mojo:tracing");
   application_manager_.ConnectToApplication(
-      nullptr, request.Pass(), std::string(), GURL(),
-      GetProxy(&service_provider_ptr), tracing_service_provider_ptr.Pass(),
+      nullptr, request.Pass(), std::string(), GetProxy(&service_provider_ptr),
+      tracing_service_provider_ptr.Pass(),
       shell::GetPermissiveCapabilityFilter(), base::Closure(),
       shell::EmptyConnectCallback());
 
@@ -381,7 +383,7 @@ void Context::Run(const GURL& url) {
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From(url.spec());
   application_manager_.ConnectToApplication(
-      nullptr, request.Pass(), std::string(), GURL(), GetProxy(&services),
+      nullptr, request.Pass(), std::string(), GetProxy(&services),
       exposed_services.Pass(), shell::GetPermissiveCapabilityFilter(),
       base::Bind(&Context::OnApplicationEnd, base::Unretained(this), url),
       shell::EmptyConnectCallback());

@@ -108,7 +108,7 @@ void DisplayListRasterSource::RasterCommon(
     float contents_scale) const {
   canvas->translate(-canvas_bitmap_rect.x(), -canvas_bitmap_rect.y());
   gfx::Rect content_rect =
-      gfx::ToEnclosingRect(gfx::ScaleRect(gfx::Rect(size_), contents_scale));
+      gfx::ScaleToEnclosingRect(gfx::Rect(size_), contents_scale);
   content_rect.Intersect(canvas_playback_rect);
 
   canvas->clipRect(gfx::RectToSkRect(content_rect), SkRegion::kIntersect_Op);
@@ -161,14 +161,14 @@ void DisplayListRasterSource::PerformSolidColorAnalysis(
   analysis->is_solid_color = canvas.GetColorIfSolid(&analysis->solid_color);
 }
 
-void DisplayListRasterSource::GatherPixelRefs(
+void DisplayListRasterSource::GatherDiscardableImages(
     const gfx::Rect& layer_rect,
-    std::vector<skia::PositionPixelRef>* pixel_refs) const {
-  DCHECK_EQ(0u, pixel_refs->size());
+    std::vector<skia::PositionImage>* images) const {
+  DCHECK_EQ(0u, images->size());
 
-  PixelRefMap::Iterator iterator(layer_rect, display_list_.get());
+  DiscardableImageMap::Iterator iterator(layer_rect, display_list_.get());
   while (iterator) {
-    pixel_refs->push_back(*iterator);
+    images->push_back(*iterator);
     ++iterator;
   }
 }
@@ -196,6 +196,10 @@ SkColor DisplayListRasterSource::GetSolidColor() const {
 
 bool DisplayListRasterSource::HasRecordings() const {
   return !!display_list_.get();
+}
+
+gfx::Rect DisplayListRasterSource::RecordedViewport() const {
+  return recorded_viewport_;
 }
 
 void DisplayListRasterSource::SetShouldAttemptToUseDistanceFieldText() {

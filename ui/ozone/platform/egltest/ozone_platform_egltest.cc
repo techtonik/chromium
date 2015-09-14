@@ -67,8 +67,8 @@ void ScaleTouchEvent(TouchEvent* event, const gfx::SizeF& size) {
       double ratio = std::sqrt(size.GetArea() / touchscreen_size.GetArea());
 
       event->set_location(location);
-      event->set_radius_x(event->radius_x() * ratio);
-      event->set_radius_y(event->radius_y() * ratio);
+      event->set_radius_x(event->pointer_details().radius_x() * ratio);
+      event->set_radius_y(event->pointer_details().radius_y() * ratio);
       return;
     }
   }
@@ -85,6 +85,7 @@ class EgltestWindow : public PlatformWindow, public PlatformEventDispatcher {
   // PlatformWindow:
   gfx::Rect GetBounds() override;
   void SetBounds(const gfx::Rect& bounds) override;
+  void SetTitle(const base::string16& title) override;
   void Show() override;
   void Hide() override;
   void Close() override;
@@ -140,6 +141,9 @@ gfx::Rect EgltestWindow::GetBounds() {
 void EgltestWindow::SetBounds(const gfx::Rect& bounds) {
   bounds_ = bounds;
   delegate_->OnBoundsChanged(bounds);
+}
+
+void EgltestWindow::SetTitle(const base::string16& title) {
 }
 
 void EgltestWindow::Show() {

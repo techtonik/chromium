@@ -466,6 +466,7 @@
         'debug/task_annotator_unittest.cc',
         'deferred_sequenced_task_runner_unittest.cc',
         'environment_unittest.cc',
+        'feature_list_unittest.cc',
         'file_version_info_unittest.cc',
         'files/dir_reader_posix_unittest.cc',
         'files/file_path_unittest.cc',
@@ -518,6 +519,7 @@
         'memory/aligned_memory_unittest.cc',
         'memory/discardable_shared_memory_unittest.cc',
         'memory/linked_ptr_unittest.cc',
+        'memory/memory_pressure_listener_unittest.cc',
         'memory/memory_pressure_monitor_chromeos_unittest.cc',
         'memory/memory_pressure_monitor_mac_unittest.cc',
         'memory/memory_pressure_monitor_win_unittest.cc',
@@ -653,6 +655,7 @@
         'win/registry_unittest.cc',
         'win/scoped_bstr_unittest.cc',
         'win/scoped_comptr_unittest.cc',
+        'win/scoped_handle_unittest.cc',
         'win/scoped_process_information_unittest.cc',
         'win/scoped_variant_unittest.cc',
         'win/shortcut_unittest.cc',
@@ -690,6 +693,8 @@
         }],
         ['OS == "ios" and _toolset != "host"', {
           'sources/': [
+            # iOS does not support FilePathWatcher.
+            ['exclude', '^files/file_path_watcher_unittest\\.cc$'],
             # Only test the iOS-meaningful portion of memory and process_utils.
             ['exclude', '^memory/discardable_shared_memory_unittest\\.cc$'],
             ['exclude', '^memory/shared_memory_unittest\\.cc$'],
@@ -905,8 +910,8 @@
         'test/gtest_xml_util.h',
         'test/histogram_tester.cc',
         'test/histogram_tester.h',
-	'test/icu_test_util.cc',
-	'test/icu_test_util.h',
+        'test/icu_test_util.cc',
+        'test/icu_test_util.h',
         'test/ios/wait_util.h',
         'test/ios/wait_util.mm',
         'test/launcher/test_launcher.cc',

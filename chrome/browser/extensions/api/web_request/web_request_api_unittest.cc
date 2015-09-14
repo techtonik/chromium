@@ -592,8 +592,7 @@ TEST_F(ExtensionWebRequestTest, AccessRequestBodyData) {
   // Contents of formData.
   const char kFormData[] =
       "{\"A\":[\"test text\"],\"B\":[\"\"],\"C\":[\"test password\"]}";
-  scoped_ptr<const base::Value> form_data(
-      base::JSONReader::DeprecatedRead(kFormData));
+  scoped_ptr<const base::Value> form_data = base::JSONReader::Read(kFormData);
   ASSERT_TRUE(form_data.get() != NULL);
   ASSERT_TRUE(form_data->GetType() == base::Value::TYPE_DICTIONARY);
   // Contents of raw.
@@ -1287,6 +1286,7 @@ TEST(ExtensionWebRequestHelpersTest, TestCalculateOnHeadersReceivedDelta) {
       "Key1: Value1\r\n"
       "Key2: Value2, Bar\r\n"
       "Key3: Value3\r\n"
+      "Key5: Value5, end5\r\n"
       "\r\n";
   scoped_refptr<net::HttpResponseHeaders> base_headers(
       new net::HttpResponseHeaders(
@@ -1298,6 +1298,7 @@ TEST(ExtensionWebRequestHelpersTest, TestCalculateOnHeadersReceivedDelta) {
   new_headers.push_back(ResponseHeader("Key2", "Value1"));  // Modified
   // Key3 is deleted
   new_headers.push_back(ResponseHeader("Key4", "Value4"));  // Added
+  new_headers.push_back(ResponseHeader("Key5", "Value5, end5"));  // Unchanged
   GURL effective_new_url;
 
   scoped_ptr<EventResponseDelta> delta(

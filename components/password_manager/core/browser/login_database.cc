@@ -25,15 +25,17 @@
 #include "sql/connection.h"
 #include "sql/statement.h"
 #include "sql/transaction.h"
-#include "url/origin.h"
 #include "url/url_constants.h"
 
 using autofill::PasswordForm;
 
 namespace password_manager {
 
-const int kCurrentVersionNumber = 13;
-static const int kCompatibleVersionNumber = 1;
+// The current version number of the login database schema.
+const int kCurrentVersionNumber = 14;
+// The oldest version of the schema such that a legacy Chrome client using that
+// version can still read/write the current database.
+static const int kCompatibleVersionNumber = 14;
 
 base::Pickle SerializeVector(const std::vector<base::string16>& vec) {
   base::Pickle p;
@@ -77,7 +79,7 @@ enum LoginTableColumns {
   COLUMN_FORM_DATA,
   COLUMN_DATE_SYNCED,
   COLUMN_DISPLAY_NAME,
-  COLUMN_AVATAR_URL,
+  COLUMN_ICON_URL,
   COLUMN_FEDERATION_URL,
   COLUMN_SKIP_ZERO_CLICK,
   COLUMN_GENERATION_UPLOAD_STATUS,
@@ -131,7 +133,7 @@ void BindAddStatement(const PasswordForm& form,
               form_data_pickle.size());
   s->BindInt64(COLUMN_DATE_SYNCED, form.date_synced.ToInternalValue());
   s->BindString16(COLUMN_DISPLAY_NAME, form.display_name);
-  s->BindString(COLUMN_AVATAR_URL, form.icon_url.spec());
+  s->BindString(COLUMN_ICON_URL, form.icon_url.spec());
   s->BindString(COLUMN_FEDERATION_URL, form.federation_url.spec());
   s->BindInt(COLUMN_SKIP_ZERO_CLICK, form.skip_zero_click);
   s->BindInt(COLUMN_GENERATION_UPLOAD_STATUS, form.generation_upload_status);
@@ -194,68 +196,130 @@ void LogNumberOfAccountsReusingPassword(const std::string& suffix,
                     1, max, bucket_count);
 }
 
-// TODO(engedy): Extend url::Origin with an IsScheme() method instead.
-// See: https://crbug.com/517560.
-bool HasScheme(const url::Origin& origin, const char* scheme) {
-  return base::LowerCaseEqualsASCII(origin.scheme(), scheme);
-}
-
 // Records password reuse metrics given the |signon_realms| corresponding to a
 // set of accounts that reuse the same password. See histograms.xml for details.
-void LogPasswordReuseMetrics(const std::vector<url::Origin>& signon_realms) {
-  for (const url::Origin& source_realm : signon_realms) {
-    int same_host_http = 0;
-    int same_host_https = 0;
-    int psl_matching = 0;  // PSL match always implies the scheme is the same.
-    int different_host_http = 0;
-    int different_host_https = 0;
+void LogPasswordReuseMetrics(const std::vector<std::string>& signon_realms) {
+  struct StatisticsPerScheme {
+    StatisticsPerScheme() : num_total_accounts(0) {}
 
-    for (const url::Origin& target_realm : signon_realms) {
-      if (&target_realm == &source_realm)
-        continue;
-      if (source_realm.host() == target_realm.host()) {
-        if (HasScheme(target_realm, url::kHttpScheme))
-          ++same_host_http;
-        else if (HasScheme(target_realm, url::kHttpsScheme))
-          ++same_host_https;
-      } else if (IsPublicSuffixDomainMatch(source_realm.Serialize(),
-                                           target_realm.Serialize())) {
-        ++psl_matching;
-      } else if (HasScheme(target_realm, url::kHttpScheme)) {
-        ++different_host_http;
-      } else if (HasScheme(target_realm, url::kHttpsScheme)) {
-        ++different_host_https;
-      }
-    }
+    // The number of accounts for each registry controlled domain.
+    std::map<std::string, int> num_accounts_per_registry_controlled_domain;
 
-    std::string source_realm_kind;
-    if (HasScheme(source_realm, url::kHttpScheme))
-      source_realm_kind = "FromHttpRealm";
-    else if (HasScheme(source_realm, url::kHttpsScheme))
-      source_realm_kind = "FromHttpsRealm";
-    else
+    // The number of accounts for each domain.
+    std::map<std::string, int> num_accounts_per_domain;
+
+    // Total number of accounts with this scheme. This equals the sum of counts
+    // in either of the above maps.
+    int num_total_accounts;
+  };
+
+  // The scheme (i.e. protocol) of the origin, not PasswordForm::scheme.
+  enum Scheme { SCHEME_HTTP, SCHEME_HTTPS };
+  const Scheme kAllSchemes[] = {SCHEME_HTTP, SCHEME_HTTPS};
+
+  StatisticsPerScheme statistics[arraysize(kAllSchemes)];
+  std::map<std::string, std::string> domain_to_registry_controlled_domain;
+
+  for (const std::string& signon_realm : signon_realms) {
+    const GURL signon_realm_url(signon_realm);
+    const std::string domain = signon_realm_url.host();
+    if (domain.empty())
       continue;
 
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnHttpRealmWithSameHost", same_host_http,
-        HistogramSize::SMALL);
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnHttpsRealmWithSameHost", same_host_https,
-        HistogramSize::SMALL);
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnPSLMatchingRealm", psl_matching,
-        HistogramSize::SMALL);
+    if (!domain_to_registry_controlled_domain.count(domain)) {
+      domain_to_registry_controlled_domain[domain] =
+          GetRegistryControlledDomain(signon_realm_url);
+      if (domain_to_registry_controlled_domain[domain].empty())
+        domain_to_registry_controlled_domain[domain] = domain;
+    }
+    const std::string& registry_controlled_domain =
+        domain_to_registry_controlled_domain[domain];
 
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnHttpRealmWithDifferentHost",
-        different_host_http, HistogramSize::LARGE);
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnHttpsRealmWithDifferentHost",
-        different_host_https, HistogramSize::LARGE);
+    Scheme scheme = SCHEME_HTTP;
+    COMPILE_ASSERT(arraysize(kAllSchemes) == 2, "Update this logic");
+    if (signon_realm_url.SchemeIs(url::kHttpsScheme))
+      scheme = SCHEME_HTTPS;
+    else if (!signon_realm_url.SchemeIs(url::kHttpScheme))
+      continue;
 
-    LogNumberOfAccountsReusingPassword(
-        source_realm_kind + ".OnAnyRealmWithDifferentHost",
-        different_host_http + different_host_https, HistogramSize::LARGE);
+    statistics[scheme].num_accounts_per_domain[domain]++;
+    statistics[scheme].num_accounts_per_registry_controlled_domain
+        [registry_controlled_domain]++;
+    statistics[scheme].num_total_accounts++;
+  }
+
+  // For each "source" account of either scheme, count the number of "target"
+  // accounts reusing the same password (of either scheme).
+  for (const Scheme scheme : kAllSchemes) {
+    for (const auto& kv : statistics[scheme].num_accounts_per_domain) {
+      const std::string& domain(kv.first);
+      const int num_accounts_per_domain(kv.second);
+      const std::string& registry_controlled_domain =
+          domain_to_registry_controlled_domain[domain];
+
+      Scheme other_scheme = scheme == SCHEME_HTTP ? SCHEME_HTTPS : SCHEME_HTTP;
+      COMPILE_ASSERT(arraysize(kAllSchemes) == 2, "Update |other_scheme|");
+
+      // Discount the account at hand from the number of accounts with the same
+      // domain and scheme.
+      int num_accounts_for_same_domain[arraysize(kAllSchemes)] = {};
+      num_accounts_for_same_domain[scheme] =
+          statistics[scheme].num_accounts_per_domain[domain] - 1;
+      num_accounts_for_same_domain[other_scheme] =
+          statistics[other_scheme].num_accounts_per_domain[domain];
+
+      // By definition, a PSL match requires the scheme to be the same.
+      int num_psl_matching_accounts =
+          statistics[scheme].num_accounts_per_registry_controlled_domain
+              [registry_controlled_domain] -
+          statistics[scheme].num_accounts_per_domain[domain];
+
+      // Discount PSL matches from the number of accounts with different domains
+      // but the same scheme.
+      int num_accounts_for_different_domain[arraysize(kAllSchemes)] = {};
+      num_accounts_for_different_domain[scheme] =
+          statistics[scheme].num_total_accounts -
+          statistics[scheme].num_accounts_per_registry_controlled_domain
+              [registry_controlled_domain];
+      num_accounts_for_different_domain[other_scheme] =
+          statistics[other_scheme].num_total_accounts -
+          statistics[other_scheme].num_accounts_per_domain[domain];
+
+      std::string source_realm_kind =
+          scheme == SCHEME_HTTP ? "FromHttpRealm" : "FromHttpsRealm";
+      COMPILE_ASSERT(arraysize(kAllSchemes) == 2, "Update |source_realm_kind|");
+
+      // So far, the calculation has been carried out once per "source" domain,
+      // but the metrics need to be recorded on a per-account basis. The set of
+      // metrics are the same for all accounts for the same domain, so simply
+      // report them as many times as accounts.
+      for (int i = 0; i < num_accounts_per_domain; ++i) {
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnHttpRealmWithSameHost",
+            num_accounts_for_same_domain[SCHEME_HTTP], HistogramSize::SMALL);
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnHttpsRealmWithSameHost",
+            num_accounts_for_same_domain[SCHEME_HTTPS], HistogramSize::SMALL);
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnPSLMatchingRealm",
+            num_psl_matching_accounts, HistogramSize::SMALL);
+
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnHttpRealmWithDifferentHost",
+            num_accounts_for_different_domain[SCHEME_HTTP],
+            HistogramSize::LARGE);
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnHttpsRealmWithDifferentHost",
+            num_accounts_for_different_domain[SCHEME_HTTPS],
+            HistogramSize::LARGE);
+
+        LogNumberOfAccountsReusingPassword(
+            source_realm_kind + ".OnAnyRealmWithDifferentHost",
+            num_accounts_for_different_domain[SCHEME_HTTP] +
+                num_accounts_for_different_domain[SCHEME_HTTPS],
+            HistogramSize::LARGE);
+      }
+    }
   }
 }
 
@@ -284,7 +348,7 @@ bool CreateNewTable(sql::Connection* db,
       "form_data BLOB,"
       "date_synced INTEGER,"
       "display_name VARCHAR,"
-      "avatar_url VARCHAR,"
+      "icon_url VARCHAR,"
       "federation_url VARCHAR,"
       "skip_zero_click INTEGER,"
       "%s"
@@ -364,7 +428,8 @@ bool LoginDatabase::Init() {
   }
 
   // If the file on disk is an older database version, bring it up to date.
-  if (!MigrateOldVersionsAsNeeded()) {
+  if (meta_table_.GetVersionNumber() < kCurrentVersionNumber &&
+      !MigrateOldVersionsAsNeeded()) {
     LogDatabaseInitError(MIGRATION_ERROR);
     UMA_HISTOGRAM_SPARSE_SLOWLY("PasswordManager.LoginDatabaseFailedVersion",
                                 meta_table_.GetVersionNumber());
@@ -387,7 +452,8 @@ bool LoginDatabase::Init() {
 }
 
 bool LoginDatabase::MigrateOldVersionsAsNeeded() {
-  switch (meta_table_.GetVersionNumber()) {
+  const int original_version = meta_table_.GetVersionNumber();
+  switch (original_version) {
     case 1:
       if (!db_.Execute("ALTER TABLE logins "
                        "ADD COLUMN password_type INTEGER") ||
@@ -482,11 +548,14 @@ bool LoginDatabase::MigrateOldVersionsAsNeeded() {
         return false;
 
       meta_table_.SetVersionNumber(10);
+      // Fall through.
     }
     case 10: {
-      // rename is_zero_click -> skip_zero_click and restore the unique key
-      // (origin_url, username_element, username_value, password_element,
-      // signon_realm).
+      // Rename is_zero_click -> skip_zero_click. Note that previous versions
+      // may have incorrectly used a 6-column key (origin_url, username_element,
+      // username_value, password_element, signon_realm, submit_element).
+      // In that case, this step also restores the correct 5-column key;
+      // that is, the above without "submit_element".
       const char copy_query[] = "INSERT OR REPLACE INTO logins_new SELECT "
           "origin_url, action_url, username_element, username_value, "
           "password_element, password_value, submit_element, signon_realm, "
@@ -494,12 +563,15 @@ bool LoginDatabase::MigrateOldVersionsAsNeeded() {
           "password_type, possible_usernames, times_used, form_data, "
           "date_synced, display_name, avatar_url, federation_url, is_zero_click"
           " FROM logins";
-      if (!CreateNewTable(&db_, "logins_new", "") || !db_.Execute(copy_query) ||
+      if (!CreateNewTable(&db_, "logins_new", "") ||
+          !db_.Execute(copy_query) ||
           !db_.Execute("DROP TABLE logins") ||
           !db_.Execute("ALTER TABLE logins_new RENAME TO logins") ||
-          !CreateIndexOnSignonRealm(&db_, "logins"))
+          !CreateIndexOnSignonRealm(&db_, "logins")) {
         return false;
+      }
       meta_table_.SetVersionNumber(11);
+      // Fall through.
     }
     case 11:
       if (!db_.Execute(
@@ -507,9 +579,41 @@ bool LoginDatabase::MigrateOldVersionsAsNeeded() {
               "generation_upload_status INTEGER"))
         return false;
       meta_table_.SetVersionNumber(12);
+      // Fall through.
     case 12:
       // The stats table was added. Nothing to do really.
       meta_table_.SetVersionNumber(13);
+      // Fall through.
+    case 13: {
+      // Rename avatar_url -> icon_url. Note that if the original version was
+      // at most 10, this renaming would have already happened in step 10,
+      // as |CreateNewTable| would create a table with the new column name.
+      if (original_version > 10) {
+        const char copy_query[] = "INSERT OR REPLACE INTO logins_new SELECT "
+            "origin_url, action_url, username_element, username_value, "
+            "password_element, password_value, submit_element, signon_realm, "
+            "ssl_valid, preferred, date_created, blacklisted_by_user, scheme, "
+            "password_type, possible_usernames, times_used, form_data, "
+            "date_synced, display_name, avatar_url, federation_url, "
+            "skip_zero_click, generation_upload_status FROM logins";
+        if (!CreateNewTable(
+                &db_, "logins_new", "generation_upload_status INTEGER,") ||
+            !db_.Execute(copy_query) ||
+            !db_.Execute("DROP TABLE logins") ||
+            !db_.Execute("ALTER TABLE logins_new RENAME TO logins") ||
+            !CreateIndexOnSignonRealm(&db_, "logins")) {
+          return false;
+        }
+      }
+      meta_table_.SetVersionNumber(14);
+      // Fall through.
+    }
+    // -------------------------------------------------------------------------
+    // DO NOT FORGET to update |kCompatibleVersionNumber| if you add a migration
+    // step that is a breaking change. This is needed so that an older version
+    // of the browser can fail with a meaningful error when opening a newer
+    // database, as opposed to failing on the first database operation.
+    // -------------------------------------------------------------------------
     case kCurrentVersionNumber:
       // Already up to date
       return true;
@@ -700,7 +804,7 @@ void LoginDatabase::ReportMetrics(const std::string& sync_username,
       db_.GetUniqueStatement("SELECT signon_realm, password_value FROM logins "
                              "WHERE blacklisted_by_user = 0 AND scheme = 0"));
 
-  std::map<base::string16, std::vector<url::Origin>> passwords_to_realms;
+  std::map<base::string16, std::vector<std::string>> passwords_to_realms;
   while (form_based_passwords_statement.Step()) {
     std::string signon_realm = form_based_passwords_statement.ColumnString(0);
     base::string16 decrypted_password;
@@ -709,8 +813,7 @@ void LoginDatabase::ReportMetrics(const std::string& sync_username,
     if (!IsValidAndroidFacetURI(signon_realm) &&
         DecryptedString(form_based_passwords_statement.ColumnString(1),
                         &decrypted_password) == ENCRYPTION_RESULT_SUCCESS) {
-      passwords_to_realms[decrypted_password].push_back(
-          url::Origin(GURL(signon_realm)));
+      passwords_to_realms[decrypted_password].push_back(signon_realm);
     }
   }
 
@@ -736,7 +839,7 @@ PasswordStoreChangeList LoginDatabase::AddLogin(const PasswordForm& form) {
       " password_element, password_value, submit_element, "
       " signon_realm, ssl_valid, preferred, date_created, blacklisted_by_user, "
       " scheme, password_type, possible_usernames, times_used, form_data, "
-      " date_synced, display_name, avatar_url,"
+      " date_synced, display_name, icon_url,"
       " federation_url, skip_zero_click, generation_upload_status) VALUES "
       "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
   BindAddStatement(form, encrypted_password, &s);
@@ -755,7 +858,7 @@ PasswordStoreChangeList LoginDatabase::AddLogin(const PasswordForm& form) {
       " password_element, password_value, submit_element, "
       " signon_realm, ssl_valid, preferred, date_created, blacklisted_by_user, "
       " scheme, password_type, possible_usernames, times_used, form_data, "
-      " date_synced, display_name, avatar_url,"
+      " date_synced, display_name, icon_url,"
       " federation_url, skip_zero_click, generation_upload_status) VALUES "
       "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
   BindAddStatement(form, encrypted_password, &s);
@@ -790,7 +893,7 @@ PasswordStoreChangeList LoginDatabase::UpdateLogin(const PasswordForm& form) {
                                           "scheme = ?, "
                                           "password_type = ?, "
                                           "display_name = ?, "
-                                          "avatar_url = ?, "
+                                          "icon_url = ?, "
                                           "federation_url = ?, "
                                           "skip_zero_click = ?, "
                                           "generation_upload_status = ? "
@@ -942,7 +1045,7 @@ LoginDatabase::EncryptionResult LoginDatabase::InitPasswordFormFromStatement(
   form->date_synced =
       base::Time::FromInternalValue(s.ColumnInt64(COLUMN_DATE_SYNCED));
   form->display_name = s.ColumnString16(COLUMN_DISPLAY_NAME);
-  form->icon_url = GURL(s.ColumnString(COLUMN_AVATAR_URL));
+  form->icon_url = GURL(s.ColumnString(COLUMN_ICON_URL));
   form->federation_url = GURL(s.ColumnString(COLUMN_FEDERATION_URL));
   form->skip_zero_click = (s.ColumnInt(COLUMN_SKIP_ZERO_CLICK) > 0);
   int generation_upload_status_int =
@@ -966,7 +1069,7 @@ bool LoginDatabase::GetLogins(
       "password_element, password_value, submit_element, "
       "signon_realm, ssl_valid, preferred, date_created, blacklisted_by_user, "
       "scheme, password_type, possible_usernames, times_used, form_data, "
-      "date_synced, display_name, avatar_url, "
+      "date_synced, display_name, icon_url, "
       "federation_url, skip_zero_click, generation_upload_status "
       "FROM logins WHERE signon_realm == ? ";
   sql::Statement s;
@@ -1029,7 +1132,7 @@ bool LoginDatabase::GetLoginsCreatedBetween(
       "password_element, password_value, submit_element, "
       "signon_realm, ssl_valid, preferred, date_created, blacklisted_by_user, "
       "scheme, password_type, possible_usernames, times_used, form_data, "
-      "date_synced, display_name, avatar_url, "
+      "date_synced, display_name, icon_url, "
       "federation_url, skip_zero_click, generation_upload_status FROM logins "
       "WHERE date_created >= ? AND date_created < ?"
       "ORDER BY origin_url"));
@@ -1051,7 +1154,7 @@ bool LoginDatabase::GetLoginsSyncedBetween(
       "password_element, password_value, submit_element, signon_realm, "
       "ssl_valid, preferred, date_created, blacklisted_by_user, "
       "scheme, password_type, possible_usernames, times_used, form_data, "
-      "date_synced, display_name, avatar_url, "
+      "date_synced, display_name, icon_url, "
       "federation_url, skip_zero_click, generation_upload_status FROM logins "
       "WHERE date_synced >= ? AND date_synced < ?"
       "ORDER BY origin_url"));
@@ -1085,7 +1188,7 @@ bool LoginDatabase::GetAllLoginsWithBlacklistSetting(
       "password_element, password_value, submit_element, "
       "signon_realm, ssl_valid, preferred, date_created, blacklisted_by_user, "
       "scheme, password_type, possible_usernames, times_used, form_data, "
-      "date_synced, display_name, avatar_url, "
+      "date_synced, display_name, icon_url, "
       "federation_url, skip_zero_click, generation_upload_status FROM logins "
       "WHERE blacklisted_by_user == ? ORDER BY origin_url"));
   s.BindInt(0, blacklisted ? 1 : 0);

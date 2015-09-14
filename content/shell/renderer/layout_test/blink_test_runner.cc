@@ -56,6 +56,7 @@
 #include "third_party/WebKit/public/platform/WebRect.h"
 #include "third_party/WebKit/public/platform/WebSize.h"
 #include "third_party/WebKit/public/platform/WebString.h"
+#include "third_party/WebKit/public/platform/WebTaskRunner.h"
 #include "third_party/WebKit/public/platform/WebThread.h"
 #include "third_party/WebKit/public/platform/WebTraceLocation.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
@@ -107,7 +108,7 @@ namespace content {
 
 namespace {
 
-class InvokeTaskHelper : public WebThread::Task {
+class InvokeTaskHelper : public blink::WebTaskRunner::Task {
  public:
   InvokeTaskHelper(scoped_ptr<test_runner::WebTask> task)
       : task_(task.Pass()) {}
@@ -290,14 +291,14 @@ void BlinkTestRunner::PrintMessage(const std::string& message) {
 }
 
 void BlinkTestRunner::PostTask(test_runner::WebTask* task) {
-  Platform::current()->currentThread()->postTask(
+  Platform::current()->currentThread()->taskRunner()->postTask(
       WebTraceLocation(__FUNCTION__, __FILE__),
       new InvokeTaskHelper(make_scoped_ptr(task)));
 }
 
 void BlinkTestRunner::PostDelayedTask(test_runner::WebTask* task,
                                       long long ms) {
-  Platform::current()->currentThread()->postDelayedTask(
+  Platform::current()->currentThread()->taskRunner()->postDelayedTask(
       WebTraceLocation(__FUNCTION__, __FILE__),
       new InvokeTaskHelper(make_scoped_ptr(task)), ms);
 }
@@ -475,6 +476,25 @@ void BlinkTestRunner::SetDeviceColorProfile(const std::string& name) {
 
 void BlinkTestRunner::SetBluetoothMockDataSet(const std::string& name) {
   Send(new LayoutTestHostMsg_SetBluetoothAdapter(name));
+  // Auto-reset the chooser type so we don't get order dependence when some
+  // tests forget to do it explicitly.
+  Send(new ShellViewHostMsg_SetBluetoothManualChooser(routing_id(), false));
+}
+
+void BlinkTestRunner::SetBluetoothManualChooser() {
+  Send(new ShellViewHostMsg_SetBluetoothManualChooser(routing_id(), true));
+}
+std::vector<std::string> BlinkTestRunner::GetBluetoothManualChooserEvents() {
+  std::vector<std::string> result;
+  Send(new ShellViewHostMsg_GetBluetoothManualChooserEvents(routing_id(),
+                                                            &result));
+  return result;
+}
+void BlinkTestRunner::SendBluetoothManualChooserEvent(
+    const std::string& event,
+    const std::string& argument) {
+  Send(new ShellViewHostMsg_SendBluetoothManualChooserEvent(routing_id(), event,
+                                                            argument));
 }
 
 void BlinkTestRunner::SetGeofencingMockProvider(bool service_available) {
@@ -646,16 +666,6 @@ void BlinkTestRunner::SetPermission(const std::string& name,
 
 void BlinkTestRunner::ResetPermissions() {
   Send(new LayoutTestHostMsg_ResetPermissions(routing_id()));
-}
-
-scoped_refptr<cc::TextureLayer> BlinkTestRunner::CreateTextureLayerForMailbox(
-    cc::TextureLayerClient* client) {
-  return ::content::CreateTextureLayerForMailbox(client);
-}
-
-blink::WebLayer* BlinkTestRunner::InstantiateWebLayer(
-    scoped_refptr<cc::TextureLayer> layer) {
-  return ::content::InstantiateWebLayer(layer);
 }
 
 cc::SharedBitmapManager* BlinkTestRunner::GetSharedBitmapManager() {

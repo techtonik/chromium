@@ -28,21 +28,15 @@
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/text_elider.h"
 
+namespace signin_ui_util {
+
 namespace {
+
 // Maximum width of a username - we trim emails that are wider than this so
 // the wrench menu doesn't get ridiculously wide.
 const int kUsernameMaxWidth = 200;
-}  // namespace
 
-namespace signin_ui_util {
-
-GlobalError* GetSignedInServiceError(Profile* profile) {
-  std::vector<GlobalError*> errors = GetSignedInServiceErrors(profile);
-  if (errors.empty())
-    return NULL;
-  return errors[0];
-}
-
+// Returns all errors reported by signed in services.
 std::vector<GlobalError*> GetSignedInServiceErrors(Profile* profile) {
   std::vector<GlobalError*> errors;
   // Chrome OS doesn't use SigninGlobalError or SyncGlobalError. Other platforms
@@ -68,6 +62,17 @@ std::vector<GlobalError*> GetSignedInServiceErrors(Profile* profile) {
   return errors;
 }
 
+// If a signed in service is reporting an error, returns the GlobalError
+// object associated with that service, or NULL if no errors are reported.
+GlobalError* GetSignedInServiceError(Profile* profile) {
+  std::vector<GlobalError*> errors = GetSignedInServiceErrors(profile);
+  if (errors.empty())
+    return NULL;
+  return errors[0];
+}
+
+}  // namespace
+
 base::string16 GetSigninMenuLabel(Profile* profile) {
   GlobalError* error = signin_ui_util::GetSignedInServiceError(profile);
   if (error)
@@ -79,7 +84,7 @@ base::string16 GetSigninMenuLabel(Profile* profile) {
 
   // Even if the user is signed in, don't display the "signed in as..."
   // label if we're still setting up sync.
-  if (!service || !service->FirstSetupInProgress()) {
+  if (!service || !service->IsFirstSetupInProgress()) {
     std::string username;
     SigninManagerBase* signin_manager =
         SigninManagerFactory::GetForProfileIfExists(profile);

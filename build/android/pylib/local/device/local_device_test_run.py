@@ -4,11 +4,11 @@
 
 import logging
 
+from devil.android import device_errors
 from pylib import valgrind_tools
 from pylib.base import base_test_result
 from pylib.base import test_run
 from pylib.base import test_collection
-from pylib.device import device_errors
 
 
 class LocalDeviceTestRun(test_run.TestRun):
@@ -109,6 +109,7 @@ class LocalDeviceTestRun(test_run.TestRun):
   def _CreateShards(self, tests):
     raise NotImplementedError
 
+  # pylint: disable=no-self-use
   def _GetTestName(self, test):
     return test
 

@@ -87,6 +87,13 @@
     'captive_portal_unittest_sources': [
       'captive_portal/captive_portal_detector_unittest.cc',
     ],
+    'certificate_reporting_unittest_sources': [
+      'certificate_reporting/error_report_unittest.cc',
+      'certificate_reporting/error_reporter_unittest.cc',
+    ],
+    'certificate_transparency_unittest_sources': [
+      'certificate_transparency/log_proof_fetcher_unittest.cc',
+    ],
     'cloud_devices_unittest_sources': [
       'cloud_devices/common/cloud_devices_urls_unittest.cc',
       'cloud_devices/common/printer_description_unittest.cc',
@@ -101,11 +108,10 @@
     'content_settings_unittest_sources': [
       'content_settings/core/browser/content_settings_mock_provider.cc',
       'content_settings/core/browser/content_settings_mock_provider.h',
-      'content_settings/core/browser/content_settings_provider_unittest.cc',
+      'content_settings/core/browser/content_settings_registry_unittest.cc',
       'content_settings/core/browser/content_settings_rule_unittest.cc',
       'content_settings/core/browser/content_settings_utils_unittest.cc',
       'content_settings/core/browser/cookie_settings_unittest.cc',
-      'content_settings/core/browser/plugins_field_trial_unittest.cc',
       'content_settings/core/browser/website_settings_registry_unittest.cc',
       'content_settings/core/common/content_settings_pattern_parser_unittest.cc',
       'content_settings/core/common/content_settings_pattern_unittest.cc',
@@ -209,6 +215,9 @@
     'cronet_unittest_sources': [
       'cronet/histogram_manager_unittest.cc',
     ],
+    'data_use_measurement_unittest_sources': [
+      'data_use_measurement/content/data_use_measurement_unittest.cc',
+    ],
     'enhanced_bookmarks_unittest_sources': [
       'enhanced_bookmarks/enhanced_bookmark_model_unittest.cc',
       'enhanced_bookmarks/image_store_ios_unittest.mm',
@@ -309,6 +318,7 @@
       'memory_pressure/filtered_memory_pressure_calculator_unittest.cc',
       'memory_pressure/test_memory_pressure_calculator.cc',
       'memory_pressure/test_memory_pressure_calculator.h',
+      'memory_pressure/memory_pressure_stats_collector_unittest.cc',
     ],
     'metrics_unittest_sources': [
       'metrics/call_stack_profile_metrics_provider_unittest.cc',
@@ -399,10 +409,14 @@
       'password_manager/core/browser/import/csv_reader_unittest.cc',
       'password_manager/core/browser/log_router_unittest.cc',
       'password_manager/core/browser/login_database_unittest.cc',
+      'password_manager/core/browser/mock_affiliated_match_helper.cc',
+      'password_manager/core/browser/mock_affiliated_match_helper.h',
       'password_manager/core/browser/password_autofill_manager_unittest.cc',
+      'password_manager/core/browser/password_bubble_experiment_unittest.cc',
       'password_manager/core/browser/password_form_manager_unittest.cc',
       'password_manager/core/browser/password_generation_manager_unittest.cc',
       'password_manager/core/browser/password_manager_metrics_util_unittest.cc',
+      'password_manager/core/browser/password_manager_settings_migration_experiment_unittest.cc',
       'password_manager/core/browser/password_manager_unittest.cc',
       'password_manager/core/browser/password_store_default_unittest.cc',
       'password_manager/core/browser/password_store_unittest.cc',
@@ -422,6 +436,7 @@
       'policy/core/browser/browser_policy_connector_unittest.cc',
       'policy/core/browser/configuration_policy_handler_unittest.cc',
       'policy/core/browser/configuration_policy_pref_store_unittest.cc',
+      'policy/core/browser/url_blacklist_manager_unittest.cc',
       'policy/core/browser/url_blacklist_policy_handler_unittest.cc',
       'policy/core/common/async_policy_provider_unittest.cc',
       'policy/core/common/cloud/cloud_policy_client_unittest.cc',
@@ -688,6 +703,7 @@
       'variations/variations_seed_processor_unittest.cc',
       'variations/variations_seed_simulator_unittest.cc',
       'variations/variations_seed_store_unittest.cc',
+      'variations/service/variations_service_unittest.cc',
     ],
     'visitedlink_unittest_sources': [
       'visitedlink/test/visitedlink_unittest.cc',
@@ -703,6 +719,8 @@
     ],
     'web_resource_unittest_sources': [
       'web_resource/eula_accepted_notifier_unittest.cc',
+      'web_resource/promo_resource_service_mobile_ntp_unittest.cc',
+      'web_resource/promo_resource_service_unittest.cc',
       'web_resource/resource_request_allowed_notifier_unittest.cc',
     ],
     'webcrypto_unittest_sources': [
@@ -723,6 +741,9 @@
     ],
     'webdata_unittest_sources': [
       'webdata/common/web_database_migration_unittest.cc',
+    ],
+    'webusb_detector_unittest_sources': [
+      'webusb/webusb_detector_unittest.cc',
     ],
   },
   'targets': [
@@ -766,6 +787,7 @@
         '<@(browser_watcher_unittest_sources)',
         '<@(bubble_unittest_sources)',
         '<@(captive_portal_unittest_sources)',
+        '<@(certificate_reporting_unittest_sources)',
         '<@(cloud_devices_unittest_sources)',
         '<@(component_updater_unittest_sources)',
         '<@(compression_unittest_sources)',
@@ -773,6 +795,7 @@
         '<@(crash_unittest_sources)',
         '<@(crx_file_unittest_sources)',
         '<@(data_reduction_proxy_unittest_sources)',
+        '<@(data_use_measurement_unittest_sources)',
         '<@(device_event_log_unittest_sources)',
         '<@(dom_distiller_unittest_sources)',
         '<@(domain_reliability_unittest_sources)',
@@ -829,9 +852,6 @@
         '../base/base.gyp:base',
         '../base/base.gyp:base_prefs_test_support',
         '../base/base.gyp:test_support_base',
-        # TODO(blundell): Eliminate the need for this dependency in code
-        # that iOS shares. crbug.com/325243
-        '../content/content_shell_and_tests.gyp:test_support_content',
         '../google_apis/google_apis.gyp:google_apis_test_support',
         '../jingle/jingle.gyp:notifier_test_util',
         '../net/net.gyp:net_test_support',
@@ -840,6 +860,7 @@
         '../sync/sync.gyp:test_support_sync_api',
         '../testing/gmock.gyp:gmock',
         '../testing/gtest.gyp:gtest',
+        '../third_party/icu/icu.gyp:icui18n',
         '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
         '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_util',
         '../third_party/libjingle/libjingle.gyp:libjingle',
@@ -862,6 +883,7 @@
         'components.gyp:bookmarks_test_support',
         'components.gyp:bubble',
         'components.gyp:captive_portal_test_support',
+        'components.gyp:certificate_reporting',
         'components.gyp:cloud_devices_common',
         'components.gyp:component_updater',
         'components.gyp:compression',
@@ -872,6 +894,7 @@
         'components.gyp:data_reduction_proxy_core_browser',
         'components.gyp:data_reduction_proxy_core_common',
         'components.gyp:data_reduction_proxy_test_support',
+        'components.gyp:data_use_measurement_core',
         'components.gyp:device_event_log_component',
         'components.gyp:dom_distiller_core',
         'components.gyp:dom_distiller_protos',
@@ -898,9 +921,7 @@
         'components.gyp:login',
         'components.gyp:memory_pressure',
         'components.gyp:metrics',
-        'components.gyp:metrics_gpu',
         'components.gyp:metrics_net',
-        'components.gyp:metrics_profiler',
         'components.gyp:metrics_test_support',
         'components.gyp:network_time',
         'components.gyp:offline_pages',
@@ -940,6 +961,7 @@
         'components.gyp:user_prefs_tracked_test_support',
         'components.gyp:variations',
         'components.gyp:variations_http_provider',
+        'components.gyp:variations_service',
         'components.gyp:version_info',
         'components.gyp:wallpaper',
         'components.gyp:web_resource',
@@ -997,6 +1019,7 @@
         }],
         ['OS != "ios"', {
           'sources': [
+            '<@(certificate_transparency_unittest_sources)',
             '<@(devtools_http_handler_unittest_sources)',
             '<@(error_page_unittest_sources)',
             '<@(guest_view_unittest_sources)',
@@ -1013,12 +1036,15 @@
             '<@(web_modal_unittest_sources)',
           ],
           'dependencies': [
+            '../content/content_shell_and_tests.gyp:test_support_content',
             '../skia/skia.gyp:skia',
             'components.gyp:autofill_content_browser',
             'components.gyp:autofill_content_renderer',
             'components.gyp:autofill_content_test_support',
+            'components.gyp:certificate_transparency',
             'components.gyp:crash_test_support',
             'components.gyp:data_reduction_proxy_content_browser',
+            'components.gyp:data_use_measurement_content',
             'components.gyp:devtools_http_handler',
             'components.gyp:dom_distiller_content_browser',
             'components.gyp:error_page_renderer',
@@ -1030,6 +1056,8 @@
             'components.gyp:keyed_service_content',
             'components.gyp:navigation_interception',
             'components.gyp:network_hints_renderer',
+            'components.gyp:metrics_gpu',
+            'components.gyp:metrics_profiler',
             'components.gyp:password_manager_content_browser',
             'components.gyp:password_manager_content_common',
             'components.gyp:power',
@@ -1046,6 +1074,7 @@
             'components.gyp:web_modal',
             'components.gyp:web_modal_test_support',
             'scheduler/scheduler.gyp:scheduler',
+            'test_runner/test_runner.gyp:test_runner',
             'webcrypto/webcrypto.gyp:webcrypto',
             '../third_party/re2/re2.gyp:re2',
           ],
@@ -1082,6 +1111,8 @@
           ],
           'sources!': [
             'metrics/gpu/gpu_metrics_provider_unittest.cc',
+            'metrics/profiler/profiler_metrics_provider_unittest.cc',
+            'metrics/profiler/tracking_synchronizer_unittest.cc',
           ],
           'sources/': [
             # Exclude all tests that depends on //content (based on layered-
@@ -1107,6 +1138,7 @@
               'action_name': 'copy_test_data',
               'variables': {
                 'test_data_files': [
+                  '../net/data/ssl/certificates',
                   'test/data',
                 ],
                 'test_data_prefix': 'components',
@@ -1192,12 +1224,17 @@
             '<@(feedback_unittest_sources)',
             '<@(proximity_auth_unittest_sources)',
             '<@(tracing_unittest_sources)',
+            '<@(webusb_detector_unittest_sources)',
           ],
           'sources!': [
             'variations/variations_request_scheduler_mobile_unittest.cc',
+            'web_resource/promo_resource_service_mobile_ntp_unittest.cc',
           ],
           'dependencies': [
             '../device/bluetooth/bluetooth.gyp:device_bluetooth_mocks',
+            '../device/core/core.gyp:device_core',
+            '../device/usb/usb.gyp:device_usb',
+            '../device/usb/usb.gyp:device_usb_mocks',
             '../google_apis/google_apis.gyp:google_apis_test_support',
             '../third_party/protobuf/protobuf.gyp:protobuf_lite',
             'components.gyp:audio_modem',
@@ -1211,6 +1248,7 @@
             'components.gyp:pref_registry_test_support',
             'components.gyp:proximity_auth',
             'components.gyp:proximity_auth_test_support',
+            'components.gyp:webusb',
             'tracing.gyp:tracing',
           ],
         }],
@@ -1313,6 +1351,12 @@
                 'policy/core/common/mac_util_unittest.cc',
               ],
             }],
+          ],
+        }],
+        ['enable_plugins == 1', {
+          'sources': [
+            'content_settings/core/browser/content_settings_provider_unittest.cc',
+            'content_settings/core/browser/plugins_field_trial_unittest.cc',
           ],
         }],
       ],

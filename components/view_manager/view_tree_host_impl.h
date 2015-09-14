@@ -7,6 +7,8 @@
 
 #include "base/memory/scoped_ptr.h"
 #include "components/view_manager/display_manager.h"
+#include "components/view_manager/event_dispatcher.h"
+#include "components/view_manager/focus_controller_delegate.h"
 #include "components/view_manager/public/cpp/types.h"
 #include "components/view_manager/public/interfaces/view_tree_host.mojom.h"
 #include "components/view_manager/server_view.h"
@@ -22,6 +24,7 @@ class SurfacesScheduler;
 namespace view_manager {
 
 class ConnectionManager;
+class FocusController;
 class ViewTreeHostDelegate;
 class ViewTreeImpl;
 
@@ -31,7 +34,8 @@ class ViewTreeImpl;
 // closes the associated window, then this object and related state will be
 // deleted.
 class ViewTreeHostImpl : public DisplayManagerDelegate,
-                         public mojo::ViewTreeHost {
+                         public mojo::ViewTreeHost,
+                         public FocusControllerDelegate {
  public:
   // TODO(fsamuel): All these parameters are just plumbing for creating
   // DisplayManagers. We should probably just store these common parameters
@@ -68,18 +72,29 @@ class ViewTreeHostImpl : public DisplayManagerDelegate,
 
   // Returns the root ServerView of this viewport.
   ServerView* root_view() { return root_.get(); }
+  const ServerView* root_view() const { return root_.get(); }
 
-  void UpdateTextInputState(const ui::TextInputState& state);
-  void SetImeVisibility(bool visible);
+  void SetFocusedView(ServerView* view);
+  ServerView* GetFocusedView();
+  void DestroyFocusController();
+
+  void UpdateTextInputState(ServerView* view, const ui::TextInputState& state);
+  void SetImeVisibility(ServerView* view, bool visible);
+
+  void OnAccelerator(uint32_t accelerator_id, mojo::EventPtr event);
+  void DispatchInputEventToView(const ServerView* target, mojo::EventPtr event);
 
   // ViewTreeHost:
   void SetSize(mojo::SizePtr size) override;
+  void SetTitle(const mojo::String& title) override;
   void AddAccelerator(uint32_t id,
                       mojo::KeyboardCode keyboard_code,
                       mojo::EventFlags flags) override;
   void RemoveAccelerator(uint32_t id) override;
 
  private:
+  void OnClientClosed();
+
   // DisplayManagerDelegate:
   ServerView* GetRootView() override;
   void OnEvent(mojo::EventPtr event) override;
@@ -88,11 +103,17 @@ class ViewTreeHostImpl : public DisplayManagerDelegate,
       const mojo::ViewportMetrics& old_metrics,
       const mojo::ViewportMetrics& new_metrics) override;
 
+  // FocusControllerDelegate:
+  void OnFocusChanged(ServerView* old_focused_view,
+                      ServerView* new_focused_view) override;
+
   ViewTreeHostDelegate* delegate_;
   ConnectionManager* const connection_manager_;
   mojo::ViewTreeHostClientPtr client_;
+  EventDispatcher event_dispatcher_;
   scoped_ptr<ServerView> root_;
   scoped_ptr<DisplayManager> display_manager_;
+  scoped_ptr<FocusController> focus_controller_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewTreeHostImpl);
 };

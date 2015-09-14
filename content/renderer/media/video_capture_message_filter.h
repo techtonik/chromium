@@ -18,6 +18,7 @@
 #include "content/common/media/video_capture.h"
 #include "ipc/message_filter.h"
 #include "media/base/video_capture_types.h"
+#include "media/base/video_frame.h"
 #include "ui/gfx/gpu_memory_buffer.h"
 
 struct VideoCaptureMsg_BufferReady_Params;
@@ -56,7 +57,7 @@ class CONTENT_EXPORT VideoCaptureMessageFilter : public IPC::MessageFilter {
         media::VideoFrame::StorageType storage_type,
         const gfx::Size& coded_size,
         const gfx::Rect& visible_rect,
-        const gpu::MailboxHolder& mailbox_holder) = 0;
+        const std::vector<gpu::MailboxHolder>& mailbox_holders) = 0;
 
     // Called when state of a video capture device has changed in the browser
     // process.

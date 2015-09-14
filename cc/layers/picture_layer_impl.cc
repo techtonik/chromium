@@ -182,9 +182,19 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
     gfx::Rect opaque_rect = contents_opaque() ? geometry_rect : gfx::Rect();
     gfx::Rect visible_geometry_rect =
         scaled_occlusion.GetUnoccludedContentRect(geometry_rect);
+
+    // The raster source may not be valid over the entire visible rect,
+    // and rastering outside of that may cause incorrect pixels.
+    gfx::Rect scaled_recorded_viewport = gfx::ScaleToEnclosingRect(
+        raster_source_->RecordedViewport(), max_contents_scale);
+    geometry_rect.Intersect(scaled_recorded_viewport);
+    opaque_rect.Intersect(scaled_recorded_viewport);
+    visible_geometry_rect.Intersect(scaled_recorded_viewport);
+
     if (visible_geometry_rect.IsEmpty())
       return;
 
+    DCHECK(raster_source_->HasRecordings());
     gfx::Rect quad_content_rect = shared_quad_state->visible_quad_layer_rect;
     gfx::Size texture_size = quad_content_rect.size();
     gfx::RectF texture_rect = gfx::RectF(texture_size);
@@ -336,8 +346,6 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
         append_quads_data->num_missing_tiles++;
         ++missing_tile_count;
       }
-      append_quads_data->approximated_visible_content_area +=
-          visible_geometry_rect.width() * visible_geometry_rect.height();
       append_quads_data->checkerboarded_visible_content_area +=
           visible_geometry_rect.width() * visible_geometry_rect.height();
       continue;
@@ -469,9 +477,8 @@ void PictureLayerImpl::UpdateViewportRectForTilePriorityInContentSpace() {
     gfx::Transform view_to_layer(gfx::Transform::kSkipInitialization);
     if (screen_space_transform().GetInverse(&view_to_layer)) {
       // Transform from view space to content space.
-      visible_rect_in_content_space =
-          gfx::ToEnclosingRect(MathUtil::ProjectClippedRect(
-              view_to_layer, viewport_rect_for_tile_priority));
+      visible_rect_in_content_space = MathUtil::ProjectEnclosingClippedRect(
+          view_to_layer, viewport_rect_for_tile_priority);
 
       // We have to allow for a viewport that is outside of the layer bounds in
       // order to compute tile priorities correctly for offscreen content that

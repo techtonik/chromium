@@ -19,7 +19,7 @@
 
 namespace {
 
-// Note that md_settings.html contains a <script> tag which imports a script of
+// Note that settings.html contains a <script> tag which imports a script of
 // the following name. These names must be kept in sync.
 const char kLocalizedStringsFile[] = "strings.js";
 
@@ -178,6 +178,23 @@ void AddInternetStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString("OncTypeWimax", IDS_NETWORK_TYPE_WIMAX);
 }
 #endif
+
+void AddLanguagesStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString(
+      "languagesPageTitle", IDS_SETTINGS_LANGUAGES_PAGE_TITLE);
+  html_source->AddLocalizedString(
+      "languagesListTitle", IDS_SETTINGS_LANGUAGES_LANGUAGES_LIST_TITLE);
+  html_source->AddLocalizedString(
+      "manageLanguages", IDS_SETTINGS_LANGUAGES_LANGUAGES_MANAGE);
+  html_source->AddLocalizedString(
+      "inputMethodsListTitle", IDS_SETTINGS_LANGUAGES_INPUT_METHODS_LIST_TITLE);
+  html_source->AddLocalizedString(
+      "manageInputMethods", IDS_SETTINGS_LANGUAGES_INPUT_METHODS_MANAGE);
+  html_source->AddLocalizedString(
+      "spellCheckListTitle", IDS_SETTINGS_LANGUAGES_SPELL_CHECK_LIST_TITLE);
+  html_source->AddLocalizedString(
+      "manageSpellCheck", IDS_SETTINGS_LANGUAGES_SPELL_CHECK_MANAGE);
+}
 
 void AddOnStartupStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
@@ -410,6 +427,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source) {
 #if defined(OS_CHROMEOS)
   AddInternetStrings(html_source);
 #endif
+  AddLanguagesStrings(html_source);
   AddOnStartupStrings(html_source);
   AddPrivacyStrings(html_source);
   AddSearchStrings(html_source);

@@ -68,6 +68,8 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
                              bool powered) override;
   void DeviceAdded(device::BluetoothAdapter* adapter,
                    device::BluetoothDevice* device) override;
+  void DeviceRemoved(device::BluetoothAdapter* adapter,
+                     device::BluetoothDevice* device) override;
 
   // IPC Handlers, see definitions in bluetooth_messages.h.
   void OnRequestDevice(
@@ -148,6 +150,11 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
   void OnWriteValueFailed(int thread_id,
                           int request_id,
                           device::BluetoothGattService::GattErrorCode);
+
+  // Show help pages from the chooser dialog.
+  void ShowBluetoothOverviewLink();
+  void ShowBluetoothPairingLink();
+  void ShowBluetoothAdapterOffLink();
 
   int render_process_id_;
 

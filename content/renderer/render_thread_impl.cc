@@ -32,6 +32,7 @@
 #include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
+#include "cc/base/histograms.h"
 #include "cc/base/switches.h"
 #include "cc/blink/web_external_bitmap_impl.h"
 #include "cc/blink/web_layer_impl.h"
@@ -647,6 +648,7 @@ void RenderThreadImpl::Init() {
   if (command_line.HasSwitch(switches::kEnableCompositorAnimationTimelines))
     layer_settings.use_compositor_animation_timelines = true;
   cc_blink::WebLayerImpl::SetLayerSettings(layer_settings);
+  cc::SetClientNameForMetrics("Renderer");
 
   is_threaded_animation_enabled_ =
       !command_line.HasSwitch(cc::switches::kDisableThreadedAnimation);
@@ -1156,6 +1158,11 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
   if (GetContentClient()->renderer()->RunIdleHandlerWhenWidgetsHidden())
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
 
+  renderer_scheduler_->SetTimerQueueSuspensionWhenBackgroundedEnabled(
+      GetContentClient()
+          ->renderer()
+          ->AllowTimerSuspensionWhenProcessBackgrounded());
+
   cc_blink::SetSharedBitmapAllocationFunction(AllocateSharedBitmapFunction);
 
   SkGraphics::SetResourceCacheSingleAllocationByteLimit(
@@ -1353,7 +1360,11 @@ RenderThreadImpl::GetGpuFactories() {
     const bool enable_video_accelerator =
         !cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode);
     const bool enable_gpu_memory_buffer_video_frames =
+#if defined(OS_MACOSX)
+        !cmd_line->HasSwitch(switches::kDisableGpuMemoryBufferVideoFrames);
+#else
         cmd_line->HasSwitch(switches::kEnableGpuMemoryBufferVideoFrames);
+#endif
     std::string image_texture_target_string =
         cmd_line->GetSwitchValueASCII(switches::kVideoImageTextureTarget);
     unsigned image_texture_target = 0;
@@ -1364,15 +1375,11 @@ RenderThreadImpl::GetGpuFactories() {
                                  "gpu_channel_. See crbug.com/495185.";
     CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but lost "
                                      "gpu_channel_. See crbug.com/495185.";
-    media::VideoPixelFormat video_pixel_format = media::PIXEL_FORMAT_I420;
-#if defined(OS_MACOSX)
-    // TODO(dcastagna): Check that the extension is available.
-    video_pixel_format = media::PIXEL_FORMAT_UYVY;
-#endif
+
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
         gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
         enable_gpu_memory_buffer_video_frames, image_texture_target,
-        video_pixel_format, enable_video_accelerator);
+        enable_video_accelerator);
   }
   return gpu_factories;
 }
@@ -1449,7 +1456,7 @@ base::WaitableEvent* RenderThreadImpl::GetShutdownEvent() {
 #if defined(OS_WIN)
 void RenderThreadImpl::PreCacheFontCharacters(const LOGFONT& log_font,
                                               const base::string16& str) {
-  Send(new ViewHostMsg_PreCacheFontCharacters(log_font, str));
+  Send(new FrameHostMsg_PreCacheFontCharacters(log_font, str));
 }
 
 #endif  // OS_WIN
@@ -1623,21 +1630,32 @@ bool RenderThreadImpl::OnControlMessageReceived(const IPC::Message& msg) {
   return handled;
 }
 
+void RenderThreadImpl::OnProcessBackgrounded(bool backgrounded) {
+  ChildThreadImpl::OnProcessBackgrounded(backgrounded);
+
+  if (backgrounded)
+    renderer_scheduler_->OnRendererBackgrounded();
+  else
+    renderer_scheduler_->OnRendererForegrounded();
+}
+
 void RenderThreadImpl::OnCreateNewFrame(FrameMsg_NewFrame_Params params) {
   CompositorDependencies* compositor_deps = this;
   RenderFrameImpl::CreateFrame(
-      params.routing_id, params.parent_routing_id,
-      params.previous_sibling_routing_id, params.proxy_routing_id,
+      params.routing_id, params.proxy_routing_id, params.opener_routing_id,
+      params.parent_routing_id, params.previous_sibling_routing_id,
       params.replication_state, compositor_deps, params.widget_params);
 }
 
 void RenderThreadImpl::OnCreateNewFrameProxy(
     int routing_id,
-    int parent_routing_id,
     int render_view_routing_id,
+    int opener_routing_id,
+    int parent_routing_id,
     const FrameReplicationState& replicated_state) {
-  RenderFrameProxy::CreateFrameProxy(routing_id, parent_routing_id,
-                                     render_view_routing_id, replicated_state);
+  RenderFrameProxy::CreateFrameProxy(routing_id, render_view_routing_id,
+                                     opener_routing_id, parent_routing_id,
+                                     replicated_state);
 }
 
 void RenderThreadImpl::OnSetZoomLevelForCurrentURL(const std::string& scheme,

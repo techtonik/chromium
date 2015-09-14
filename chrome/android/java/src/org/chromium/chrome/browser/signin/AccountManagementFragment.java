@@ -508,7 +508,7 @@ public class AccountManagementFragment extends PreferenceFragment
         }
 
         if (AndroidSyncSettings.isSyncEnabled(activity)) {
-            if (!profileSyncService.isSyncInitialized()) {
+            if (!profileSyncService.isBackendInitialized()) {
                 return res.getString(R.string.sync_setup_progress);
             }
 
@@ -676,7 +676,8 @@ public class AccountManagementFragment extends PreferenceFragment
 
         final int imageSidePixels =
                 context.getResources().getDimensionPixelOffset(R.dimen.user_picture_size);
-        ProfileDownloader.startFetchingAccountInfoFor(profile, accountName, imageSidePixels, false);
+        ProfileDownloader.startFetchingAccountInfoFor(
+                context, profile, accountName, imageSidePixels, false);
     }
 
     /**

@@ -7,14 +7,12 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
-#include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/sessions/tab_restore_service_factory.h"
 
 InMemoryTabRestoreService::InMemoryTabRestoreService(
-    Profile* profile,
+    scoped_ptr<sessions::TabRestoreServiceClient> client,
     TabRestoreService::TimeFactory* time_factory)
-    : helper_(this, NULL, profile, time_factory) {
-}
+    : client_(client.Pass()),
+      helper_(this, NULL, client_.get(), time_factory) {}
 
 InMemoryTabRestoreService::~InMemoryTabRestoreService() {}
 
@@ -55,7 +53,7 @@ const TabRestoreService::Entries& InMemoryTabRestoreService::entries() const {
 std::vector<content::WebContents*>
 InMemoryTabRestoreService::RestoreMostRecentEntry(
     TabRestoreServiceDelegate* delegate,
-    chrome::HostDesktopType host_desktop_type) {
+    int host_desktop_type) {
   return helper_.RestoreMostRecentEntry(delegate, host_desktop_type);
 }
 
@@ -67,7 +65,7 @@ TabRestoreService::Tab* InMemoryTabRestoreService::RemoveTabEntryById(
 std::vector<content::WebContents*> InMemoryTabRestoreService::RestoreEntryById(
     TabRestoreServiceDelegate* delegate,
     SessionID::id_type id,
-    chrome::HostDesktopType host_desktop_type,
+    int host_desktop_type,
     WindowOpenDisposition disposition) {
   return helper_.RestoreEntryById(delegate, id, host_desktop_type, disposition);
 }
@@ -87,9 +85,4 @@ void InMemoryTabRestoreService::DeleteLastSession() {
 }
 
 void InMemoryTabRestoreService::Shutdown() {
-}
-
-KeyedService* TabRestoreServiceFactory::BuildServiceInstanceFor(
-    content::BrowserContext* profile) const {
-  return new InMemoryTabRestoreService(static_cast<Profile*>(profile), NULL);
 }

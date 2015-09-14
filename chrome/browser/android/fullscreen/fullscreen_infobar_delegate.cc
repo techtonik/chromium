@@ -21,8 +21,9 @@
 #include "url/gurl.h"
 
 // static
-jlong LaunchFullscreenInfoBar(
-    JNIEnv* env, jobject obj, jobject tab) {
+jlong LaunchFullscreenInfoBar(JNIEnv* env,
+                              const JavaParamRef<jobject>& obj,
+                              const JavaParamRef<jobject>& tab) {
   TabAndroid* tab_android = TabAndroid::GetNativeTab(env, tab);
   GURL origin = tab_android->GetURL().GetOrigin();
   FullscreenInfoBarDelegate* delegate = new FullscreenInfoBarDelegate(
@@ -52,14 +53,13 @@ FullscreenInfoBarDelegate::~FullscreenInfoBarDelegate() {
 }
 
 void FullscreenInfoBarDelegate::CloseFullscreenInfoBar(
-    JNIEnv* env, jobject obj, jobject tab) {
+    JNIEnv* env, jobject obj) {
   j_delegate_.Reset();
-  TabAndroid* tab_android = TabAndroid::GetNativeTab(env, tab);
-  InfoBarService::FromWebContents(tab_android->web_contents())->RemoveInfoBar(
-      infobar());
+  if (infobar() && infobar()->owner())
+    infobar()->owner()->RemoveInfoBar(infobar());
 }
 
-int FullscreenInfoBarDelegate::GetIconID() const {
+int FullscreenInfoBarDelegate::GetIconId() const {
   return IDR_INFOBAR_FULLSCREEN;
 }
 

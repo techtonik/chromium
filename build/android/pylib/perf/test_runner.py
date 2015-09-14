@@ -57,13 +57,13 @@ import tempfile
 import threading
 import time
 
-from pylib import cmd_helper
+from devil.android import battery_utils
+from devil.android import device_errors
+from devil.utils import cmd_helper
 from pylib import constants
 from pylib import forwarder
 from pylib.base import base_test_result
 from pylib.base import base_test_runner
-from pylib.device import battery_utils
-from pylib.device import device_errors
 
 
 def GetPersistedResult(test_name):
@@ -258,7 +258,7 @@ class TestRunner(base_test_runner.BaseTestRunner):
       logging.warning('Unmapping device ports')
       forwarder.Forwarder.UnmapAllDevicePorts(self.device)
       self.device.RestartAdbd()
-    except Exception as e:
+    except Exception as e: # pylint: disable=broad-except
       logging.error('Exception when tearing down device %s', e)
 
     cmd = ('%s --device %s' %
@@ -330,7 +330,7 @@ class TestRunner(base_test_runner.BaseTestRunner):
       try:
         self.device.WaitUntilFullyBooted(timeout=120)
       except device_errors.CommandTimeoutError as e:
-        logging.error('Device failed to return after %s: %s' % (test_name, e))
+        logging.error('Device failed to return after %s: %s', test_name, e)
 
     actual_exit_code = exit_code
     if test_name in self._flaky_tests:

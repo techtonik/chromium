@@ -10,23 +10,27 @@ import argparse
 import collections
 import logging
 import os
-import shutil
 import signal
 import sys
 import threading
 import unittest
 
+from devil import base_error
+from devil.android import apk_helper
+from devil.android import device_blacklist
+from devil.android import device_errors
+from devil.android import device_utils
+from devil.android import ports
+from devil.utils import reraiser_thread
+from devil.utils import run_tests_helper
+
 from pylib import constants
 from pylib import forwarder
-from pylib import ports
 from pylib.base import base_test_result
 from pylib.base import environment_factory
 from pylib.base import test_dispatcher
 from pylib.base import test_instance_factory
 from pylib.base import test_run_factory
-from pylib.device import device_blacklist
-from pylib.device import device_errors
-from pylib.device import device_utils
 from pylib.gtest import gtest_config
 # TODO(jbudorick): Remove this once we stop selectively enabling platform mode.
 from pylib.gtest import gtest_test_instance
@@ -47,10 +51,6 @@ from pylib.results import json_results
 from pylib.results import report_results
 from pylib.uiautomator import setup as uiautomator_setup
 from pylib.uiautomator import test_options as uiautomator_test_options
-from pylib.utils import apk_helper
-from pylib.utils import base_error
-from pylib.utils import reraiser_thread
-from pylib.utils import run_tests_helper
 
 
 def AddCommonOptions(parser):
@@ -711,7 +711,7 @@ def _RunLinkerTests(args, devices):
 
 def _RunInstrumentationTests(args, devices):
   """Subcommand of RunTestsCommands which runs instrumentation tests."""
-  logging.info('_RunInstrumentationTests(%s, %s)' % (str(args), str(devices)))
+  logging.info('_RunInstrumentationTests(%s, %s)', str(args), str(devices))
 
   instrumentation_options = ProcessInstrumentationOptions(args)
 
@@ -894,13 +894,10 @@ def _GetAttachedDevices(blacklist_file, test_device):
   Returns:
     A list of attached devices.
   """
-  if not blacklist_file:
-    # TODO(jbudorick): Remove this once bots pass the blacklist file.
-    blacklist_file = device_blacklist.BLACKLIST_JSON
-    logging.warning('Using default device blacklist %s',
-                    device_blacklist.BLACKLIST_JSON)
+  blacklist = (device_blacklist.Blacklist(blacklist_file)
+               if blacklist_file
+               else None)
 
-  blacklist = device_blacklist.Blacklist(blacklist_file)
   attached_devices = device_utils.DeviceUtils.HealthyDevices(blacklist)
   if test_device:
     test_device = [d for d in attached_devices if d == test_device]
@@ -916,7 +913,7 @@ def _GetAttachedDevices(blacklist_file, test_device):
     return sorted(attached_devices)
 
 
-def RunTestsCommand(args, parser):
+def RunTestsCommand(args, parser): # pylint: disable=too-many-return-statements
   """Checks test type and dispatches to the appropriate function.
 
   Args:

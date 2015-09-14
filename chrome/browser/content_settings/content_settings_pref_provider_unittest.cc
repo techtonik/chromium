@@ -27,6 +27,7 @@
 #include "chrome/test/base/testing_pref_service_syncable.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/content_settings/core/browser/content_settings_pref.h"
+#include "components/content_settings/core/browser/content_settings_registry.h"
 #include "components/content_settings/core/browser/content_settings_rule.h"
 #include "components/content_settings/core/browser/website_settings_info.h"
 #include "components/content_settings/core/browser/website_settings_registry.h"
@@ -64,13 +65,12 @@ class DeadlockCheckerObserver {
       : provider_(provider),
       notification_received_(false) {
     pref_change_registrar_.Init(prefs);
-    for (size_t i = 0; i < CONTENT_SETTINGS_NUM_TYPES; ++i) {
+    for (ContentSettingsPref* pref : provider_->content_settings_prefs_) {
       pref_change_registrar_.Add(
-          provider_->content_settings_prefs_[i]->pref_name_,
+          pref->pref_name_,
           base::Bind(
               &DeadlockCheckerObserver::OnContentSettingsPatternPairsChanged,
-              base::Unretained(this),
-              base::Unretained(provider_->content_settings_prefs_[i])));
+              base::Unretained(this), base::Unretained(pref)));
     }
   }
   virtual ~DeadlockCheckerObserver() {}
@@ -97,6 +97,13 @@ class DeadlockCheckerObserver {
 };
 
 class PrefProviderTest : public testing::Test {
+ public:
+  PrefProviderTest() {
+    // Ensure all content settings are initialized.
+    ContentSettingsRegistry::GetInstance();
+  }
+
+ private:
   content::TestBrowserThreadBundle thread_bundle_;
 };
 

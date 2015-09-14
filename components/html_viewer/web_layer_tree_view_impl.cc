@@ -160,10 +160,6 @@ void WebLayerTreeViewImpl::setViewportSize(
   layer_tree_host_->SetViewportSize(device_viewport_size);
 }
 
-blink::WebSize WebLayerTreeViewImpl::deviceViewportSize() const {
-  return layer_tree_host_->device_viewport_size();
-}
-
 void WebLayerTreeViewImpl::setDeviceScaleFactor(float device_scale_factor) {
   layer_tree_host_->SetDeviceScaleFactor(device_scale_factor);
 }
@@ -243,10 +239,6 @@ void WebLayerTreeViewImpl::startPageScaleAnimation(
 
 void WebLayerTreeViewImpl::setNeedsAnimate() {
   layer_tree_host_->SetNeedsAnimate();
-}
-
-void WebLayerTreeViewImpl::finishAllRendering() {
-  layer_tree_host_->FinishAllRendering();
 }
 
 }  // namespace html_viewer

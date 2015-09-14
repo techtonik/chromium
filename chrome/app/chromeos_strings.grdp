@@ -586,7 +586,10 @@ Press any key to continue exploring.
     Google Drive is not available right now. Uploading will automatically restart once Google Drive is back.
   </message>
   <message name="IDS_FILE_BROWSER_SYNC_MISC_ERROR" desc="File Manager status message shown when the drive sync is failed because of miscellaneous errors.">
-    Google Drive was unable to sync "<ph name="FILENAME">$1<ex>photo.jpg</ex></ph>" right now. Please try again later.
+    Google Drive was unable to sync "<ph name="FILENAME">$1<ex>photo.jpg</ex></ph>" right now. Google Drive will try again later.
+  </message>
+  <message name="IDS_FILE_BROWSER_SYNC_NO_SERVER_SPACE" desc="File Manager status message shown when the drive sync is failed because it runs out the space in Google Drive server.">
+    "<ph name="FILENAME">$1<ex>photo.jpg</ex></ph>" was not uploaded. There is not enough free space in your Google Drive.
   </message>
   <message name="IDS_FILE_BROWSER_SHARE_ERROR" desc="File Manager error message when sharing a file or a directory on Drive fails because of internet connection problems.">
     Sharing failed. Check your connection and try again later.
@@ -2064,35 +2067,35 @@ Press any key to continue exploring.
   <message name="IDS_OPTIONS_POWER_SOURCE_LOW_POWER_CHARGER" desc="The text referring to a low-power charger like a USB charger as the power source.">
     Low-power charger
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT" desc="The text referring to the USB Type-C port on the left side of the device.">
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT" desc="The text identifying an external device, when that device is connected to the USB Type-C port on the left side of this device.">
     USB-C device (left port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT" desc="The text referring to the USB Type-C port on the right side of the device.">
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT" desc="The text identifying an external device, when that device is connected to the USB Type-C port on the right side of this device.">
     USB-C device (right port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK" desc="The text referring to the USB Type-C port on the back of the device.">
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK" desc="The text identifying an external device, when that device is connected to the USB Type-C port on the back of this device.">
     USB-C device (rear port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_FRONT" desc="The text referring to the USB Type-C port on the front of the device.">
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_FRONT" desc="The text identifying an external device, when that device is connected to the USB Type-C port on the front of this device.">
     USB-C device (front port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_FRONT" desc="The text referring to the furthest front USB Type-C port on the left side of the device.">
-    USB-C device (left-front port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_FRONT" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the left side of this device. In this case there are two ports on that side, so this text should refer to the front one on that side.">
+    USB-C device (left side front port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_BACK" desc="The text referring to the furthest back USB Type-C port on the left side of the device.">
-    USB-C device (left-back port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_LEFT_BACK" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the left side of this device. In this case there are two ports on that side, so this text should refer to the back one on that side.">
+    USB-C device (left side back port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_FRONT" desc="The text referring to the furthest front USB Type-C port on the right side of the device.">
-    USB-C device (right-front port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_FRONT" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the right side of this device. In this case there are two ports on that side, so this text should refer to the front one on that side.">">
+    USB-C device (right side front port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_BACK" desc="The text referring to the furthest back USB Type-C port on the right side of the device.">
-    USB-C device (right-back port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_RIGHT_BACK" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the right side of this device. In this case there are two ports on that side, so this text should refer to the back one on that side.">">
+    USB-C device (right side back port)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_LEFT" desc="The text referring to the furthest left USB Type-C port on the back of the device.">
-    USB-C device (rear-left port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_LEFT" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the back of this device. In this case there are two ports on the back, so this text should refer to the one on the left.">
+    USB-C device (left port in the back)
   </message>
-  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_RIGHT" desc="The text referring to the furthest right USB Type-C port on the back of the device.">
-    USB-C device (rear-right port)
+  <message name="IDS_OPTIONS_POWER_SOURCE_PORT_BACK_RIGHT" desc="The text identifying an external device, when that device is connected to a USB Type-C port on the back of this device. In this case there are two ports on the back, so this text should refer to the one on the right.">
+    USB-C device (right port in the back)
   </message>
   <message name="IDS_OPTIONS_POWER_SOURCE_PORT_UNKNOWN" desc="The text referring to the device to charge from, when its port location cannot be determined.">
     USB-C device
@@ -4826,8 +4829,14 @@ Battery full
   <message name="IDS_STATUSBAR_LAYOUT_ESTONIA" desc="In the language menu button, this shows the input mode [Estonian keyboard].">
     Estonian
   </message>
+  <message name="IDS_STATUSBAR_LAYOUT_FAROESE" desc="In the language menu button, this shows the input mode [Faroese keyboard].">
+    Faroese
+  </message>
   <message name="IDS_STATUSBAR_LAYOUT_HUNGARY" desc="In the language menu button, this shows the input mode [Hungarian keyboard].">
     Hungarian
+  </message>
+  <message name="IDS_STATUSBAR_LAYOUT_HUNGARY_QWERTY" desc="In the language menu button, this shows the input mode [Hungarian QWERTY keyboard].">
+    Hungarian QWERTY
   </message>
   <message name="IDS_STATUSBAR_LAYOUT_POLAND" desc="In the language menu button, this shows the input mode [Polish keyboard].">
     Polish
@@ -4927,6 +4936,9 @@ Battery full
   </message>
   <message name="IDS_STATUSBAR_LAYOUT_SPAIN_CATALAN" desc="In the language menu button, this shows the input mode [Catalan keyboard].">
     Catalan
+  </message>
+  <message name="IDS_STATUSBAR_LAYOUT_FRANCE_BEPO" desc="In the language menu button, this shows the input mode [French Bepo keyboard].">
+    French Bepo
   </message>
   <message name="IDS_STATUSBAR_LAYOUT_FRANCE" desc="In the language menu button, this shows the input mode [French keyboard].">
     French
@@ -5028,8 +5040,14 @@ Battery full
   <message name="IDS_IME_NAME_KEYBOARD_ESTONIAN" desc="The input method name shows in system tray menu, this shows [Estonian keyboard].">
     Estonian keyboard
   </message>
+  <message name="IDS_IME_NAME_KEYBOARD_FAROESE" desc="The input method name shows in system tray menu, this shows [Faroese keyboard].">
+    Faroese keyboard
+  </message>
   <message name="IDS_IME_NAME_KEYBOARD_FINNISH" desc="The input method name shows in system tray menu, this shows [Finnish keyboard].">
     Finnish keyboard
+  </message>
+  <message name="IDS_IME_NAME_KEYBOARD_FRENCH_BEPO" desc="The input method name shows in system tray menu, this shows [French Bepo keyboard].">
+    French Bepo keyboard
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_FRENCH" desc="The input method name shows in system tray menu, this shows [French keyboard].">
     French keyboard
@@ -5051,6 +5069,9 @@ Battery full
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_HUNGARIAN" desc="The input method name shows in system tray menu, this shows [Hungarian keyboard].">
     Hungarian keyboard
+  </message>
+  <message name="IDS_IME_NAME_KEYBOARD_HUNGARIAN_QWERTY" desc="The input method name shows in system tray menu, this shows [Hungarian QWERTY keyboard].">
+    Hungarian QWERTY keyboard
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_ICELANDIC" desc="The input method name shows in system tray menu, this shows [Icelandic keyboard].">
     Icelandic keyboard

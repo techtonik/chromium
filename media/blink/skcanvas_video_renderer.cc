@@ -18,6 +18,7 @@
 #include "third_party/skia/include/gpu/GrPaint.h"
 #include "third_party/skia/include/gpu/GrTexture.h"
 #include "third_party/skia/include/gpu/GrTextureProvider.h"
+#include "third_party/skia/include/gpu/SkGr.h"
 #include "ui/gfx/geometry/rect_f.h"
 
 // Skia internal format depends on a platform. On Android it is ABGR, on others
@@ -27,11 +28,15 @@
 #define LIBYUV_I420_TO_ARGB libyuv::I420ToARGB
 #define LIBYUV_I422_TO_ARGB libyuv::I422ToARGB
 #define LIBYUV_I420ALPHA_TO_ARGB libyuv::I420AlphaToARGB
+#define LIBYUV_J420_TO_ARGB libyuv::J420ToARGB
+#define LIBYUV_H420_TO_ARGB libyuv::H420ToARGB
 #elif SK_R32_SHIFT == 0 && SK_G32_SHIFT == 8 && SK_B32_SHIFT == 16 && \
     SK_A32_SHIFT == 24
 #define LIBYUV_I420_TO_ARGB libyuv::I420ToABGR
 #define LIBYUV_I422_TO_ARGB libyuv::I422ToABGR
 #define LIBYUV_I420ALPHA_TO_ARGB libyuv::I420AlphaToABGR
+#define LIBYUV_J420_TO_ARGB libyuv::J420ToABGR
+#define LIBYUV_H420_TO_ARGB libyuv::H420ToABGR
 #else
 #error Unexpected Skia ARGB_8888 layout!
 #endif
@@ -125,7 +130,6 @@ skia::RefPtr<SkImage> NewSkImageFromVideoFrameYUVTextures(
   SkImage* img = SkImage::NewFromYUVTexturesCopy(context_3d.gr_context,
                                                  color_space, handles, yuvSizes,
                                                  kTopLeft_GrSurfaceOrigin);
-  DCHECK(img);
   gl->DeleteTextures(3, source_textures);
   return skia::AdoptRef(img);
 }
@@ -136,6 +140,7 @@ skia::RefPtr<SkImage> NewSkImageFromVideoFrameNative(
     VideoFrame* video_frame,
     const Context3D& context_3d) {
   DCHECK(PIXEL_FORMAT_ARGB == video_frame->format() ||
+         PIXEL_FORMAT_NV12 == video_frame->format() ||
          PIXEL_FORMAT_UYVY == video_frame->format());
 
   const gpu::MailboxHolder& mailbox_holder = video_frame->mailbox_holder(0);
@@ -334,6 +339,8 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
       auto video_generator = new VideoImageGenerator(video_frame);
       last_image_ = skia::AdoptRef(SkImage::NewFromGenerator(video_generator));
     }
+    if (!last_image_)  // Couldn't create the SkImage.
+      return;
     last_timestamp_ = video_frame->timestamp();
   }
   last_image_deleting_timer_.Reset();
@@ -378,7 +385,25 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
     canvas->translate(-SkFloatToScalar(last_image_->width() * 0.5f),
                       -SkFloatToScalar(last_image_->height() * 0.5f));
   }
-  canvas->drawImage(last_image_.get(), 0, 0, &paint);
+
+  // This is a workaround for crbug.com/524717. SkBitmaps are read back before a
+  // SkPicture is sent to multiple threads while SkImages are not. The long term
+  // solution is for Skia to provide a SkPicture filter that makes a picture
+  // safe for multiple CPU raster threads (skbug.com/4321). We limit the
+  // workaround to cases where the src frame is a texture and the canvas is
+  // recording.
+  if (last_image_.get()->getTexture() &&
+      canvas->imageInfo().colorType() == kUnknown_SkColorType) {
+    SkBitmap bmp;
+    GrWrapTextureInBitmap(last_image_.get()->getTexture(),
+        last_image_.get()->width(), last_image_.get()->height(), true, &bmp);
+    // Even though the bitmap is logically immutable we do not mark it as such
+    // because doing so would defer readback until rasterization, which will be
+    // on another thread and is therefore unsafe.
+    canvas->drawBitmap(bmp, 0, 0, &paint);
+  } else {
+    canvas->drawImage(last_image_.get(), 0, 0, &paint);
+  }
 
   if (need_transform)
     canvas->restore();
@@ -419,7 +444,7 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
     case PIXEL_FORMAT_YV12:
     case PIXEL_FORMAT_I420:
       if (CheckColorSpace(video_frame, COLOR_SPACE_JPEG)) {
-        libyuv::J420ToARGB(
+        LIBYUV_J420_TO_ARGB(
             video_frame->visible_data(VideoFrame::kYPlane),
             video_frame->stride(VideoFrame::kYPlane),
             video_frame->visible_data(VideoFrame::kUPlane),
@@ -430,25 +455,18 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
             row_bytes,
             video_frame->visible_rect().width(),
             video_frame->visible_rect().height());
-#if SK_R32_SHIFT == 0 && SK_G32_SHIFT == 8 && SK_B32_SHIFT == 16 && \
-    SK_A32_SHIFT == 24
-        libyuv::ARGBToABGR(static_cast<uint8*>(rgb_pixels),
-                           row_bytes,
-                           static_cast<uint8*>(rgb_pixels),
-                           row_bytes,
-                           video_frame->visible_rect().width(),
-                           video_frame->visible_rect().height());
-#endif
       } else if (CheckColorSpace(video_frame, COLOR_SPACE_HD_REC709)) {
-        ConvertYUVToRGB32(video_frame->visible_data(VideoFrame::kYPlane),
-                          video_frame->visible_data(VideoFrame::kUPlane),
-                          video_frame->visible_data(VideoFrame::kVPlane),
-                          static_cast<uint8*>(rgb_pixels),
-                          video_frame->visible_rect().width(),
-                          video_frame->visible_rect().height(),
-                          video_frame->stride(VideoFrame::kYPlane),
-                          video_frame->stride(VideoFrame::kUPlane), row_bytes,
-                          YV12HD);
+        LIBYUV_H420_TO_ARGB(
+            video_frame->visible_data(VideoFrame::kYPlane),
+            video_frame->stride(VideoFrame::kYPlane),
+            video_frame->visible_data(VideoFrame::kUPlane),
+            video_frame->stride(VideoFrame::kUPlane),
+            video_frame->visible_data(VideoFrame::kVPlane),
+            video_frame->stride(VideoFrame::kVPlane),
+            static_cast<uint8*>(rgb_pixels),
+            row_bytes,
+            video_frame->visible_rect().width(),
+            video_frame->visible_rect().height());
       } else {
         LIBYUV_I420_TO_ARGB(
             video_frame->visible_data(VideoFrame::kYPlane),
@@ -524,6 +542,7 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
     case PIXEL_FORMAT_RGB24:
     case PIXEL_FORMAT_RGB32:
     case PIXEL_FORMAT_MJPEG:
+    case PIXEL_FORMAT_MT21:
     case PIXEL_FORMAT_UNKNOWN:
       NOTREACHED();
   }

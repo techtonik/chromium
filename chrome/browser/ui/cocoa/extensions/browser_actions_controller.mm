@@ -202,8 +202,6 @@ class ToolbarActionsBarBridge : public ToolbarActionsBarDelegate {
   bool IsAnimating() const override;
   void StopAnimating() override;
   int GetChevronWidth() const override;
-  void OnOverflowedActionWantsToRunChanged(bool overflowed_action_wants_to_run)
-      override;
   void ShowExtensionMessageBubble(
       scoped_ptr<extensions::ExtensionMessageBubbleController> controller,
       ToolbarActionViewController* anchor_action) override;
@@ -272,12 +270,6 @@ void ToolbarActionsBarBridge::StopAnimating() {
 
 int ToolbarActionsBarBridge::GetChevronWidth() const {
   return kChevronWidth;
-}
-
-void ToolbarActionsBarBridge::OnOverflowedActionWantsToRunChanged(
-    bool overflowed_action_wants_to_run) {
-  [[controller_ toolbarController]
-      setOverflowedToolbarActionWantsToRun:overflowed_action_wants_to_run];
 }
 
 void ToolbarActionsBarBridge::ShowExtensionMessageBubble(
@@ -676,7 +668,7 @@ void ToolbarActionsBarBridge::ShowExtensionMessageBubble(
 
 - (void)updateButtonOpacity {
   for (BrowserActionButton* button in buttons_.get()) {
-    NSRect buttonFrame = [button frame];
+    NSRect buttonFrame = [button frameAfterAnimation];
     if (NSContainsRect([containerView_ bounds], buttonFrame)) {
       if ([button alphaValue] != 1.0)
         [button setAlphaValue:1.0];

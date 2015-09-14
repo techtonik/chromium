@@ -42,6 +42,7 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
     bool multisampled_render_to_texture;
     // Use the IMG GLenum values and functions rather than EXT.
     bool use_img_for_multisampled_render_to_texture;
+    bool chromium_screen_space_antialiasing;
     bool oes_standard_derivatives;
     bool oes_egl_image_external;
     bool oes_depth24;
@@ -140,6 +141,8 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
     return unsafe_es3_apis_enabled_;
   }
 
+  bool disable_shader_translator() const { return disable_shader_translator_; }
+
  private:
   friend class base::RefCounted<FeatureInfo>;
   friend class BufferManagerClientSideArraysTest;
@@ -171,6 +174,7 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
   // Whether the command line switch kEnableGLPathRendering is passed in.
   bool enable_gl_path_rendering_switch_;
 
+  bool disable_shader_translator_;
   scoped_ptr<gfx::GLVersionInfo> gl_version_info_;
 
   DISALLOW_COPY_AND_ASSIGN(FeatureInfo);

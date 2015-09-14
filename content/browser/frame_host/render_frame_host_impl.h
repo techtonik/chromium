@@ -80,11 +80,8 @@ struct ResourceResponse;
 enum CreateRenderFrameFlags {
   // The RFH will be initially placed on the swapped out hosts list.
   CREATE_RF_SWAPPED_OUT = 1 << 0,
-  // The new RenderFrame is being created for a navigation of the
-  // top-level frame.
-  CREATE_RF_FOR_MAIN_FRAME_NAVIGATION = 1 << 1,
   // The RenderFrame is initially hidden.
-  CREATE_RF_HIDDEN = 1 << 2,
+  CREATE_RF_HIDDEN = 1 << 1,
 };
 
 class CONTENT_EXPORT RenderFrameHostImpl
@@ -191,9 +188,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // Creates a RenderFrame in the renderer process.  Only called for
   // cross-process subframe navigations in --site-per-process.
-  bool CreateRenderFrame(int parent_routing_id,
-                         int previous_sibling_routing_id,
-                         int proxy_routing_id);
+  bool CreateRenderFrame(int proxy_routing_id,
+                         int opener_routing_id,
+                         int parent_routing_id,
+                         int previous_sibling_routing_id);
 
   // Tracks whether the RenderFrame for this RenderFrameHost has been created in
   // the renderer process.  This is currently only used for subframes.

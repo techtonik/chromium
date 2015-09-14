@@ -14,6 +14,7 @@
 #include "grit/components_scaled_resources.h"
 #include "grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/gfx/vector_icons_public.h"
 #include "url/gurl.h"
 
 namespace autofill {
@@ -56,8 +57,16 @@ AutofillCCInfoBarDelegate::GetInfoBarType() const {
   return PAGE_ACTION_TYPE;
 }
 
-int AutofillCCInfoBarDelegate::GetIconID() const {
+int AutofillCCInfoBarDelegate::GetIconId() const {
   return IDR_INFOBAR_AUTOFILL_CC;
+}
+
+gfx::VectorIconId AutofillCCInfoBarDelegate::GetVectorIconId() const {
+#if !defined(OS_MACOSX) && !defined(OS_IOS) && !defined(OS_ANDROID)
+  return gfx::VectorIconId::AUTOFILL;
+#else
+  return gfx::VectorIconId::VECTOR_ICON_NONE;
+#endif
 }
 
 bool AutofillCCInfoBarDelegate::ShouldExpire(

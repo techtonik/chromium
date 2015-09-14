@@ -1144,6 +1144,10 @@ _NAMED_TYPE_INFO = {
     ],
     'valid_es3': [
       'GL_DEPTH_STENCIL_ATTACHMENT',
+      # For backbuffer.
+      'GL_COLOR_EXT',
+      'GL_DEPTH_EXT',
+      'GL_STENCIL_EXT',
     ],
   },
   'BackbufferAttachment': {
@@ -2130,6 +2134,12 @@ _FUNCTION_INFO = {
     'impl_func': False,
     'client_test': False,
   },
+  'ApplyScreenSpaceAntialiasingCHROMIUM': {
+    'decoder_func': 'DoApplyScreenSpaceAntialiasingCHROMIUM',
+    'extension_flag': 'chromium_screen_space_antialiasing',
+    'unit_test': False,
+    'client_test': False,
+  },
   'AttachShader': {'decoder_func': 'DoAttachShader'},
   'BindAttribLocation': {
     'type': 'GLchar',
@@ -2149,7 +2159,7 @@ _FUNCTION_INFO = {
   },
   'BindBufferRange': {
     'type': 'Bind',
-    'id_mapping': [ 'Buffer' ],
+    'decoder_func': 'DoBindBufferRange',
     'gen_func': 'GenBuffersARB',
     'valid_args': {
       '3': '4',
@@ -3452,6 +3462,7 @@ _FUNCTION_INFO = {
     'decoder_func': 'DoTransformFeedbackVaryings',
     'cmd_args':
         'GLuint program, const char** varyings, GLenum buffermode',
+    'expectation': False,
     'unsafe': True,
   },
   'Uniform1f': {'type': 'PUTXn', 'count': 1},
@@ -3470,11 +3481,14 @@ _FUNCTION_INFO = {
   'Uniform1ui': {
     'type': 'PUTXn',
     'count': 1,
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform1uiv': {
     'type': 'PUTn',
     'count': 1,
+    'decoder_func': 'DoUniform1uiv',
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform2i': {'type': 'PUTXn', 'count': 2},
@@ -3492,11 +3506,14 @@ _FUNCTION_INFO = {
   'Uniform2ui': {
     'type': 'PUTXn',
     'count': 2,
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform2uiv': {
     'type': 'PUTn',
     'count': 2,
+    'decoder_func': 'DoUniform2uiv',
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform3i': {'type': 'PUTXn', 'count': 3},
@@ -3514,11 +3531,14 @@ _FUNCTION_INFO = {
   'Uniform3ui': {
     'type': 'PUTXn',
     'count': 3,
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform3uiv': {
     'type': 'PUTn',
     'count': 3,
+    'decoder_func': 'DoUniform3uiv',
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform4i': {'type': 'PUTXn', 'count': 4},
@@ -3536,11 +3556,14 @@ _FUNCTION_INFO = {
   'Uniform4ui': {
     'type': 'PUTXn',
     'count': 4,
+    'unit_test': False,
     'unsafe': True,
   },
   'Uniform4uiv': {
     'type': 'PUTn',
     'count': 4,
+    'decoder_func': 'DoUniform4uiv',
+    'unit_test': False,
     'unsafe': True,
   },
   'UniformMatrix2fv': {
@@ -6625,9 +6648,7 @@ TEST_F(GLES2ImplementationTest, %(name)s) {
     valid_test = """
 TEST_P(%(test_name)s, %(name)sValidArgs) {
   EXPECT_CALL(*gl_, GetError())
-      .WillOnce(Return(GL_NO_ERROR))
-      .WillOnce(Return(GL_NO_ERROR))
-      .RetiresOnSaturation();
+      .WillRepeatedly(Return(GL_NO_ERROR));
   SpecializedSetup<cmds::%(name)s, 0>(true);
   typedef cmds::%(name)s::Result Result;
   Result* result = static_cast<Result*>(shared_memory_address_);
@@ -7723,13 +7744,7 @@ class PUTXnHandler(ArrayArgTypeHandler):
 
   def WriteHandlerImplementation(self, func, f):
     """Overrriden from TypeHandler."""
-    code = """  %(type)s temp[%(count)s] = { %(values)s};"""
-    if func.IsUnsafe():
-      code += """
-  gl%(name)sv(%(location)s, 1, &temp[0]);
-"""
-    else:
-      code += """
+    code = """  %(type)s temp[%(count)s] = { %(values)s};
   Do%(name)sv(%(location)s, 1, &temp[0]);
 """
     values = ""

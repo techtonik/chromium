@@ -10,6 +10,7 @@ goog.provide('Output');
 goog.provide('Output.EventType');
 
 goog.require('AutomationUtil.Dir');
+goog.require('EarconEngine');
 goog.require('cursors.Cursor');
 goog.require('cursors.Range');
 goog.require('cursors.Unit');
@@ -446,7 +447,7 @@ Output.RULES = {
       speak: '@describe_slider($value, $name) $help'
     },
     staticText: {
-      speak: '$value $name'
+      speak: '$value='
     },
     tab: {
       speak: '@describe_tab($name)'
@@ -797,7 +798,8 @@ Output.prototype = {
             }
           }
           // Annotate this as a name so we don't duplicate names from ancestors.
-          if (node.role == chrome.automation.RoleType.inlineTextBox)
+          if (node.role == chrome.automation.RoleType.inlineTextBox ||
+              node.role == chrome.automation.RoleType.staticText)
             token = 'name';
           options.annotation.push(token);
           this.append_(buff, text, options);

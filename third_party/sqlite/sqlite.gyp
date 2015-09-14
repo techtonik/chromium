@@ -47,15 +47,14 @@
       'target_name': 'sqlite',
       'conditions': [
         [ 'chromeos==1' , {
-            'defines': [
-                # Despite obvious warnings about not using this flag
-                # in deployment, we are turning off sync in ChromeOS
-                # and relying on the underlying journaling filesystem
-                # to do error recovery properly.  It's much faster.
-                'SQLITE_NO_SYNC',
-                ],
-          },
-        ],
+          'defines': [
+            # Despite obvious warnings about not using this flag in deployment,
+            # we are turning off sync in ChromeOS and relying on the underlying
+            # journaling filesystem to do error recovery properly.  It's much
+            # faster.
+            'SQLITE_NO_SYNC',
+          ],
+        }],
         ['os_posix == 1', {
           'defines': [
             # Allow xSleep() call on Unix to use usleep() rather than sleep().
@@ -64,12 +63,24 @@
             # profile databases are mostly exclusive, but renderer databases may
             # allow for contention.
             'HAVE_USLEEP=1',
+            # Use pread/pwrite directly rather than emulating them.
+            'USE_PREAD=1',
           ],
         }],
         ['OS == "linux" or OS == "android"', {
           'defines': [
             # Linux provides fdatasync(), a faster equivalent of fsync().
             'fdatasync=fdatasync',
+          ],
+        }],
+        # SQLite wants to track malloc sizes.  On OSX it uses malloc_size(), on
+        # Windows _msize(), elsewhere it handles it manually by enlarging the
+        # malloc and injecting a field.  Enable malloc_usable_size() for Linux.
+        # NOTE(shess): Android does _not_ export malloc_usable_size().
+        ['OS == "linux"', {
+          'defines': [
+            'HAVE_MALLOC_H',
+            'HAVE_MALLOC_USABLE_SIZE',
           ],
         }],
         ['use_system_sqlite', {
@@ -115,8 +126,9 @@
             }],
           ],
         }, { # !use_system_sqlite
-          'product_name': 'sqlite3',
-          'type': 'static_library',
+          # "sqlite3" can cause conflicts with the system library.
+          'product_name': 'chromium_sqlite3',
+          'type': '<(component)',
           'sources': [
             'amalgamation/sqlite3.h',
             'amalgamation/sqlite3.c',
@@ -138,16 +150,19 @@
             '../icu/icu.gyp:icui18n',
             '../icu/icu.gyp:icuuc',
           ],
-          'direct_dependent_settings': {
-            'include_dirs': [
-              '.',
-              '../..',
-            ],
-          },
           'msvs_disabled_warnings': [
             4244, 4267,
           ],
           'conditions': [
+            ['OS == "win" and component == "shared_library"', {
+              'defines': ['SQLITE_API=__declspec(dllexport)'],
+              'direct_dependent_settings': {
+                'defines': ['SQLITE_API=__declspec(dllimport)'],
+              },
+            }],
+            ['OS != "win" and component == "shared_library"', {
+              'defines': ['SQLITE_API=__attribute__((visibility("default")))'],
+            }],
             ['OS=="linux"', {
               'link_settings': {
                 'libraries': [
@@ -159,6 +174,7 @@
               'link_settings': {
                 'libraries': [
                   '$(SDKROOT)/System/Library/Frameworks/CoreFoundation.framework',
+                  '$(SDKROOT)/System/Library/Frameworks/CoreServices.framework',
                 ],
               },
             }],
@@ -199,6 +215,10 @@
           'dependencies': [
             '../icu/icu.gyp:icuuc',
             'sqlite',
+          ],
+          # So shell.c can find the correct sqlite3.h.
+          'include_dirs': [
+            'amalgamation',
           ],
           'sources': [
             'src/src/shell.c',

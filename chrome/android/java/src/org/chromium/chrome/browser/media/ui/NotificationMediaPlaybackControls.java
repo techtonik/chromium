@@ -266,8 +266,8 @@ public class NotificationMediaPlaybackControls {
         // The MediaSession icon is a plain color.
         int size = context.getResources().getDimensionPixelSize(R.dimen.media_session_icon_size);
         mMediaSessionIcon = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        mMediaSessionIcon.eraseColor(
-                context.getResources().getColor(R.color.media_session_icon_color));
+        mMediaSessionIcon.eraseColor(ApiCompatibilityUtils.getColor(
+                context.getResources(), R.color.media_session_icon_color));
     }
 
     private void showNotification(MediaNotificationInfo mediaNotificationInfo) {
@@ -346,20 +346,6 @@ public class NotificationMediaPlaybackControls {
         return title.startsWith("\u25B6") ? title.substring(1).trim() : title;
     }
 
-    private String getStatus() {
-        if (mMediaNotificationInfo.origin != null) {
-            return mContext.getString(R.string.media_notification_link_text,
-                                      mMediaNotificationInfo.origin);
-        }
-        return mContext.getString(R.string.media_notification_text_no_link);
-    }
-
-    private PendingIntent createContentIntent() {
-        int tabId = mMediaNotificationInfo.tabId;
-        return PendingIntent.getActivity(
-                mContext, tabId, Tab.createBringTabToFrontIntent(tabId), 0);
-    }
-
     private MediaMetadataCompat createMetadata() {
         MediaMetadataCompat.Builder metadataBuilder = new MediaMetadataCompat.Builder();
 
@@ -406,12 +392,17 @@ public class NotificationMediaPlaybackControls {
                 .setDeleteIntent(mService.getPendingIntent(ListenerService.ACTION_STOP));
         }
         mNotificationBuilder.setOngoing(!mMediaNotificationInfo.isPaused);
-        mNotificationBuilder.setContentIntent(createContentIntent());
+
+        int tabId = mMediaNotificationInfo.tabId;
+        Intent tabIntent = Tab.createBringTabToFrontIntent(tabId);
+        if (tabIntent != null) {
+            mNotificationBuilder
+                    .setContentIntent(PendingIntent.getActivity(mContext, tabId, tabIntent, 0));
+        }
 
         RemoteViews contentView = createContentView();
-
         contentView.setTextViewText(R.id.title, mMediaNotificationInfo.title);
-        contentView.setTextViewText(R.id.status, getStatus());
+        contentView.setTextViewText(R.id.status, mMediaNotificationInfo.origin);
         if (mNotificationIcon != null) {
             contentView.setImageViewBitmap(R.id.icon, mNotificationIcon);
         } else {
@@ -443,7 +434,20 @@ public class NotificationMediaPlaybackControls {
             mMediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
                     | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
             mMediaSession.setCallback(mMediaSessionCallback);
-            mMediaSession.setActive(true);
+
+            // TODO(mlamouri): the following code is to work around a bug that hopefully
+            // MediaSessionCompat will handle directly. see b/24051980.
+            try {
+                mMediaSession.setActive(true);
+            } catch (NullPointerException e) {
+                // Some versions of KitKat do not support AudioManager.registerMediaButtonIntent
+                // with a PendingIntent. They will throw a NullPointerException, in which case
+                // they should be able to activate a MediaSessionCompat with only transport
+                // controls.
+                mMediaSession.setActive(false);
+                mMediaSession.setFlags(MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
+                mMediaSession.setActive(true);
+            }
         }
 
         mMediaSession.setMetadata(createMetadata());

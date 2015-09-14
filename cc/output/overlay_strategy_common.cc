@@ -6,6 +6,7 @@
 
 #include <limits>
 
+#include "cc/base/math_util.h"
 #include "cc/quads/io_surface_draw_quad.h"
 #include "cc/quads/solid_color_draw_quad.h"
 #include "cc/quads/stream_video_draw_quad.h"
@@ -33,31 +34,42 @@ bool OverlayStrategyCommon::Attempt(RenderPassList* render_passes_in_draw_order,
   RenderPass* root_render_pass = render_passes_in_draw_order->back();
   DCHECK(root_render_pass);
 
-  QuadList& quad_list = root_render_pass->quad_list;
-  for (auto it = quad_list.begin(); it != quad_list.end(); ++it) {
-    OverlayCandidate candidate;
-    const DrawQuad* draw_quad = *it;
-    if (IsOverlayQuad(draw_quad) &&
-        GetCandidateQuadInfo(*draw_quad, &candidate) &&
-        delegate_->TryOverlay(capability_checker_, render_passes_in_draw_order,
-                              candidate_list, candidate, it,
-                              device_scale_factor))
-      return true;
-  }
-  return false;
-}
+  // Add our primary surface.
+  OverlayCandidate main_image;
+  main_image.display_rect = gfx::RectF(root_render_pass->output_rect);
+  DCHECK(candidate_list->empty());
+  candidate_list->push_back(main_image);
 
-bool OverlayStrategyCommon::IsOverlayQuad(const DrawQuad* draw_quad) {
-  switch (draw_quad->material) {
-    case DrawQuad::TEXTURE_CONTENT:
-      return TextureDrawQuad::MaterialCast(draw_quad)->allow_overlay();
-    case DrawQuad::STREAM_VIDEO_CONTENT:
-      return StreamVideoDrawQuad::MaterialCast(draw_quad)->allow_overlay();
-    case DrawQuad::IO_SURFACE_CONTENT:
-      return IOSurfaceDrawQuad::MaterialCast(draw_quad)->allow_overlay;
-    default:
-      return false;
+  bool created_overlay = false;
+  QuadList& quad_list = root_render_pass->quad_list;
+  for (auto it = quad_list.begin(); it != quad_list.end();) {
+    OverlayCandidate candidate;
+    if (!GetCandidateQuadInfo(**it, &candidate)) {
+      ++it;
+      continue;
+    }
+
+    OverlayResult result = delegate_->TryOverlay(
+        capability_checker_, render_passes_in_draw_order, candidate_list,
+        candidate, &it, device_scale_factor);
+    switch (result) {
+      case DID_NOT_CREATE_OVERLAY:
+        ++it;
+        break;
+      case CREATED_OVERLAY_STOP_LOOKING:
+        return true;
+      case CREATED_OVERLAY_KEEP_LOOKING:
+        created_overlay = true;
+        break;
+    }
   }
+
+  if (!created_overlay) {
+    DCHECK_EQ(1u, candidate_list->size());
+    candidate_list->clear();
+  }
+
+  return created_overlay;
 }
 
 // static
@@ -76,6 +88,8 @@ bool OverlayStrategyCommon::IsInvisibleQuad(const DrawQuad* draw_quad) {
 
 bool OverlayStrategyCommon::GetTextureQuadInfo(const TextureDrawQuad& quad,
                                                OverlayCandidate* quad_info) {
+  if (!quad.allow_overlay())
+    return false;
   gfx::OverlayTransform overlay_transform =
       OverlayCandidate::GetOverlayTransform(
           quad.shared_quad_state->quad_to_target_transform, quad.y_flipped);
@@ -87,11 +101,17 @@ bool OverlayStrategyCommon::GetTextureQuadInfo(const TextureDrawQuad& quad,
   quad_info->resource_size_in_pixels = quad.resource_size_in_pixels();
   quad_info->transform = overlay_transform;
   quad_info->uv_rect = BoundingRect(quad.uv_top_left, quad.uv_bottom_right);
+  quad_info->quad_rect_in_target_space = MathUtil::MapEnclosingClippedRect(
+      quad.shared_quad_state->quad_to_target_transform, quad.rect);
+  quad_info->clip_rect = quad.shared_quad_state->clip_rect;
+  quad_info->is_clipped = quad.shared_quad_state->is_clipped;
   return true;
 }
 
 bool OverlayStrategyCommon::GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
                                              OverlayCandidate* quad_info) {
+  if (!quad.allow_overlay())
+    return false;
   gfx::OverlayTransform overlay_transform =
       OverlayCandidate::GetOverlayTransform(
           quad.shared_quad_state->quad_to_target_transform, false);
@@ -105,6 +125,10 @@ bool OverlayStrategyCommon::GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
   quad_info->resource_id = quad.resource_id();
   quad_info->resource_size_in_pixels = quad.resource_size_in_pixels();
   quad_info->transform = overlay_transform;
+  quad_info->quad_rect_in_target_space = MathUtil::MapEnclosingClippedRect(
+      quad.shared_quad_state->quad_to_target_transform, quad.rect);
+  quad_info->clip_rect = quad.shared_quad_state->clip_rect;
+  quad_info->is_clipped = quad.shared_quad_state->is_clipped;
 
   gfx::Point3F uv0 = gfx::Point3F(0, 0, 0);
   gfx::Point3F uv1 = gfx::Point3F(1, 1, 0);
@@ -135,6 +159,8 @@ bool OverlayStrategyCommon::GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
 
 bool OverlayStrategyCommon::GetIOSurfaceQuadInfo(const IOSurfaceDrawQuad& quad,
                                                  OverlayCandidate* quad_info) {
+  if (!quad.allow_overlay)
+    return false;
   gfx::OverlayTransform overlay_transform =
       OverlayCandidate::GetOverlayTransform(
           quad.shared_quad_state->quad_to_target_transform, false);
@@ -143,7 +169,11 @@ bool OverlayStrategyCommon::GetIOSurfaceQuadInfo(const IOSurfaceDrawQuad& quad,
   quad_info->resource_id = quad.io_surface_resource_id();
   quad_info->resource_size_in_pixels = quad.io_surface_size;
   quad_info->transform = overlay_transform;
-  quad_info->uv_rect = gfx::Rect(0, 0, 1, 1);
+  quad_info->uv_rect = gfx::RectF(1.f, 1.f);
+  quad_info->quad_rect_in_target_space = MathUtil::MapEnclosingClippedRect(
+      quad.shared_quad_state->quad_to_target_transform, quad.rect);
+  quad_info->clip_rect = quad.shared_quad_state->clip_rect;
+  quad_info->is_clipped = quad.shared_quad_state->is_clipped;
   return true;
 }
 

@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -35,17 +36,20 @@ import org.chromium.base.Log;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.CalledByNative;
 import org.chromium.chrome.R;
+import org.chromium.chrome.browser.webapps.WebappDataStorage;
 import org.chromium.chrome.browser.webapps.WebappLauncherActivity;
+import org.chromium.chrome.browser.webapps.WebappRegistry;
 import org.chromium.chrome.browser.widget.RoundedIconGenerator;
 import org.chromium.content_public.common.ScreenOrientationConstants;
 import org.chromium.ui.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
-import java.util.UUID;
 
 /**
- * This is a helper class to create shortcuts on the Android home screen.
+ * This class contains functions related to adding shortcuts to the Android Home
+ * screen.  These shortcuts are used to either open a page in the main browser
+ * or open a web app.
  */
 public class ShortcutHelper {
     public static final String EXTRA_ICON = "org.chromium.chrome.browser.webapp_icon";
@@ -115,9 +119,9 @@ public class ShortcutHelper {
      */
     @SuppressWarnings("unused")
     @CalledByNative
-    private static void addShortcut(Context context, String url, String userTitle, String name,
-            String shortName, Bitmap icon, boolean isWebappCapable, int orientation, int source,
-            long themeColor, long backgroundColor) {
+    private static void addShortcut(Context context, String id, String url, final String userTitle,
+            String name, String shortName, Bitmap icon, boolean isWebappCapable, int orientation,
+            int source, long themeColor, long backgroundColor) {
         Intent shortcutIntent;
         if (isWebappCapable) {
             // Encode the icon as a base64 string (Launcher drops Bitmaps in the Intent).
@@ -127,7 +131,7 @@ public class ShortcutHelper {
             shortcutIntent = new Intent();
             shortcutIntent.setAction(sDelegate.getFullscreenAction());
             shortcutIntent.putExtra(EXTRA_ICON, encodedIcon);
-            shortcutIntent.putExtra(EXTRA_ID, UUID.randomUUID().toString());
+            shortcutIntent.putExtra(EXTRA_ID, id);
             shortcutIntent.putExtra(EXTRA_NAME, name);
             shortcutIntent.putExtra(EXTRA_SHORT_NAME, shortName);
             shortcutIntent.putExtra(EXTRA_URL, url);
@@ -148,18 +152,31 @@ public class ShortcutHelper {
                 context, createAddToHomeIntent(url, userTitle, icon, shortcutIntent));
 
         // Alert the user about adding the shortcut.
-        final String shortUrl = UrlUtilities.getDomainAndRegistry(url, true);
         Handler handler = new Handler(Looper.getMainLooper());
         handler.post(new Runnable() {
             @Override
             public void run() {
                 Context applicationContext = ApplicationStatus.getApplicationContext();
                 String toastText =
-                        applicationContext.getString(R.string.added_to_homescreen, shortUrl);
+                        applicationContext.getString(R.string.added_to_homescreen, userTitle);
                 Toast toast = Toast.makeText(applicationContext, toastText, Toast.LENGTH_SHORT);
                 toast.show();
             }
         });
+    }
+
+    /**
+     * Creates a storage location and stores the data for a web app using {@link WebappDataStorage}.
+     * @param context     Context to open the WebappDataStorage with.
+     * @param id          ID of the webapp which is storing data.
+     * @param splashImage Image which should be displayed on the splash screen of
+     *                    the webapp. This can be null of there is no image to show.
+     */
+    @SuppressWarnings("unused")
+    @CalledByNative
+    private static void storeWebappData(Context context, String id, Bitmap splashImage) {
+        WebappRegistry.registerWebapp(context, id);
+        WebappDataStorage.open(context, id).updateSplashScreenImage(splashImage);
     }
 
     /**
@@ -278,6 +295,42 @@ public class ShortcutHelper {
         return BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
     }
 
+    /**
+     * Returns the ideal size for an image displayed on a web app's splash screen.
+     * @param resources Resources to retrieve the dimension from.
+     * @return the dimensions in dp which the image should have.
+     */
+    public static int getIdealSplashImageSizeInDp(Resources resources) {
+        return getIdealSizeFromResource(resources, R.dimen.webapp_splash_image_size);
+    }
+
+    /**
+     * Returns the ideal size for an icon representing a web app.  This size is used on app banners,
+     * the Android Home screen, and in Android's recent tasks list, among other places.
+     * @param resources Resources to retrieve the dimension from.
+     * @return the dimensions in dp which the icon should have.
+     */
+    public static int getIdealIconSizeInDp(Resources resources) {
+        return getIdealSizeFromResource(resources, R.dimen.webapp_home_screen_icon_size);
+    }
+
+    /**
+     * @return String that can be used to verify that a WebappActivity is being started by Chrome.
+     */
+    public static String getEncodedMac(Context context, String url) {
+        // The only reason we convert to a String here is because Android inexplicably eats a
+        // byte[] when adding the shortcut -- the Bundle received by the launched Activity even
+        // lacks the key for the extra.
+        byte[] mac = WebappAuthenticator.getMacForUrl(context, url);
+        return Base64.encodeToString(mac, Base64.DEFAULT);
+    }
+
+    private static int getIdealSizeFromResource(Resources resources, int resource) {
+        float sizeInPx = resources.getDimension(resource);
+        float density = resources.getDisplayMetrics().density;
+        return Math.round(sizeInPx / density);
+    }
+
     private static Bitmap getBitmapFromResourceId(Context context, int id, int density) {
         Drawable drawable = ApiCompatibilityUtils.getDrawableForDensity(
                 context.getResources(), id, density);
@@ -342,16 +395,5 @@ public class ShortcutHelper {
         if (icon == null) return; // Bookmark URL does not have a domain.
         canvas.drawBitmap(icon, iconBounds.exactCenterX() - icon.getWidth() / 2.0f,
                 iconBounds.exactCenterY() - icon.getHeight() / 2.0f, null);
-    }
-
-    /**
-     * @return String that can be used to verify that a WebappActivity is being started by Chrome.
-     */
-    public static String getEncodedMac(Context context, String url) {
-        // The only reason we convert to a String here is because Android inexplicably eats a
-        // byte[] when adding the shortcut -- the Bundle received by the launched Activity even
-        // lacks the key for the extra.
-        byte[] mac = WebappAuthenticator.getMacForUrl(context, url);
-        return Base64.encodeToString(mac, Base64.DEFAULT);
     }
 }

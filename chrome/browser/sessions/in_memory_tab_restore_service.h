@@ -7,8 +7,14 @@
 
 #include <vector>
 
+#include "base/memory/scoped_ptr.h"
 #include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_helper.h"
+#include "components/sessions/core/tab_restore_service_client.h"
+
+namespace sessions {
+class TabRestoreServiceClient;
+}
 
 // Tab restore service that doesn't persist tabs on disk. This is used on
 // Android where tabs persistence is implemented on the application side in
@@ -19,8 +25,9 @@ class InMemoryTabRestoreService : public TabRestoreService {
   // Creates a new TabRestoreService and provides an object that provides the
   // current time. The TabRestoreService does not take ownership of
   // |time_factory|.
-  InMemoryTabRestoreService(Profile* profile,
-                            TimeFactory* time_factory);
+  InMemoryTabRestoreService(
+      scoped_ptr<sessions::TabRestoreServiceClient> client,
+      TimeFactory* time_factory);
 
   ~InMemoryTabRestoreService() override;
 
@@ -34,12 +41,12 @@ class InMemoryTabRestoreService : public TabRestoreService {
   const Entries& entries() const override;
   std::vector<content::WebContents*> RestoreMostRecentEntry(
       TabRestoreServiceDelegate* delegate,
-      chrome::HostDesktopType host_desktop_type) override;
+      int host_desktop_type) override;
   Tab* RemoveTabEntryById(SessionID::id_type id) override;
   std::vector<content::WebContents*> RestoreEntryById(
       TabRestoreServiceDelegate* delegate,
       SessionID::id_type id,
-      chrome::HostDesktopType host_desktop_type,
+      int host_desktop_type,
       WindowOpenDisposition disposition) override;
   void LoadTabsFromLastSession() override;
   bool IsLoaded() const override;
@@ -47,6 +54,7 @@ class InMemoryTabRestoreService : public TabRestoreService {
   void Shutdown() override;
 
  private:
+  scoped_ptr<sessions::TabRestoreServiceClient> client_;
   TabRestoreServiceHelper helper_;
 
   DISALLOW_COPY_AND_ASSIGN(InMemoryTabRestoreService);

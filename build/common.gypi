@@ -517,12 +517,6 @@
       # This is intended for iOS builds only.
       'use_system_libcxx%': 0,
 
-      # Use a modified version of Clang to intercept allocated types and sizes
-      # for allocated objects. clang_type_profiler=1 implies clang=1.
-      # See http://dev.chromium.org/developers/deep-memory-profiler/cpp-object-type-identifier
-      # TODO(dmikurube): Support mac.  See http://crbug.com/123758#c11
-      'clang_type_profiler%': 0,
-
       # Set to true to instrument the code with function call logger.
       # See src/third_party/cygprofile/cyg-profile.cc for details.
       'order_profiling%': 0,
@@ -557,16 +551,15 @@
       'enable_print_preview%': 1,
 
       # Set the version of CLD.
-      #   1: Use only CLD1.
+      #   1: (DEPRECATED! See http://crbug.com/528305 for info) Use only CLD1.
       #   2: Use only CLD2.
       'cld_version%': 2,
 
       # For CLD2, the size of the tables that should be included in the build
-      # Only evaluated if cld_version == 2 or if building the CLD2 dynamic data
-      # tool explicitly.
+      # Only evaluated if cld_version == 2.
       # See third_party/cld_2/cld_2.gyp for more information.
-      #   0: Small tables, lower accuracy
-      #   2: Large tables, high accuracy
+      #   0: Small tables, high accuracy
+      #   2: Large tables, higher accuracy
       'cld2_table_size%': 2,
 
       # Enable spell checker.
@@ -702,6 +695,9 @@
       # Libxkbcommon usage.
       'use_xkbcommon%': 0,
 
+      # Whether we use GTKv3 on linux.
+      'use_gtk3%': 0,
+
       # Control Flow Integrity for virtual calls and casts.
       # See http://clang.llvm.org/docs/ControlFlowIntegrity.html
       'cfi_vptr%': 0,
@@ -814,7 +810,7 @@
         ['OS=="android"', {
           'enable_extensions%': 0,
           'enable_google_now%': 0,
-          'cld_version%': 1,
+          'cld2_table_size%': 0,
           'enable_themes%': 0,
           'remoting%': 0,
           'arm_neon%': 0,
@@ -866,7 +862,6 @@
           'disable_ftp_support%': 1,
           'enable_extensions%': 0,
           'enable_google_now%': 0,
-          'cld_version%': 2,
           'cld2_table_size%': 0,
           'enable_basic_printing%': 0,
           'enable_print_preview%': 0,
@@ -1138,6 +1133,7 @@
     'use_ozone%': '<(use_ozone)',
     'use_ozone_evdev%': '<(use_ozone_evdev)',
     'use_xkbcommon%': '<(use_xkbcommon)',
+    'use_gtk3%': '<(use_gtk3)',
     'use_clipboard_aurax11%': '<(use_clipboard_aurax11)',
     'desktop_linux%': '<(desktop_linux)',
     'use_x11%': '<(use_x11)',
@@ -1203,7 +1199,6 @@
     'use_prebuilt_instrumented_libraries%': '<(use_prebuilt_instrumented_libraries)',
     'use_custom_libcxx%': '<(use_custom_libcxx)',
     'use_system_libcxx%': '<(use_system_libcxx)',
-    'clang_type_profiler%': '<(clang_type_profiler)',
     'order_profiling%': '<(order_profiling)',
     'order_text_section%': '<(order_text_section)',
     'enable_extensions%': '<(enable_extensions)',
@@ -1846,7 +1841,11 @@
         'use_openssl_certs%': 1,
 
         'proprietary_codecs%': '<(proprietary_codecs)',
-        'safe_browsing%': 3,
+
+        # safe_browsing defaults to 2 for public builds and is switched to 3 in
+        # //clank/supplement.gypi since mode 3 requires an internal API.
+        'safe_browsing%': 2,
+
         'enable_web_speech%': 0,
         'java_bridge%': 1,
         'use_allocator%': 'none',
@@ -2275,23 +2274,6 @@
         'v8_target_arch': 'arm64',
       }],
 
-      ['OS=="linux" and clang_type_profiler==1', {
-        'clang%': 1,
-        'clang_use_chrome_plugins%': 0,
-        'conditions': [
-          ['host_arch=="x64"', {
-            'make_clang_dir%': 'third_party/llvm-allocated-type/Linux_x64',
-          }],
-          ['host_arch=="ia32"', {
-            # 32-bit Clang is unsupported.  It may not build.  Put your 32-bit
-            # Clang in this directory at your own risk if needed for some
-            # purpose (e.g. to compare 32-bit and 64-bit behavior like memory
-            # usage).  Any failure by this compiler should not close the tree.
-            'make_clang_dir%': 'third_party/llvm-allocated-type/Linux_ia32',
-          }],
-        ],
-      }],
-
       # On valgrind bots, override the optimizer settings so we don't inline too
       # much and make the stacks harder to figure out.
       #
@@ -2667,18 +2649,6 @@
       ['OS=="win" and asan==1 and component=="shared_library"', {
         'dependencies': [
           '<(DEPTH)/build/win/asan.gyp:asan_dynamic_runtime',
-        ],
-      }],
-      ['OS=="linux" and use_allocator!="none" and clang_type_profiler==1', {
-        'cflags_cc!': ['-fno-rtti'],
-        'cflags_cc+': [
-          '-frtti',
-          '-gline-tables-only',
-          '-fintercept-allocation-functions',
-        ],
-        'defines': ['TYPE_PROFILING'],
-        'dependencies': [
-          '<(DEPTH)/base/allocator/allocator.gyp:type_profiler',
         ],
       }],
       ['branding=="Chrome"', {
@@ -4628,9 +4598,10 @@
                 'cflags': [
                   '-finstrument-functions',
                   # Allow mmx intrinsics to inline, so that the
-                  #0 compiler can expand the intrinsics.
+                  # compiler can expand the intrinsics.
                   '-finstrument-functions-exclude-file-list=mmintrin.h',
                 ],
+                'defines': ['CYGPROFILE_INSTRUMENTATION'],
               }],
               ['_toolset=="target" and OS=="android"', {
                 'cflags': [

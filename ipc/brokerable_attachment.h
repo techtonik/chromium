@@ -64,7 +64,6 @@ class IPC_EXPORT BrokerableAttachment : public MessageAttachment {
   virtual BrokerableType GetBrokerableType() const = 0;
 
  protected:
-  BrokerableAttachment();
   BrokerableAttachment(const AttachmentId& id, bool needs_brokering);
   ~BrokerableAttachment() override;
 

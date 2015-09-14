@@ -33,6 +33,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/content_settings/cookie_settings_factory.h"
+#include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/dom_distiller/profile_utils.h"
 #include "chrome/browser/domain_reliability/service_factory.h"
 #include "chrome/browser/download/chrome_download_manager_delegate.h"
@@ -51,6 +52,7 @@
 #include "chrome/browser/prefs/browser_prefs.h"
 #include "chrome/browser/prefs/chrome_pref_service_factory.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
+#include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/prerender/prerender_manager_factory.h"
 #include "chrome/browser/profiles/bookmark_model_loaded_observer.h"
 #include "chrome/browser/profiles/chrome_version_service.h"
@@ -369,7 +371,6 @@ ProfileImpl::ProfileImpl(
     : path_(path),
       pref_registry_(new user_prefs::PrefRegistrySyncable),
       io_data_(this),
-      host_content_settings_map_(NULL),
       last_session_exit_type_(EXIT_NORMAL),
       start_time_(Time::Now()),
       delegate_(delegate),
@@ -688,9 +689,6 @@ ProfileImpl::~ProfileImpl() {
   if (pref_proxy_config_tracker_)
     pref_proxy_config_tracker_->DetachFromPrefService();
 
-  if (host_content_settings_map_.get())
-    host_content_settings_map_->ShutdownOnUIThread();
-
   // This causes the Preferences file to be written to disk.
   if (prefs_loaded)
     SetExitType(EXIT_NORMAL);
@@ -709,9 +707,9 @@ Profile::ProfileType ProfileImpl::GetProfileType() const {
   return REGULAR_PROFILE;
 }
 
-scoped_ptr<content::ZoomLevelDelegate>
-ProfileImpl::CreateZoomLevelDelegate(const base::FilePath& partition_path) {
-  return make_scoped_ptr(new chrome::ChromeZoomLevelPrefs(
+scoped_ptr<content::ZoomLevelDelegate> ProfileImpl::CreateZoomLevelDelegate(
+    const base::FilePath& partition_path) {
+  return make_scoped_ptr(new ChromeZoomLevelPrefs(
       GetPrefs(), GetPath(), partition_path,
       ui_zoom::ZoomEventManager::GetForBrowserContext(this)->GetWeakPtr()));
 }
@@ -815,12 +813,6 @@ void ProfileImpl::OnLocaleReady() {
   // TODO(sky): remove this in a couple of releases (m28ish).
   prefs_->SetBoolean(prefs::kSessionExitedCleanly, true);
 
-#if defined(SAFE_BROWSING_DB_REMOTE)
-  // Hardcode this pref on this build of Android until the UX is developed.
-  // http://crbug.com/481558
-  prefs_->SetBoolean(prefs::kSafeBrowsingEnabled, true);
-#endif
-
   g_browser_process->profile_manager()->InitProfileUserPrefs(this);
 
   {
@@ -904,8 +896,8 @@ const PrefService* ProfileImpl::GetPrefs() const {
   return prefs_.get();
 }
 
-chrome::ChromeZoomLevelPrefs* ProfileImpl::GetZoomLevelPrefs() {
-  return static_cast<chrome::ChromeZoomLevelPrefs*>(
+ChromeZoomLevelPrefs* ProfileImpl::GetZoomLevelPrefs() {
+  return static_cast<ChromeZoomLevelPrefs*>(
       GetDefaultStoragePartition(this)->GetZoomLevelDelegate());
 }
 
@@ -914,8 +906,8 @@ PrefService* ProfileImpl::GetOffTheRecordPrefs() {
   if (!otr_prefs_) {
     // The new ExtensionPrefStore is ref_counted and the new PrefService
     // stores a reference so that we do not leak memory here.
-    otr_prefs_.reset(prefs_->CreateIncognitoPrefService(
-        CreateExtensionPrefStore(this, true)));
+    otr_prefs_.reset(CreateIncognitoPrefServiceSyncable(
+        prefs_.get(), CreateExtensionPrefStore(this, true)));
   }
   return otr_prefs_.get();
 }
@@ -998,20 +990,10 @@ net::SSLConfigService* ProfileImpl::GetSSLConfigService() {
 }
 
 HostContentSettingsMap* ProfileImpl::GetHostContentSettingsMap() {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (!host_content_settings_map_.get()) {
-    host_content_settings_map_ = new HostContentSettingsMap(GetPrefs(), false);
-#if defined(ENABLE_SUPERVISED_USERS)
-  SupervisedUserSettingsService* supervised_user_settings =
-      SupervisedUserSettingsServiceFactory::GetForProfile(this);
-    scoped_ptr<content_settings::SupervisedProvider> supervised_provider(
-        new content_settings::SupervisedProvider(supervised_user_settings));
-    host_content_settings_map_->RegisterProvider(
-        HostContentSettingsMap::SUPERVISED_PROVIDER,
-        supervised_provider.Pass());
-#endif
-  }
-  return host_content_settings_map_.get();
+  // TODO(peconn): Once HostContentSettingsMapFactory works for TestingProfiles
+  // remove Profile::GetHostContentSettingsMap and replace all references to it.
+  // Don't forget to remove the #include "host_content_settings_map_factory"!
+  return HostContentSettingsMapFactory::GetForProfile(this);
 }
 
 content::BrowserPluginGuestManager* ProfileImpl::GetGuestManager() {

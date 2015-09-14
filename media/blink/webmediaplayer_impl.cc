@@ -27,6 +27,7 @@
 #include "media/base/limits.h"
 #include "media/base/media_log.h"
 #include "media/base/text_renderer.h"
+#include "media/base/timestamp_constants.h"
 #include "media/base/video_frame.h"
 #include "media/blink/texttrack_impl.h"
 #include "media/blink/webaudiosourceprovider_impl.h"
@@ -842,7 +843,8 @@ void WebMediaPlayerImpl::OnPipelineMetadata(
     }
 
     video_weblayer_.reset(new cc_blink::WebLayerImpl(layer));
-    video_weblayer_->setOpaque(opaque_);
+    video_weblayer_->layer()->SetContentsOpaque(opaque_);
+    video_weblayer_->SetContentsOpaqueIsFixed(true);
     client_->setWebLayer(video_weblayer_.get());
   }
 }
@@ -1022,8 +1024,10 @@ void WebMediaPlayerImpl::OnOpacityChanged(bool opaque) {
   DCHECK_NE(ready_state_, WebMediaPlayer::ReadyStateHaveNothing);
 
   opaque_ = opaque;
+  // Modify content opaqueness of cc::Layer directly so that
+  // SetContentsOpaqueIsFixed is ignored.
   if (video_weblayer_)
-    video_weblayer_->setOpaque(opaque_);
+    video_weblayer_->layer()->SetContentsOpaque(opaque_);
 }
 
 static void GetCurrentFrameAndSignal(
