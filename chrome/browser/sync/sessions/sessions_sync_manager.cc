@@ -11,11 +11,11 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/sync/glue/synced_tab_delegate.h"
-#include "chrome/browser/sync/glue/synced_window_delegate.h"
-#include "chrome/browser/sync/sessions/synced_window_delegates_getter.h"
 #include "chrome/common/url_constants.h"
 #include "components/sessions/content/content_serialized_navigation_builder.h"
+#include "components/sync_driver/glue/synced_window_delegate.h"
 #include "components/sync_driver/local_device_info_provider.h"
+#include "components/sync_driver/sessions/synced_window_delegates_getter.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_details.h"
@@ -75,7 +75,8 @@ bool SessionsRecencyComparator(const sync_driver::SyncedSession* s1,
 SessionsSyncManager::SessionsSyncManager(
     Profile* profile,
     LocalDeviceInfoProvider* local_device,
-    scoped_ptr<LocalSessionEventRouter> router)
+    scoped_ptr<LocalSessionEventRouter> router,
+    scoped_ptr<SyncedWindowDelegatesGetter> synced_window_getter)
     : favicon_cache_(FaviconServiceFactory::GetForProfile(
                          profile,
                          ServiceAccessType::EXPLICIT_ACCESS),
@@ -90,7 +91,7 @@ SessionsSyncManager::SessionsSyncManager(
       local_session_header_node_id_(TabNodePool::kInvalidTabNodeID),
       stale_session_threshold_days_(kDefaultStaleSessionThresholdDays),
       local_event_router_(router.Pass()),
-      synced_window_getter_(new SyncedWindowDelegatesGetter()) {}
+      synced_window_getter_(synced_window_getter.Pass()) {}
 
 LocalSessionEventRouter::~LocalSessionEventRouter() {}
 

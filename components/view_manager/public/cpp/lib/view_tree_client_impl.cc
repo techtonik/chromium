@@ -150,7 +150,7 @@ void ViewTreeClientImpl::SetFocus(Id view_id) {
   // In order for us to get here we had to have exposed a view, which implies we
   // got a connection.
   DCHECK(tree_);
-  tree_->SetFocus(view_id, ActionCompletedCallback());
+  tree_->SetFocus(view_id);
 }
 
 void ViewTreeClientImpl::SetVisible(Id view_id, bool visible) {
@@ -182,9 +182,16 @@ void ViewTreeClientImpl::SetImeVisibility(Id view_id,
   tree_->SetImeVisibility(view_id, visible, state.Pass());
 }
 
-void ViewTreeClientImpl::Embed(Id view_id, ViewTreeClientPtr client) {
+void ViewTreeClientImpl::SetAccessPolicy(Id view_id, uint32_t access_policy) {
   DCHECK(tree_);
-  tree_->Embed(view_id, client.Pass(), ActionCompletedCallback());
+  tree_->SetAccessPolicy(view_id, access_policy);
+}
+
+void ViewTreeClientImpl::Embed(Id view_id,
+                               ViewTreeClientPtr client,
+                               const ViewTree::EmbedCallback& callback) {
+  DCHECK(tree_);
+  tree_->Embed(view_id, client.Pass(), callback);
 }
 
 void ViewTreeClientImpl::RequestSurface(Id view_id,
@@ -248,10 +255,12 @@ View* ViewTreeClientImpl::CreateView() {
   return view;
 }
 
-void ViewTreeClientImpl::SetEmbedRoot() {
-  // TODO(sky): this isn't right. The server may ignore the call.
-  is_embed_root_ = true;
-  tree_->SetEmbedRoot();
+bool ViewTreeClientImpl::IsEmbedRoot() {
+  return is_embed_root_;
+}
+
+ConnectionSpecificId ViewTreeClientImpl::GetConnectionId() {
+  return connection_id_;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -260,13 +269,16 @@ void ViewTreeClientImpl::SetEmbedRoot() {
 void ViewTreeClientImpl::OnEmbed(ConnectionSpecificId connection_id,
                                  ViewDataPtr root_data,
                                  ViewTreePtr tree,
-                                 Id focused_view_id) {
+                                 Id focused_view_id,
+                                 uint32 access_policy) {
   if (tree) {
     DCHECK(!tree_);
     tree_ = tree.Pass();
     tree_.set_connection_error_handler([this]() { delete this; });
   }
   connection_id_ = connection_id;
+  is_embed_root_ =
+      (access_policy & mojo::ViewTree::ACCESS_POLICY_EMBED_ROOT) != 0;
 
   DCHECK(!root_);
   root_ = AddViewToConnection(this, nullptr, root_data);
@@ -406,11 +418,14 @@ void ViewTreeClientImpl::OnViewInputEvent(
 void ViewTreeClientImpl::OnViewFocused(Id focused_view_id) {
   View* focused = GetViewById(focused_view_id);
   View* blurred = focused_view_;
+  // Update |focused_view_| before calling any of the observers, so that the
+  // observers get the correct result from calling |View::HasFocus()|,
+  // |ViewTreeConnection::GetFocusedView()| etc.
+  focused_view_ = focused;
   if (blurred) {
     FOR_EACH_OBSERVER(ViewObserver, *ViewPrivate(blurred).observers(),
                       OnViewFocusChanged(focused, blurred));
   }
-  focused_view_ = focused;
   if (focused) {
     FOR_EACH_OBSERVER(ViewObserver, *ViewPrivate(focused).observers(),
                       OnViewFocusChanged(focused, blurred));

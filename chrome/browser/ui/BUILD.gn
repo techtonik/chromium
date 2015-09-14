@@ -43,11 +43,11 @@ source_set("ui") {
     "//chrome:strings",
     "//chrome/app/resources:platform_locale_settings",
     "//chrome/app/theme:theme_resources",
-    "//chrome/browser/net:encrypted_cert_logger_proto",
-    "//chrome/browser/ssl:cert_logger_proto",
     "//chrome/common",
     "//components/app_modal",
     "//components/auto_login_parser",
+    "//components/certificate_reporting:cert_logger_proto",
+    "//components/certificate_reporting:encrypted_cert_logger_proto",
     "//components/dom_distiller/webui",
     "//components/invalidation/impl",
     "//components/omnibox/common",
@@ -346,7 +346,6 @@ source_set("ui") {
     sources +=
         rebase_path(gypi_values.chrome_browser_ui_win_sources, ".", "//chrome")
     sources -= [
-      "views/apps/keyboard_hook_handler.cc",
       "views/frame/taskbar_decorator.cc",
     ]
     public_deps += [

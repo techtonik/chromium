@@ -7,8 +7,8 @@
 #include "base/bind.h"
 #include "base/logging.h"
 #include "media/base/android/media_codec_bridge.h"
-#include "media/base/buffers.h"
 #include "media/base/demuxer_stream.h"
+#include "media/base/timestamp_constants.h"
 
 namespace media {
 
@@ -214,7 +214,6 @@ void MediaCodecVideoDecoder::Render(int buffer_index,
   DCHECK(decoder_thread_.task_runner()->BelongsToCurrentThread());
 
   DVLOG(2) << class_name() << "::" << __FUNCTION__ << " pts:" << pts
-           << " index:" << buffer_index << " size:" << size
            << (eos_encountered ? " EOS " : " ") << AsString(render_mode);
 
   // Normally EOS comes as a separate access unit that does not have data,

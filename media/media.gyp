@@ -33,6 +33,13 @@
       }, {
         'use_low_memory_buffer%': 0,
       }],
+      ['chromecast==1', {
+        # Enable HEVC/H265 demuxing. Actual decoding must be provided by the
+        # platform.
+        'enable_hevc_demuxing%': 1,
+      }, {
+        'enable_hevc_demuxing%': 0,
+      }],
     ],
   },
   'includes': [
@@ -154,8 +161,6 @@
         'audio/mac/audio_manager_mac.h',
         'audio/null_audio_sink.cc',
         'audio/null_audio_sink.h',
-        'audio/openbsd/audio_manager_openbsd.cc',
-        'audio/openbsd/audio_manager_openbsd.h',
         'audio/pulse/audio_manager_pulse.cc',
         'audio/pulse/audio_manager_pulse.h',
         'audio/pulse/pulse_input.cc',
@@ -245,7 +250,6 @@
         'base/bit_reader_core.h',
         'base/bitstream_buffer.h',
         'base/buffering_state.h',
-        'base/buffers.h',
         'base/byte_queue.cc',
         'base/byte_queue.h',
         'base/cdm_callback_promise.cc',
@@ -372,6 +376,7 @@
         'base/time_delta_interpolator.cc',
         'base/time_delta_interpolator.h',
         'base/time_source.h',
+        'base/timestamp_constants.h',
         'base/user_input_monitor.cc',
         'base/user_input_monitor.h',
         'base/user_input_monitor_linux.cc',
@@ -478,8 +483,6 @@
         'capture/video/win/video_capture_device_mf_win.h',
         'capture/video/win/video_capture_device_win.cc',
         'capture/video/win/video_capture_device_win.h',
-        'capture/webm_muxer.cc',
-        'capture/webm_muxer.h',
         'cdm/aes_decryptor.cc',
         'cdm/aes_decryptor.h',
         'cdm/default_cdm_factory.cc',
@@ -700,9 +703,7 @@
           'dependencies': [
             '<(DEPTH)/third_party/libwebm/libwebm.gyp:libwebm',
           ],
-        }, {  # media_use_libwebm==0
-          # Exclude the sources that depend on libwebm.
-          'sources!': [
+          'sources': [
             'capture/webm_muxer.cc',
             'capture/webm_muxer.h',
           ],
@@ -777,12 +778,7 @@
             ['exclude', '_alsa\\.(h|cc)$'],
           ],
         }],
-        ['OS!="openbsd"', {
-          'sources!': [
-            'audio/openbsd/audio_manager_openbsd.cc',
-            'audio/openbsd/audio_manager_openbsd.h',
-          ],
-        }, {  # else: openbsd==1
+        ['OS=="openbsd"', {
           'sources!': [
             'capture/video/linux/v4l2_capture_delegate_multi_plane.cc',
             'capture/video/linux/v4l2_capture_delegate_multi_plane.h',
@@ -1096,6 +1092,23 @@
             'formats/mpeg/mpeg_audio_stream_parser_base.h',
           ],
         }],
+        ['proprietary_codecs==1 and enable_hevc_demuxing==1', {
+          'defines': [
+            'ENABLE_HEVC_DEMUXING'
+          ],
+          'sources': [
+            'filters/h265_parser.cc',
+            'filters/h265_parser.h',
+            'formats/mp4/hevc.cc',
+            'formats/mp4/hevc.h',
+          ],
+        }],
+        ['proprietary_codecs==1 and enable_hevc_demuxing==1 and media_use_ffmpeg==1', {
+          'sources': [
+            'filters/ffmpeg_h265_to_annex_b_bitstream_converter.cc',
+            'filters/ffmpeg_h265_to_annex_b_bitstream_converter.h',
+          ],
+        }],
         ['target_arch=="ia32" or target_arch=="x64"', {
           'dependencies': [
             'media_asm',
@@ -1273,7 +1286,6 @@
         'filters/vp8_parser_unittest.cc',
         'filters/vp9_parser_unittest.cc',
         'filters/vp9_raw_bits_reader_unittest.cc',
-        'capture/webm_muxer_unittest.cc',
         'formats/common/offset_byte_queue_unittest.cc',
         'formats/webm/cluster_builder.cc',
         'formats/webm/cluster_builder.h',
@@ -1302,6 +1314,14 @@
         ['arm_neon==1', {
           'defines': [
             'USE_NEON'
+          ],
+        }],
+        ['proprietary_codecs==1 and enable_hevc_demuxing==1', {
+          'defines': [
+            'ENABLE_HEVC_DEMUXING'
+          ],
+          'sources': [
+            'filters/h265_parser_unittest.cc',
           ],
         }],
         ['media_use_ffmpeg==1', {
@@ -1337,9 +1357,7 @@
           'dependencies': [
             '<(DEPTH)/third_party/libwebm/libwebm.gyp:libwebm',
           ],
-        }, {  # media_use_libwebm==0
-          # Exclude the sources that depend on libwebm.
-          'sources!': [
+          'sources': [
             'capture/webm_muxer_unittest.cc',
           ],
         }],
@@ -1477,6 +1495,7 @@
           'audio/audio_parameters_unittest.cc',
           'audio/audio_power_monitor_unittest.cc',
           'audio/fake_audio_worker_unittest.cc',
+          'audio/point_unittest.cc',
           'audio/simple_sources_unittest.cc',
           'audio/virtual_audio_input_stream_unittest.cc',
           'audio/virtual_audio_output_stream_unittest.cc',
@@ -1626,6 +1645,7 @@
       'type': '<(component)',
       'dependencies': [
         '../base/base.gyp:base',
+        '../ui/gfx/gfx.gyp:gfx_geometry',
       ],
       'defines': [
         'MEDIA_IMPLEMENTATION',

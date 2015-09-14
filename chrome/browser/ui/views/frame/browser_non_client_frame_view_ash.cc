@@ -353,6 +353,10 @@ void BrowserNonClientFrameViewAsh::Layout() {
   }
   header_painter_->SetHeaderHeightForPainting(painted_height);
 
+  if (avatar_button()) {
+    LayoutAvatar();
+    header_painter_->UpdateLeftViewXInset(avatar_button()->bounds().right());
+  }
 #if defined(FRAME_AVATAR_BUTTON)
   if (new_avatar_button())
     LayoutNewStyleAvatar();
@@ -629,35 +633,56 @@ void BrowserNonClientFrameViewAsh::PaintToolbarBackground(gfx::Canvas* canvas) {
   int w = toolbar_bounds.width();
   int y = toolbar_bounds.y();
   int h = toolbar_bounds.height();
-
-  // Gross hack: We split the toolbar images into two pieces, since sometimes
-  // (popup mode) the toolbar isn't tall enough to show the whole image.  The
-  // split happens between the top shadow section and the bottom gradient
-  // section so that we never break the gradient.
-  // NOTE(pkotwicz): If the computation for |bottom_y| is changed, Layout() must
-  // be changed as well.
-  int split_point = kFrameShadowThickness * 2;
-  int bottom_y = y + split_point;
   ui::ThemeProvider* tp = GetThemeProvider();
-  int bottom_edge_height = h - split_point;
 
-  canvas->FillRect(gfx::Rect(x, bottom_y, w, bottom_edge_height),
-                   tp->GetColor(ThemeProperties::COLOR_TOOLBAR));
+  if (ui::MaterialDesignController::IsModeMaterial()) {
+    // Paint the main toolbar image.  Since this image is also used to draw the
+    // tab background, we must use the tab strip offset to compute the image
+    // source y position.  If you have to debug this code use an image editor
+    // to paint a diagonal line through the toolbar image and ensure it lines up
+    // across the tab and toolbar.
+    gfx::ImageSkia* theme_toolbar = tp->GetImageSkiaNamed(IDR_THEME_TOOLBAR);
+    canvas->TileImageInt(
+        *theme_toolbar,
+        x + GetThemeBackgroundXInset(),
+        y - GetTopInset(),
+        x, y,
+        w, theme_toolbar->height());
 
-  // Paint the main toolbar image.  Since this image is also used to draw the
-  // tab background, we must use the tab strip offset to compute the image
-  // source y position.  If you have to debug this code use an image editor
-  // to paint a diagonal line through the toolbar image and ensure it lines up
-  // across the tab and toolbar.
-  gfx::ImageSkia* theme_toolbar = tp->GetImageSkiaNamed(IDR_THEME_TOOLBAR);
-  canvas->TileImageInt(
-      *theme_toolbar,
-      x + GetThemeBackgroundXInset(),
-      bottom_y - GetTopInset(),
-      x, bottom_y,
-      w, theme_toolbar->height());
+    // Draw the content/toolbar separator.
+    toolbar_bounds.Inset(kClientEdgeThickness, 0);
+    BrowserView::Paint1pxHorizontalLine(
+        canvas,
+        ThemeProperties::GetDefaultColor(
+            ThemeProperties::COLOR_TOOLBAR_SEPARATOR),
+        toolbar_bounds);
+  } else {
+    // Gross hack: We split the toolbar images into two pieces, since sometimes
+    // (popup mode) the toolbar isn't tall enough to show the whole image.  The
+    // split happens between the top shadow section and the bottom gradient
+    // section so that we never break the gradient.
+    // NOTE(pkotwicz): If the computation for |bottom_y| is changed, Layout()
+    // must be changed as well.
+    int split_point = kFrameShadowThickness * 2;
+    int bottom_y = y + split_point;
+    int bottom_edge_height = h - split_point;
 
-  if (!ui::MaterialDesignController::IsModeMaterial()) {
+    canvas->FillRect(gfx::Rect(x, bottom_y, w, bottom_edge_height),
+                     tp->GetColor(ThemeProperties::COLOR_TOOLBAR));
+
+    // Paint the main toolbar image.  Since this image is also used to draw the
+    // tab background, we must use the tab strip offset to compute the image
+    // source y position.  If you have to debug this code use an image editor
+    // to paint a diagonal line through the toolbar image and ensure it lines up
+    // across the tab and toolbar.
+    gfx::ImageSkia* theme_toolbar = tp->GetImageSkiaNamed(IDR_THEME_TOOLBAR);
+    canvas->TileImageInt(
+        *theme_toolbar,
+        x + GetThemeBackgroundXInset(),
+        bottom_y - GetTopInset(),
+        x, bottom_y,
+        w, theme_toolbar->height());
+
     // The pre-material design content area line has a shadow that extends a
     // couple of pixels above the toolbar bounds.
     const int kContentShadowHeight = 2;
@@ -682,16 +707,16 @@ void BrowserNonClientFrameViewAsh::PaintToolbarBackground(gfx::Canvas* canvas) {
                          w - toolbar_right->width() - 2 * kClientEdgeThickness,
                          y + kClientEdgeThickness + kContentShadowHeight,
                          toolbar_right->width(), theme_toolbar->height());
-  }
 
-  // Draw the content/toolbar separator.
-  canvas->FillRect(
-      gfx::Rect(x + kClientEdgeThickness,
-                toolbar_bounds.bottom() - kClientEdgeThickness,
-                w - (2 * kClientEdgeThickness),
-                kClientEdgeThickness),
-      ThemeProperties::GetDefaultColor(
-          ThemeProperties::COLOR_TOOLBAR_SEPARATOR));
+    // Draw the content/toolbar separator.
+    canvas->FillRect(
+        gfx::Rect(x + kClientEdgeThickness,
+                  toolbar_bounds.bottom() - kClientEdgeThickness,
+                  w - (2 * kClientEdgeThickness),
+                  kClientEdgeThickness),
+        ThemeProperties::GetDefaultColor(
+            ThemeProperties::COLOR_TOOLBAR_SEPARATOR));
+  }
 }
 
 void BrowserNonClientFrameViewAsh::PaintContentEdge(gfx::Canvas* canvas) {

@@ -21,6 +21,7 @@ import android.view.ViewGroup.LayoutParams;
 import android.widget.FrameLayout;
 
 import org.chromium.base.ActivityState;
+import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ApplicationState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ObserverList;
@@ -49,6 +50,7 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuParams;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorWrapper;
 import org.chromium.chrome.browser.contextmenu.EmptyChromeContextMenuItemDelegate;
+import org.chromium.chrome.browser.customtabs.CustomTabActivity;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
 import org.chromium.chrome.browser.help.HelpAndFeedback;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
@@ -85,6 +87,7 @@ import org.chromium.ui.base.PageTransition;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.gfx.DeviceDisplayInfo;
 
+import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -474,6 +477,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         @Override
         public void rendererUnresponsive() {
             super.rendererUnresponsive();
+            if (mNativeTabAndroid != 0) nativeOnRendererUnresponsive(mNativeTabAndroid);
             if (mFullscreenManager == null) return;
             mFullscreenHungRendererToken =
                     mFullscreenManager.showControlsPersistentAndClearOldToken(
@@ -483,6 +487,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         @Override
         public void rendererResponsive() {
             super.rendererResponsive();
+            if (mNativeTabAndroid != 0) nativeOnRendererResponsive(mNativeTabAndroid);
             if (mFullscreenManager == null) return;
             mFullscreenManager.hideControlsPersistent(mFullscreenHungRendererToken);
             mFullscreenHungRendererToken = FullscreenManager.INVALID_TOKEN;
@@ -591,9 +596,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             } else {
                 rendererCrashStatus = TAB_RENDERER_CRASH_STATUS_SHOWN_IN_FOREGROUND_APP;
                 showSadTab();
-                // TODO(jaekyun): This isn't needed anymore because a histogram
-                // "Tab.RendererCrashStatus" is recorded.
-                UmaSessionStats.logRendererCrash(mWindowAndroid.getActivity().get());
+                // This is necessary to correlate histogram data with stability counts.
+                UmaSessionStats.logRendererCrash();
             }
             RecordHistogram.recordEnumeratedHistogram(
                     "Tab.RendererCrashStatus", rendererCrashStatus, TAB_RENDERER_CRASH_STATUS_MAX);
@@ -805,8 +809,9 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         if (mContext != null) {
             mNumPixel16DP = (int) (DeviceDisplayInfo.create(mContext).getDIPScale() * 16);
             Resources resources = mContext.getResources();
-            mDefaultThemeColor = mIncognito ? resources.getColor(R.color.incognito_primary_color)
-                    : resources.getColor(R.color.default_primary_color);
+            mDefaultThemeColor = mIncognito
+                    ? ApiCompatibilityUtils.getColor(resources, R.color.incognito_primary_color)
+                    : ApiCompatibilityUtils.getColor(resources, R.color.default_primary_color);
             mThemeColor = mDefaultThemeColor;
         } else {
             mDefaultThemeColor = 0;
@@ -2838,9 +2843,21 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
-     * Returns an Intent that tells Chrome to open a Tab with a particular ID.
+     * @return Intent that tells Chrome to bring an Activity for a particular Tab back to the
+     *         foreground, or null if this isn't possible.
      */
     public static Intent createBringTabToFrontIntent(int tabId) {
+        // Iterate through all {@link CustomTab}s and check whether the given tabId belongs to a
+        // {@link CustomTab}. If so, return null as the client app's task cannot be foregrounded.
+        List<WeakReference<Activity>> list = ApplicationStatus.getRunningActivities();
+        for (WeakReference<Activity> ref : list) {
+            Activity activity = ref.get();
+            if (activity instanceof CustomTabActivity
+                    && tabId == ((CustomTabActivity) activity).getActivityTab().getId()) {
+                return null;
+            }
+        }
+
         String packageName = ApplicationStatus.getApplicationContext().getPackageName();
         Intent intent = new Intent(Intent.ACTION_MAIN);
         intent.putExtra(Browser.EXTRA_APPLICATION_ID, packageName);
@@ -2881,6 +2898,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native void nativeDetachOverlayContentViewCore(long nativeTabAndroid,
             ContentViewCore content);
     private native boolean nativeHasPrerenderedUrl(long nativeTabAndroid, String url);
+    private native void nativeOnRendererUnresponsive(long nativeTabAndroid);
+    private native void nativeOnRendererResponsive(long nativeTabAndroid);
 
     private static native void nativeRecordStartupToCommitUma();
 }

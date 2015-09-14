@@ -130,6 +130,7 @@ FeatureInfo::FeatureFlags::FeatureFlags()
       use_core_framebuffer_multisample(false),
       multisampled_render_to_texture(false),
       use_img_for_multisampled_render_to_texture(false),
+      chromium_screen_space_antialiasing(false),
       oes_standard_derivatives(false),
       oes_egl_image_external(false),
       oes_depth24(false),
@@ -218,6 +219,13 @@ void FeatureInfo::InitializeBasicState(const base::CommandLine* command_line) {
 
   enable_gl_path_rendering_switch_ =
       command_line->HasSwitch(switches::kEnableGLPathRendering);
+
+  // The shader translator is needed to translate from WebGL-conformant GLES SL
+  // to normal GLES SL, enforce WebGL conformance, translate from GLES SL 1.0 to
+  // target context GLSL, etc.
+  // The flag here is for testing only.
+  disable_shader_translator_ =
+      command_line->HasSwitch(switches::kDisableGLSLTranslator);
 
   unsafe_es3_apis_enabled_ = false;
 }
@@ -724,6 +732,11 @@ void FeatureInfo::InitializeFeatures() {
           GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_SAMPLES_EXT);
       AddExtensionString("GL_EXT_multisampled_render_to_texture");
     }
+  }
+
+  if (extensions.Contains("GL_INTEL_framebuffer_CMAA")) {
+    feature_flags_.chromium_screen_space_antialiasing = true;
+    AddExtensionString("GL_CHROMIUM_screen_space_antialiasing");
   }
 
   if (extensions.Contains("GL_OES_depth24") || gfx::HasDesktopGLFeatures() ||

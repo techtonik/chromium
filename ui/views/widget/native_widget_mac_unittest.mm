@@ -45,7 +45,7 @@
 @end
 
 // Test NSWindow that provides hooks via method overrides to verify behavior.
-@interface NativeWidetMacTestWindow : NativeWidgetMacNSWindow {
+@interface NativeWidgetMacTestWindow : NativeWidgetMacNSWindow {
  @private
   int invalidateShadowCount_;
 }
@@ -87,14 +87,15 @@ class TestWindowNativeWidgetMac : public NativeWidgetMac {
 
  protected:
   // NativeWidgetMac:
-  gfx::NativeWindow CreateNSWindow(const Widget::InitParams& params) override {
+  NativeWidgetMacNSWindow* CreateNSWindow(
+      const Widget::InitParams& params) override {
     NSUInteger style_mask = NSBorderlessWindowMask;
     if (params.type == Widget::InitParams::TYPE_WINDOW) {
       style_mask = NSTexturedBackgroundWindowMask | NSTitledWindowMask |
                    NSClosableWindowMask | NSMiniaturizableWindowMask |
                    NSResizableWindowMask;
     }
-    return [[[NativeWidetMacTestWindow alloc]
+    return [[[NativeWidgetMacTestWindow alloc]
         initWithContentRect:ui::kWindowSizeDeterminedLater
                   styleMask:style_mask
                     backing:NSBackingStoreBuffered
@@ -126,14 +127,14 @@ class NativeWidgetMacTest : public WidgetTest {
     return native_parent_;
   }
 
-  // Create a Widget backed by the NativeWidetMacTestWindow NSWindow subclass.
+  // Create a Widget backed by the NativeWidgetMacTestWindow NSWindow subclass.
   Widget* CreateWidgetWithTestWindow(Widget::InitParams params,
-                                     NativeWidetMacTestWindow** window) {
+                                     NativeWidgetMacTestWindow** window) {
     Widget* widget = new Widget;
     params.native_widget = new TestWindowNativeWidgetMac(widget);
     widget->Init(params);
     widget->Show();
-    *window = base::mac::ObjCCastStrict<NativeWidetMacTestWindow>(
+    *window = base::mac::ObjCCastStrict<NativeWidgetMacTestWindow>(
         widget->GetNativeWindow());
     EXPECT_TRUE(*window);
     return widget;
@@ -279,20 +280,33 @@ TEST_F(NativeWidgetMacTest, HideAndShowExternally) {
 // A view that counts calls to OnPaint().
 class PaintCountView : public View {
  public:
-  PaintCountView() : paint_count_(0) {
-    SetBounds(0, 0, 100, 100);
-  }
+  PaintCountView() { SetBounds(0, 0, 100, 100); }
 
   // View:
   void OnPaint(gfx::Canvas* canvas) override {
     EXPECT_TRUE(GetWidget()->IsVisible());
     ++paint_count_;
+    if (run_loop_ && paint_count_ == target_paint_count_)
+      run_loop_->Quit();
+  }
+
+  void WaitForPaintCount(int target) {
+    if (paint_count_ == target)
+      return;
+
+    target_paint_count_ = target;
+    base::RunLoop run_loop;
+    run_loop_ = &run_loop;
+    run_loop.Run();
+    run_loop_ = nullptr;
   }
 
   int paint_count() { return paint_count_; }
 
  private:
-  int paint_count_;
+  int paint_count_ = 0;
+  int target_paint_count_ = 0;
+  base::RunLoop* run_loop_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(PaintCountView);
 };
@@ -324,7 +338,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_TRUE(widget->IsVisible());
 
   // Showing should paint.
-  EXPECT_EQ(1, view->paint_count());
+  view->WaitForPaintCount(1);
 
   // First try performMiniaturize:, which requires a minimize button. Note that
   // Cocoa just blocks the UI thread during the animation, so no need to do
@@ -353,7 +367,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_EQ(1, observer.lost_visible_count());
   EXPECT_EQ(restored_bounds, widget->GetRestoredBounds());
 
-  EXPECT_EQ(2, view->paint_count());  // A single paint when deminiaturizing.
+  view->WaitForPaintCount(2);  // A single paint when deminiaturizing.
   EXPECT_FALSE([ns_window isMiniaturized]);
 
   widget->Minimize();
@@ -374,7 +388,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_EQ(3, observer.gained_visible_count());
   EXPECT_EQ(2, observer.lost_visible_count());
   EXPECT_EQ(restored_bounds, widget->GetRestoredBounds());
-  EXPECT_EQ(3, view->paint_count());
+  view->WaitForPaintCount(3);
 
   widget->Restore();  // If not miniaturized, does nothing.
   base::RunLoop().RunUntilIdle();
@@ -923,7 +937,7 @@ TEST_F(NativeWidgetMacTest, DoesHideTitle) {
 
 // Test calls to invalidate the shadow when composited frames arrive.
 TEST_F(NativeWidgetMacTest, InvalidateShadow) {
-  NativeWidetMacTestWindow* window;
+  NativeWidgetMacTestWindow* window;
   const gfx::Rect rect(0, 0, 100, 200);
   Widget::InitParams init_params =
       CreateParams(Widget::InitParams::TYPE_WINDOW_FRAMELESS);
@@ -992,7 +1006,7 @@ TEST_F(NativeWidgetMacTest, GetWorkAreaBoundsInScreen) {
 }
 @end
 
-@implementation NativeWidetMacTestWindow
+@implementation NativeWidgetMacTestWindow
 
 @synthesize invalidateShadowCount = invalidateShadowCount_;
 

@@ -4,6 +4,8 @@
 
 #include "content/common/gpu/gpu_channel_manager.h"
 
+#include <algorithm>
+
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/location.h"
@@ -33,7 +35,6 @@ GpuChannelManager::GpuChannelManager(
     base::SingleThreadTaskRunner* task_runner,
     base::SingleThreadTaskRunner* io_task_runner,
     base::WaitableEvent* shutdown_event,
-    IPC::AttachmentBroker* broker,
     gpu::SyncPointManager* sync_point_manager,
     GpuMemoryBufferFactory* gpu_memory_buffer_factory)
     : task_runner_(task_runner),
@@ -46,7 +47,6 @@ GpuChannelManager::GpuChannelManager(
           GpuMemoryManager::kDefaultMaxSurfacesWithFrontbufferSoftLimit),
       sync_point_manager_(sync_point_manager),
       gpu_memory_buffer_factory_(gpu_memory_buffer_factory),
-      attachment_broker_(broker),
       weak_factory_(this) {
   DCHECK(task_runner);
   DCHECK(io_task_runner);
@@ -141,17 +141,19 @@ scoped_ptr<GpuChannel> GpuChannelManager::CreateGpuChannel(
     gpu::gles2::MailboxManager* mailbox_manager,
     int client_id,
     uint64_t client_tracing_id,
-    bool allow_future_sync_points) {
-  return make_scoped_ptr(
-      new GpuChannel(this, watchdog_, share_group, mailbox_manager,
-                     task_runner_.get(), io_task_runner_.get(), client_id,
-                     client_tracing_id, false, allow_future_sync_points));
+    bool allow_future_sync_points,
+    bool allow_real_time_streams) {
+  return make_scoped_ptr(new GpuChannel(
+      this, watchdog_, share_group, mailbox_manager, task_runner_.get(),
+      io_task_runner_.get(), client_id, client_tracing_id, false,
+      allow_future_sync_points, allow_real_time_streams));
 }
 
 void GpuChannelManager::OnEstablishChannel(int client_id,
                                            uint64_t client_tracing_id,
                                            bool share_context,
-                                           bool allow_future_sync_points) {
+                                           bool allow_future_sync_points,
+                                           bool allow_real_time_streams) {
   gfx::GLShareGroup* share_group = nullptr;
   gpu::gles2::MailboxManager* mailbox_manager = nullptr;
   if (share_context) {
@@ -164,11 +166,10 @@ void GpuChannelManager::OnEstablishChannel(int client_id,
     mailbox_manager = mailbox_manager_.get();
   }
 
-  scoped_ptr<GpuChannel> channel =
-      CreateGpuChannel(share_group, mailbox_manager, client_id,
-                       client_tracing_id, allow_future_sync_points);
-  IPC::ChannelHandle channel_handle =
-      channel->Init(shutdown_event_, attachment_broker_);
+  scoped_ptr<GpuChannel> channel = CreateGpuChannel(
+      share_group, mailbox_manager, client_id, client_tracing_id,
+      allow_future_sync_points, allow_real_time_streams);
+  IPC::ChannelHandle channel_handle = channel->Init(shutdown_event_);
 
   gpu_channels_.set(client_id, channel.Pass());
 
@@ -247,24 +248,28 @@ void GpuChannelManager::OnLoadedShader(std::string program_proto) {
     program_cache()->LoadProgram(program_proto);
 }
 
-bool GpuChannelManager::HandleMessagesScheduled() {
+uint32_t GpuChannelManager::ProcessedOrderNumber() {
+  uint32_t processed_order_num = 0;
   for (auto& kv : gpu_channels_) {
-    if (kv.second->handle_messages_scheduled())
-      return true;
+    processed_order_num =
+        std::max(processed_order_num, kv.second->GetProcessedOrderNum());
   }
-  return false;
+  return processed_order_num;
 }
 
-uint64 GpuChannelManager::MessagesProcessed() {
-  uint64 messages_processed = 0;
-  for (auto& kv : gpu_channels_)
-    messages_processed += kv.second->messages_processed();
-  return messages_processed;
+uint32_t GpuChannelManager::UnprocessedOrderNumber() {
+  uint32_t unprocessed_order_num = 0;
+  for (auto& kv : gpu_channels_) {
+    unprocessed_order_num =
+        std::max(unprocessed_order_num, kv.second->GetUnprocessedOrderNum());
+  }
+  return unprocessed_order_num;
 }
 
 void GpuChannelManager::LoseAllContexts() {
-  for (auto& kv : gpu_channels_)
+  for (auto& kv : gpu_channels_) {
     kv.second->MarkAllContextsLost();
+  }
   task_runner_->PostTask(FROM_HERE,
                          base::Bind(&GpuChannelManager::OnLoseAllContexts,
                                     weak_factory_.GetWeakPtr()));

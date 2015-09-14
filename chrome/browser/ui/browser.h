@@ -465,6 +465,9 @@ class Browser : public TabStripModelObserver,
   content::SecurityStyle GetSecurityStyle(
       content::WebContents* web_contents,
       content::SecurityStyleExplanations* security_style_explanations) override;
+  void ShowCertificateViewerInDevTools(
+      content::WebContents* web_contents,
+      int cert_id) override;
 
   bool is_type_tabbed() const { return type_ == TYPE_TABBED; }
   bool is_type_popup() const { return type_ == TYPE_POPUP; }
@@ -616,6 +619,8 @@ class Browser : public TabStripModelObserver,
                                  const GURL& origin) override;
   void ExitFullscreenModeForTab(content::WebContents* web_contents) override;
   bool IsFullscreenForTabOrPending(
+      const content::WebContents* web_contents) const override;
+  blink::WebDisplayMode GetDisplayMode(
       const content::WebContents* web_contents) const override;
   void RegisterProtocolHandler(content::WebContents* web_contents,
                                const std::string& protocol,

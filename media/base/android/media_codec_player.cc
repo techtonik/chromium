@@ -13,7 +13,7 @@
 #include "media/base/android/media_codec_audio_decoder.h"
 #include "media/base/android/media_codec_video_decoder.h"
 #include "media/base/android/media_player_manager.h"
-#include "media/base/buffers.h"
+#include "media/base/timestamp_constants.h"
 
 #define RUN_ON_MEDIA_THREAD(METHOD, ...)                                     \
   do {                                                                       \
@@ -441,7 +441,11 @@ void MediaCodecPlayer::OnDemuxerSeekDone(
                                   : seek_info_->seek_time;
 
   interpolator_.SetBounds(seek_time, seek_time);
+
   audio_decoder_->SetBaseTimestamp(seek_time);
+
+  audio_decoder_->SetPrerollTimestamp(seek_time);
+  video_decoder_->SetPrerollTimestamp(seek_time);
 
   // The Flush() might set the state to kStateError.
   if (state_ == kStateError) {
@@ -606,6 +610,13 @@ void MediaCodecPlayer::OnPrefetchDone() {
 
 void MediaCodecPlayer::OnPrerollDone() {
   DCHECK(GetMediaTaskRunner()->BelongsToCurrentThread());
+
+  if (state_ != kStatePlaying) {
+    DVLOG(1) << __FUNCTION__ << ": in state " << AsString(state_)
+             << ", ignoring";
+    return;
+  }
+
   DVLOG(1) << __FUNCTION__;
 
   StartStatus status = StartDecoders();
@@ -620,8 +631,20 @@ void MediaCodecPlayer::OnDecoderDrained(DemuxerStream::Type type) {
   // We expect that OnStopDone() comes next.
 
   DCHECK(type == DemuxerStream::AUDIO || type == DemuxerStream::VIDEO);
-  DCHECK(state_ == kStatePlaying || state_ == kStateStopping)
-      << __FUNCTION__ << " illegal state: " << AsString(state_);
+
+  // DCHECK(state_ == kStatePlaying || state_ == kStateStopping)
+  //    << __FUNCTION__ << " illegal state: " << AsString(state_);
+  //
+  // With simultaneous reconfiguration of audio and video streams the state
+  // can be kStatePrefetching as well:
+  // OnLastFrameRendered VIDEO (VIDEO decoder is stopped)
+  // OnLastFrameRendered AUDIO (AUDIO decoder is stopped)
+  // OnDecoderDrained VIDEO (kStatePlaying -> kStateStopping)
+  // OnStopDone VIDEO (kStateStopping -> kStatePrefetching)
+  // OnDecoderDrained AUDIO
+  // OnStopDone AUDIO
+  //
+  // TODO(timav): combine OnDecoderDrained() and OnStopDone() ?
 
   switch (state_) {
     case kStatePlaying:
@@ -630,24 +653,14 @@ void MediaCodecPlayer::OnDecoderDrained(DemuxerStream::Type type) {
 
       if (type == DemuxerStream::AUDIO && !VideoFinished()) {
         DVLOG(1) << __FUNCTION__ << " requesting to stop video";
-        video_decoder_->SetDecodingUntilOutputIsPresent();
         video_decoder_->RequestToStop();
       } else if (type == DemuxerStream::VIDEO && !AudioFinished()) {
         DVLOG(1) << __FUNCTION__ << " requesting to stop audio";
-        audio_decoder_->SetDecodingUntilOutputIsPresent();
         audio_decoder_->RequestToStop();
       }
       break;
 
-    case kStateStopping:
-      if (type == DemuxerStream::AUDIO && !VideoFinished())
-        video_decoder_->SetDecodingUntilOutputIsPresent();
-      else if (type == DemuxerStream::VIDEO && !AudioFinished())
-        audio_decoder_->SetDecodingUntilOutputIsPresent();
-      break;
-
     default:
-      NOTREACHED();
       break;
   }
 }
@@ -694,7 +707,7 @@ void MediaCodecPlayer::OnStopDone(DemuxerStream::Type type) {
       // then video posts, then first OnStopDone arrives at which point
       // both streams are already stopped, then second OnStopDone arrives. When
       // the second one arrives, the state us not kStateStopping any more.
-      break;
+      return;
   }
 
   // DetachListener to UI thread
@@ -963,9 +976,7 @@ MediaCodecPlayer::StartStatus MediaCodecPlayer::MaybePrerollDecoders(
     bool* preroll_required) {
   DCHECK(GetMediaTaskRunner()->BelongsToCurrentThread());
 
-  base::TimeDelta current_time = GetInterpolatedTime();
-
-  DVLOG(1) << __FUNCTION__ << " current_time:" << current_time;
+  DVLOG(1) << __FUNCTION__ << " current_time:" << GetInterpolatedTime();
 
   // If requested, preroll is always done in the beginning of the playback,
   // after prefetch. The request might not happen at all though, in which case
@@ -978,12 +989,12 @@ MediaCodecPlayer::StartStatus MediaCodecPlayer::MaybePrerollDecoders(
   *preroll_required = false;
 
   int count = 0;
-  const bool do_audio_preroll = audio_decoder_->NotCompletedAndNeedsPreroll();
-  if (do_audio_preroll)
+  const bool do_audio = audio_decoder_->NotCompletedAndNeedsPreroll();
+  if (do_audio)
     ++count;
 
-  const bool do_video_preroll = video_decoder_->NotCompletedAndNeedsPreroll();
-  if (do_video_preroll)
+  const bool do_video = video_decoder_->NotCompletedAndNeedsPreroll();
+  if (do_video)
     ++count;
 
   if (count == 0) {
@@ -994,22 +1005,18 @@ MediaCodecPlayer::StartStatus MediaCodecPlayer::MaybePrerollDecoders(
   *preroll_required = true;
 
   DCHECK(count > 0);
-  DCHECK(do_audio_preroll || do_video_preroll);
+  DCHECK(do_audio || do_video);
 
   DVLOG(1) << __FUNCTION__ << ": preroll for " << count << " stream(s)";
 
   base::Closure preroll_cb = base::BarrierClosure(
       count, base::Bind(&MediaCodecPlayer::OnPrerollDone, media_weak_this_));
 
-  if (do_audio_preroll) {
-    if (!audio_decoder_->Preroll(current_time, preroll_cb))
-      return kStartFailed;
-  }
+  if (do_audio && !audio_decoder_->Preroll(preroll_cb))
+    return kStartFailed;
 
-  if (do_video_preroll) {
-    if (!video_decoder_->Preroll(current_time, preroll_cb))
-      return kStartFailed;
-  }
+  if (do_video && !video_decoder_->Preroll(preroll_cb))
+    return kStartFailed;
 
   return kStartOk;
 }

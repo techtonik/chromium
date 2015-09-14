@@ -158,9 +158,11 @@ TEST_F(WebsiteSettingsTest, OnPermissionsChanged) {
   ContentSetting setting = content_settings->GetContentSetting(
       url(), url(), CONTENT_SETTINGS_TYPE_POPUPS, std::string());
   EXPECT_EQ(setting, CONTENT_SETTING_BLOCK);
+#if defined(ENABLE_PLUGINS)
   setting = content_settings->GetContentSetting(
       url(), url(), CONTENT_SETTINGS_TYPE_PLUGINS, std::string());
   EXPECT_EQ(setting, CONTENT_SETTING_ALLOW);
+#endif
   setting = content_settings->GetContentSetting(
       url(), url(), CONTENT_SETTINGS_TYPE_GEOLOCATION, std::string());
   EXPECT_EQ(setting, CONTENT_SETTING_ASK);
@@ -179,12 +181,7 @@ TEST_F(WebsiteSettingsTest, OnPermissionsChanged) {
 
   // SetPermissionInfo() is called once initially, and then again every time
   // OnSitePermissionChanged() is called.
-// TODO(markusheintz): This is a temporary hack to fix issue: http://crbug.com/144203.
-#if defined(OS_MACOSX)
   EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(7);
-#else
-  EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(1);
-#endif
   EXPECT_CALL(*mock_ui(), SetSelectedTab(
       WebsiteSettingsUI::TAB_ID_PERMISSIONS));
 
@@ -238,13 +235,7 @@ TEST_F(WebsiteSettingsTest, OnPermissionsChanged_Fullscreen) {
 
   // SetPermissionInfo() is called once initially, and then again every time
   // OnSitePermissionChanged() is called.
-  // TODO(markusheintz): This is a temporary hack to fix issue:
-  // http://crbug.com/144203.
-#if defined(OS_MACOSX)
   EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(3);
-#else
-  EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(1);
-#endif
 
   // Execute code under tests.
   website_settings()->OnSitePermissionChanged(CONTENT_SETTINGS_TYPE_FULLSCREEN,
@@ -404,6 +395,7 @@ TEST_F(WebsiteSettingsTest, HTTPSConnectionError) {
   EXPECT_EQ(base::string16(), website_settings()->organization_name());
 }
 
+#if !defined(OS_ANDROID)
 TEST_F(WebsiteSettingsTest, NoInfoBar) {
   SetDefaultUIExpectations(mock_ui());
   EXPECT_CALL(*mock_ui(), SetSelectedTab(
@@ -417,15 +409,7 @@ TEST_F(WebsiteSettingsTest, ShowInfoBar) {
   EXPECT_CALL(*mock_ui(), SetIdentityInfo(_));
   EXPECT_CALL(*mock_ui(), SetCookieInfo(_));
 
-  // SetPermissionInfo() is called once initially, and then again every time
-  // OnSitePermissionChanged() is called.
-  // TODO(markusheintz): This is a temporary hack to fix issue:
-  // http://crbug.com/144203.
-#if defined(OS_MACOSX)
   EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(2);
-#else
-  EXPECT_CALL(*mock_ui(), SetPermissionInfo(_)).Times(1);
-#endif
 
   EXPECT_CALL(*mock_ui(), SetSelectedTab(
       WebsiteSettingsUI::TAB_ID_PERMISSIONS));
@@ -437,6 +421,7 @@ TEST_F(WebsiteSettingsTest, ShowInfoBar) {
 
   infobar_service()->RemoveInfoBar(infobar_service()->infobar_at(0));
 }
+#endif
 
 TEST_F(WebsiteSettingsTest, AboutBlankPage) {
   SetURL("about:blank");

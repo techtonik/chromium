@@ -124,10 +124,8 @@ void LayerTreeImpl::DidUpdateScrollOffset(int layer_id) {
   if (layer_id != outer_layer_id && layer_id != inner_layer_id)
     return;
 
-  if (!root_layer_scroll_offset_delegate_)
-    return;
-
-  UpdateRootScrollOffsetDelegate();
+  if (root_layer_scroll_offset_delegate_)
+    UpdateRootScrollOffsetDelegate();
 }
 
 void LayerTreeImpl::SetRootLayer(scoped_ptr<LayerImpl> layer) {
@@ -441,12 +439,8 @@ void LayerTreeImpl::DidUpdatePageScale() {
 
   set_needs_update_draw_properties();
 
-  if (root_layer_scroll_offset_delegate_) {
-    root_layer_scroll_offset_delegate_->UpdateRootLayerState(
-        TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
-        current_page_scale_factor(), min_page_scale_factor_,
-        max_page_scale_factor_);
-  }
+  if (root_layer_scroll_offset_delegate_)
+    UpdateRootScrollOffsetDelegate();
 
   if (PageScaleLayer() && PageScaleLayer()->transform_tree_index() != -1) {
     TransformNode* node = property_trees_.transform_tree.Node(
@@ -1026,6 +1020,11 @@ void LayerTreeImpl::AsValueInto(base::trace_event::TracedValue* state) const {
   for (auto* swap_promise : swap_promise_list_)
     state->AppendDouble(swap_promise->TraceId());
   state->EndArray();
+
+  state->BeginArray("pinned_swap_promise_trace_ids");
+  for (auto* swap_promise : pinned_swap_promise_list_)
+    state->AppendDouble(swap_promise->TraceId());
+  state->EndArray();
 }
 
 void LayerTreeImpl::SetRootLayerScrollOffsetDelegate(
@@ -1036,35 +1035,24 @@ void LayerTreeImpl::SetRootLayerScrollOffsetDelegate(
   root_layer_scroll_offset_delegate_ = root_layer_scroll_offset_delegate;
 
   if (root_layer_scroll_offset_delegate_) {
-    root_layer_scroll_offset_delegate_->UpdateRootLayerState(
-        TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
-        current_page_scale_factor(), min_page_scale_factor(),
-        max_page_scale_factor());
+    UpdateRootScrollOffsetDelegate();
 
-    DistributeRootScrollOffset();
+    DistributeRootScrollOffset(
+        root_layer_scroll_offset_delegate_->GetTotalScrollOffset());
   }
 }
 
 void LayerTreeImpl::UpdateRootScrollOffsetDelegate() {
   DCHECK(root_layer_scroll_offset_delegate_);
-
-  gfx::ScrollOffset offset = InnerViewportScrollLayer()->CurrentScrollOffset();
-
-  if (OuterViewportScrollLayer())
-    offset += OuterViewportScrollLayer()->CurrentScrollOffset();
-
   root_layer_scroll_offset_delegate_->UpdateRootLayerState(
-      offset, TotalMaxScrollOffset(), ScrollableSize(),
+      TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
       current_page_scale_factor(), min_page_scale_factor(),
       max_page_scale_factor());
 }
 
-void LayerTreeImpl::DistributeRootScrollOffset() {
-  if (!root_layer_scroll_offset_delegate_)
-    return;
-
-  gfx::ScrollOffset root_offset =
-      root_layer_scroll_offset_delegate_->GetTotalScrollOffset();
+void LayerTreeImpl::DistributeRootScrollOffset(
+    const gfx::ScrollOffset& root_offset) {
+  DCHECK(root_layer_scroll_offset_delegate_);
 
   if (!InnerViewportScrollLayer())
     return;
@@ -1103,23 +1091,37 @@ void LayerTreeImpl::QueueSwapPromise(scoped_ptr<SwapPromise> swap_promise) {
   swap_promise_list_.push_back(swap_promise.Pass());
 }
 
+void LayerTreeImpl::QueuePinnedSwapPromise(
+    scoped_ptr<SwapPromise> swap_promise) {
+  DCHECK(IsActiveTree());
+  DCHECK(swap_promise);
+  pinned_swap_promise_list_.push_back(swap_promise.Pass());
+}
+
 void LayerTreeImpl::PassSwapPromises(
     ScopedPtrVector<SwapPromise>* new_swap_promise) {
-  swap_promise_list_.insert_and_take(swap_promise_list_.end(),
-                                     new_swap_promise);
-  new_swap_promise->clear();
+  for (auto* swap_promise : swap_promise_list_)
+    swap_promise->DidNotSwap(SwapPromise::SWAP_FAILS);
+  swap_promise_list_.clear();
+  swap_promise_list_.swap(*new_swap_promise);
 }
 
 void LayerTreeImpl::FinishSwapPromises(CompositorFrameMetadata* metadata) {
   for (auto* swap_promise : swap_promise_list_)
     swap_promise->DidSwap(metadata);
   swap_promise_list_.clear();
+  for (auto* swap_promise : pinned_swap_promise_list_)
+    swap_promise->DidSwap(metadata);
+  pinned_swap_promise_list_.clear();
 }
 
 void LayerTreeImpl::BreakSwapPromises(SwapPromise::DidNotSwapReason reason) {
   for (auto* swap_promise : swap_promise_list_)
     swap_promise->DidNotSwap(reason);
   swap_promise_list_.clear();
+  for (auto* swap_promise : pinned_swap_promise_list_)
+    swap_promise->DidNotSwap(reason);
+  pinned_swap_promise_list_.clear();
 }
 
 void LayerTreeImpl::DidModifyTilePriorities() {
@@ -1226,7 +1228,7 @@ static inline bool LayerClipsSubtree(LayerType* layer) {
 static bool PointHitsRect(
     const gfx::PointF& screen_space_point,
     const gfx::Transform& local_space_to_screen_space_transform,
-    const gfx::RectF& local_space_rect,
+    const gfx::Rect& local_space_rect,
     float* distance_to_camera) {
   // If the transform is not invertible, then assume that this point doesn't hit
   // this rect.
@@ -1249,7 +1251,7 @@ static bool PointHitsRect(
   if (clipped)
     return false;
 
-  if (!local_space_rect.Contains(hit_test_point_in_local_space))
+  if (!gfx::RectF(local_space_rect).Contains(hit_test_point_in_local_space))
     return false;
 
   if (distance_to_camera) {
@@ -1325,7 +1327,7 @@ static bool PointIsClippedBySurfaceOrClipRect(
 static bool PointHitsLayer(const LayerImpl* layer,
                            const gfx::PointF& screen_space_point,
                            float* distance_to_intersection) {
-  gfx::RectF content_rect(layer->bounds());
+  gfx::Rect content_rect(layer->bounds());
   if (!PointHitsRect(screen_space_point,
                      layer->screen_space_transform(),
                      content_rect,

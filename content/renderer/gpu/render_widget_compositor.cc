@@ -308,7 +308,7 @@ void RenderWidgetCompositor::Initialize() {
       compositor_deps_->IsElasticOverscrollEnabled();
   settings.use_image_texture_targets =
       compositor_deps_->GetImageTextureTargets();
-  settings.gather_pixel_refs = compositor_deps_->IsGatherPixelRefsEnabled();
+  settings.gather_images = compositor_deps_->IsGatherPixelRefsEnabled();
 
   if (cmd->HasSwitch(cc::switches::kTopControlsShowThreshold)) {
       std::string top_threshold_str =
@@ -461,10 +461,10 @@ void RenderWidgetCompositor::Initialize() {
     settings.use_external_begin_frame_source = false;
   }
 
-  settings.max_staging_buffers = 32;
+  settings.max_staging_buffer_usage_in_bytes = 32 * 1024 * 1024;  // 32MB
   // Use 1/4th of staging buffers on low-end devices.
   if (base::SysInfo::IsLowEndDevice())
-    settings.max_staging_buffers /= 4;
+    settings.max_staging_buffer_usage_in_bytes /= 4;
 
   scoped_refptr<base::SingleThreadTaskRunner> compositor_thread_task_runner =
       compositor_deps_->GetCompositorImplThreadTaskRunner();
@@ -617,14 +617,6 @@ void RenderWidgetCompositor::setViewportSize(
 void RenderWidgetCompositor::setViewportSize(
     const WebSize& device_viewport_size) {
   layer_tree_host_->SetViewportSize(device_viewport_size);
-}
-
-WebSize RenderWidgetCompositor::layoutViewportSize() const {
-  return layer_tree_host_->device_viewport_size();
-}
-
-WebSize RenderWidgetCompositor::deviceViewportSize() const {
-  return layer_tree_host_->device_viewport_size();
 }
 
 WebFloatPoint RenderWidgetCompositor::adjustEventPointForPinchZoom(
@@ -809,10 +801,6 @@ void RenderWidgetCompositor::compositeAndReadbackAsync(
 void RenderWidgetCompositor::SynchronouslyComposite() {
   DCHECK(CompositeIsSynchronous());
   layer_tree_host_->Composite(base::TimeTicks::Now());
-}
-
-void RenderWidgetCompositor::finishAllRendering() {
-  layer_tree_host_->FinishAllRendering();
 }
 
 void RenderWidgetCompositor::setDeferCommits(bool defer_commits) {

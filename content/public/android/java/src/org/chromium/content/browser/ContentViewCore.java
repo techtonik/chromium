@@ -664,7 +664,8 @@ public class ContentViewCore implements
         mEditable = Editable.Factory.getInstance().newEditable("");
         Selection.setSelection(mEditable, 0);
         mContainerViewObservers = new ObserverList<ContainerViewObserver>();
-        mCurrentConfig = getContext().getResources().getConfiguration();
+        // Deep copy newConfig so that we can notice the difference.
+        mCurrentConfig = new Configuration(getContext().getResources().getConfiguration());
     }
 
     /**
@@ -1265,8 +1266,7 @@ public class ContentViewCore implements
     }
 
     public boolean isScrollInProgress() {
-        return mTouchScrollInProgress || mPotentiallyActiveFlingCount > 0
-                || getContentViewClient().isExternalScrollActive();
+        return mTouchScrollInProgress || mPotentiallyActiveFlingCount > 0;
     }
 
     @SuppressWarnings("unused")
@@ -1371,6 +1371,12 @@ public class ContentViewCore implements
         nativeDoubleTap(mNativeContentViewCore, timeMs, x, y);
     }
 
+    /**
+     * Flings the viewport with velocity vector (velocityX, velocityY).
+     * @param timeMs the current time.
+     * @param velocityX fling speed in x-axis.
+     * @param velocityY fling speed in y-axis.
+     */
     public void flingViewport(long timeMs, int velocityX, int velocityY) {
         if (mNativeContentViewCore == 0) return;
         nativeFlingCancel(mNativeContentViewCore, timeMs);
@@ -1418,9 +1424,6 @@ public class ContentViewCore implements
                     listener.onFlingEndGesture(
                             computeVerticalScrollOffset(),
                             computeVerticalScrollExtent());
-                    break;
-                case GestureEventType.FLING_CANCEL:
-                    listener.onFlingCancelGesture();
                     break;
                 case GestureEventType.SCROLL_START:
                     listener.onScrollStarted(
@@ -1617,7 +1620,8 @@ public class ContentViewCore implements
             // onConfigurationChange and layout has to be changed in most case.
             mContainerView.requestLayout();
         } finally {
-            mCurrentConfig = newConfig;
+            // Deep copy newConfig so that we can notice the difference.
+            mCurrentConfig = new Configuration(newConfig);
             TraceEvent.end("ContentViewCore.onConfigurationChanged");
         }
     }

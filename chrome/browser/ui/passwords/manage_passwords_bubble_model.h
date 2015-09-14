@@ -127,6 +127,10 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   // should be presented.
   bool ShouldShowMultipleAccountUpdateUI() const;
 
+  // True if the save bubble should display the warm welcome for Google Smart
+  // Lock.
+  bool ShouldShowGoogleSmartLockWelcome() const;
+
 #if defined(UNIT_TEST)
   // Gets and sets the reason the bubble was displayed.
   password_manager::metrics_util::UIDisplayDisposition display_disposition()
@@ -156,6 +160,8 @@ class ManagePasswordsBubbleModel : public content::WebContentsObserver {
   // Updates |title_| and |title_brand_link_range_| for the
   // PENDING_PASSWORD_STATE.
   void UpdatePendingStateTitle();
+  // Updates |title_| for the MANAGE_STATE.
+  void UpdateManageStateTitle();
   password_manager::metrics_util::UpdatePasswordSubmissionEvent
   GetUpdateDismissalReason(UserBehaviorOnUpdateBubble behavior) const;
   // URL of the page from where this bubble was triggered.

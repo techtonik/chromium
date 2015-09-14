@@ -15,8 +15,11 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import org.chromium.base.ActivityState;
+import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.blink_public.platform.WebDisplayMode;
@@ -29,6 +32,7 @@ import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabObserver;
+import org.chromium.chrome.browser.util.ColorUtils;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.content.browser.ScreenOrientationProvider;
 import org.chromium.content_public.browser.LoadUrlParams;
@@ -98,15 +102,12 @@ public class WebappActivity extends FullScreenActivity {
         getActivityTab().addObserver(createTabObserver());
         getActivityTab().getChromeWebContentsDelegateAndroid().setDisplayMode(
                 (int) WebDisplayMode.Standalone);
-        updateTaskDescription();
     }
 
     @Override
     public void preInflationStartup() {
         WebappInfo info = WebappInfo.create(getIntent());
         if (info != null) mWebappInfo.copy(info);
-
-        updateTaskDescription();
 
         mCleanupTask = new WebappDirectoryManager(getActivityDirectory(),
                 WEBAPP_SCHEME, FeatureUtilities.isDocumentModeEligible(this));
@@ -147,12 +148,16 @@ public class WebappActivity extends FullScreenActivity {
 
     @Override
     public void onResume() {
-        if (!isFinishing() && getIntent() != null) {
-            // Avoid situations where Android starts two Activities with the same data.
-            DocumentUtils.finishOtherTasksWithData(getIntent().getData(), getTaskId());
+        if (!isFinishing()) {
+            if (getIntent() != null) {
+                // Avoid situations where Android starts two Activities with the same data.
+                DocumentUtils.finishOtherTasksWithData(getIntent().getData(), getTaskId());
+            }
+            updateTaskDescription();
         }
         super.onResume();
     }
+
     @Override
     protected int getControlContainerLayoutId() {
         return R.layout.webapp_control_container;
@@ -160,16 +165,7 @@ public class WebappActivity extends FullScreenActivity {
 
     @Override
     public void postInflationStartup() {
-        ViewGroup contentView = (ViewGroup) findViewById(android.R.id.content);
-        mSplashScreen = (ViewGroup) LayoutInflater.from(this)
-                .inflate(R.layout.webapp_splashscreen, contentView, false);
-
-        if (mWebappInfo.backgroundColor() == ShortcutHelper.MANIFEST_COLOR_INVALID_OR_MISSING) {
-            mSplashScreen.setBackgroundResource(R.color.webapp_default_bg);
-        } else {
-            mSplashScreen.setBackgroundColor((int) mWebappInfo.backgroundColor());
-        }
-        contentView.addView(mSplashScreen);
+        initializeSplashScreen();
 
         super.postInflationStartup();
         WebappControlContainer controlContainer =
@@ -182,6 +178,24 @@ public class WebappActivity extends FullScreenActivity {
      */
     WebappInfo getWebappInfo() {
         return mWebappInfo;
+    }
+
+    private void initializeSplashScreen() {
+        final int backgroundColor = mWebappInfo.backgroundColor(
+                getResources().getColor(R.color.webapp_default_bg));
+
+        ViewGroup contentView = (ViewGroup) findViewById(android.R.id.content);
+        mSplashScreen = createSplashScreen(contentView);
+        mSplashScreen.setBackgroundColor(backgroundColor);
+        contentView.addView(mSplashScreen);
+
+        WebappDataStorage.open(this, mWebappInfo.id())
+                .getSplashScreenImage(new WebappDataStorage.FetchCallback<Bitmap>() {
+                    @Override
+                    public void onDataRetrieved(Bitmap splashIcon) {
+                        setSplashScreenIconAndText(mSplashScreen, splashIcon, backgroundColor);
+                    }
+                });
     }
 
     private void updateUrlBar() {
@@ -312,7 +326,8 @@ public class WebappActivity extends FullScreenActivity {
             mBrandColor = (int) mWebappInfo.themeColor();
         }
         int color = mBrandColor == null
-                ? getResources().getColor(R.color.default_primary_color) : mBrandColor;
+                ? ApiCompatibilityUtils.getColor(getResources(), R.color.default_primary_color)
+                : mBrandColor;
 
         DocumentUtils.updateTaskDescription(this, title, icon, color, mBrandColor == null);
     }
@@ -325,6 +340,35 @@ public class WebappActivity extends FullScreenActivity {
     @Override
     protected File getActivityDirectory() {
         return WebappDirectoryManager.getWebappDirectory(mWebappInfo.id());
+    }
+
+    @VisibleForTesting
+    ViewGroup createSplashScreen(ViewGroup parentView) {
+        return (ViewGroup) LayoutInflater.from(this)
+                .inflate(R.layout.webapp_splash_screen, parentView, false);
+    }
+
+    @VisibleForTesting
+    void setSplashScreenIconAndText(View splashScreen, Bitmap splashIcon, int backgroundColor) {
+        if (splashScreen == null) return;
+
+        Bitmap displayIcon = splashIcon == null ? mWebappInfo.icon() : splashIcon;
+        if (displayIcon == null || displayIcon.getWidth() < getResources()
+                .getDimensionPixelSize(R.dimen.webapp_splash_image_min_size)) {
+            return;
+        }
+
+        TextView appNameView = (TextView) splashScreen.findViewById(
+                R.id.webapp_splash_screen_name);
+        ImageView splashIconView = (ImageView) splashScreen.findViewById(
+                R.id.webapp_splash_screen_icon);
+        appNameView.setText(mWebappInfo.name());
+        splashIconView.setImageBitmap(displayIcon);
+
+        if (ColorUtils.shoudUseLightForegroundOnBackground(backgroundColor)) {
+            appNameView.setTextColor(getResources().getColor(
+                    R.color.webapp_splash_title_light));
+        }
     }
 
     @VisibleForTesting

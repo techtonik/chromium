@@ -5,6 +5,7 @@
 // IPC messages for interacting with frames.
 // Multiply-included message file, hence no include guard.
 
+#include "base/memory/shared_memory.h"
 #include "cc/surfaces/surface_id.h"
 #include "cc/surfaces/surface_sequence.h"
 #include "content/common/content_export.h"
@@ -31,6 +32,14 @@
 #include "ui/gfx/ipc/gfx_param_traits.h"
 #include "url/gurl.h"
 #include "url/origin.h"
+
+#if defined(OS_MACOSX)
+#include "content/common/mac/font_descriptor.h"
+#endif
+
+#if defined(ENABLE_PLUGINS)
+#include "content/common/pepper_renderer_instance_data.h"
+#endif
 
 #undef IPC_MESSAGE_EXPORT
 #define IPC_MESSAGE_EXPORT CONTENT_EXPORT
@@ -323,6 +332,14 @@ IPC_STRUCT_BEGIN(FrameMsg_NewFrame_Params)
   // Specifies the routing ID of the new RenderFrame object.
   IPC_STRUCT_MEMBER(int, routing_id)
 
+  // If a valid |proxy_routing_id| is provided, the new frame will be
+  // configured to replace the proxy on commit.
+  IPC_STRUCT_MEMBER(int, proxy_routing_id)
+
+  // Specifies the new frame's opener.  The opener will be null if this is
+  // MSG_ROUTING_NONE.
+  IPC_STRUCT_MEMBER(int, opener_routing_id)
+
   // The new frame should be created as a child of the object
   // identified by |parent_routing_id| or as top level if that is
   // MSG_ROUTING_NONE.
@@ -333,10 +350,6 @@ IPC_STRUCT_BEGIN(FrameMsg_NewFrame_Params)
   // MSG_ROUTING_NONE, the frame will be created as the leftmost child of its
   // parent frame, in front of any other children.
   IPC_STRUCT_MEMBER(int, previous_sibling_routing_id)
-
-  // If a valid |proxy_routing_id| is provided, the new frame will be
-  // configured to replace the proxy on commit.
-  IPC_STRUCT_MEMBER(int, proxy_routing_id)
 
   // When the new frame has a parent, |replication_state| holds the new frame's
   // properties replicated from the process rendering the parent frame, such as
@@ -409,6 +422,23 @@ IPC_STRUCT_BEGIN(FrameHostMsg_ShowPopup_Params)
 IPC_STRUCT_END()
 #endif
 
+#if defined(OS_MACOSX)
+IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
+  IPC_STRUCT_TRAITS_MEMBER(font_name)
+  IPC_STRUCT_TRAITS_MEMBER(font_point_size)
+IPC_STRUCT_TRAITS_END()
+#endif
+
+#if defined(ENABLE_PLUGINS)
+IPC_STRUCT_TRAITS_BEGIN(content::PepperRendererInstanceData)
+  IPC_STRUCT_TRAITS_MEMBER(render_process_id)
+  IPC_STRUCT_TRAITS_MEMBER(render_frame_id)
+  IPC_STRUCT_TRAITS_MEMBER(document_url)
+  IPC_STRUCT_TRAITS_MEMBER(plugin_url)
+  IPC_STRUCT_TRAITS_MEMBER(is_potentially_secure_plugin_context)
+IPC_STRUCT_TRAITS_END()
+#endif
+
 // -----------------------------------------------------------------------------
 // Messages sent from the browser to the renderer.
 
@@ -454,13 +484,17 @@ IPC_MESSAGE_ROUTED1(FrameMsg_VisualStateRequest, uint64 /* id */)
 IPC_MESSAGE_CONTROL1(FrameMsg_NewFrame, FrameMsg_NewFrame_Params /* params */)
 
 // Instructs the renderer to create a new RenderFrameProxy object with
-// |routing_id|. The new proxy should be created as a child of the object
-// identified by |parent_routing_id| or as top level if that is
+// |routing_id|.  |render_view_routing_id| identifies the
+// RenderView to be associated with this proxy.  The new proxy's opener should
+// be set to the object identified by |opener_routing_id|, or to null if that
+// is MSG_ROUTING_NONE.  The new proxy should be created as a child of the
+// object identified by |parent_routing_id| or as top level if that is
 // MSG_ROUTING_NONE.
-IPC_MESSAGE_CONTROL4(FrameMsg_NewFrameProxy,
+IPC_MESSAGE_CONTROL5(FrameMsg_NewFrameProxy,
                      int /* routing_id */,
-                     int /* parent_routing_id */,
                      int /* render_view_routing_id */,
+                     int /* opener_routing_id */,
+                     int /* parent_routing_id */,
                      content::FrameReplicationState /* replication_state */)
 
 // Tells the renderer to perform the specified navigation, interrupting any
@@ -850,6 +884,11 @@ IPC_MESSAGE_ROUTED2(FrameHostMsg_PluginCrashed,
                     base::FilePath /* plugin_path */,
                     base::ProcessId /* plugin_pid */)
 
+// Used to get the list of plugins
+IPC_SYNC_MESSAGE_CONTROL1_1(FrameHostMsg_GetPlugins,
+    bool /* refresh*/,
+    std::vector<content::WebPluginInfo> /* plugins */)
+
 // Return information about a plugin for the given URL and MIME
 // type. If there is no matching plugin, |found| is false.
 // |actual_mime_type| is the actual mime type supported by the
@@ -869,7 +908,6 @@ IPC_SYNC_MESSAGE_CONTROL4_3(FrameHostMsg_GetPluginInfo,
 // RenderFrame is destroyed.
 IPC_MESSAGE_ROUTED1(FrameHostMsg_PluginContentOriginAllowed,
                     GURL /* content_origin */)
-#endif  // defined(ENABLE_PLUGINS)
 
 // A renderer sends this to the browser process when it wants to
 // create a plugin.  The browser will create the plugin process if
@@ -882,6 +920,78 @@ IPC_SYNC_MESSAGE_CONTROL4_2(FrameHostMsg_OpenChannelToPlugin,
                             std::string /* mime_type */,
                             IPC::ChannelHandle /* channel_handle */,
                             content::WebPluginInfo /* info */)
+
+// A renderer sends this to the browser process when it wants to create a ppapi
+// plugin.  The browser will create the plugin process if necessary, and will
+// return a handle to the channel on success.
+//
+// The plugin_child_id is the ChildProcessHost ID assigned in the browser
+// process. This ID is valid only in the context of the browser process and is
+// used to identify the proper process when the renderer notifies it that the
+// plugin is hung.
+//
+// On error an empty string and null handles are returned.
+IPC_SYNC_MESSAGE_CONTROL1_3(FrameHostMsg_OpenChannelToPepperPlugin,
+                            base::FilePath /* path */,
+                            IPC::ChannelHandle /* handle to channel */,
+                            base::ProcessId /* plugin_pid */,
+                            int /* plugin_child_id */)
+
+// Message from the renderer to the browser indicating the in-process instance
+// has been created.
+IPC_MESSAGE_CONTROL2(FrameHostMsg_DidCreateInProcessInstance,
+                     int32 /* instance */,
+                     content::PepperRendererInstanceData /* instance_data */)
+
+// Message from the renderer to the browser indicating the in-process instance
+// has been destroyed.
+IPC_MESSAGE_CONTROL1(FrameHostMsg_DidDeleteInProcessInstance,
+                     int32 /* instance */)
+
+// Notification that a plugin has created a new plugin instance. The parameters
+// indicate:
+//  - The plugin process ID that we're creating the instance for.
+//  - The instance ID of the instance being created.
+//  - A PepperRendererInstanceData struct which contains properties from the
+//    renderer which are associated with the plugin instance. This includes the
+//    routing ID of the associated RenderFrame and the URL of plugin.
+//  - Whether the plugin we're creating an instance for is external or internal.
+//
+// This message must be sync even though it returns no parameters to avoid
+// a race condition with the plugin process. The plugin process sends messages
+// to the browser that assume the browser knows about the instance. We need to
+// make sure that the browser actually knows about the instance before we tell
+// the plugin to run.
+IPC_SYNC_MESSAGE_CONTROL4_0(
+    FrameHostMsg_DidCreateOutOfProcessPepperInstance,
+    int /* plugin_child_id */,
+    int32 /* pp_instance */,
+    content::PepperRendererInstanceData /* creation_data */,
+    bool /* is_external */)
+
+// Notification that a plugin has destroyed an instance. This is the opposite of
+// the "DidCreate" message above.
+IPC_MESSAGE_CONTROL3(FrameHostMsg_DidDeleteOutOfProcessPepperInstance,
+                     int /* plugin_child_id */,
+                     int32 /* pp_instance */,
+                     bool /* is_external */)
+
+// A renderer sends this to the browser process when it wants to
+// create a ppapi broker.  The browser will create the broker process
+// if necessary, and will return a handle to the channel on success.
+// On error an empty string is returned.
+// The browser will respond with ViewMsg_PpapiBrokerChannelCreated.
+IPC_MESSAGE_CONTROL2(FrameHostMsg_OpenChannelToPpapiBroker,
+                     int /* routing_id */,
+                     base::FilePath /* path */)
+
+// A renderer sends this to the browser process when it throttles or unthrottles
+// a plugin instance for the Plugin Power Saver feature.
+IPC_MESSAGE_CONTROL3(FrameHostMsg_PluginInstanceThrottleStateChange,
+                     int /* plugin_child_id */,
+                     int32 /* pp_instance */,
+                     bool /* is_throttled */)
+#endif  // defined(ENABLE_PLUGINS)
 
 // Acknowledge that we presented an ubercomp frame.
 //
@@ -1062,3 +1172,24 @@ IPC_MESSAGE_ROUTED1(FrameHostMsg_ShowPopup,
 IPC_MESSAGE_ROUTED0(FrameHostMsg_HidePopup)
 
 #endif
+
+#if defined(OS_MACOSX)
+// Request that the browser load a font into shared memory for us.
+IPC_SYNC_MESSAGE_CONTROL1_3(FrameHostMsg_LoadFont,
+                            FontDescriptor /* font to load */,
+                            uint32 /* buffer size */,
+                            base::SharedMemoryHandle /* font data */,
+                            uint32 /* font id */)
+#elif defined(OS_WIN)
+// Request that the given font characters be loaded by the browser so it's
+// cached by the OS. Please see RenderMessageFilter::OnPreCacheFontCharacters
+// for details.
+IPC_SYNC_MESSAGE_CONTROL2_0(FrameHostMsg_PreCacheFontCharacters,
+                            LOGFONT /* font_data */,
+                            base::string16 /* characters */)
+#endif
+
+// Adding a new message? Stick to the sort order above: first platform
+// independent FrameMsg, then ifdefs for platform specific FrameMsg, then
+// platform independent FrameHostMsg, then ifdefs for platform specific
+// FrameHostMsg.

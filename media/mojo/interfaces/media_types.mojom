@@ -107,7 +107,8 @@ enum VideoFormat {
   RGB24,
   RGB32,
   MJPEG,
-  FORMAT_MAX = MJPEG,
+  MT21,
+  FORMAT_MAX = MT21,
 };
 
 // Kept in sync with media::ColorSpace via static_asserts.
@@ -130,7 +131,8 @@ enum VideoCodec {
   Theora,
   VP8,
   VP9,
-  Max = VP9,
+  HEVC,
+  Max = HEVC,
 };
 
 // See media/base/video_decoder_config.h for descriptions.
@@ -204,7 +206,6 @@ struct DecryptConfig {
 
 // This defines a mojo transport format for media::DecoderBuffer.
 struct DecoderBuffer {
-  // See media/base/buffers.h for details.
   int64 timestamp_usec;
   int64 duration_usec;
 

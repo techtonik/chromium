@@ -66,6 +66,7 @@ TEST_F(HostContentSettingsMapTest, DefaultValues) {
                 CONTENT_SETTINGS_TYPE_IMAGES,
                 std::string()));
 
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->SetDefaultContentSetting(
       CONTENT_SETTINGS_TYPE_PLUGINS, CONTENT_SETTING_ALLOW);
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
@@ -81,6 +82,7 @@ TEST_F(HostContentSettingsMapTest, DefaultValues) {
   EXPECT_EQ(CONTENT_SETTING_DETECT_IMPORTANT_CONTENT,
             host_content_settings_map->GetDefaultContentSetting(
                 CONTENT_SETTINGS_TYPE_PLUGINS, NULL));
+#endif
 
   host_content_settings_map->SetDefaultContentSetting(
       CONTENT_SETTINGS_TYPE_POPUPS, CONTENT_SETTING_ALLOW);
@@ -119,9 +121,11 @@ TEST_F(HostContentSettingsMapTest, IndividualSettings) {
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
+#if defined(ENABLE_PLUGINS)
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_PLUGINS, std::string()));
+#endif
 
   // Check returning all settings for a host.
   host_content_settings_map->SetContentSetting(
@@ -142,6 +146,7 @@ TEST_F(HostContentSettingsMapTest, IndividualSettings) {
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_JAVASCRIPT, std::string()));
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->SetContentSetting(
       pattern,
       ContentSettingsPattern::Wildcard(),
@@ -151,6 +156,7 @@ TEST_F(HostContentSettingsMapTest, IndividualSettings) {
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_PLUGINS, std::string()));
+#endif
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_POPUPS, std::string()));
@@ -177,21 +183,25 @@ TEST_F(HostContentSettingsMapTest, IndividualSettings) {
       CONTENT_SETTINGS_TYPE_IMAGES,
       std::string(),
       CONTENT_SETTING_BLOCK);
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->SetContentSetting(
       pattern2,
       ContentSettingsPattern::Wildcard(),
       CONTENT_SETTINGS_TYPE_PLUGINS,
       std::string(),
       CONTENT_SETTING_BLOCK);
+#endif
   ContentSettingsForOneType host_settings;
   host_content_settings_map->GetSettingsForOneType(
       CONTENT_SETTINGS_TYPE_IMAGES, std::string(), &host_settings);
   // |host_settings| contains the default setting and an exception.
   EXPECT_EQ(2U, host_settings.size());
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->GetSettingsForOneType(
       CONTENT_SETTINGS_TYPE_PLUGINS, std::string(), &host_settings);
   // |host_settings| contains the default setting and 2 exceptions.
   EXPECT_EQ(3U, host_settings.size());
+#endif
   host_content_settings_map->GetSettingsForOneType(
       CONTENT_SETTINGS_TYPE_POPUPS, std::string(), &host_settings);
   // |host_settings| contains only the default setting.
@@ -220,12 +230,14 @@ TEST_F(HostContentSettingsMapTest, Clear) {
       CONTENT_SETTINGS_TYPE_IMAGES,
       std::string(),
       CONTENT_SETTING_BLOCK);
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->SetContentSetting(
       pattern,
       ContentSettingsPattern::Wildcard(),
       CONTENT_SETTINGS_TYPE_PLUGINS,
       std::string(),
       CONTENT_SETTING_BLOCK);
+#endif
   host_content_settings_map->SetContentSetting(
       pattern2,
       ContentSettingsPattern::Wildcard(),
@@ -239,10 +251,12 @@ TEST_F(HostContentSettingsMapTest, Clear) {
       CONTENT_SETTINGS_TYPE_IMAGES, std::string(), &host_settings);
   // |host_settings| contains only the default setting.
   EXPECT_EQ(1U, host_settings.size());
+#if defined(ENABLE_PLUGINS)
   host_content_settings_map->GetSettingsForOneType(
       CONTENT_SETTINGS_TYPE_PLUGINS, std::string(), &host_settings);
   // |host_settings| contains the default setting and an exception.
   EXPECT_EQ(2U, host_settings.size());
+#endif
 }
 
 TEST_F(HostContentSettingsMapTest, Patterns) {
@@ -499,6 +513,7 @@ TEST_F(HostContentSettingsMapTest, HostTrimEndingDotCheck) {
                 CONTENT_SETTINGS_TYPE_JAVASCRIPT,
                 std::string()));
 
+#if defined(ENABLE_PLUGINS)
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetContentSetting(
                 host_ending_with_dot,
@@ -529,6 +544,7 @@ TEST_F(HostContentSettingsMapTest, HostTrimEndingDotCheck) {
                 host_ending_with_dot,
                 CONTENT_SETTINGS_TYPE_PLUGINS,
                 std::string()));
+#endif
 
   EXPECT_EQ(
       CONTENT_SETTING_BLOCK,
@@ -714,13 +730,13 @@ TEST_F(HostContentSettingsMapTest, CanonicalizeExceptionsUnicodeOnly) {
 TEST_F(HostContentSettingsMapTest, CanonicalizeExceptionsUnicodeAndPunycode) {
   TestingProfile profile;
 
-  scoped_ptr<base::Value> value(base::JSONReader::DeprecatedRead(
-      "{\"[*.]\\xC4\\x87ira.com,*\":{\"setting\":1}}"));
+  scoped_ptr<base::Value> value =
+      base::JSONReader::Read("{\"[*.]\\xC4\\x87ira.com,*\":{\"setting\":1}}");
   profile.GetPrefs()->Set(GetPrefName(CONTENT_SETTINGS_TYPE_COOKIES), *value);
 
   // Set punycode equivalent, with different setting.
-  scoped_ptr<base::Value> puny_value(base::JSONReader::DeprecatedRead(
-      "{\"[*.]xn--ira-ppa.com,*\":{\"setting\":2}}"));
+  scoped_ptr<base::Value> puny_value =
+      base::JSONReader::Read("{\"[*.]xn--ira-ppa.com,*\":{\"setting\":2}}");
   profile.GetPrefs()->Set(GetPrefName(CONTENT_SETTINGS_TYPE_COOKIES),
                           *puny_value);
 
@@ -768,11 +784,13 @@ TEST_F(HostContentSettingsMapTest, ManagedDefaultContentSetting) {
             host_content_settings_map->GetDefaultContentSetting(
                 CONTENT_SETTINGS_TYPE_PLUGINS, NULL));
 
+#if defined(ENABLE_PLUGINS)
   // Remove the preference to manage the default-content-setting for Plugins.
   prefs->RemoveManagedPref(prefs::kManagedDefaultPluginsSetting);
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetDefaultContentSetting(
                 CONTENT_SETTINGS_TYPE_PLUGINS, NULL));
+#endif
 }
 
 TEST_F(HostContentSettingsMapTest,
@@ -932,36 +950,6 @@ TEST_F(HostContentSettingsMapTest, GetContentSetting) {
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetContentSetting(
                 embedder, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
-}
-
-TEST_F(HostContentSettingsMapTest, ShouldAllowAllContent) {
-  GURL http_host("http://example.com/");
-  GURL https_host("https://example.com/");
-  GURL embedder("chrome://foo");
-  GURL extension("chrome-extension://foo");
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   http_host, embedder, CONTENT_SETTINGS_TYPE_NOTIFICATIONS));
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   http_host, embedder, CONTENT_SETTINGS_TYPE_GEOLOCATION));
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   http_host, embedder, CONTENT_SETTINGS_TYPE_COOKIES));
-  EXPECT_TRUE(HostContentSettingsMap::ShouldAllowAllContent(
-                  https_host, embedder, CONTENT_SETTINGS_TYPE_COOKIES));
-  EXPECT_TRUE(HostContentSettingsMap::ShouldAllowAllContent(
-                  https_host, embedder, CONTENT_SETTINGS_TYPE_COOKIES));
-  EXPECT_TRUE(HostContentSettingsMap::ShouldAllowAllContent(
-                  embedder, http_host, CONTENT_SETTINGS_TYPE_COOKIES));
-#if defined(ENABLE_EXTENSIONS)
-  EXPECT_TRUE(HostContentSettingsMap::ShouldAllowAllContent(
-                  extension, extension, CONTENT_SETTINGS_TYPE_COOKIES));
-#else
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   extension, extension, CONTENT_SETTINGS_TYPE_COOKIES));
-#endif
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   extension, extension, CONTENT_SETTINGS_TYPE_PLUGINS));
-  EXPECT_FALSE(HostContentSettingsMap::ShouldAllowAllContent(
-                   extension, http_host, CONTENT_SETTINGS_TYPE_COOKIES));
 }
 
 TEST_F(HostContentSettingsMapTest, IsSettingAllowedForType) {

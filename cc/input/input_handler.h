@@ -15,6 +15,7 @@
 namespace gfx {
 class Point;
 class PointF;
+class ScrollOffset;
 class Vector2d;
 class Vector2dF;
 }
@@ -130,10 +131,12 @@ class CC_EXPORT InputHandler {
 
   // Called when the value returned by
   // LayerScrollOffsetDelegate.GetTotalScrollOffset has changed for reasons
-  // other than a SetTotalScrollOffset call.
+  // other than a SetTotalScrollOffset call. This passes along the new value of
+  // GetTotalScrollOffset.
   // NOTE: This should only called after a valid delegate was set via a call to
   // SetRootLayerScrollOffsetDelegate.
-  virtual void OnRootLayerDelegatedScrollOffsetChanged() = 0;
+  virtual void OnRootLayerDelegatedScrollOffsetChanged(
+      const gfx::ScrollOffset& root_offset) = 0;
 
   virtual void PinchGestureBegin() = 0;
   virtual void PinchGestureUpdate(float magnify_delta,
@@ -143,9 +146,13 @@ class CC_EXPORT InputHandler {
   // Request another callback to InputHandlerClient::Animate().
   virtual void SetNeedsAnimateInput() = 0;
 
+  // If there is a scroll active, this reports whether the scroll is on the
+  // root layer, or on some other sublayer.
+  virtual bool IsCurrentlyScrollingRoot() const = 0;
+
   // Whether the layer under |viewport_point| is the currently scrolling layer.
   virtual bool IsCurrentlyScrollingLayerAt(const gfx::Point& viewport_point,
-                                           ScrollInputType type) = 0;
+                                           ScrollInputType type) const = 0;
 
   virtual bool HaveWheelEventHandlersAt(const gfx::Point& viewport_point) = 0;
 

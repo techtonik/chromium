@@ -27,12 +27,12 @@
 #include "chrome/browser/sync/startup_controller.h"
 #include "chrome/browser/sync/supervised_user_signin_manager_wrapper.h"
 #include "chrome/browser/themes/theme_service_factory.h"
-#include "chrome/browser/ui/global_error/global_error_service_factory.h"
 #include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/channel_info.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager.h"
+#include "components/sync_driver/signin_manager_wrapper.h"
 #include "components/sync_driver/sync_util.h"
 #include "components/variations/variations_associated_data.h"
 #include "url/gurl.h"
@@ -42,9 +42,13 @@
 #include "extensions/browser/extensions_browser_client.h"
 #endif
 
+#if !defined(OS_ANDROID)
+#include "chrome/browser/ui/global_error/global_error_service_factory.h"
+#endif
+
 // static
 ProfileSyncServiceFactory* ProfileSyncServiceFactory::GetInstance() {
-  return Singleton<ProfileSyncServiceFactory>::get();
+  return base::Singleton<ProfileSyncServiceFactory>::get();
 }
 
 // static
@@ -84,7 +88,9 @@ ProfileSyncServiceFactory::ProfileSyncServiceFactory()
   DependsOn(autofill::PersonalDataManagerFactory::GetInstance());
   DependsOn(BookmarkModelFactory::GetInstance());
   DependsOn(ChromeSigninClientFactory::GetInstance());
+#if !defined(OS_ANDROID)
   DependsOn(GlobalErrorServiceFactory::GetInstance());
+#endif
   DependsOn(HistoryServiceFactory::GetInstance());
   DependsOn(invalidation::ProfileInvalidationProviderFactory::GetInstance());
   DependsOn(PasswordStoreFactory::GetInstance());
@@ -129,7 +135,7 @@ KeyedService* ProfileSyncServiceFactory::BuildServiceInstanceFor(
   const GURL sync_service_url = GetSyncServiceURL(
       *base::CommandLine::ForCurrentProcess(), chrome::GetChannel());
 
-  scoped_ptr<SupervisedUserSigninManagerWrapper> signin_wrapper(
+  scoped_ptr<SigninManagerWrapper> signin_wrapper(
       new SupervisedUserSigninManagerWrapper(profile, signin));
   std::string account_id = signin_wrapper->GetAccountIdToUse();
   OAuth2TokenService::ScopeSet scope_set;

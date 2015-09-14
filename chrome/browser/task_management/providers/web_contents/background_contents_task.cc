@@ -49,7 +49,7 @@ base::string16 AdjustAndLocalizeTitle(const base::string16& title,
 
   // Ensure that the string has the appropriate direction markers.
   base::i18n::AdjustStringForLocaleDirection(&localized_title);
-  return l10n_util::GetStringFUTF16(IDS_TASK_MANAGER_BACKGROUND_PREFIX,
+  return l10n_util::GetStringFUTF16(IDS_TASK_MANAGER_BACKGROUND_APP_PREFIX,
                                     localized_title);
 }
 
@@ -68,12 +68,12 @@ BackgroundContentsTask::BackgroundContentsTask(
 BackgroundContentsTask::~BackgroundContentsTask() {
 }
 
-void BackgroundContentsTask::OnTitleChanged(content::NavigationEntry* entry) {
+void BackgroundContentsTask::UpdateTitle() {
   // TODO(afakhry): At the time of integration testing figure out whether we
   // need to change the title of the task here.
 }
 
-void BackgroundContentsTask::OnFaviconChanged() {
+void BackgroundContentsTask::UpdateFavicon() {
   // We don't do anything here. For background contents we always use the
   // default icon.
 }

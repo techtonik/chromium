@@ -61,6 +61,7 @@ class PowerSaveBlocker;
 class RenderViewHost;
 class RenderViewHostDelegateView;
 class RenderWidgetHostImpl;
+class RenderWidgetHostInputEventRouter;
 class SavePackage;
 class ScreenOrientationDispatcherHost;
 class SiteInstance;
@@ -584,6 +585,7 @@ class CONTENT_EXPORT WebContentsImpl
   void SelectRange(const gfx::Point& base, const gfx::Point& extent) override;
   void AdjustSelectionByCharacterOffset(int start_adjust, int end_adjust)
       override;
+  RenderWidgetHostInputEventRouter* GetInputEventRouter() override;
 
   // RenderFrameHostManager::Delegate ------------------------------------------
 
@@ -591,12 +593,15 @@ class CONTENT_EXPORT WebContentsImpl
       RenderViewHost* render_view_host,
       int opener_frame_routing_id,
       int proxy_routing_id,
-      const FrameReplicationState& replicated_frame_state,
-      bool for_main_frame_navigation) override;
-  bool CreateRenderFrameForRenderManager(RenderFrameHost* render_frame_host,
-                                         int parent_routing_id,
-                                         int previous_sibling_routing_id,
-                                         int proxy_routing_id) override;
+      const FrameReplicationState& replicated_frame_state) override;
+  void CreateRenderWidgetHostViewForRenderManager(
+      RenderViewHost* render_view_host) override;
+  bool CreateRenderFrameForRenderManager(
+      RenderFrameHost* render_frame_host,
+      int proxy_routing_id,
+      int opener_routing_id,
+      int parent_routing_id,
+      int previous_sibling_routing_id) override;
   void BeforeUnloadFiredFromRenderManager(
       bool proceed,
       const base::TimeTicks& proceed_time,
@@ -716,6 +721,8 @@ class CONTENT_EXPORT WebContentsImpl
   FRIEND_TEST_ALL_PREFIXES(WebContentsImplTest, GetLastActiveTime);
   FRIEND_TEST_ALL_PREFIXES(WebContentsImplTest,
                            LoadResourceFromMemoryCacheWithBadSecurityInfo);
+  FRIEND_TEST_ALL_PREFIXES(WebContentsImplTest,
+                           LoadResourceFromMemoryCacheWithEmptySecurityInfo);
   FRIEND_TEST_ALL_PREFIXES(FormStructureBrowserTest, HTMLFiles);
   FRIEND_TEST_ALL_PREFIXES(NavigationControllerTest, HistoryNavigate);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostManagerTest, PageDoesBackAndReload);
@@ -1297,6 +1304,8 @@ class CONTENT_EXPORT WebContentsImpl
   // Manages all the media player and CDM managers and forwards IPCs to them.
   scoped_ptr<MediaWebContentsObserver> media_web_contents_observer_;
 #endif
+
+  scoped_ptr<RenderWidgetHostInputEventRouter> rwh_input_event_router_;
 
   base::WeakPtrFactory<WebContentsImpl> loading_weak_factory_;
 

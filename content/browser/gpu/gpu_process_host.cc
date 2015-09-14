@@ -516,6 +516,9 @@ GpuProcessHost::~GpuProcessHost() {
       case base::TERMINATION_STATUS_PROCESS_CRASHED:
         message = "The GPU process crashed!";
         break;
+      case base::TERMINATION_STATUS_LAUNCH_FAILED:
+        message = "The GPU process failed to start!";
+        break;
       default:
         break;
     }
@@ -643,6 +646,7 @@ void GpuProcessHost::EstablishGpuChannel(
     uint64_t client_tracing_id,
     bool share_context,
     bool allow_future_sync_points,
+    bool allow_real_time_streams,
     const EstablishChannelCallback& callback) {
   DCHECK(CalledOnValidThread());
   TRACE_EVENT0("gpu", "GpuProcessHost::EstablishGpuChannel");
@@ -655,8 +659,8 @@ void GpuProcessHost::EstablishGpuChannel(
   }
 
   if (Send(new GpuMsg_EstablishChannel(client_id, client_tracing_id,
-                                       share_context,
-                                       allow_future_sync_points))) {
+                                       share_context, allow_future_sync_points,
+                                       allow_real_time_streams))) {
     channel_requests_.push(callback);
   } else {
     DVLOG(1) << "Failed to send GpuMsg_EstablishChannel.";

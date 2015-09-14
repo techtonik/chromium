@@ -126,6 +126,10 @@ const char kDisableGpuCompositing[]         = "disable-gpu-compositing";
 // Disable proactive early init of GPU process.
 const char kDisableGpuEarlyInit[]           = "disable-gpu-early-init";
 
+// Disable GpuMemoryBuffer backed VideoFrames.
+const char kDisableGpuMemoryBufferVideoFrames[] =
+    "disable-gpu-memory-buffer-video-frames";
+
 // Disable the limit on the number of times the GPU process may be restarted
 // This switch is intended only for tests.
 const char kDisableGpuProcessCrashLimit[] = "disable-gpu-process-crash-limit";
@@ -164,9 +168,9 @@ const char kDisableHistogramCustomizer[]    = "disable-histogram-customizer";
 // this switch.
 const char kDisableKillAfterBadIPC[]        = "disable-kill-after-bad-ipc";
 
-// Disables prefixed Encrypted Media API (e.g. webkitGenerateKeyRequest()).
-const char kDisablePrefixedEncryptedMedia[] =
-    "disable-prefixed-encrypted-media";
+// Enables prefixed Encrypted Media API (e.g. webkitGenerateKeyRequest()).
+const char kEnablePrefixedEncryptedMedia[] =
+    "enable-prefixed-encrypted-media";
 
 // Disables LCD text.
 const char kDisableLCDText[]                = "disable-lcd-text";
@@ -379,11 +383,6 @@ const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
 // Enables the network information API.
 const char kEnableNetworkInformation[]      = "enable-network-information";
 
-// Enables use of hardware overlay for fullscreen video playback. Android only.
-// TODO(watk): Remove this once blink is updated to pass
-// kForceOverlayFullscreenVideo for layout tests. http://crbug.com/511376
-const char kEnableOverlayFullscreenVideo[]  = "enable-overlay-fullscreen-video";
-
 // Enables the use of persistent GPU memory buffers for partial raster.
 const char kEnablePersistentGpuMemoryBuffer[] =
     "enable-persistent-gpu-memory-buffer";
@@ -525,7 +524,7 @@ const char kGpuRasterizationMSAASampleCount[] =
 
 // Forces use of hardware overlay for fullscreen video playback. Useful for
 // testing the Android overlay fullscreen functionality on other platforms.
-const char kForceOverlayFullscreenVideo[]  = "force-overlay-fullscreen-video";
+const char kForceOverlayFullscreenVideo[]   = "force-overlay-fullscreen-video";
 
 // Force renderer accessibility to be on instead of enabling it on demand when
 // a screen reader is detected. The disable-renderer-accessibility switch

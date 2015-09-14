@@ -6,23 +6,27 @@
 
 #include "components/bubble/bubble_controller.h"
 #include "components/bubble/bubble_delegate.h"
+#include "components/bubble/bubble_reference.h"
 #include "components/bubble/bubble_ui.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
 
-class MockBubbleUI : public BubbleUI {
+class MockBubbleUi : public BubbleUi {
  public:
-  MockBubbleUI() {}
-  ~MockBubbleUI() override { Destroyed(); }
+  MockBubbleUi() {}
+  ~MockBubbleUi() override { Destroyed(); }
 
-  MOCK_METHOD0(Show, void());
+  MOCK_METHOD1(Show, void(BubbleReference));
   MOCK_METHOD0(Close, void());
   MOCK_METHOD0(UpdateAnchorPosition, void());
 
   // To verify destructor call.
   MOCK_METHOD0(Destroyed, void());
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockBubbleUi);
 };
 
 class MockBubbleDelegate : public BubbleDelegate {
@@ -39,20 +43,27 @@ class MockBubbleDelegate : public BubbleDelegate {
   MOCK_METHOD1(ShouldClose, bool(BubbleCloseReason reason));
 
   // A scoped_ptr can't be returned in MOCK_METHOD.
-  MOCK_METHOD0(BuildBubbleUIMock, BubbleUI*());
-  scoped_ptr<BubbleUI> BuildBubbleUI() override {
-    return make_scoped_ptr(BuildBubbleUIMock());
+  MOCK_METHOD0(BuildBubbleUiMock, BubbleUi*());
+  scoped_ptr<BubbleUi> BuildBubbleUi() override {
+    return make_scoped_ptr(BuildBubbleUiMock());
   }
+
+  MOCK_METHOD1(UpdateBubbleUi, bool(BubbleUi*));
+
+  MOCK_CONST_METHOD0(GetName, std::string());
 
   // To verify destructor call.
   MOCK_METHOD0(Destroyed, void());
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockBubbleDelegate);
 };
 
 // static
 scoped_ptr<MockBubbleDelegate> MockBubbleDelegate::Default() {
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
-      .WillOnce(testing::Return(new MockBubbleUI));
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::Return(true));
   return make_scoped_ptr(delegate);
@@ -61,8 +72,8 @@ scoped_ptr<MockBubbleDelegate> MockBubbleDelegate::Default() {
 // static
 scoped_ptr<MockBubbleDelegate> MockBubbleDelegate::Stubborn() {
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
-      .WillOnce(testing::Return(new MockBubbleUI));
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillRepeatedly(testing::Return(false));
   return make_scoped_ptr(delegate);
@@ -83,12 +94,26 @@ class DelegateChainHelper {
  private:
   BubbleManager* manager_;  // Weak.
   scoped_ptr<BubbleDelegate> next_delegate_;
+
+  DISALLOW_COPY_AND_ASSIGN(DelegateChainHelper);
 };
 
 DelegateChainHelper::DelegateChainHelper(
     BubbleManager* manager,
     scoped_ptr<BubbleDelegate> next_delegate)
     : manager_(manager), next_delegate_(next_delegate.Pass()) {}
+
+class MockBubbleManagerObserver : public BubbleManager::BubbleManagerObserver {
+ public:
+  MockBubbleManagerObserver() {}
+  ~MockBubbleManagerObserver() override {}
+
+  MOCK_METHOD1(OnBubbleNeverShown, void(BubbleReference));
+  MOCK_METHOD2(OnBubbleClosed, void(BubbleReference, BubbleCloseReason));
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockBubbleManagerObserver);
+};
 
 class BubbleManagerTest : public testing::Test {
  public:
@@ -100,6 +125,9 @@ class BubbleManagerTest : public testing::Test {
 
  protected:
   scoped_ptr<BubbleManager> manager_;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(BubbleManagerTest);
 };
 
 BubbleManagerTest::BubbleManagerTest() {}
@@ -114,18 +142,18 @@ void BubbleManagerTest::TearDown() {
   testing::Test::TearDown();
 }
 
-TEST_F(BubbleManagerTest, ManagerShowsBubbleUI) {
+TEST_F(BubbleManagerTest, ManagerShowsBubbleUi) {
   // Manager will delete bubble_ui.
-  MockBubbleUI* bubble_ui = new MockBubbleUI;
+  MockBubbleUi* bubble_ui = new MockBubbleUi;
   EXPECT_CALL(*bubble_ui, Destroyed());
-  EXPECT_CALL(*bubble_ui, Show());
+  EXPECT_CALL(*bubble_ui, Show(testing::_));
   EXPECT_CALL(*bubble_ui, Close());
   EXPECT_CALL(*bubble_ui, UpdateAnchorPosition()).Times(0);
 
   // Manager will delete delegate.
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
   EXPECT_CALL(*delegate, Destroyed());
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
       .WillOnce(testing::Return(bubble_ui));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::Return(true));
@@ -133,18 +161,18 @@ TEST_F(BubbleManagerTest, ManagerShowsBubbleUI) {
   manager_->ShowBubble(make_scoped_ptr(delegate));
 }
 
-TEST_F(BubbleManagerTest, ManagerUpdatesBubbleUI) {
+TEST_F(BubbleManagerTest, ManagerUpdatesBubbleUi) {
   // Manager will delete bubble_ui.
-  MockBubbleUI* bubble_ui = new MockBubbleUI;
+  MockBubbleUi* bubble_ui = new MockBubbleUi;
   EXPECT_CALL(*bubble_ui, Destroyed());
-  EXPECT_CALL(*bubble_ui, Show());
+  EXPECT_CALL(*bubble_ui, Show(testing::_));
   EXPECT_CALL(*bubble_ui, Close());
   EXPECT_CALL(*bubble_ui, UpdateAnchorPosition());
 
   // Manager will delete delegate.
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
   EXPECT_CALL(*delegate, Destroyed());
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
       .WillOnce(testing::Return(bubble_ui));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::Return(true));
@@ -287,8 +315,8 @@ TEST_F(BubbleManagerTest, AllowBubbleChainingOnClose) {
 
   // Manager will delete delegate.
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
-      .WillOnce(testing::Return(new MockBubbleUI));
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::DoAll(testing::InvokeWithoutArgs(
                                    &chain_helper, &DelegateChainHelper::Chain),
@@ -306,8 +334,8 @@ TEST_F(BubbleManagerTest, AllowBubbleChainingOnCloseAll) {
 
   // Manager will delete delegate.
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
-      .WillOnce(testing::Return(new MockBubbleUI));
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::DoAll(testing::InvokeWithoutArgs(
                                    &chain_helper, &DelegateChainHelper::Chain),
@@ -322,7 +350,7 @@ TEST_F(BubbleManagerTest, AllowBubbleChainingOnCloseAll) {
 TEST_F(BubbleManagerTest, BubblesDoNotChainOnDestroy) {
   // Manager will delete delegate.
   MockBubbleDelegate* chained_delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*chained_delegate, BuildBubbleUIMock()).Times(0);
+  EXPECT_CALL(*chained_delegate, BuildBubbleUiMock()).Times(0);
   EXPECT_CALL(*chained_delegate, ShouldClose(testing::_)).Times(0);
 
   DelegateChainHelper chain_helper(manager_.get(),
@@ -330,8 +358,81 @@ TEST_F(BubbleManagerTest, BubblesDoNotChainOnDestroy) {
 
   // Manager will delete delegate.
   MockBubbleDelegate* delegate = new MockBubbleDelegate;
-  EXPECT_CALL(*delegate, BuildBubbleUIMock())
-      .WillOnce(testing::Return(new MockBubbleUI));
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
+  EXPECT_CALL(*delegate, ShouldClose(testing::_))
+      .WillOnce(testing::DoAll(testing::InvokeWithoutArgs(
+                                   &chain_helper, &DelegateChainHelper::Chain),
+                               testing::Return(true)));
+
+  manager_->ShowBubble(make_scoped_ptr(delegate));
+  manager_.reset();
+
+  // The manager will take the bubble, but not show it.
+  ASSERT_TRUE(chain_helper.BubbleWasTaken());
+}
+
+TEST_F(BubbleManagerTest, BubbleUpdatesTrue) {
+  MockBubbleUi* bubble_ui = new MockBubbleUi;
+  MockBubbleDelegate* delegate = new MockBubbleDelegate;
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(bubble_ui));
+  EXPECT_CALL(*delegate, ShouldClose(testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*delegate, UpdateBubbleUi(bubble_ui))
+      .WillOnce(testing::Return(true));
+
+  BubbleReference ref = manager_->ShowBubble(make_scoped_ptr(delegate));
+  ASSERT_TRUE(ref->UpdateBubbleUi());
+}
+
+TEST_F(BubbleManagerTest, BubbleUpdatesFalse) {
+  MockBubbleUi* bubble_ui = new MockBubbleUi;
+  MockBubbleDelegate* delegate = new MockBubbleDelegate;
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(bubble_ui));
+  EXPECT_CALL(*delegate, ShouldClose(testing::_))
+      .WillOnce(testing::Return(true));
+  EXPECT_CALL(*delegate, UpdateBubbleUi(bubble_ui))
+      .WillOnce(testing::Return(false));
+
+  BubbleReference ref = manager_->ShowBubble(make_scoped_ptr(delegate));
+  ASSERT_FALSE(ref->UpdateBubbleUi());
+}
+
+TEST_F(BubbleManagerTest, BubbleCloseReasonIsCalled) {
+  MockBubbleManagerObserver metrics;
+  EXPECT_CALL(metrics, OnBubbleNeverShown(testing::_)).Times(0);
+  EXPECT_CALL(metrics, OnBubbleClosed(testing::_, BUBBLE_CLOSE_ACCEPTED));
+  manager_->AddBubbleManagerObserver(&metrics);
+
+  BubbleReference ref = manager_->ShowBubble(MockBubbleDelegate::Default());
+  ref->CloseBubble(BUBBLE_CLOSE_ACCEPTED);
+
+  // Destroy to verify no events are sent to |metrics| in destructor.
+  manager_.reset();
+}
+
+TEST_F(BubbleManagerTest, BubbleCloseNeverShownIsCalled) {
+  MockBubbleManagerObserver metrics;
+  // |chained_delegate| should never be shown.
+  EXPECT_CALL(metrics, OnBubbleNeverShown(testing::_));
+  // |delegate| should be forced to close when the manager is destroyed.
+  EXPECT_CALL(metrics, OnBubbleClosed(testing::_, BUBBLE_CLOSE_FORCED));
+  manager_->AddBubbleManagerObserver(&metrics);
+
+  // Manager will delete delegate.
+  MockBubbleDelegate* chained_delegate = new MockBubbleDelegate;
+  EXPECT_CALL(*chained_delegate, BuildBubbleUiMock()).Times(0);
+  EXPECT_CALL(*chained_delegate, ShouldClose(testing::_)).Times(0);
+
+  DelegateChainHelper chain_helper(manager_.get(),
+                                   make_scoped_ptr(chained_delegate));
+
+  // Manager will delete delegate.
+  MockBubbleDelegate* delegate = new MockBubbleDelegate;
+  EXPECT_CALL(*delegate, BuildBubbleUiMock())
+      .WillOnce(testing::Return(new MockBubbleUi));
   EXPECT_CALL(*delegate, ShouldClose(testing::_))
       .WillOnce(testing::DoAll(testing::InvokeWithoutArgs(
                                    &chain_helper, &DelegateChainHelper::Chain),

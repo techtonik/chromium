@@ -18,12 +18,6 @@ cr.define('downloads', function() {
       },
     },
 
-    ready: function() {
-      window.addEventListener('resize', this.onResize_.bind(this));
-      // onResize_() doesn't need to be called immediately here because it's
-      // guaranteed to be called again shortly when items are received.
-    },
-
     /**
      * @return {number} A guess at how many items could be visible at once.
      * @private
@@ -70,16 +64,6 @@ cr.define('downloads', function() {
 
       // Shows all downloads.
       this.actionService_.search('');
-    },
-
-    /** @private */
-    onResize_: function() {
-      // TODO(dbeam): expose <paper-header-panel>'s #mainContainer in Polymer.
-      var container = this.$.panel.$.mainContainer;
-      var scrollbarWidth = container.offsetWidth - container.clientWidth;
-      this.items_.forEach(function(item) {
-        item.scrollbarWidth = scrollbarWidth;
-      });
     },
 
     /** @private */
@@ -181,12 +165,18 @@ cr.define('downloads', function() {
         this.$['downloads-list'].insertBefore(item, before);
       }
 
-      this.hasDownloads_ = this.size_() > 0;
+      var hasDownloads = this.size_() > 0;
+      if (!hasDownloads) {
+        var isSearching = this.actionService_.isSearching();
+        var messageToShow = isSearching ? 'noSearchResults' : 'noDownloads';
+        this.$['no-downloads'].querySelector('span').textContent =
+            loadTimeData.getString(messageToShow);
+      }
+      this.hasDownloads_ = hasDownloads;
 
       if (loadTimeData.getBoolean('allowDeletingHistory'))
         this.$.toolbar.downloadsShowing = this.hasDownloads_;
 
-      this.onResize_();
       this.$.panel.classList.remove('loading');
 
       var allReady = this.items_.map(function(i) { return i.readyPromise; });
@@ -209,8 +199,6 @@ cr.define('downloads', function() {
         var focusRow = this.focusGrid_.getRowForRoot(item.content);
         focusRow.getEquivalentElement(activeControl).focus();
       }
-
-      this.onResize_();
     },
   });
 

@@ -11,8 +11,9 @@
 
 namespace sync_driver {
 
-FakeSyncService::FakeSyncService() : error_(GoogleServiceAuthError::NONE) {
-}
+FakeSyncService::FakeSyncService()
+    : error_(GoogleServiceAuthError::NONE),
+      user_share_(make_scoped_ptr(new syncer::UserShare())) {}
 
 FakeSyncService::~FakeSyncService() {
 }
@@ -68,14 +69,14 @@ void FakeSyncService::OnUserChoseDatatypes(bool sync_everything,
 void FakeSyncService::SetSyncSetupCompleted() {
 }
 
-bool FakeSyncService::FirstSetupInProgress() const {
+bool FakeSyncService::IsFirstSetupInProgress() const {
   return false;
 }
 
 void FakeSyncService::SetSetupInProgress(bool setup_in_progress) {
 }
 
-bool FakeSyncService::setup_in_progress() const {
+bool FakeSyncService::IsSetupInProgress() const {
   return false;
 }
 
@@ -91,7 +92,7 @@ bool FakeSyncService::HasUnrecoverableError() const {
   return false;
 }
 
-bool FakeSyncService::backend_initialized() const {
+bool FakeSyncService::IsBackendInitialized() const {
   return false;
 }
 
@@ -114,7 +115,7 @@ bool FakeSyncService::IsUsingSecondaryPassphrase() const {
 void FakeSyncService::EnableEncryptEverything() {
 }
 
-bool FakeSyncService::EncryptEverythingEnabled() const {
+bool FakeSyncService::IsEncryptEverythingEnabled() const {
   return false;
 }
 
@@ -132,7 +133,7 @@ bool FakeSyncService::IsCryptographerReady(
 }
 
 syncer::UserShare* FakeSyncService::GetUserShare() const {
-  return new syncer::UserShare();
+  return user_share_.get();
 }
 
 LocalDeviceInfoProvider* FakeSyncService::GetLocalDeviceInfoProvider() const {

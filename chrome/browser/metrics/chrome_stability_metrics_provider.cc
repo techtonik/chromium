@@ -11,7 +11,6 @@
 #include "base/metrics/sparse_histogram.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "base/prefs/pref_service.h"
-#include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/pref_names.h"
@@ -42,19 +41,14 @@
 
 namespace {
 
-void IncrementPrefValue(const char* path) {
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
-  int value = pref->GetInteger(path);
-  pref->SetInteger(path, value + 1);
-}
-
-void IncrementLongPrefsValue(const char* path) {
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
-  int64 value = pref->GetInt64(path);
-  pref->SetInt64(path, value + 1);
-}
+enum RendererType {
+  RENDERER_TYPE_RENDERER = 1,
+  RENDERER_TYPE_EXTENSION,
+  // NOTE: Add new action types only immediately above this line. Also,
+  // make sure the enum list in tools/metrics/histograms/histograms.xml is
+  // updated with any change in here.
+  RENDERER_TYPE_COUNT
+};
 
 // Converts an exit code into something that can be inserted into our
 // histograms (which expect non-negative numbers less than MAX_INT).
@@ -113,14 +107,17 @@ void CountBrowserCrashDumpAttempts() {
 }
 #endif  // defined(OS_WIN)
 
-void RecordChildKills(bool was_extension_process) {
-  UMA_HISTOGRAM_PERCENTAGE("BrowserRenderProcessHost.ChildKills",
-                           was_extension_process ? 2 : 1);
+void RecordChildKills(int histogram_type) {
+  UMA_HISTOGRAM_ENUMERATION("BrowserRenderProcessHost.ChildKills",
+                            histogram_type, RENDERER_TYPE_COUNT);
 }
 
 }  // namespace
 
-ChromeStabilityMetricsProvider::ChromeStabilityMetricsProvider() {
+ChromeStabilityMetricsProvider::ChromeStabilityMetricsProvider(
+    PrefService* local_state)
+    : local_state_(local_state) {
+  DCHECK(local_state_);
   BrowserChildProcessObserver::Add(this);
 }
 
@@ -146,38 +143,52 @@ void ChromeStabilityMetricsProvider::OnRecordingDisabled() {
 
 void ChromeStabilityMetricsProvider::ProvideStabilityMetrics(
     metrics::SystemProfileProto* system_profile_proto) {
-  PrefService* pref = g_browser_process->local_state();
   metrics::SystemProfileProto_Stability* stability_proto =
       system_profile_proto->mutable_stability();
 
-  int count = pref->GetInteger(prefs::kStabilityPageLoadCount);
+  int count = local_state_->GetInteger(prefs::kStabilityPageLoadCount);
   if (count) {
     stability_proto->set_page_load_count(count);
-    pref->SetInteger(prefs::kStabilityPageLoadCount, 0);
+    local_state_->SetInteger(prefs::kStabilityPageLoadCount, 0);
   }
 
-  count = pref->GetInteger(prefs::kStabilityChildProcessCrashCount);
+  count = local_state_->GetInteger(prefs::kStabilityChildProcessCrashCount);
   if (count) {
     stability_proto->set_child_process_crash_count(count);
-    pref->SetInteger(prefs::kStabilityChildProcessCrashCount, 0);
+    local_state_->SetInteger(prefs::kStabilityChildProcessCrashCount, 0);
   }
 
-  count = pref->GetInteger(prefs::kStabilityRendererCrashCount);
+  count = local_state_->GetInteger(prefs::kStabilityRendererCrashCount);
   if (count) {
     stability_proto->set_renderer_crash_count(count);
-    pref->SetInteger(prefs::kStabilityRendererCrashCount, 0);
+    local_state_->SetInteger(prefs::kStabilityRendererCrashCount, 0);
   }
 
-  count = pref->GetInteger(prefs::kStabilityExtensionRendererCrashCount);
+  count = local_state_->GetInteger(prefs::kStabilityRendererFailedLaunchCount);
+  if (count) {
+    stability_proto->set_renderer_failed_launch_count(count);
+    local_state_->SetInteger(prefs::kStabilityRendererFailedLaunchCount, 0);
+  }
+
+  count =
+      local_state_->GetInteger(prefs::kStabilityExtensionRendererCrashCount);
   if (count) {
     stability_proto->set_extension_renderer_crash_count(count);
-    pref->SetInteger(prefs::kStabilityExtensionRendererCrashCount, 0);
+    local_state_->SetInteger(prefs::kStabilityExtensionRendererCrashCount, 0);
   }
 
-  count = pref->GetInteger(prefs::kStabilityRendererHangCount);
+  count = local_state_->GetInteger(
+      prefs::kStabilityExtensionRendererFailedLaunchCount);
+  if (count) {
+    stability_proto->set_extension_renderer_failed_launch_count(count);
+    local_state_->SetInteger(
+        prefs::kStabilityExtensionRendererFailedLaunchCount, 0);
+  }
+
+  count = local_state_->GetInteger(prefs::kStabilityRendererHangCount);
   if (count) {
     stability_proto->set_renderer_hang_count(count);
-    pref->SetInteger(prefs::kStabilityRendererHangCount, 0);
+    local_state_->SetInteger(prefs::kStabilityRendererHangCount, 0);
   }
 
 #if defined(OS_WIN)
@@ -186,15 +197,16 @@ void ChromeStabilityMetricsProvider::ProvideStabilityMetrics(
 }
 
 void ChromeStabilityMetricsProvider::ClearSavedStabilityMetrics() {
-  PrefService* local_state = g_browser_process->local_state();
-
   // Clear all the prefs used in this class in UMA reports (which doesn't
   // include |kUninstallMetricsPageLoadCount| as it's not sent up by UMA).
-  local_state->SetInteger(prefs::kStabilityChildProcessCrashCount, 0);
-  local_state->SetInteger(prefs::kStabilityExtensionRendererCrashCount, 0);
-  local_state->SetInteger(prefs::kStabilityPageLoadCount, 0);
-  local_state->SetInteger(prefs::kStabilityRendererCrashCount, 0);
-  local_state->SetInteger(prefs::kStabilityRendererHangCount, 0);
+  local_state_->SetInteger(prefs::kStabilityChildProcessCrashCount, 0);
+  local_state_->SetInteger(prefs::kStabilityExtensionRendererCrashCount, 0);
+  local_state_->SetInteger(prefs::kStabilityExtensionRendererFailedLaunchCount,
+                           0);
+  local_state_->SetInteger(prefs::kStabilityPageLoadCount, 0);
+  local_state_->SetInteger(prefs::kStabilityRendererCrashCount, 0);
+  local_state_->SetInteger(prefs::kStabilityRendererFailedLaunchCount, 0);
+  local_state_->SetInteger(prefs::kStabilityRendererHangCount, 0);
 }
 
 // static
@@ -203,8 +215,11 @@ void ChromeStabilityMetricsProvider::RegisterPrefs(
   registry->RegisterIntegerPref(prefs::kStabilityChildProcessCrashCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityExtensionRendererCrashCount,
                                 0);
+  registry->RegisterIntegerPref(
+      prefs::kStabilityExtensionRendererFailedLaunchCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityPageLoadCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityRendererCrashCount, 0);
+  registry->RegisterIntegerPref(prefs::kStabilityRendererFailedLaunchCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityRendererHangCount, 0);
 
   registry->RegisterInt64Pref(prefs::kUninstallMetricsPageLoadCount, 0);
@@ -272,11 +287,14 @@ void ChromeStabilityMetricsProvider::LogRendererCrash(
     content::RenderProcessHost* host,
     base::TerminationStatus status,
     int exit_code) {
+  int histogram_type = RENDERER_TYPE_RENDERER;
   bool was_extension_process = false;
 #if defined(ENABLE_EXTENSIONS)
-  was_extension_process =
-      extensions::ProcessMap::Get(host->GetBrowserContext())->Contains(
-          host->GetID());
+  if (extensions::ProcessMap::Get(host->GetBrowserContext())
+          ->Contains(host->GetID())) {
+    histogram_type = RENDERER_TYPE_EXTENSION;
+    was_extension_process = true;
+  }
 #endif
   if (status == base::TERMINATION_STATUS_PROCESS_CRASHED ||
       status == base::TERMINATION_STATUS_ABNORMAL_TERMINATION) {
@@ -292,13 +310,13 @@ void ChromeStabilityMetricsProvider::LogRendererCrash(
                                   MapCrashExitCodeForHistogram(exit_code));
     }
 
-    UMA_HISTOGRAM_PERCENTAGE("BrowserRenderProcessHost.ChildCrashes",
-                             was_extension_process ? 2 : 1);
+    UMA_HISTOGRAM_ENUMERATION("BrowserRenderProcessHost.ChildCrashes",
+                              histogram_type, RENDERER_TYPE_COUNT);
   } else if (status == base::TERMINATION_STATUS_PROCESS_WAS_KILLED) {
-    RecordChildKills(was_extension_process);
+    RecordChildKills(histogram_type);
 #if defined(OS_CHROMEOS)
   } else if (status == base::TERMINATION_STATUS_PROCESS_WAS_KILLED_BY_OOM) {
-    RecordChildKills(was_extension_process);
+    RecordChildKills(histogram_type);
     UMA_HISTOGRAM_ENUMERATION("BrowserRenderProcessHost.ChildKills.OOM",
                               was_extension_process ? 2 : 1,
                               3);
@@ -308,9 +326,26 @@ void ChromeStabilityMetricsProvider::LogRendererCrash(
             : memory::RECORD_MEMORY_STATS_CONTENTS_OOM_KILLED);
 #endif
   } else if (status == base::TERMINATION_STATUS_STILL_RUNNING) {
-    UMA_HISTOGRAM_PERCENTAGE("BrowserRenderProcessHost.DisconnectedAlive",
-                             was_extension_process ? 2 : 1);
+    UMA_HISTOGRAM_ENUMERATION("BrowserRenderProcessHost.DisconnectedAlive",
+                              histogram_type, RENDERER_TYPE_COUNT);
+  } else if (status == base::TERMINATION_STATUS_LAUNCH_FAILED) {
+    UMA_HISTOGRAM_ENUMERATION("BrowserRenderProcessHost.ChildLaunchFailures",
+                              histogram_type, RENDERER_TYPE_COUNT);
+    if (was_extension_process)
+      IncrementPrefValue(prefs::kStabilityExtensionRendererFailedLaunchCount);
+    else
+      IncrementPrefValue(prefs::kStabilityRendererFailedLaunchCount);
   }
+}
+
+void ChromeStabilityMetricsProvider::IncrementPrefValue(const char* path) {
+  int value = local_state_->GetInteger(path);
+  local_state_->SetInteger(path, value + 1);
+}
+
+void ChromeStabilityMetricsProvider::IncrementLongPrefsValue(const char* path) {
+  int64 value = local_state_->GetInt64(path);
+  local_state_->SetInt64(path, value + 1);
 }
 
 void ChromeStabilityMetricsProvider::LogRendererHang() {

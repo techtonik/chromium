@@ -130,13 +130,23 @@ all other OS specific variables will be false.
   </translations>
   <release seq="1" allow_pseudo="false">
     <messages fallback_to_english="true">
-      <message name="IDS_AUTOFILL_ACCNAME_HIDE_KEYBOARD" desc="The accessible name for the hide keyboard button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
+      <!-- The default value for HTTP Accept-Language header. -->
+      <message name="IDS_IOS_ACCEPT_LANGUAGES" use_name_for_id="true">
+        en-US,en
+      </message>
+
+      <!-- The default value for |WebPreference::default_encoding|. -->
+      <message name="IDS_IOS_DEFAULT_ENCODING" use_name_for_id="true">
+        windows-1252
+      </message>
+
+      <message name="IDS_IOS_AUTOFILL_ACCNAME_HIDE_KEYBOARD" desc="The accessible name for the hide keyboard button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
         Hide keyboard
       </message>
-      <message name="IDS_AUTOFILL_ACCNAME_NEXT_FIELD" desc="The accessible name for the next field button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
+      <message name="IDS_IOS_AUTOFILL_ACCNAME_NEXT_FIELD" desc="The accessible name for the next field button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
         Next field
       </message>
-      <message name="IDS_AUTOFILL_ACCNAME_PREVIOUS_FIELD" desc="The accessible name for the previous field button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
+      <message name="IDS_IOS_AUTOFILL_ACCNAME_PREVIOUS_FIELD" desc="The accessible name for the previous field button in the keyboard accessory shown when filling out forms. [Length: unlimited] [iOS only]">
         Previous field
       </message>
       <message name="IDS_IOS_AUTOFILL_DIALOG_PLACEHOLDER_EXPIRY_MONTH" desc="The placeholder text for credit card expiration month in the payments card unmask dialog. [Length: 4em] [iOS only]">
@@ -145,8 +155,23 @@ all other OS specific variables will be false.
       <message name="IDS_IOS_AUTOFILL_DIALOG_PLACEHOLDER_EXPIRY_YEAR" desc="The placeholder text for credit card expiration year in the payments card unmask dialog. [Length: 4em] [iOS only]">
         YY
       </message>
+      <message name="IDS_IOS_KEYBOARD_BOOKMARK_THIS_PAGE" desc="In Title Case: Title of the keyboard shortcut that bookmarks the current page. [Length: 20 em] [iOS only]">
+        Bookmark This Page...
+      </message>
+      <message name="IDS_IOS_KEYBOARD_HISTORY_BACK" desc="Title of the keyboard shortcut to go back in the history menu. [Length: 20 em] [iOS only]">
+        Back
+      </message>
+      <message name="IDS_IOS_KEYBOARD_HISTORY_FORWARD" desc="Title of the keyboard shortcut to go forward in the history menu. [Length: 20 em] [iOS only]">
+        Forward
+      </message>
+      <message name="IDS_IOS_KEYBOARD_OPEN_LOCATION" desc="Title of the keyboard shortcut to open a location (puts cursor in the URL bar). [Length: 20 em] [iOS only]">
+        Open Location...
+      </message>
+      <message name="IDS_IOS_KEYBOARD_REOPEN_CLOSED_TAB" desc="Title of the keyboard shortcut to reopen a recently closed tab. [Length: 20 em] [iOS only]">
+        Reopen Closed Tab
+      </message>
       <message name="IDS_IOS_LOCATION_USAGE_CANCEL" desc="Title for the alert button to cancel sending location for Omnibox queries [Length: 20em] [iOS only]">
-          Not Now
+        Not Now
       </message>
       <message name="IDS_IOS_VERSION_COPIED" desc="The message displayed when the version label is tapped (in About settings) [Length: 10em] [iOS only]">
         Copied

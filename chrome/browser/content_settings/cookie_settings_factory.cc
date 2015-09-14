@@ -21,14 +21,14 @@ using base::UserMetricsAction;
 // static
 scoped_refptr<content_settings::CookieSettings>
 CookieSettingsFactory::GetForProfile(Profile* profile) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   return static_cast<content_settings::CookieSettings*>(
       GetInstance()->GetServiceForBrowserContext(profile, true).get());
 }
 
 // static
 CookieSettingsFactory* CookieSettingsFactory::GetInstance() {
-  return Singleton<CookieSettingsFactory>::get();
+  return base::Singleton<CookieSettingsFactory>::get();
 }
 
 CookieSettingsFactory::CookieSettingsFactory()

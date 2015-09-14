@@ -602,9 +602,10 @@ gfx::NativeViewAccessible
   return NULL;
 }
 
-bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
-                                            int previous_sibling_routing_id,
-                                            int proxy_routing_id) {
+bool RenderFrameHostImpl::CreateRenderFrame(int proxy_routing_id,
+                                            int opener_routing_id,
+                                            int parent_routing_id,
+                                            int previous_sibling_routing_id) {
   TRACE_EVENT0("navigation", "RenderFrameHostImpl::CreateRenderFrame");
   DCHECK(!IsRenderFrameLive()) << "Creating frame twice";
 
@@ -619,8 +620,9 @@ bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
 
   FrameMsg_NewFrame_Params params;
   params.routing_id = routing_id_;
-  params.parent_routing_id = parent_routing_id;
   params.proxy_routing_id = proxy_routing_id;
+  params.opener_routing_id = opener_routing_id;
+  params.parent_routing_id = parent_routing_id;
   params.previous_sibling_routing_id = previous_sibling_routing_id;
   params.replication_state = frame_tree_node()->current_replication_state();
 
@@ -1376,7 +1378,9 @@ void RenderFrameHostImpl::OnAccessibilityEvents(
   accessibility_reset_token_ = 0;
 
   RenderWidgetHostViewBase* view = static_cast<RenderWidgetHostViewBase*>(
-      render_view_host_->GetView());
+      frame_tree_node_->frame_tree()
+          ->GetMainFrame()
+          ->render_view_host_->GetView());
 
   AccessibilityMode accessibility_mode = delegate_->GetAccessibilityMode();
   if ((accessibility_mode != AccessibilityModeOff) && view &&
@@ -1783,7 +1787,7 @@ void RenderFrameHostImpl::UpdateOpener() {
   // exist.
   if (frame_tree_node_->opener()) {
     frame_tree_node_->opener()->render_manager()->CreateOpenerProxies(
-        GetSiteInstance());
+        GetSiteInstance(), frame_tree_node_);
   }
 
   int opener_routing_id =
@@ -1980,7 +1984,9 @@ const ui::AXTree* RenderFrameHostImpl::GetAXTreeForTesting() {
 BrowserAccessibilityManager*
     RenderFrameHostImpl::GetOrCreateBrowserAccessibilityManager() {
   RenderWidgetHostViewBase* view = static_cast<RenderWidgetHostViewBase*>(
-      render_view_host_->GetView());
+      frame_tree_node_->frame_tree()
+          ->GetMainFrame()
+          ->render_view_host_->GetView());
   if (view &&
       !browser_accessibility_manager_ &&
       !no_create_browser_accessibility_manager_for_testing_) {

@@ -110,6 +110,8 @@ Compositor::Compositor(ui::ContextFactory* context_factory,
       !command_line->HasSwitch(cc::switches::kUIDisablePartialSwap);
 #if defined(OS_WIN)
   settings.renderer_settings.finish_rendering_on_resize = true;
+#elif defined(OS_MACOSX)
+  settings.renderer_settings.delay_releasing_overlay_resources = true;
 #endif
 
   // These flags should be mirrored by renderer versions in content/renderer/.
@@ -153,9 +155,9 @@ Compositor::Compositor(ui::ContextFactory* context_factory,
             static_cast<gfx::BufferFormat>(format), usage);
   }
 
-  // Note: gathering of pixel refs is only needed when using multiple
+  // Note: gathering of images is only needed when using multiple
   // raster threads.
-  settings.gather_pixel_refs = false;
+  settings.gather_images = false;
 
   settings.use_compositor_animation_timelines =
       command_line->HasSwitch(switches::kUIEnableCompositorAnimationTimelines);

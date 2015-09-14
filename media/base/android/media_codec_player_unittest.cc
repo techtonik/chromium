@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include "base/bind.h"
 #include "base/logging.h"
 #include "base/timer/timer.h"
@@ -11,7 +13,7 @@
 #include "media/base/android/media_player_manager.h"
 #include "media/base/android/test_data_factory.h"
 #include "media/base/android/test_statistics.h"
-#include "media/base/buffers.h"
+#include "media/base/timestamp_constants.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gl/android/surface_texture.h"
 
@@ -43,6 +45,11 @@ const base::TimeDelta kAudioFramePeriod =
     base::TimeDelta::FromSecondsD(1024.0 / 44100);  // 1024 samples @ 44100 Hz
 const base::TimeDelta kVideoFramePeriod = base::TimeDelta::FromMilliseconds(20);
 
+enum Flags {
+  kAlwaysReconfigAudio = 0x1,
+  kAlwaysReconfigVideo = 0x2,
+};
+
 // The predicate that always returns false, used for WaitForDelay implementation
 bool AlwaysFalse() {
   return false;
@@ -53,6 +60,29 @@ bool AlwaysFalse() {
 template <typename T>
 bool AlmostEqual(T a, T b, double tolerance_ms) {
   return (a - b).magnitude().InMilliseconds() <= tolerance_ms;
+}
+
+// A helper function to calculate the expected number of frames.
+int GetFrameCount(base::TimeDelta duration,
+                  base::TimeDelta frame_period,
+                  int num_reconfigs) {
+  // A chunk has 4 access units. The last unit timestamp must exceed the
+  // duration. Last chunk has 3 regular access units and one stand-alone EOS
+  // unit that we do not count.
+
+  // Number of time intervals to exceed duration.
+  int num_intervals = duration / frame_period + 1.0;
+
+  // To cover these intervals we need one extra unit at the beginning and a one
+  // for each reconfiguration.
+  int num_units = num_intervals + 1 + num_reconfigs;
+
+  // Number of 4-unit chunks that hold these units:
+  int num_chunks = (num_units + 3) / 4;
+
+  // Altogether these chunks hold 4*num_chunks units, but we do not count
+  // reconfiguration units and last EOS as frames.
+  return 4 * num_chunks - 1 - num_reconfigs;
 }
 
 // Mock of MediaPlayerManager for testing purpose.
@@ -206,6 +236,7 @@ DemuxerConfigs CreateAudioVideoConfigs(const TestDataFactory* audio,
   result.video_codec = vconf.video_codec;
   result.video_size = vconf.video_size;
   result.is_video_encrypted = vconf.is_video_encrypted;
+  result.duration = std::max(result.duration, vconf.duration);
   return result;
 }
 
@@ -221,8 +252,12 @@ class AudioFactory : public TestDataFactory {
   }
 
  protected:
-  void ModifyAccessUnit(int index_in_chunk, AccessUnit* unit) override {
-    unit->is_key_frame = true;
+  void ModifyChunk(DemuxerData* chunk) override {
+    DCHECK(chunk);
+    for (AccessUnit& unit : chunk->access_units) {
+      if (!unit.data.empty())
+        unit.is_key_frame = true;
+    }
   }
 };
 
@@ -242,7 +277,7 @@ class VideoFactory : public TestDataFactory {
   void RequestKeyFrame() { key_frame_requested_ = true; }
 
  protected:
-  void ModifyAccessUnit(int index_in_chunk, AccessUnit* unit) override {
+  void ModifyChunk(DemuxerData* chunk) override {
     // The frames are taken from High profile and some are B-frames.
     // The first 4 frames appear in the file in the following order:
     //
@@ -252,23 +287,34 @@ class VideoFactory : public TestDataFactory {
     //
     // I keep the last PTS to be 3 for simplicity.
 
-    // Swap pts for second and third frames. Make first frame a key frame.
-    switch (index_in_chunk) {
-      case 0:  // first frame
-        unit->is_key_frame = key_frame_requested_;
-        key_frame_requested_ = false;
-        break;
-      case 1:  // second frame
-        unit->timestamp += frame_period_;
-        break;
-      case 2:  // third frame
-        unit->timestamp -= frame_period_;
-        break;
-      case 3:  // fourth frame, do not modify
-        break;
-      default:
-        NOTREACHED();
-        break;
+    // If the chunk contains EOS, it should not break the presentation order.
+    // For instance, the following chunk is ok:
+    //
+    // Frames:             I P B EOS
+    // Decoding order:     0 1 2 -
+    // Presentation order: 0 2 1 -
+    //
+    // while this might cause decoder to block:
+    //
+    // Frames:             I P EOS
+    // Decoding order:     0 1 -
+    // Presentation order: 0 2 -  <------- might wait for the B frame forever
+    //
+    // With current base class implementation that always has EOS at the 4th
+    // place we are covered (http://crbug.com/526755)
+
+    DCHECK(chunk);
+    DCHECK(chunk->access_units.size() == 4);
+
+    // Swap pts for second and third frames.
+    base::TimeDelta tmp = chunk->access_units[1].timestamp;
+    chunk->access_units[1].timestamp = chunk->access_units[2].timestamp;
+    chunk->access_units[2].timestamp = tmp;
+
+    // Make first frame a key frame.
+    if (key_frame_requested_) {
+      chunk->access_units[0].is_key_frame = true;
+      key_frame_requested_ = false;
     }
   }
 
@@ -519,13 +565,20 @@ class MediaCodecPlayerTest : public testing::Test {
   // started.
   bool StartVideoPlayback(base::TimeDelta duration, const char* test_name);
 
+  // Helper method that starts audio and video streams.
+  bool StartAVPlayback(scoped_ptr<AudioFactory> audio_factory,
+                       scoped_ptr<VideoFactory> video_factory,
+                       uint32_t flags,
+                       const char* test_name);
+
   // Helper method that starts audio and video streams with preroll.
   // The preroll is achieved by setting significant video preroll interval
   // so video will have to catch up with audio. To make room for this interval
   // the Start() command is preceded by SeekTo().
-  bool StartAVSeekAndPreroll(base::TimeDelta duration,
+  bool StartAVSeekAndPreroll(scoped_ptr<AudioFactory> audio_factory,
+                             scoped_ptr<VideoFactory> video_factory,
                              base::TimeDelta seek_position,
-                             base::TimeDelta video_preroll,
+                             uint32_t flags,
                              const char* test_name);
 
   // Callback sent when demuxer is being deleted.
@@ -691,25 +744,16 @@ bool MediaCodecPlayerTest::StartVideoPlayback(base::TimeDelta duration,
   return true;
 }
 
-bool MediaCodecPlayerTest::StartAVSeekAndPreroll(base::TimeDelta duration,
-                                                 base::TimeDelta seek_position,
-                                                 base::TimeDelta video_preroll,
-                                                 const char* test_name) {
-  const base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(800);
-
-  demuxer_->SetVideoPrerollInterval(video_preroll);
-
-  demuxer_->SetAudioFactory(
-      scoped_ptr<AudioFactory>(new AudioFactory(duration)));
-  demuxer_->SetVideoFactory(
-      scoped_ptr<VideoFactory>(new VideoFactory(duration)));
+bool MediaCodecPlayerTest::StartAVPlayback(
+    scoped_ptr<AudioFactory> audio_factory,
+    scoped_ptr<VideoFactory> video_factory,
+    uint32_t flags,
+    const char* test_name) {
+  demuxer_->SetAudioFactory(audio_factory.Pass());
+  demuxer_->SetVideoFactory(video_factory.Pass());
 
   CreatePlayer();
-
-  // Set special testing callback to receive PTS from decoders.
-  player_->SetDecodersTimeCallbackForTests(
-      base::Bind(&MockMediaPlayerManager::OnDecodersTimeUpdate,
-                 base::Unretained(&manager_)));
+  SetVideoSurface();
 
   // Wait till the player is initialized on media thread.
   EXPECT_TRUE(WaitForCondition(base::Bind(&MockDemuxerAndroid::IsInitialized,
@@ -720,7 +764,82 @@ bool MediaCodecPlayerTest::StartAVSeekAndPreroll(base::TimeDelta duration,
     return false;
   }
 
+  // Ask decoders to always reconfigure after the player has been initialized.
+  if (flags & kAlwaysReconfigAudio)
+    player_->SetAlwaysReconfigureForTests(DemuxerStream::AUDIO);
+  if (flags & kAlwaysReconfigVideo)
+    player_->SetAlwaysReconfigureForTests(DemuxerStream::VIDEO);
+
+  // Set a testing callback to receive PTS from decoders.
+  player_->SetDecodersTimeCallbackForTests(
+      base::Bind(&MockMediaPlayerManager::OnDecodersTimeUpdate,
+                 base::Unretained(&manager_)));
+
+  // Set a testing callback to receive MediaCodec creation events from decoders.
+  player_->SetCodecCreatedCallbackForTests(
+      base::Bind(&MockMediaPlayerManager::OnMediaCodecCreated,
+                 base::Unretained(&manager_)));
+
+  // Post configuration after the player has been initialized.
+  demuxer_->PostInternalConfigs();
+
+  // Start and wait for playback.
+  player_->Start();
+
+  // Wait till we start to play.
+  base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(2000);
+
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
+                                  base::Unretained(&manager_)),
+                       start_timeout));
+
+  if (!manager_.IsPlaybackStarted()) {
+    DVLOG(0) << test_name << ": playback did not start";
+    return false;
+  }
+
+  return true;
+}
+
+bool MediaCodecPlayerTest::StartAVSeekAndPreroll(
+    scoped_ptr<AudioFactory> audio_factory,
+    scoped_ptr<VideoFactory> video_factory,
+    base::TimeDelta seek_position,
+    uint32_t flags,
+    const char* test_name) {
+  // Initialize A/V playback
+
+  demuxer_->SetAudioFactory(audio_factory.Pass());
+  demuxer_->SetVideoFactory(video_factory.Pass());
+
+  CreatePlayer();
   SetVideoSurface();
+
+  // Wait till the player is initialized on media thread.
+  EXPECT_TRUE(WaitForCondition(base::Bind(&MockDemuxerAndroid::IsInitialized,
+                                          base::Unretained(demuxer_))));
+
+  if (!demuxer_->IsInitialized()) {
+    DVLOG(0) << test_name << ": demuxer is not initialized";
+    return false;
+  }
+
+  // Ask decoders to always reconfigure after the player has been initialized.
+  if (flags & kAlwaysReconfigAudio)
+    player_->SetAlwaysReconfigureForTests(DemuxerStream::AUDIO);
+  if (flags & kAlwaysReconfigVideo)
+    player_->SetAlwaysReconfigureForTests(DemuxerStream::VIDEO);
+
+  // Set a testing callback to receive PTS from decoders.
+  player_->SetDecodersTimeCallbackForTests(
+      base::Bind(&MockMediaPlayerManager::OnDecodersTimeUpdate,
+                 base::Unretained(&manager_)));
+
+  // Set a testing callback to receive MediaCodec creation events from decoders.
+  player_->SetCodecCreatedCallbackForTests(
+      base::Bind(&MockMediaPlayerManager::OnMediaCodecCreated,
+                 base::Unretained(&manager_)));
 
   // Post configuration after the player has been initialized.
   demuxer_->PostInternalConfigs();
@@ -732,6 +851,7 @@ bool MediaCodecPlayerTest::StartAVSeekAndPreroll(base::TimeDelta duration,
   player_->Start();
 
   // Wait till preroll starts.
+  base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(2000);
   EXPECT_TRUE(WaitForCondition(
       base::Bind(&MediaCodecPlayer::IsPrerollingForTests,
                  base::Unretained(player_), DemuxerStream::VIDEO),
@@ -1356,7 +1476,13 @@ TEST_F(MediaCodecPlayerTest, AVPrerollAudioWaitsForVideo) {
   base::TimeDelta preroll_intvl = base::TimeDelta::FromMilliseconds(500);
   base::TimeDelta preroll_timeout = base::TimeDelta::FromMilliseconds(1000);
 
-  ASSERT_TRUE(StartAVSeekAndPreroll(duration, seek_position, preroll_intvl,
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  demuxer_->SetVideoPrerollInterval(preroll_intvl);
+
+  ASSERT_TRUE(StartAVSeekAndPreroll(audio_factory.Pass(), video_factory.Pass(),
+                                    seek_position, 0,
                                     "AVPrerollAudioWaitsForVideo"));
 
   // Wait till preroll finishes and the real playback starts.
@@ -1399,7 +1525,13 @@ TEST_F(MediaCodecPlayerTest, AVPrerollReleaseAndRestart) {
   base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(800);
   base::TimeDelta preroll_timeout = base::TimeDelta::FromMilliseconds(1000);
 
-  ASSERT_TRUE(StartAVSeekAndPreroll(duration, seek_position, preroll_intvl,
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  demuxer_->SetVideoPrerollInterval(preroll_intvl);
+
+  ASSERT_TRUE(StartAVSeekAndPreroll(audio_factory.Pass(), video_factory.Pass(),
+                                    seek_position, 0,
                                     "AVPrerollReleaseAndRestart"));
 
   // Issue Release().
@@ -1467,7 +1599,13 @@ TEST_F(MediaCodecPlayerTest, AVPrerollStopAndRestart) {
   base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(800);
   base::TimeDelta preroll_timeout = base::TimeDelta::FromMilliseconds(1000);
 
-  ASSERT_TRUE(StartAVSeekAndPreroll(duration, seek_position, preroll_intvl,
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  demuxer_->SetVideoPrerollInterval(preroll_intvl);
+
+  ASSERT_TRUE(StartAVSeekAndPreroll(audio_factory.Pass(), video_factory.Pass(),
+                                    seek_position, 0,
                                     "AVPrerollStopAndRestart"));
 
   // Video stream should be prerolling. Request to stop.
@@ -1543,6 +1681,10 @@ TEST_F(MediaCodecPlayerTest, AVPrerollVideoEndsWhilePrerolling) {
   // Test that when one stream ends in the preroll phase and another is not
   // the preroll finishes and playback continues after it.
 
+  // http://crbug.com/526755
+  // TODO(timav): remove these logs after verifying that the bug is fixed.
+  DVLOG(0) << "AVPrerollVideoEndsWhilePrerolling: begin";
+
   base::TimeDelta audio_duration = base::TimeDelta::FromMilliseconds(1100);
   base::TimeDelta video_duration = base::TimeDelta::FromMilliseconds(900);
   base::TimeDelta seek_position = base::TimeDelta::FromMilliseconds(1000);
@@ -1592,10 +1734,17 @@ TEST_F(MediaCodecPlayerTest, AVPrerollVideoEndsWhilePrerolling) {
       start_timeout));
 
   // Wait for playback to start.
-  EXPECT_TRUE(
+  bool playback_started =
       WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
                                   base::Unretained(&manager_)),
-                       preroll_timeout));
+                       preroll_timeout);
+
+  // http://crbug.com/526755
+  if (!playback_started) {
+    DVLOG(0) << "AVPrerollVideoEndsWhilePrerolling: playback did not start for "
+             << preroll_timeout;
+  }
+  ASSERT_TRUE(playback_started);
 
   EXPECT_TRUE(manager_.HasFirstFrame(DemuxerStream::AUDIO));
 
@@ -1606,6 +1755,9 @@ TEST_F(MediaCodecPlayerTest, AVPrerollVideoEndsWhilePrerolling) {
 
   // There should not be any video frames.
   EXPECT_FALSE(manager_.HasFirstFrame(DemuxerStream::VIDEO));
+
+  // http://crbug.com/526755
+  DVLOG(0) << "AVPrerollVideoEndsWhilePrerolling: end";
 }
 
 TEST_F(MediaCodecPlayerTest, VideoConfigChangeWhilePlaying) {
@@ -1634,7 +1786,7 @@ TEST_F(MediaCodecPlayerTest, VideoConfigChangeWhilePlaying) {
                                           base::Unretained(demuxer_))));
 
   if (!demuxer_->IsInitialized()) {
-    DVLOG(0) << "AVConfigChangeWhilePlaying: demuxer is not initialized";
+    DVLOG(0) << "VideoConfigChangeWhilePlaying: demuxer is not initialized";
     return;
   }
 
@@ -1673,7 +1825,7 @@ TEST_F(MediaCodecPlayerTest, VideoConfigChangeWhilePlaying) {
   EXPECT_EQ(2, manager_.num_video_codecs_created());
 
   // Check that we did not miss video frames
-  int expected_video_frames = duration / kVideoFramePeriod + 1;
+  int expected_video_frames = GetFrameCount(duration, kVideoFramePeriod, 1);
   EXPECT_EQ(expected_video_frames,
             manager_.render_stat_[DemuxerStream::VIDEO].num_values());
 }
@@ -1688,52 +1840,16 @@ TEST_F(MediaCodecPlayerTest, AVVideoConfigChangeWhilePlaying) {
   base::TimeDelta config_change_position =
       base::TimeDelta::FromMilliseconds(1000);
 
-  base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(2000);
   base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
 
-  demuxer_->SetAudioFactory(
-      scoped_ptr<AudioFactory>(new AudioFactory(duration)));
-  demuxer_->SetVideoFactory(
-      scoped_ptr<VideoFactory>(new VideoFactory(duration)));
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
 
-  demuxer_->video_factory()->RequestConfigChange(config_change_position);
+  video_factory->RequestConfigChange(config_change_position);
 
-  CreatePlayer();
-  SetVideoSurface();
-
-  // Wait till the player is initialized on media thread.
-  EXPECT_TRUE(WaitForCondition(base::Bind(&MockDemuxerAndroid::IsInitialized,
-                                          base::Unretained(demuxer_))));
-
-  if (!demuxer_->IsInitialized()) {
-    DVLOG(0) << "AVConfigChangeWhilePlaying: demuxer is not initialized";
-    return;
-  }
-
-  // Ask decoders to always reconfigure after the player has been initialized.
-  player_->SetAlwaysReconfigureForTests(DemuxerStream::VIDEO);
-
-  // Set a testing callback to receive PTS from decoders.
-  player_->SetDecodersTimeCallbackForTests(
-      base::Bind(&MockMediaPlayerManager::OnDecodersTimeUpdate,
-                 base::Unretained(&manager_)));
-
-  // Set a testing callback to receive MediaCodec creation events from decoders.
-  player_->SetCodecCreatedCallbackForTests(
-      base::Bind(&MockMediaPlayerManager::OnMediaCodecCreated,
-                 base::Unretained(&manager_)));
-
-  // Post configuration after the player has been initialized.
-  demuxer_->PostInternalConfigs();
-
-  // Start and wait for playback.
-  player_->Start();
-
-  // Wait till we start to play.
-  EXPECT_TRUE(
-      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
-                                  base::Unretained(&manager_)),
-                       start_timeout));
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigVideo,
+                              "AVVideoConfigChangeWhilePlaying"));
 
   // Wait till completion
   EXPECT_TRUE(
@@ -1748,15 +1864,15 @@ TEST_F(MediaCodecPlayerTest, AVVideoConfigChangeWhilePlaying) {
   EXPECT_EQ(2, manager_.num_video_codecs_created());
 
   // Check that we did not miss video frames
-  int expected_video_frames = duration / kVideoFramePeriod + 1;
+  int expected_video_frames = GetFrameCount(duration, kVideoFramePeriod, 1);
   EXPECT_EQ(expected_video_frames,
             manager_.render_stat_[DemuxerStream::VIDEO].num_values());
 
-  // Check that we did not miss audio frames. We expect two postponed frames
+  // Check that we did not miss audio frames. We expect one postponed frames
   // that are not reported.
   // For Nexus 4 KitKat the AAC decoder seems to swallow the first frame
   // but reports the last pts twice, maybe it just shifts the reported PTS.
-  int expected_audio_frames = duration / kAudioFramePeriod + 1 - 2;
+  int expected_audio_frames = GetFrameCount(duration, kAudioFramePeriod, 0) - 1;
   EXPECT_EQ(expected_audio_frames,
             manager_.render_stat_[DemuxerStream::AUDIO].num_values());
 }
@@ -1766,57 +1882,20 @@ TEST_F(MediaCodecPlayerTest, AVAudioConfigChangeWhilePlaying) {
 
   // Test that A/V playback continues after audio config change.
 
-  // Initialize A/V playback
   base::TimeDelta duration = base::TimeDelta::FromMilliseconds(1200);
   base::TimeDelta config_change_position =
       base::TimeDelta::FromMilliseconds(1000);
 
-  base::TimeDelta start_timeout = base::TimeDelta::FromMilliseconds(2000);
   base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
 
-  demuxer_->SetAudioFactory(
-      scoped_ptr<AudioFactory>(new AudioFactory(duration)));
-  demuxer_->SetVideoFactory(
-      scoped_ptr<VideoFactory>(new VideoFactory(duration)));
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
 
-  demuxer_->audio_factory()->RequestConfigChange(config_change_position);
+  audio_factory->RequestConfigChange(config_change_position);
 
-  CreatePlayer();
-  SetVideoSurface();
-
-  // Wait till the player is initialized on media thread.
-  EXPECT_TRUE(WaitForCondition(base::Bind(&MockDemuxerAndroid::IsInitialized,
-                                          base::Unretained(demuxer_))));
-
-  if (!demuxer_->IsInitialized()) {
-    DVLOG(0) << "AVConfigChangeWhilePlaying: demuxer is not initialized";
-    return;
-  }
-
-  // Ask decoders to always reconfigure after the player has been initialized.
-  player_->SetAlwaysReconfigureForTests(DemuxerStream::AUDIO);
-
-  // Set a testing callback to receive PTS from decoders.
-  player_->SetDecodersTimeCallbackForTests(
-      base::Bind(&MockMediaPlayerManager::OnDecodersTimeUpdate,
-                 base::Unretained(&manager_)));
-
-  // Set a testing callback to receive MediaCodec creation events from decoders.
-  player_->SetCodecCreatedCallbackForTests(
-      base::Bind(&MockMediaPlayerManager::OnMediaCodecCreated,
-                 base::Unretained(&manager_)));
-
-  // Post configuration after the player has been initialized.
-  demuxer_->PostInternalConfigs();
-
-  // Start and wait for playback.
-  player_->Start();
-
-  // Wait till we start to play.
-  EXPECT_TRUE(
-      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
-                                  base::Unretained(&manager_)),
-                       start_timeout));
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigAudio,
+                              "AVAudioConfigChangeWhilePlaying"));
 
   // Wait till completion
   EXPECT_TRUE(
@@ -1831,15 +1910,303 @@ TEST_F(MediaCodecPlayerTest, AVAudioConfigChangeWhilePlaying) {
   EXPECT_EQ(1, manager_.num_video_codecs_created());
 
   // Check that we did not miss video frames.
-  int expected_video_frames = duration / kVideoFramePeriod + 1;
+  int expected_video_frames = GetFrameCount(duration, kVideoFramePeriod, 0);
   EXPECT_EQ(expected_video_frames,
             manager_.render_stat_[DemuxerStream::VIDEO].num_values());
 
   // Check that we did not miss audio frames. We expect two postponed frames
   // that are not reported.
-  int expected_audio_frames = duration / kAudioFramePeriod + 1 - 2;
+  int expected_audio_frames = GetFrameCount(duration, kAudioFramePeriod, 1) - 2;
   EXPECT_EQ(expected_audio_frames,
             manager_.render_stat_[DemuxerStream::AUDIO].num_values());
+}
+
+TEST_F(MediaCodecPlayerTest, AVSimultaneousConfigChange_1) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that the playback continues if audio and video config changes happen
+  // at the same time.
+
+  base::TimeDelta duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta config_change_audio = base::TimeDelta::FromMilliseconds(1000);
+  base::TimeDelta config_change_video = base::TimeDelta::FromMilliseconds(1000);
+
+  base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  audio_factory->RequestConfigChange(config_change_audio);
+  video_factory->RequestConfigChange(config_change_video);
+
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigAudio | kAlwaysReconfigVideo,
+                              "AVSimultaneousConfigChange_1"));
+
+  // Wait till completion
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackCompleted,
+                                  base::Unretained(&manager_)),
+                       completion_timeout));
+
+  // The audio codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_audio_codecs_created());
+
+  // The video codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_video_codecs_created());
+
+  // Check that we did not miss video frames.
+  int expected_video_frames = GetFrameCount(duration, kVideoFramePeriod, 1);
+  EXPECT_EQ(expected_video_frames,
+            manager_.render_stat_[DemuxerStream::VIDEO].num_values());
+
+  // Check that we did not miss audio frames. We expect two postponed frames
+  // that are not reported.
+  int expected_audio_frames = GetFrameCount(duration, kAudioFramePeriod, 1) - 2;
+  EXPECT_EQ(expected_audio_frames,
+            manager_.render_stat_[DemuxerStream::AUDIO].num_values());
+}
+
+TEST_F(MediaCodecPlayerTest, AVSimultaneousConfigChange_2) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that the playback continues if audio and video config changes happen
+  // at the same time. Move audio change moment slightly to make it drained
+  // after video.
+
+  base::TimeDelta duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta config_change_audio = base::TimeDelta::FromMilliseconds(1020);
+  base::TimeDelta config_change_video = base::TimeDelta::FromMilliseconds(1000);
+
+  base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  audio_factory->RequestConfigChange(config_change_audio);
+  video_factory->RequestConfigChange(config_change_video);
+
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigAudio | kAlwaysReconfigVideo,
+                              "AVSimultaneousConfigChange_2"));
+
+  // Wait till completion
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackCompleted,
+                                  base::Unretained(&manager_)),
+                       completion_timeout));
+
+  // The audio codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_audio_codecs_created());
+
+  // The video codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_video_codecs_created());
+
+  // Check that we did not miss video frames.
+  int expected_video_frames = GetFrameCount(duration, kVideoFramePeriod, 1);
+  EXPECT_EQ(expected_video_frames,
+            manager_.render_stat_[DemuxerStream::VIDEO].num_values());
+
+  // Check that we did not miss audio frames. We expect two postponed frames
+  // that are not reported.
+  int expected_audio_frames = GetFrameCount(duration, kAudioFramePeriod, 1) - 2;
+  EXPECT_EQ(expected_audio_frames,
+            manager_.render_stat_[DemuxerStream::AUDIO].num_values());
+}
+
+TEST_F(MediaCodecPlayerTest, AVAudioEndsAcrossVideoConfigChange) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that audio can end while video config change processing.
+
+  base::TimeDelta audio_duration = base::TimeDelta::FromMilliseconds(1000);
+  base::TimeDelta video_duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta config_change_video = base::TimeDelta::FromMilliseconds(1000);
+
+  base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(audio_duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(video_duration));
+
+  video_factory->RequestConfigChange(config_change_video);
+
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigVideo,
+                              "AVAudioEndsAcrossVideoConfigChange"));
+
+  // Wait till completion
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackCompleted,
+                                  base::Unretained(&manager_)),
+                       completion_timeout));
+
+  // The audio codec should not be recreated.
+  EXPECT_EQ(1, manager_.num_audio_codecs_created());
+
+  // The video codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_video_codecs_created());
+
+  // Check that we did not miss video frames.
+  int expected_video_frames =
+      GetFrameCount(video_duration, kVideoFramePeriod, 1);
+  EXPECT_EQ(expected_video_frames,
+            manager_.render_stat_[DemuxerStream::VIDEO].num_values());
+
+  // Check the last video frame timestamp. The maximum render pts may differ
+  // from |video_duration| because of the testing artefact: if the last video
+  // chunk is incomplete if will have different last pts due to B-frames
+  // rearrangements.
+  EXPECT_LE(video_duration,
+            manager_.render_stat_[DemuxerStream::VIDEO].max().pts);
+
+  // Check that the playback time reported by the player goes past
+  // the audio time and corresponds to video after the audio ended.
+  EXPECT_EQ(video_duration, manager_.pts_stat_.max());
+}
+
+TEST_F(MediaCodecPlayerTest, AVVideoEndsAcrossAudioConfigChange) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that video can end while audio config change processing.
+  base::TimeDelta audio_duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta video_duration = base::TimeDelta::FromMilliseconds(1000);
+  base::TimeDelta config_change_audio = base::TimeDelta::FromMilliseconds(1000);
+
+  base::TimeDelta completion_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(audio_duration));
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(video_duration));
+
+  audio_factory->RequestConfigChange(config_change_audio);
+
+  ASSERT_TRUE(StartAVPlayback(audio_factory.Pass(), video_factory.Pass(),
+                              kAlwaysReconfigAudio,
+                              "AVVideoEndsAcrossAudioConfigChange"));
+
+  // Wait till completion
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackCompleted,
+                                  base::Unretained(&manager_)),
+                       completion_timeout));
+
+  // The audio codec should be recreated upon config changes.
+  EXPECT_EQ(2, manager_.num_audio_codecs_created());
+
+  // The video codec should not be recreated.
+  EXPECT_EQ(1, manager_.num_video_codecs_created());
+
+  // Check that we did not miss audio frames. We expect two postponed frames
+  // that are not reported.
+  int expected_audio_frames =
+      GetFrameCount(audio_duration, kAudioFramePeriod, 1) - 2;
+  EXPECT_EQ(expected_audio_frames,
+            manager_.render_stat_[DemuxerStream::AUDIO].num_values());
+}
+
+TEST_F(MediaCodecPlayerTest, AVPrerollAcrossVideoConfigChange) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that preroll continues if interrupted by video config change.
+
+  base::TimeDelta duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta seek_position = base::TimeDelta::FromMilliseconds(1000);
+  base::TimeDelta config_change_position =
+      base::TimeDelta::FromMilliseconds(800);
+  base::TimeDelta video_preroll_intvl = base::TimeDelta::FromMilliseconds(500);
+  base::TimeDelta preroll_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  demuxer_->SetVideoPrerollInterval(video_preroll_intvl);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+  video_factory->RequestConfigChange(config_change_position);
+
+  ASSERT_TRUE(StartAVSeekAndPreroll(audio_factory.Pass(), video_factory.Pass(),
+                                    seek_position, kAlwaysReconfigVideo,
+                                    "AVPrerollAcrossVideoConfigChange"));
+
+  // Wait till preroll finishes and the real playback starts.
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
+                                  base::Unretained(&manager_)),
+                       preroll_timeout));
+
+  // The presense of config change should not affect preroll behavior:
+
+  // Ensure that the first audio and video pts are close to each other and are
+  // reported at the close moments in time.
+
+  EXPECT_TRUE(manager_.HasFirstFrame(DemuxerStream::AUDIO));
+  EXPECT_TRUE(WaitForCondition(
+      base::Bind(&MockMediaPlayerManager::HasFirstFrame,
+                 base::Unretained(&manager_), DemuxerStream::VIDEO)));
+
+  EXPECT_TRUE(AlmostEqual(manager_.FirstFramePTS(DemuxerStream::AUDIO),
+                          manager_.FirstFramePTS(DemuxerStream::VIDEO), 25));
+
+  EXPECT_TRUE(AlmostEqual(manager_.FirstFrameTime(DemuxerStream::AUDIO),
+                          manager_.FirstFrameTime(DemuxerStream::VIDEO), 50));
+
+  // The playback should start at |seek_position|
+  EXPECT_TRUE(AlmostEqual(seek_position, manager_.pts_stat_.min(), 25));
+}
+
+TEST_F(MediaCodecPlayerTest, AVPrerollAcrossAudioConfigChange) {
+  SKIP_TEST_IF_MEDIA_CODEC_BRIDGE_IS_NOT_AVAILABLE();
+
+  // Test that preroll continues if interrupted by video config change.
+
+  base::TimeDelta duration = base::TimeDelta::FromMilliseconds(1200);
+  base::TimeDelta seek_position = base::TimeDelta::FromMilliseconds(1000);
+  base::TimeDelta config_change_position =
+      base::TimeDelta::FromMilliseconds(800);
+  base::TimeDelta audio_preroll_intvl = base::TimeDelta::FromMilliseconds(400);
+  base::TimeDelta preroll_timeout = base::TimeDelta::FromMilliseconds(3000);
+
+  demuxer_->SetAudioPrerollInterval(audio_preroll_intvl);
+
+  scoped_ptr<AudioFactory> audio_factory(new AudioFactory(duration));
+  audio_factory->RequestConfigChange(config_change_position);
+
+  scoped_ptr<VideoFactory> video_factory(new VideoFactory(duration));
+
+  ASSERT_TRUE(StartAVSeekAndPreroll(audio_factory.Pass(), video_factory.Pass(),
+                                    seek_position, kAlwaysReconfigAudio,
+                                    "AVPrerollAcrossAudioConfigChange"));
+
+  // Wait till preroll finishes and the real playback starts.
+  EXPECT_TRUE(
+      WaitForCondition(base::Bind(&MockMediaPlayerManager::IsPlaybackStarted,
+                                  base::Unretained(&manager_)),
+                       preroll_timeout));
+
+  // The presense of config change should not affect preroll behavior:
+
+  // Ensure that the first audio and video pts are close to each other and are
+  // reported at the close moments in time.
+
+  EXPECT_TRUE(manager_.HasFirstFrame(DemuxerStream::AUDIO));
+  EXPECT_TRUE(WaitForCondition(
+      base::Bind(&MockMediaPlayerManager::HasFirstFrame,
+                 base::Unretained(&manager_), DemuxerStream::VIDEO)));
+
+  // Wait for some more video
+  WaitForDelay(base::TimeDelta::FromMilliseconds(100));
+
+  EXPECT_TRUE(AlmostEqual(manager_.FirstFramePTS(DemuxerStream::AUDIO),
+                          manager_.FirstFramePTS(DemuxerStream::VIDEO), 25));
+
+  // Because for video preroll the first frame after preroll renders during the
+  // preroll stage (and not after the preroll is done) we cannot guarantee the
+  // proper video timimg in this test.
+  // TODO(timav): maybe we should not call the testing callback for
+  // kRenderAfterPreroll for video (for audio we already do not call).
+  // EXPECT_TRUE(AlmostEqual(manager_.FirstFrameTime(DemuxerStream::AUDIO),
+  //                        manager_.FirstFrameTime(DemuxerStream::VIDEO), 50));
+
+  // The playback should start at |seek_position|
+  EXPECT_TRUE(AlmostEqual(seek_position, manager_.pts_stat_.min(), 25));
 }
 
 }  // namespace media

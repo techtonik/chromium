@@ -12,70 +12,94 @@
 <dom-module id="downloads-item">
   <template>
     <div id="date-container">
-      <div id="since"></div>
-      <div id="date"></div>
+      <template is="dom-if" if="[[!hideDate]]">
+        <div>[[computeDate_(data_.since_string, data_.date_string)]]</div>
+      </template>
     </div>
 
-    <paper-material id="content" on-dragstart="onDragStart_">
+    <paper-material id="content" on-dragstart="onDragStart_"
+        elevation$="[[computeElevation_(isActive_)]]"
+        class$="[[computeClass_(isActive_, isDangerous_, showProgress_)]]">
       <div id="file-icon-wrapper" class="icon-wrapper">
-        <img class="icon" id="file-icon" alt="" hidden="[[isDangerous_]]">
-        <div class="icon" id="warning" hidden="[[!isDangerous_]]"></div>
+        <img class="icon" id="file-icon" alt="" hidden$="[[isDangerous_]]">
+        <div class="icon" id="warning" hidden$="[[!isDangerous_]]"></div>
       </div>
 
       <div id="details">
-        <div id="title-area"><!-- Can't have any line breaks.
-          --><a is="action-link" id="file-link"
-              on-click="onFileLinkClick_"></a><!-- Before #name.
-          --><span id="name"></span>
-          <span id="tag"></span>
+        <div id="title-area"><!--
+          Can't have any line breaks.
+          --><a is="action-link" id="file-link" href$="[[data_.url]]"
+              on-click="onFileLinkClick_"
+              hidden$="[[!completelyOnDisk_]]">[[data_.file_name]]</a><!--
+          Before #name.
+          --><span id="name"
+              hidden$="[[completelyOnDisk_]]">[[data_.file_name]]</span>
+          <span id="tag">[[computeTag_(data_.state, data_.last_reason_text, data_.file_externally_removed)]]</span>
         </div>
 
-        <a id="url" target="_blank"></a>
+        <a id="url" target="_blank" href$="[[data_.url]]">[[data_.url]]</a>
 
-        <div id="description"></div>
+        <div id="description">[[computeDescription_(data_.state, data_.danger_type, data_.file_name, data_.progress_status_text)]]</div>
 
-        <paper-progress id="progress"></paper-progress>
+        <template is="dom-if" if="[[showProgress_]]">
+          <paper-progress id="progress"
+              indeterminate$="[[isIndeterminate_(data_.percent)]]"
+              value$="[[data_.percent]]"></paper-progress>
+        </template>
 
         <div id="safe" class="controls" hidden$="[[isDangerous_]]">
-          <paper-button id="show" on-click="onShowClick_"
-              i18n-content="controlShowInFolder" lowercase noink></paper-button>
-          <paper-button id="retry" on-click="onRetryClick_"
-              i18n-content="controlRetry"></paper-button>
-          <paper-button id="pause" on-click="onPauseClick_"
-              i18n-content="controlPause"></paper-button>
-          <paper-button id="resume" on-click="onResumeClick_"
-              i18n-content="controlResume"></paper-button>
-          <paper-button id="cancel" on-click="onCancelClick_"
-              i18n-content="controlCancel"></paper-button>
-          <span id="controlled-by"
-              i18n-values=".innerHTML:controlByExtension"></span>
+          <template is="dom-if" if="[[completelyOnDisk_]]">
+            <paper-button id="show" on-click="onShowClick_"
+                lowercase noink>[[i18n_.show]]</paper-button>
+          </template>
+          <template is="dom-if" if="[[data_.retry]]">
+            <paper-button id="retry"
+                on-click="onRetryClick_">[[i18n_.retry]]</paper-button>
+          </template>
+          <template is="dom-if" if="[[isInProgress_]]">
+            <paper-button id="pause"
+                on-click="onPauseClick_">[[i18n_.pause]]</paper-button>
+          </template>
+          <template is="dom-if" if="[[data_.resume]]">
+            <paper-button id="resume"
+                on-click="onResumeClick_">[[i18n_.resume]]</paper-button>
+          </template>
+          <template is="dom-if" if="[[showCancel_]]">
+            <paper-button id="cancel"
+                on-click="onCancelClick_">[[i18n_.cancel]]</paper-button>
+          </template>
+          <span id="controlled-by"><!-- Text populated dynamically. --></span>
         </div>
 
-        <div id="dangerous" class="controls" hidden$="[[!isDangerous_]]">
-          <!-- Dangerous file types (e.g. .exe, .jar). -->
-          <paper-button id="discard" i18n-content="dangerDiscard"
-              on-click="onDiscardDangerous_" class="discard"
-              hidden$="[[isMalware_]]"></paper-button>
-          <paper-button id="save" i18n-content="dangerSave"
-              on-click="onSaveDangerous_" class="keep"
-              hidden$="[[isMalware_]]"></paper-button>
+        <template is="dom-if" if="[[isDangerous_]]">
+          <div id="dangerous" class="controls">
+            <!-- Dangerous file types (e.g. .exe, .jar). -->
+            <template is="dom-if" if="[[!isMalware_]]">
+              <paper-button id="discard" on-click="onDiscardDangerous_"
+                  class="discard">[[i18n_.discard]]</paper-button>
+              <paper-button id="save" on-click="onSaveDangerous_"
+                  class="keep">[[i18n_.save]]</paper-button>
+            </template>
 
-          <!-- Things that safe browsing has determined to be dangerous. -->
-          <paper-button id="danger-remove" i18n-content="controlRemoveFromList"
-              on-click="onDiscardDangerous_" class="discard"
-              hidden$="[[!isMalware_]]"></paper-button>
-          <paper-button id="restore" i18n-content="dangerRestore"
-              on-click="onSaveDangerous_" class="keep"
-              hidden$="[[!isMalware_]]"></paper-button>
-        </div>
+            <!-- Things that safe browsing has determined to be dangerous. -->
+            <template is="dom-if" if="[[isMalware_]]">
+              <paper-button id="danger-remove" on-click="onDiscardDangerous_"
+                  class="discard">[[i18n_.remove]]</paper-button>
+              <paper-button id="restore" on-click="onSaveDangerous_"
+                  class="keep">[[i18n_.restore]</paper-button>
+            </template>
+          </div>
+        </template>
       </div>
 
       <div id="remove-wrapper" class="icon-wrapper">
         <paper-icon-button id="remove" icon="clear"
+            i18n-values="title:controlRemoveFromList"
+            style$="[[computeRemoveStyle_(isDangerous_, showCancel_)]]"
             on-click="onRemoveClick_"></paper-icon-button>
       </div>
 
-      <div id="incognito" hidden$="[[!isIncognito_]]"></div>
+      <div id="incognito" hidden$="[[!data_.otr]]"></div>
     </paper-material>
 
     <div id="end-cap"></div>

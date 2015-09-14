@@ -21,6 +21,13 @@
 #
 # TODO(vtl|msw): Add a way of specifying data dependencies.
 
+view_manager_apptests = { 'test': 'mojo:view_manager_apptests' }
+# osmesa is not used on android, so no flags are needed for
+# view_manager_apptests.
+if config.target_os != config.OS_ANDROID:
+  view_manager_apptests['args'] = [ '--use-x11-test-config',
+                                    '--override-use-gl-with-osmesa-for-tests' ]
+
 tests = [
   {
     'test': 'mojo:clipboard_apptests',
@@ -39,10 +46,7 @@ tests = [
   #  'test': 'mojo:runner_apptests',
   #  'type': 'gtest_isolated',
   #},
-  {
-    'test': 'mojo:view_manager_apptests',
-    'args': ['--use-test-config']
-  },
+  view_manager_apptests,
 ]
 
 # TODO(msw): Get these tests passing on Android too. http://crbug.com/486220
@@ -52,32 +56,30 @@ if config.target_os != config.OS_ANDROID:
       'test': 'mojo:filesystem_apptests',
       'type': 'gtest_isolated',
     },
-    {
-      'test': 'mojo:html_viewer_apptests',
-      'name': 'mojo:html_viewer_apptests',
-      'type': 'gtest_isolated',
-      'args': ['--enable-html-viewer-test-interface',
-               '--override-use-gl-with-osmesa-for-tests']
-    },
-    {
-      'test': 'mojo:html_viewer_apptests',
-      'name': 'mojo:html_viewer_apptests new frame',
-      'type': 'gtest_isolated',
-      'args': ['--oopif-always-create-new-frame-tree',
-               '--enable-html-viewer-test-interface',
-               '--override-use-gl-with-osmesa-for-tests']
-    },
+# TODO(sky): reenable once 531120 is fixed.
+#    {
+#      'test': 'mojo:html_viewer_apptests',
+#      'name': 'mojo:html_viewer_apptests',
+#      'type': 'gtest_isolated',
+#      'args': ['--enable-html-viewer-test-interface',
+#               '--use-x11-test-config',
+#               '--override-use-gl-with-osmesa-for-tests']
+#    },
+#    {
+#      'test': 'mojo:html_viewer_apptests',
+#      'name': 'mojo:html_viewer_apptests new frame',
+#      'type': 'gtest_isolated',
+#      'args': ['--oopif-always-create-new-frame-tree',
+#               '--enable-html-viewer-test-interface',
+#               '--use-x11-test-config',
+#               '--override-use-gl-with-osmesa-for-tests']
+#    },
     # TODO(ben): These tests are disabled pending mandoline:browser refactoring.
     #{
     #  'test': 'mojo:mandoline_browser_apptests',
     #  'type': 'gtest_isolated',
     #  'args': ['--use-headless-config']
     #},
-    {
-      'test': 'mojo:mandoline_frame_apptests',
-      'type': 'gtest_isolated',
-      'args': ['--use-headless-config']
-    },
     # TODO(xhwang): Fix and enable mojo:media_pipeline_integration_apptests.
     # http://crbug.com/501417
     {
@@ -87,5 +89,11 @@ if config.target_os != config.OS_ANDROID:
     {
       'test': 'mojo:sql_apptests',
       'type': 'gtest_isolated',
+    },
+    {
+      'test': 'mojo:web_view_apptests',
+      'type': 'gtest_isolated',
+      'args': ['--use-x11-test-config',
+               '--override-use-gl-with-osmesa-for-tests']
     },
   ]

@@ -1208,10 +1208,10 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
             updateSecurityButton(false);
         } else {
             updateSecurityButton(true);
-            // Since we emphasize the schema of the URL based on the security type, we need to
-            // refresh the emphasis.
-            mUrlBar.deEmphasizeUrl();
         }
+        // Since we emphasize the schema of the URL based on the security type, we need to
+        // refresh the emphasis.
+        mUrlBar.deEmphasizeUrl();
         emphasizeUrl();
     }
 
@@ -1261,7 +1261,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
                 Drawable page = ApiCompatibilityUtils.getDrawable(
                         getResources(), R.drawable.ic_omnibox_page);
                 page.setColorFilter(mUseDarkColors
-                        ? getResources().getColor(R.color.light_normal_color)
+                        ? ApiCompatibilityUtils.getColor(getResources(), R.color.light_normal_color)
                         : Color.WHITE, PorterDuff.Mode.SRC_IN);
                 mNavigationButton.setImageDrawable(page);
                 break;
@@ -2287,8 +2287,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         if (updateUseDarkColors() || getToolbarDataProvider().isUsingBrandColor()) {
             updateSecurityIcon(getSecurityLevel());
         }
-        ColorStateList colorStateList = getResources().getColorStateList(mUseDarkColors
-                ? R.color.dark_mode_tint : R.color.light_mode_tint);
+        ColorStateList colorStateList = ApiCompatibilityUtils.getColorStateList(getResources(),
+                mUseDarkColors ? R.color.dark_mode_tint : R.color.light_mode_tint);
         mMicButton.setTint(colorStateList);
         mDeleteButton.setTint(colorStateList);
 

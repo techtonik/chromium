@@ -21,7 +21,9 @@
 #include "chromecast/browser/cast_quota_permission_context.h"
 #include "chromecast/browser/cast_resource_dispatcher_host_delegate.h"
 #include "chromecast/browser/geolocation/cast_access_token_store.h"
+#include "chromecast/browser/media/cma_media_pipeline_client.h"
 #include "chromecast/browser/media/cma_message_filter_host.h"
+#include "chromecast/browser/service/cast_service_simple.h"
 #include "chromecast/browser/url_request_context_factory.h"
 #include "chromecast/common/global_descriptors.h"
 #include "chromecast/media/base/media_message_loop.h"
@@ -48,6 +50,8 @@
 #if defined(OS_ANDROID)
 #include "components/crash/browser/crash_dump_manager_android.h"
 #include "components/external_video_surface/browser/android/external_video_surface_container_impl.h"
+#else
+#include "chromecast/browser/media/cast_browser_cdm_factory.h"
 #endif  // defined(OS_ANDROID)
 
 namespace chromecast {
@@ -68,9 +72,11 @@ void CastContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line) {
 }
 
-std::vector<scoped_refptr<content::BrowserMessageFilter>>
-CastContentBrowserClient::GetBrowserMessageFilters() {
-  return std::vector<scoped_refptr<content::BrowserMessageFilter>>();
+scoped_ptr<CastService> CastContentBrowserClient::CreateCastService(
+    content::BrowserContext* browser_context,
+    PrefService* pref_service,
+    net::URLRequestContextGetter* request_context_getter) {
+  return make_scoped_ptr(new CastServiceSimple(browser_context, pref_service));
 }
 
 scoped_ptr<::media::AudioManagerFactory>
@@ -81,11 +87,14 @@ CastContentBrowserClient::CreateAudioManagerFactory() {
 }
 
 #if !defined(OS_ANDROID)
-scoped_ptr<media::MediaPipelineBackend>
-CastContentBrowserClient::CreateMediaPipelineBackend(
-    const media::MediaPipelineDeviceParams& params) {
-  return make_scoped_ptr(
-      media::CastMediaShlib::CreateMediaPipelineBackend(params));
+scoped_refptr<media::CmaMediaPipelineClient>
+CastContentBrowserClient::CreateCmaMediaPipelineClient() {
+  return make_scoped_refptr(new media::CmaMediaPipelineClient());
+}
+
+scoped_ptr<::media::BrowserCdmFactory>
+CastContentBrowserClient::CreateBrowserCdmFactory() {
+  return make_scoped_ptr(new media::CastBrowserCdmFactory());
 }
 #endif
 
@@ -104,6 +113,10 @@ void CastContentBrowserClient::RegisterMetricsProviders(
     ::metrics::MetricsService* metrics_service) {
 }
 
+bool CastContentBrowserClient::EnableRemoteDebuggingImmediately() {
+  return true;
+}
+
 content::BrowserMainParts* CastContentBrowserClient::CreateBrowserMainParts(
     const content::MainFunctionParams& parameters) {
   content::BrowserMainParts* parts = new CastBrowserMainParts(
@@ -117,10 +130,8 @@ void CastContentBrowserClient::RenderProcessWillLaunch(
     content::RenderProcessHost* host) {
 #if !defined(OS_ANDROID)
   scoped_refptr<media::CmaMessageFilterHost> cma_message_filter(
-      new media::CmaMessageFilterHost(
-          host->GetID(),
-          base::Bind(&CastContentBrowserClient::CreateMediaPipelineBackend,
-                     base::Unretained(this))));
+      new media::CmaMessageFilterHost(host->GetID(),
+                                      CreateCmaMediaPipelineClient()));
   host->AddFilter(cma_message_filter.get());
 #endif  // !defined(OS_ANDROID)
 
@@ -133,11 +144,6 @@ void CastContentBrowserClient::RenderProcessWillLaunch(
                     url_request_context_factory_->GetSystemGetter())),
       base::Bind(&CastContentBrowserClient::AddNetworkHintsMessageFilter,
                  base::Unretained(this), host->GetID()));
-
-  auto extra_filters = GetBrowserMessageFilters();
-  for (auto const& filter : extra_filters) {
-    host->AddFilter(filter.get());
-  }
 }
 
 void CastContentBrowserClient::AddNetworkHintsMessageFilter(
@@ -215,6 +221,8 @@ void CastContentBrowserClient::AppendExtraCommandLineSwitches(
       command_line->AppendSwitch(switches::kEnableCmaMediaPipeline);
     if (browser_command_line->HasSwitch(switches::kEnableLegacyHolePunching))
       command_line->AppendSwitch(switches::kEnableLegacyHolePunching);
+    if (browser_command_line->HasSwitch(switches::kAllowHiddenMediaPlayback))
+      command_line->AppendSwitch(switches::kAllowHiddenMediaPlayback);
   }
 
 #if defined(OS_LINUX)

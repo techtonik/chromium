@@ -62,33 +62,29 @@ class FakeDisplayListRecordingSource : public DisplayListRecordingSource {
                                 recorded_viewport_, 0, RECORD_NORMALLY);
   }
 
-  void add_draw_rect(const gfx::RectF& rect) {
+  void add_draw_rect(const gfx::Rect& rect) {
     client_.add_draw_rect(rect, default_paint_);
   }
 
-  void add_draw_rect_with_paint(const gfx::RectF& rect, const SkPaint& paint) {
+  void add_draw_rect_with_paint(const gfx::Rect& rect, const SkPaint& paint) {
     client_.add_draw_rect(rect, paint);
   }
 
-  void add_draw_bitmap(const SkBitmap& bitmap, const gfx::Point& point) {
-    client_.add_draw_bitmap(bitmap, point, default_paint_);
+  void add_draw_rectf(const gfx::RectF& rect) {
+    client_.add_draw_rectf(rect, default_paint_);
   }
 
-  void add_draw_bitmap_with_transform(const SkBitmap& bitmap,
-                                      const gfx::Transform& transform) {
-    client_.add_draw_bitmap_with_transform(bitmap, transform, default_paint_);
+  void add_draw_rectf_with_paint(const gfx::RectF& rect, const SkPaint& paint) {
+    client_.add_draw_rectf(rect, paint);
   }
 
-  void add_draw_bitmap_with_paint(const SkBitmap& bitmap,
-                                  const gfx::Point& point,
-                                  const SkPaint& paint) {
-    client_.add_draw_bitmap(bitmap, point, paint);
+  void add_draw_image(const SkImage* image, const gfx::Point& point) {
+    client_.add_draw_image(image, point, default_paint_);
   }
 
-  void add_draw_bitmap_with_paint_and_transform(const SkBitmap& bitmap,
-                                                const gfx::Transform& transform,
-                                                const SkPaint& paint) {
-    client_.add_draw_bitmap_with_transform(bitmap, transform, paint);
+  void add_draw_image_with_transform(const SkImage* image,
+                                     const gfx::Transform& transform) {
+    client_.add_draw_image_with_transform(image, transform, default_paint_);
   }
 
   void set_default_paint(const SkPaint& paint) { default_paint_ = paint; }

@@ -5,6 +5,8 @@
 #ifndef NET_QUIC_QUIC_HTTP_STREAM_H_
 #define NET_QUIC_QUIC_HTTP_STREAM_H_
 
+#include <stdint.h>
+
 #include <list>
 
 #include "build/build_config.h"
@@ -60,15 +62,14 @@ class NET_EXPORT_PRIVATE QuicHttpStream
   void Close(bool not_reusable) override;
   HttpStream* RenewStreamForAuth() override;
   bool IsResponseBodyComplete() const override;
-  bool CanFindEndOfResponse() const override;
   bool IsConnectionReused() const override;
   void SetConnectionReused() override;
-  bool IsConnectionReusable() const override;
+  bool CanReuseConnection() const override;
   int64 GetTotalReceivedBytes() const override;
+  int64_t GetTotalSentBytes() const override;
   bool GetLoadTimingInfo(LoadTimingInfo* load_timing_info) const override;
   void GetSSLInfo(SSLInfo* ssl_info) override;
   void GetSSLCertRequestInfo(SSLCertRequestInfo* cert_request_info) override;
-  bool IsSpdyHttpStream() const override;
   void Drain(HttpNetworkSession* session) override;
   void SetPriority(RequestPriority priority) override;
 
@@ -168,6 +169,8 @@ class NET_EXPORT_PRIVATE QuicHttpStream
 
   // Number of bytes received when the stream was closed.
   int64 closed_stream_received_bytes_;
+  // Number of bytes sent when the stream was closed.
+  int64_t closed_stream_sent_bytes_;
 
   // The caller's callback to be used for asynchronous operations.
   CompletionCallback callback_;

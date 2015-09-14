@@ -705,8 +705,10 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
       main_render_frame_->set_render_frame_proxy(proxy);
     } else {
       DCHECK(SiteIsolationPolicy::IsSwappedOutStateForbidden());
-      RenderFrameProxy::CreateFrameProxy(params.proxy_routing_id,
-                                         MSG_ROUTING_NONE, routing_id_,
+      // Pass MSG_ROUTING_NONE for opener, since actual opener (if any) will be
+      // set separately below.
+      RenderFrameProxy::CreateFrameProxy(params.proxy_routing_id, routing_id_,
+                                         MSG_ROUTING_NONE, MSG_ROUTING_NONE,
                                          params.replicated_frame_state);
     }
   }
@@ -1111,13 +1113,7 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setReportScreenSizeInPhysicalPixelsQuirk(
       prefs.report_screen_size_in_physical_pixels_quirk);
   settings->setPreferHiddenVolumeControls(true);
-
-  bool record_full_layer =
-      RenderViewImpl::FromWebView(web_view)
-          ? RenderViewImpl::FromWebView(web_view)->DoesRecordFullLayer()
-          : false;
-  settings->setMainFrameClipsContent(!record_full_layer);
-
+  settings->setMainFrameClipsContent(!prefs.record_whole_document);
   settings->setShrinksViewportContentToFit(true);
   settings->setUseMobileViewportStyle(true);
 #endif
@@ -3406,6 +3402,12 @@ bool RenderViewImpl::CanComposeInline() {
 void RenderViewImpl::DidCompletePageScaleAnimation() {
   FocusChangeComplete();
 }
+
+#if defined(OS_ANDROID)
+bool RenderViewImpl::DoesRecordFullLayer() const {
+  return webkit_preferences_.record_whole_document;
+}
+#endif
 
 void RenderViewImpl::SetScreenMetricsEmulationParameters(
     bool enabled,

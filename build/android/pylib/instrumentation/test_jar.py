@@ -11,10 +11,9 @@ import pickle
 import re
 import sys
 
-from pylib import cmd_helper
+from devil.android import device_utils
+from devil.android import md5sum
 from pylib import constants
-from pylib.device import device_utils
-from pylib.utils import md5sum
 from pylib.utils import proguard
 
 sys.path.insert(0,
@@ -120,7 +119,7 @@ class TestJar(object):
   def GetTestAnnotations(self, test):
     """Returns a list of all annotations for the given |test|. May be empty."""
     if not self._IsTestMethod(test) or not test in self._test_methods:
-      return []
+      return {}
     return self._test_methods[test]['annotations']
 
   @staticmethod

@@ -11,7 +11,8 @@
 #include "base/basictypes.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "mandoline/tab/public/interfaces/frame_tree.mojom.h"
+#include "base/observer_list.h"
+#include "components/web_view/public/interfaces/frame_tree.mojom.h"
 
 namespace blink {
 class WebView;
@@ -27,6 +28,7 @@ class DocumentResourceWaiter;
 class GlobalState;
 class HTMLFrame;
 class HTMLFrameDelegate;
+class HTMLFrameTreeManagerObserver;
 
 // HTMLFrameTreeManager is responsible for managing the frames that comprise a
 // document. Some of the frames may be remote. HTMLFrameTreeManager updates its
@@ -44,12 +46,24 @@ class HTMLFrameTreeManager {
       scoped_ptr<DocumentResourceWaiter> resource_waiter,
       HTMLFrameDelegate* delegate);
 
+  // Returns the HTMLFrameTreeManager with the specified root id.
+  static HTMLFrameTreeManager* FindFrameTreeWithRoot(uint32_t root_frame_id);
+
   GlobalState* global_state() { return global_state_; }
 
   blink::WebView* GetWebView();
 
+  // Ever increasing value that is used to identify the state the tree is in.
+  // That is, the value increases every time a structural change is made to
+  // the tree, eg add or remove.
+  uint32_t change_id() const { return change_id_; }
+
+  void AddObserver(HTMLFrameTreeManagerObserver* observer);
+  void RemoveObserver(HTMLFrameTreeManagerObserver* observer);
+
  private:
   friend class HTMLFrame;
+  class ChangeIdAdvancedNotifier;
   using TreeMap = std::map<uint32_t, HTMLFrameTreeManager*>;
   using ChangeIDSet = std::set<uint32_t>;
 
@@ -58,13 +72,13 @@ class HTMLFrameTreeManager {
 
   void Init(HTMLFrameDelegate* delegate,
             mojo::View* local_view,
-            const mojo::Array<mandoline::FrameDataPtr>& frame_data,
+            const mojo::Array<web_view::FrameDataPtr>& frame_data,
             uint32_t change_id);
 
   // Creates a Frame per FrameData element in |frame_data|. Returns the root.
   HTMLFrame* BuildFrameTree(
       HTMLFrameDelegate* delegate,
-      const mojo::Array<mandoline::FrameDataPtr>& frame_data,
+      const mojo::Array<web_view::FrameDataPtr>& frame_data,
       uint32_t local_frame_id,
       mojo::View* local_view);
 
@@ -85,7 +99,7 @@ class HTMLFrameTreeManager {
   // sees the same change, and a change only need be processed once).
   void ProcessOnFrameAdded(HTMLFrame* source,
                            uint32_t change_id,
-                           mandoline::FrameDataPtr frame_data);
+                           web_view::FrameDataPtr frame_data);
   void ProcessOnFrameRemoved(HTMLFrame* source,
                              uint32_t change_id,
                              uint32_t frame_id);
@@ -114,6 +128,8 @@ class HTMLFrameTreeManager {
 
   // If true, we're in ProcessOnFrameRemoved().
   bool in_process_on_frame_removed_;
+
+  base::ObserverList<HTMLFrameTreeManagerObserver> observers_;
 
   base::WeakPtrFactory<HTMLFrameTreeManager> weak_factory_;
 

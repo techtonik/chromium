@@ -45,6 +45,7 @@ class Extension;
 class ExtensionSet;
 class ExtensionsGuestViewContainerDispatcher;
 class RendererPermissionsPolicyDelegate;
+class ResourceRequestPolicy;
 }
 
 namespace prerender {
@@ -105,6 +106,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
                       bool has_played_media_before,
                       const base::Closure& closure) override;
   bool RunIdleHandlerWhenWidgetsHidden() override;
+  bool AllowTimerSuspensionWhenProcessBackgrounded() override;
   bool AllowPopup() override;
   bool ShouldFork(blink::WebLocalFrame* frame,
                   const GURL& url,
@@ -229,6 +231,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
       permissions_policy_delegate_;
   scoped_ptr<extensions::ExtensionsGuestViewContainerDispatcher>
       guest_view_container_dispatcher_;
+  scoped_ptr<extensions::ResourceRequestPolicy> resource_request_policy_;
 #endif
 
   scoped_ptr<network_hints::PrescientNetworkingDispatcher>

@@ -25,6 +25,22 @@ Polymer({
 
   properties: {
     /**
+     * The current active route.
+     */
+    currentRoute: {
+      type: Object,
+      observer: 'currentRouteChanged_',
+    },
+
+    /**
+     * The section is expanded to a full-page view when this property matches
+     * currentRoute.section.
+     */
+    section: {
+      type: String,
+    },
+
+    /**
      * Title for the page header and navigation menu.
      */
     pageTitle: String,
@@ -33,16 +49,6 @@ Polymer({
      * Name of the 'iron-icon' to show.
      */
     icon: String,
-
-    /**
-     * True if the section should be expanded to take up the full height of
-     * the page (except the toolbar). The title and icon of the section will be
-     * hidden, and the section contents is expected to provide its own subtitle.
-     */
-    expanded: {
-      type: Boolean,
-      observer: 'expandedChanged',
-    },
 
     /**
      * Container that determines the sizing of expanded sections.
@@ -68,12 +74,18 @@ Polymer({
     },
   },
 
-  expandedChanged: function() {
-    if (this.expanded) {
-      this.playAnimation('expand');
-    } else {
-      this.playAnimation('collapse');
-    }
+  /** @private */
+  expanded_: false,
+
+  /** @private */
+  currentRouteChanged_: function() {
+    var expanded = this.currentRoute.section == this.section;
+
+    if (expanded == this.expanded_)
+      return;
+
+    this.expanded_ = expanded;
+    this.playAnimation(expanded ? 'expand' : 'collapse');
   },
 });
 
@@ -97,10 +109,11 @@ Polymer({
     var newHeight = containerRect.height + headerHeight;
 
     node.style.position = 'fixed';
+    node.style.zIndex = '1';
 
     this._effect = new KeyframeEffect(node, [
-      {'top': nodeRect.top, 'height': nodeRect.height},
-      {'top': newTop, 'height': newHeight},
+      {'top': nodeRect.top + 'px', 'height': nodeRect.height + 'px'},
+      {'top': newTop + 'px', 'height': newHeight + 'px'},
     ], this.timingFromConfig(config));
     return this._effect;
   },
@@ -128,18 +141,23 @@ Polymer({
     // Temporarily set position to static to determine new height.
     node.style.position = '';
     var newTop = node.getBoundingClientRect().top;
-    var newHeight = node.unexpandedHeight;
+
+    // TODO(tommycli): This value is undefined when the user navigates to a
+    // subpage directly by URL instead of from the settings root. Find a better
+    // method than using 200 as a dummy height.
+    var newHeight = node.unexpandedHeight || 200;
 
     node.style.position = 'fixed';
 
     this._effect = new KeyframeEffect(node, [
-      {'top': oldRect.top, 'height': oldRect.height},
-      {'top': newTop, 'height': newHeight},
+      {'top': oldRect.top + 'px', 'height': oldRect.height + 'px'},
+      {'top': newTop + 'px', 'height': newHeight + 'px'},
     ], this.timingFromConfig(config));
     return this._effect;
   },
 
   complete: function(config) {
     config.node.style.position = '';
+    config.node.style.zIndex = '0';
   }
 });

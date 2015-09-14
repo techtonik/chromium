@@ -337,7 +337,7 @@ class PrefWatcher : public KeyedService {
 #if defined(ENABLE_WEBRTC)
     pref_change_registrar_.Add(prefs::kWebRTCMultipleRoutesEnabled,
                                renderer_callback);
-    pref_change_registrar_.Add(prefs::kWebRTCNonProxiedUdpTransportEnabled,
+    pref_change_registrar_.Add(prefs::kWebRTCNonProxiedUdpEnabled,
                                renderer_callback);
 #endif
 
@@ -414,11 +414,11 @@ class PrefWatcherFactory : public BrowserContextKeyedServiceFactory {
   }
 
   static PrefWatcherFactory* GetInstance() {
-    return Singleton<PrefWatcherFactory>::get();
+    return base::Singleton<PrefWatcherFactory>::get();
   }
 
  private:
-  friend struct DefaultSingletonTraits<PrefWatcherFactory>;
+  friend struct base::DefaultSingletonTraits<PrefWatcherFactory>;
 
   PrefWatcherFactory() : BrowserContextKeyedServiceFactory(
       "PrefWatcher",
@@ -453,7 +453,7 @@ PrefsTabHelper::PrefsTabHelper(WebContents* contents)
     // If the tab is in an incognito profile, we track changes in the default
     // zoom level of the parent profile instead.
     Profile* profile_to_track = profile_->GetOriginalProfile();
-    chrome::ChromeZoomLevelPrefs* zoom_level_prefs =
+    ChromeZoomLevelPrefs* zoom_level_prefs =
         profile_to_track->GetZoomLevelPrefs();
 
     base::Closure renderer_callback = base::Bind(
@@ -488,19 +488,6 @@ PrefsTabHelper::PrefsTabHelper(WebContents* contents)
 
 PrefsTabHelper::~PrefsTabHelper() {
   PrefWatcher::Get(profile_)->UnregisterHelper(this);
-}
-
-// static
-void PrefsTabHelper::InitIncognitoUserPrefStore(
-    OverlayUserPrefStore* pref_store) {
-  // List of keys that cannot be changed in the user prefs file by the incognito
-  // profile.  All preferences that store information about the browsing history
-  // or behavior of the user should have this property.
-  pref_store->RegisterOverlayPref(prefs::kBrowserWindowPlacement);
-  pref_store->RegisterOverlayPref(prefs::kSaveFileDefaultDirectory);
-#if defined(OS_ANDROID) || defined(OS_IOS)
-  pref_store->RegisterOverlayPref(proxy_config::prefs::kProxy);
-#endif  // defined(OS_ANDROID) || defined(OS_IOS)
 }
 
 // static

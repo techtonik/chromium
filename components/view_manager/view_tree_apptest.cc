@@ -67,6 +67,14 @@ void ViewTreeResultCallback(base::RunLoop* run_loop,
   run_loop->Quit();
 }
 
+void EmbedCallbackImpl(base::RunLoop* run_loop,
+                       bool* result_cache,
+                       bool result,
+                       ConnectionSpecificId connection_id) {
+  *result_cache = result;
+  run_loop->Quit();
+}
+
 // -----------------------------------------------------------------------------
 
 bool EmbedUrl(mojo::ApplicationImpl* app,
@@ -83,7 +91,7 @@ bool EmbedUrl(mojo::ApplicationImpl* app,
     mojo::ViewTreeClientPtr client;
     connection->ConnectToService(&client);
     vm->Embed(root_id, client.Pass(),
-              base::Bind(&BoolResultCallback, &run_loop, &result));
+              base::Bind(&EmbedCallbackImpl, &run_loop, &result));
   }
   run_loop.Run();
   return result;
@@ -94,7 +102,7 @@ bool Embed(ViewTree* vm, Id root_id, mojo::ViewTreeClientPtr client) {
   base::RunLoop run_loop;
   {
     vm->Embed(root_id, client.Pass(),
-              base::Bind(&BoolResultCallback, &run_loop, &result));
+              base::Bind(&EmbedCallbackImpl, &run_loop, &result));
   }
   run_loop.Run();
   return result;
@@ -213,13 +221,6 @@ bool WaitForAllMessages(ViewTree* vm) {
   return result != ERROR_CODE_NONE;
 }
 
-bool HasClonedView(const std::vector<TestView>& views) {
-  for (size_t i = 0; i < views.size(); ++i)
-    if (views[i].view_id == ViewIdToTransportId(ClonedViewId()))
-      return true;
-  return false;
-}
-
 const Id kNullParentId = 0;
 std::string IdToString(Id id) {
   return (id == kNullParentId)
@@ -310,7 +311,8 @@ class ViewTreeClientImpl : public mojo::ViewTreeClient,
   void OnEmbed(ConnectionSpecificId connection_id,
                ViewDataPtr root,
                mojo::ViewTreePtr tree,
-               mojo::Id focused_view_id) override {
+               mojo::Id focused_view_id,
+               uint32_t access_policy) override {
     // TODO(sky): add coverage of |focused_view_id|.
     tree_ = tree.Pass();
     connection_id_ = connection_id;
@@ -412,7 +414,7 @@ class ViewTreeClientFactory : public mojo::InterfaceFactory<ViewTreeClient> {
  private:
   // InterfaceFactory<ViewTreeClient>:
   void Create(ApplicationConnection* connection,
-    InterfaceRequest<ViewTreeClient> request) override {
+              InterfaceRequest<ViewTreeClient> request) override {
     client_impl_.reset(new ViewTreeClientImpl(app_));
     client_impl_->Bind(request.Pass());
     if (run_loop_.get())
@@ -485,12 +487,14 @@ class ViewTreeAppTest : public mojo::test::ApplicationTestBase,
     vm_client3_->set_root_view(root_view_id_);
   }
 
+  scoped_ptr<ViewTreeClientImpl> WaitForViewTreeClient() {
+    return client_factory_->WaitForInstance();
+  }
+
   // Establishes a new connection by way of Embed() on the specified
   // ViewTree.
-  scoped_ptr<ViewTreeClientImpl> EstablishConnectionViaEmbed(
-    ViewTree* owner,
-      Id root_id,
-      int* connection_id) {
+  scoped_ptr<ViewTreeClientImpl>
+  EstablishConnectionViaEmbed(ViewTree* owner, Id root_id, int* connection_id) {
     if (!EmbedUrl(application_impl(), owner, application_impl()->url(),
                   root_id)) {
       ADD_FAILURE() << "Embed() failed";
@@ -1522,12 +1526,20 @@ TEST_F(ViewTreeAppTest, OnEmbeddedAppDisconnected) {
   changes2()->clear();
   ASSERT_NO_FATAL_FAILURE(EstablishThirdConnection(vm2(), view_2_2));
 
+  // Connection 1 should get a hierarchy change for view_2_2.
+  vm_client1_->WaitForChangeCount(1);
+  changes1()->clear();
+
   // Close connection 3. Connection 2 (which had previously embedded 3) should
   // be notified of this.
   vm_client3_.reset();
   vm_client2_->WaitForChangeCount(1);
   EXPECT_EQ("OnEmbeddedAppDisconnected view=" + IdToString(view_2_2),
             SingleChangeToDescription(*changes2()));
+
+  vm_client1_->WaitForChangeCount(1);
+  EXPECT_EQ("OnEmbeddedAppDisconnected view=" + IdToString(view_2_2),
+            SingleChangeToDescription(*changes1()));
 }
 
 // Verifies when the parent of an Embed() is destroyed the embedded app gets
@@ -1619,6 +1631,35 @@ TEST_F(ViewTreeAppTest, EmbedFromOtherConnection) {
 
   WaitForAllMessages(vm2());
   EXPECT_EQ(std::string(), SingleChangeToDescription(*changes2()));
+}
+
+TEST_F(ViewTreeAppTest, CantEmbedFromConnectionRoot) {
+  // Shouldn't be able to embed into the root.
+  ASSERT_FALSE(EmbedUrl(application_impl(), vm1(), application_impl()->url(),
+                        root_view_id()));
+
+  // Even though the call above failed a ViewTreeClient was obtained. We need to
+  // wait for it else we throw off the next connect.
+  WaitForViewTreeClient();
+
+  // Don't allow a connection to embed into its own root.
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+  EXPECT_FALSE(EmbedUrl(application_impl(), vm2(), application_impl()->url(),
+                        BuildViewId(connection_id_1(), 1)));
+
+  // Need to wait for a ViewTreeClient for same reason as above.
+  WaitForViewTreeClient();
+
+  Id view_1_2 = vm_client1()->CreateView(2);
+  ASSERT_TRUE(view_1_2);
+  ASSERT_TRUE(AddView(vm1(), BuildViewId(connection_id_1(), 1), view_1_2));
+  vm1()->SetAccessPolicy(view_1_2, ViewTree::ACCESS_POLICY_EMBED_ROOT);
+  ASSERT_NO_FATAL_FAILURE(EstablishThirdConnection(vm1(), view_1_2));
+
+  // view_1_2 is vm3's root, so even though v3 is an embed root it should not
+  // be able to Embed into itself.
+  ASSERT_FALSE(EmbedUrl(application_impl(), vm3(), application_impl()->url(),
+                        view_1_2));
 }
 
 // TODO(sky): need to better track changes to initial connection. For example,

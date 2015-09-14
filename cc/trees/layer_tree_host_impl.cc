@@ -23,6 +23,7 @@
 #include "cc/animation/scroll_offset_animation_curve.h"
 #include "cc/animation/scrollbar_animation_controller.h"
 #include "cc/animation/timing_function.h"
+#include "cc/base/histograms.h"
 #include "cc/base/math_util.h"
 #include "cc/debug/benchmark_instrumentation.h"
 #include "cc/debug/debug_rect_history.h"
@@ -404,16 +405,23 @@ bool LayerTreeHostImpl::CanDraw() const {
 }
 
 void LayerTreeHostImpl::Animate() {
+  DCHECK(proxy_->IsImplThread());
   base::TimeTicks monotonic_time = CurrentBeginFrameArgs().frame_time;
 
   // mithro(TODO): Enable these checks.
   // DCHECK(!current_begin_frame_tracker_.HasFinished());
   // DCHECK(monotonic_time == current_begin_frame_tracker_.Current().frame_time)
   //  << "Called animate with unknown frame time!?";
-  if (!root_layer_scroll_offset_delegate_ ||
-      (CurrentlyScrollingLayer() != InnerViewportScrollLayer() &&
-       CurrentlyScrollingLayer() != OuterViewportScrollLayer()))
-    AnimateInput(monotonic_time);
+
+  if (input_handler_client_) {
+    // This animates fling scrolls. But on Android WebView root flings are
+    // controlled by the application, so the compositor does not animate them.
+    bool ignore_fling =
+        settings_.ignore_root_layer_flings && IsCurrentlyScrollingRoot();
+    if (!ignore_fling)
+      input_handler_client_->Animate(monotonic_time);
+  }
+
   AnimatePageScale(monotonic_time);
   AnimateLayers(monotonic_time);
   AnimateScrollbars(monotonic_time);
@@ -473,25 +481,24 @@ void LayerTreeHostImpl::StartPageScaleAnimation(
 }
 
 void LayerTreeHostImpl::SetNeedsAnimateInput() {
-  if (root_layer_scroll_offset_delegate_ &&
-      (CurrentlyScrollingLayer() == InnerViewportScrollLayer() ||
-       CurrentlyScrollingLayer() == OuterViewportScrollLayer())) {
-    if (root_layer_animation_callback_.is_null()) {
-      root_layer_animation_callback_ =
-          base::Bind(&LayerTreeHostImpl::AnimateInput, AsWeakPtr());
-    }
-    root_layer_scroll_offset_delegate_->SetNeedsAnimate(
-        root_layer_animation_callback_);
-    return;
-  }
-
+  DCHECK_IMPLIES(IsCurrentlyScrollingRoot(),
+                 !settings_.ignore_root_layer_flings);
   SetNeedsAnimate();
+}
+
+bool LayerTreeHostImpl::IsCurrentlyScrollingRoot() const {
+  LayerImpl* scrolling_layer = CurrentlyScrollingLayer();
+  if (!scrolling_layer)
+    return false;
+  return scrolling_layer == InnerViewportScrollLayer() ||
+         scrolling_layer == OuterViewportScrollLayer();
 }
 
 bool LayerTreeHostImpl::IsCurrentlyScrollingLayerAt(
     const gfx::Point& viewport_point,
-    InputHandler::ScrollInputType type) {
-  if (!CurrentlyScrollingLayer())
+    InputHandler::ScrollInputType type) const {
+  LayerImpl* scrolling_layer_impl = CurrentlyScrollingLayer();
+  if (!scrolling_layer_impl)
     return false;
 
   gfx::PointF device_viewport_point =
@@ -501,20 +508,20 @@ bool LayerTreeHostImpl::IsCurrentlyScrollingLayerAt(
       active_tree_->FindLayerThatIsHitByPoint(device_viewport_point);
 
   bool scroll_on_main_thread = false;
-  LayerImpl* scrolling_layer_impl = FindScrollLayerForDeviceViewportPoint(
+  LayerImpl* test_layer_impl = FindScrollLayerForDeviceViewportPoint(
       device_viewport_point, type, layer_impl, &scroll_on_main_thread, NULL);
 
-  if (!scrolling_layer_impl)
+  if (!test_layer_impl)
     return false;
 
-  if (CurrentlyScrollingLayer() == scrolling_layer_impl)
+  if (scrolling_layer_impl == test_layer_impl)
     return true;
 
   // For active scrolling state treat the inner/outer viewports interchangeably.
-  if ((CurrentlyScrollingLayer() == InnerViewportScrollLayer() &&
-       scrolling_layer_impl == OuterViewportScrollLayer()) ||
-      (CurrentlyScrollingLayer() == OuterViewportScrollLayer() &&
-       scrolling_layer_impl == InnerViewportScrollLayer())) {
+  if ((scrolling_layer_impl == InnerViewportScrollLayer() &&
+       test_layer_impl == OuterViewportScrollLayer()) ||
+      (scrolling_layer_impl == OuterViewportScrollLayer() &&
+       test_layer_impl == InnerViewportScrollLayer())) {
     return true;
   }
 
@@ -533,15 +540,16 @@ bool LayerTreeHostImpl::HaveWheelEventHandlersAt(
   return layer_impl != NULL;
 }
 
-static LayerImpl* NextScrollLayer(LayerImpl* layer) {
-  if (LayerImpl* scroll_parent = layer->scroll_parent())
-    return scroll_parent;
+static LayerImpl* NextLayerInScrollOrder(LayerImpl* layer) {
+  if (layer->scroll_parent())
+    return layer->scroll_parent();
+
   return layer->parent();
 }
 
 static ScrollBlocksOn EffectiveScrollBlocksOn(LayerImpl* layer) {
   ScrollBlocksOn blocks = SCROLL_BLOCKS_ON_NONE;
-  for (; layer; layer = NextScrollLayer(layer)) {
+  for (; layer; layer = NextLayerInScrollOrder(layer)) {
     blocks |= layer->scroll_blocks_on();
   }
   return blocks;
@@ -1021,13 +1029,18 @@ DrawResult LayerTreeHostImpl::PrepareToDraw(FrameData* frame) {
       "Compositing.NumActiveLayers",
       base::saturated_cast<int>(active_tree_->NumLayers()), 1, 400, 20);
 
-  size_t total_picture_memory = 0;
-  for (const PictureLayerImpl* layer : active_tree()->picture_layers())
-    total_picture_memory += layer->GetRasterSource()->GetPictureMemoryUsage();
-  if (total_picture_memory != 0) {
-    UMA_HISTOGRAM_COUNTS(
-        "Compositing.PictureMemoryUsageKb",
-        base::saturated_cast<int>(total_picture_memory / 1024));
+  if (const char* client_name = GetClientNameForMetrics()) {
+    size_t total_picture_memory = 0;
+    for (const PictureLayerImpl* layer : active_tree()->picture_layers())
+      total_picture_memory += layer->GetRasterSource()->GetPictureMemoryUsage();
+    if (total_picture_memory != 0) {
+      // GetClientNameForMetrics only returns one non-null value over the
+      // lifetime of the process, so this histogram name is runtime constant.
+      UMA_HISTOGRAM_COUNTS(
+          base::StringPrintf("Compositing.%s.PictureMemoryUsageKb",
+                             client_name),
+          base::saturated_cast<int>(total_picture_memory / 1024));
+    }
   }
 
   bool update_lcd_text = false;
@@ -1081,28 +1094,20 @@ void LayerTreeHostImpl::RemoveRenderPasses(FrameData* frame) {
     RenderPass* pass = frame->render_passes[i];
 
     // Remove orphan RenderPassDrawQuads.
-    bool removed = true;
-    while (removed) {
-      removed = false;
-      for (auto it = pass->quad_list.begin(); it != pass->quad_list.end();
-           ++it) {
-        if (it->material != DrawQuad::RENDER_PASS)
-          continue;
-        const RenderPassDrawQuad* quad = RenderPassDrawQuad::MaterialCast(*it);
-        // If the RenderPass doesn't exist, we can remove the quad.
-        if (pass_exists.count(quad->render_pass_id)) {
-          // Otherwise, save a reference to the RenderPass so we know there's a
-          // quad using it.
-          pass_references[quad->render_pass_id]++;
-          continue;
-        }
-        // This invalidates the iterator. So break out of the loop and look
-        // again. Luckily there's not a lot of render passes cuz this is
-        // terrible.
-        // TODO(danakj): We could make erase not invalidate the iterator.
-        pass->quad_list.EraseAndInvalidateAllPointers(it);
-        removed = true;
-        break;
+    for (auto it = pass->quad_list.begin(); it != pass->quad_list.end();) {
+      if (it->material != DrawQuad::RENDER_PASS) {
+        ++it;
+        continue;
+      }
+      const RenderPassDrawQuad* quad = RenderPassDrawQuad::MaterialCast(*it);
+      // If the RenderPass doesn't exist, we can remove the quad.
+      if (pass_exists.count(quad->render_pass_id)) {
+        // Otherwise, save a reference to the RenderPass so we know there's a
+        // quad using it.
+        pass_references[quad->render_pass_id]++;
+        ++it;
+      } else {
+        it = pass->quad_list.EraseAndInvalidateAllPointers(it);
       }
     }
 
@@ -1385,8 +1390,8 @@ void LayerTreeHostImpl::SetExternalDrawConstraints(
     if (transform_for_tile_priority.GetInverse(&screen_to_view)) {
       // Convert from screen space to view space.
       viewport_rect_for_tile_priority_in_view_space =
-          gfx::ToEnclosingRect(MathUtil::ProjectClippedRect(
-              screen_to_view, viewport_rect_for_tile_priority));
+          MathUtil::ProjectEnclosingClippedRect(
+              screen_to_view, viewport_rect_for_tile_priority);
     }
   }
 
@@ -1460,6 +1465,7 @@ CompositorFrameMetadata LayerTreeHostImpl::MakeCompositorFrameMetadata() const {
       gfx::Vector2dF(0.f, top_controls_manager_->ControlsTopOffset());
   metadata.location_bar_content_translation =
       gfx::Vector2dF(0.f, top_controls_manager_->ContentTopOffset());
+  metadata.root_background_color = active_tree_->background_color();
 
   active_tree_->GetViewportSelection(&metadata.selection);
 
@@ -1824,12 +1830,11 @@ LayerImpl* LayerTreeHostImpl::CurrentlyScrollingLayer() const {
 bool LayerTreeHostImpl::IsActivelyScrolling() const {
   if (!CurrentlyScrollingLayer())
     return false;
-  if (root_layer_scroll_offset_delegate_ &&
-      (CurrentlyScrollingLayer() == InnerViewportScrollLayer() ||
-       CurrentlyScrollingLayer() == OuterViewportScrollLayer())) {
-    // ScrollDelegate cannot determine current scroll, so assume no.
+  // On Android WebView root flings are controlled by the application,
+  // so the compositor does not animate them and can't tell if they
+  // are actually animating. So assume there are none.
+  if (settings_.ignore_root_layer_flings && IsCurrentlyScrollingRoot())
     return false;
-  }
   return did_lock_scrolling_layer_;
 }
 
@@ -2124,7 +2129,7 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
       GetTaskRunner(), task_graph_runner, context_provider,
       resource_provider_.get(), max_copy_texture_chromium_size,
       settings_.use_persistent_map_for_gpu_memory_buffers,
-      settings_.max_staging_buffers);
+      settings_.max_staging_buffer_usage_in_bytes);
 }
 
 void LayerTreeHostImpl::RecordMainFrameTiming(
@@ -2257,10 +2262,6 @@ void LayerTreeHostImpl::SetDeviceScaleFactor(float device_scale_factor) {
   SetFullRootLayerDamage();
 }
 
-void LayerTreeHostImpl::SetPageScaleOnActiveTree(float page_scale_factor) {
-  active_tree_->SetPageScaleOnActiveTree(page_scale_factor);
-}
-
 const gfx::Rect LayerTreeHostImpl::ViewportRectForTilePriority() const {
   if (viewport_rect_for_tile_priority_.IsEmpty())
     return DeviceViewport();
@@ -2328,7 +2329,7 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
 
   // Walk up the hierarchy and look for a scrollable layer.
   LayerImpl* potentially_scrolling_layer_impl = NULL;
-  for (; layer_impl; layer_impl = NextScrollLayer(layer_impl)) {
+  for (; layer_impl; layer_impl = NextLayerInScrollOrder(layer_impl)) {
     // The content layer can also block attempts to scroll outside the main
     // thread.
     ScrollStatus status =
@@ -2373,18 +2374,11 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
 static bool HasScrollAncestor(LayerImpl* child, LayerImpl* scroll_ancestor) {
   DCHECK(scroll_ancestor);
   for (LayerImpl* ancestor = child; ancestor;
-       ancestor = NextScrollLayer(ancestor)) {
+       ancestor = NextLayerInScrollOrder(ancestor)) {
     if (ancestor->scrollable())
       return ancestor == scroll_ancestor;
   }
   return false;
-}
-
-static LayerImpl* nextLayerInScrollOrder(LayerImpl* layer) {
-  if (layer->scroll_parent())
-    return layer->scroll_parent();
-
-  return layer->parent();
 }
 
 InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBeginImpl(
@@ -2669,7 +2663,7 @@ InputHandlerScrollResult LayerTreeHostImpl::ScrollBy(
 
   std::list<LayerImpl*> current_scroll_chain;
   for (LayerImpl* layer_impl = CurrentlyScrollingLayer(); layer_impl;
-       layer_impl = nextLayerInScrollOrder(layer_impl)) {
+       layer_impl = NextLayerInScrollOrder(layer_impl)) {
     // Skip the outer viewport scroll layer so that we try to scroll the
     // viewport only once. i.e. The inner viewport layer represents the
     // viewport.
@@ -2776,12 +2770,14 @@ void LayerTreeHostImpl::SetRootLayerScrollOffsetDelegate(
       root_layer_scroll_offset_delegate_);
 }
 
-void LayerTreeHostImpl::OnRootLayerDelegatedScrollOffsetChanged() {
+void LayerTreeHostImpl::OnRootLayerDelegatedScrollOffsetChanged(
+    const gfx::ScrollOffset& root_offset) {
   DCHECK(root_layer_scroll_offset_delegate_);
-  active_tree_->DistributeRootScrollOffset();
+  active_tree_->DistributeRootScrollOffset(root_offset);
   client_->SetNeedsCommitOnImplThread();
-  SetNeedsRedraw();
   active_tree_->set_needs_update_draw_properties();
+  // No need to SetNeedsRedraw, this is for WebView and every frame has redraw
+  // requested by the WebView embedder already.
 }
 
 void LayerTreeHostImpl::ClearCurrentlyScrollingLayer() {
@@ -2822,8 +2818,7 @@ float LayerTreeHostImpl::DeviceSpaceDistanceToLayer(
   gfx::Rect layer_impl_bounds(layer_impl->bounds());
 
   gfx::RectF device_viewport_layer_impl_bounds = MathUtil::MapClippedRect(
-      layer_impl->screen_space_transform(),
-      layer_impl_bounds);
+      layer_impl->screen_space_transform(), gfx::RectF(layer_impl_bounds));
 
   return device_viewport_layer_impl_bounds.ManhattanDistanceToPoint(
       device_viewport_point);
@@ -3004,12 +2999,6 @@ void LayerTreeHostImpl::ScrollViewportBy(gfx::Vector2dF scroll_delta) {
 
   if (!unused_delta.IsZero() && (scroll_layer == OuterViewportScrollLayer()))
     InnerViewportScrollLayer()->ScrollBy(unused_delta);
-}
-
-void LayerTreeHostImpl::AnimateInput(base::TimeTicks monotonic_time) {
-  DCHECK(proxy_->IsImplThread());
-  if (input_handler_client_)
-    input_handler_client_->Animate(monotonic_time);
 }
 
 void LayerTreeHostImpl::AnimatePageScale(base::TimeTicks monotonic_time) {

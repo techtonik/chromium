@@ -23,6 +23,7 @@ class URLRequestContextGetter;
 }
 
 class FileDownloader;
+class Profile;
 
 // Downloads and provides a list of suggested popular sites, for display on
 // the NTP when there are not enough personalized suggestions. Caches the
@@ -30,16 +31,22 @@ class FileDownloader;
 class PopularSites {
  public:
   struct Site {
-    Site(const base::string16& title, const GURL& url, const GURL& favicon_url);
+    Site(const base::string16& title,
+         const GURL& url,
+         const GURL& favicon_url,
+         const GURL& thumbnail_url);
+    ~Site();
 
     base::string16 title;
     GURL url;
     GURL favicon_url;
+    GURL thumbnail_url;
   };
 
   using FinishedCallback = base::Callback<void(bool /* success */)>;
 
-  PopularSites(const std::string& filename,
+  PopularSites(Profile* profile,
+               const std::string& filename,
                net::URLRequestContextGetter* request_context,
                const FinishedCallback& callback);
   ~PopularSites();

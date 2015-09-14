@@ -21,6 +21,7 @@ namespace scheduler {
 class ChildScheduler;
 class SingleThreadIdleTaskRunner;
 class TaskQueue;
+class WebTaskRunnerImpl;
 
 class SCHEDULER_EXPORT WebSchedulerImpl : public blink::WebScheduler {
  public:
@@ -41,29 +42,23 @@ class SCHEDULER_EXPORT WebSchedulerImpl : public blink::WebScheduler {
                                        blink::WebThread::IdleTask* task);
   virtual void postIdleTaskAfterWakeup(const blink::WebTraceLocation& location,
                                        blink::WebThread::IdleTask* task);
-  virtual void postLoadingTask(const blink::WebTraceLocation& location,
-                               blink::WebThread::Task* task);
+  virtual blink::WebTaskRunner* loadingTaskRunner();
+  virtual blink::WebTaskRunner* timerTaskRunner();
+
   // TODO(alexclarke): Remove when possible.
   virtual void postTimerTaskAt(const blink::WebTraceLocation& location,
-                               blink::WebThread::Task* task,
+                               blink::WebTaskRunner::Task* task,
                                double monotonicTime);
-  virtual void postTimerTask(const blink::WebTraceLocation& location,
-                             blink::WebThread::Task* task,
-                             double delaySecs);
-  // TODO(alexclarke): Remove once the Blink side patch lands.
-  virtual void postTimerTask(const blink::WebTraceLocation& location,
-                             blink::WebThread::Task* task,
-                             long long delayMs);
 
  private:
   static void runIdleTask(scoped_ptr<blink::WebThread::IdleTask> task,
                           base::TimeTicks deadline);
-  static void runTask(scoped_ptr<blink::WebThread::Task> task);
 
   ChildScheduler* child_scheduler_;  // NOT OWNED
   scoped_refptr<SingleThreadIdleTaskRunner> idle_task_runner_;
-  scoped_refptr<base::SingleThreadTaskRunner> loading_task_runner_;
   scoped_refptr<TaskQueue> timer_task_runner_;
+  scoped_ptr<WebTaskRunnerImpl> loading_web_task_runner_;
+  scoped_ptr<WebTaskRunnerImpl> timer_web_task_runner_;
 };
 
 }  // namespace scheduler

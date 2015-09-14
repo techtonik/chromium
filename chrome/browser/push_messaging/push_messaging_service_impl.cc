@@ -14,6 +14,7 @@
 #include "base/metrics/histogram.h"
 #include "base/prefs/pref_service.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/permissions/permission_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/push_messaging/push_messaging_app_identifier.h"
@@ -83,6 +84,8 @@ void UnregisterCallbackToClosure(
 
 #if defined(ENABLE_BACKGROUND)
 bool UseBackgroundMode() {
+  // Note: if push is ever enabled in incognito, the background mode integration
+  // should not be enabled for it.
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kDisablePushApiBackgroundMode))
     return false;
@@ -129,11 +132,10 @@ PushMessagingServiceImpl::PushMessagingServiceImpl(Profile* profile)
 #endif
       weak_factory_(this) {
   DCHECK(profile);
-  profile_->GetHostContentSettingsMap()->AddObserver(this);
+  HostContentSettingsMapFactory::GetForProfile(profile_)->AddObserver(this);
 }
 
 PushMessagingServiceImpl::~PushMessagingServiceImpl() {
-  profile_->GetHostContentSettingsMap()->RemoveObserver(this);
 }
 
 void PushMessagingServiceImpl::IncreasePushSubscriptionCount(int add,
@@ -745,14 +747,6 @@ void PushMessagingServiceImpl::SetContentSettingChangedCallbackForTesting(
 
 void PushMessagingServiceImpl::Shutdown() {
   GetGCMDriver()->RemoveAppHandler(kPushMessagingAppIdentifierPrefix);
-#if defined(ENABLE_BACKGROUND)
-  // TODO(mvanouwerkerk): Ensure Push API unregisters correctly from Background
-  // Mode - crbug.com/527036.
-  if (UseBackgroundMode() && g_browser_process->background_mode_manager()) {
-    g_browser_process->background_mode_manager()->UnregisterTrigger(profile_,
-                                                                    this);
-  }
-#endif  // defined(ENABLE_BACKGROUND)
 }
 
 // BackgroundTrigger methods ---------------------------------------------------

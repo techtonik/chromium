@@ -27,26 +27,25 @@ source_set("base") {
     "switching_media_renderer.h",
   ]
 
+  public_deps = [
+    "//chromecast/public/media",
+  ]
+
   configs += [ "//chromecast:config" ]
 
   deps = [
+    ":libcast_media_default",
     "//base",
-    "//chromecast/public/media",
+    "//chromecast/public",
     "//crypto",
     "//crypto:platform",
     "//media",
+    "//net",
     "//third_party/widevine/cdm:version_h",
   ]
 
-  if (chromecast_branding != "public") {
-    deps += [
-      "${libcast_media_target}",
-      # TODO(gyp): add dependency on internal/chromecast_internal:media_base_internal
-    ]
-  } else {
+  if (chromecast_branding == "public") {
     sources += [ "key_systems_common_simple.cc" ]
-
-    deps += [ ":libcast_media_default" ]
   }
 }
 
