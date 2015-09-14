@@ -27,6 +27,7 @@ namespace view_manager {
 class AccessPolicy;
 class ConnectionManager;
 class ServerView;
+class ViewTreeHostImpl;
 
 // An instance of ViewTreeImpl is created for every ViewTree request.
 // ViewTreeImpl tracks all the state and views created by a client. ViewTreeImpl
@@ -64,6 +65,8 @@ class ViewTreeImpl : public mojo::ViewTree, public AccessPolicyDelegate {
 
   bool is_embed_root() const { return is_embed_root_; }
 
+  ViewTreeHostImpl* GetHost();
+
   // Invoked when a connection is about to be destroyed.
   void OnWillDestroyViewTreeImpl(ViewTreeImpl* connection);
 
@@ -73,7 +76,9 @@ class ViewTreeImpl : public mojo::ViewTree, public AccessPolicyDelegate {
   bool AddView(const ViewId& parent_id, const ViewId& child_id);
   std::vector<const ServerView*> GetViewTree(const ViewId& view_id) const;
   bool SetViewVisibility(const ViewId& view_id, bool visible);
-  bool Embed(const ViewId& view_id, mojo::ViewTreeClientPtr client);
+  bool Embed(const ViewId& view_id,
+             mojo::ViewTreeClientPtr client,
+             mojo::ConnectionSpecificId* connection_id);
   void Embed(const ViewId& view_id, mojo::URLRequestPtr request);
 
   // The following methods are invoked after the corresponding change has been
@@ -194,17 +199,17 @@ class ViewTreeImpl : public mojo::ViewTree, public AccessPolicyDelegate {
       mojo::Id view_id,
       mojo::InterfaceRequest<mojo::Surface> surface,
       mojo::SurfaceClientPtr client) override;
-  void SetEmbedRoot() override;
   void Embed(mojo::Id transport_view_id,
              mojo::ViewTreeClientPtr client,
-             const mojo::Callback<void(bool)>& callback) override;
-  void SetFocus(uint32_t view_id, const SetFocusCallback& callback) override;
+             const EmbedCallback& callback) override;
+  void SetFocus(uint32_t view_id) override;
   void SetViewTextInputState(uint32_t view_id,
                              mojo::TextInputStatePtr state) override;
-  void SetImeVisibility(uint32_t view_id,
+  void SetImeVisibility(mojo::Id transport_view_id,
                         bool visible,
                         mojo::TextInputStatePtr state) override;
-
+  void SetAccessPolicy(mojo::Id transport_view_id,
+                       uint32 policy_bitmask) override;
 
   // AccessPolicyDelegate:
   bool IsRootForAccessPolicy(const ViewId& id) const override;
@@ -224,7 +229,7 @@ class ViewTreeImpl : public mojo::ViewTree, public AccessPolicyDelegate {
 
   mojo::ViewTreeClient* client_;
 
-  scoped_ptr<AccessPolicy> access_policy_;
+  scoped_ptr<view_manager::AccessPolicy> access_policy_;
 
   // The views created by this connection. This connection owns these objects.
   ViewMap view_map_;

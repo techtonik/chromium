@@ -82,13 +82,17 @@ class BrowsingDataRemover
     REMOVE_NOCHECKS = 1 << 16,
     REMOVE_WEBRTC_IDENTITY = 1 << 17,
     REMOVE_CACHE_STORAGE = 1 << 18,
+#if defined(OS_ANDROID)
+    REMOVE_WEBAPP_DATA = 1 << 19,
+#endif
     // The following flag is used only in tests. In normal usage, hosted app
     // data is controlled by the REMOVE_COOKIES flag, applied to the
     // protected-web origin.
     REMOVE_HOSTED_APP_DATA_TESTONLY = 1 << 31,
 
     // "Site data" includes cookies, appcache, file systems, indexedDBs, local
-    // storage, webSQL, service workers, cache storage, and plugin data.
+    // storage, webSQL, service workers, cache storage, plugin data, and web app
+    // data (on Android).
     REMOVE_SITE_DATA = REMOVE_APPCACHE | REMOVE_COOKIES | REMOVE_FILE_SYSTEMS |
                        REMOVE_INDEXEDDB |
                        REMOVE_LOCAL_STORAGE |
@@ -98,6 +102,9 @@ class BrowsingDataRemover
                        REMOVE_WEBSQL |
                        REMOVE_CHANNEL_IDS |
                        REMOVE_SITE_USAGE_DATA |
+#if defined(OS_ANDROID)
+                       REMOVE_WEBAPP_DATA |
+#endif
                        REMOVE_WEBRTC_IDENTITY,
 
     // Includes all the available remove options. Meant to be used by clients
@@ -113,6 +120,16 @@ class BrowsingDataRemover
     // is scheduled to be deleted, and all possible data should be wiped from
     // disk as soon as possible.
     REMOVE_WIPE_PROFILE = REMOVE_ALL | REMOVE_NOCHECKS,
+  };
+
+  // A helper enum to report the deletion of cookies and/or cache. Do not
+  // reorder the entries, as this enum is passed to UMA.
+  enum CookieOrCacheDeletionChoice {
+    NEITHER_COOKIES_NOR_CACHE,
+    ONLY_COOKIES,
+    ONLY_CACHE,
+    BOTH_COOKIES_AND_CACHE,
+    MAX_CHOICE_VALUE
   };
 
   // When BrowsingDataRemover successfully removes data, a notification of type
@@ -376,6 +393,9 @@ class BrowsingDataRemover
 #if defined(OS_ANDROID)
   // Callback on UI thread when the precache history has been cleared.
   void OnClearedPrecacheHistory();
+
+  // Callback on UI thread when the webapp data has been cleared.
+  void OnClearedWebappData();
 #endif
 
   void OnClearedDomainReliabilityMonitor();
@@ -436,6 +456,7 @@ class BrowsingDataRemover
   bool waiting_for_clear_pnacl_cache_ = false;
 #if defined(OS_ANDROID)
   bool waiting_for_clear_precache_history_ = false;
+  bool waiting_for_clear_webapp_data_ = false;
 #endif
   bool waiting_for_clear_storage_partition_data_ = false;
 #if defined(ENABLE_WEBRTC)

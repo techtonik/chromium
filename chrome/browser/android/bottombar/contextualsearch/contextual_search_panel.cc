@@ -117,12 +117,6 @@ void ContextualSearchPanel::DestroyWebContents(JNIEnv* env, jobject jobj) {
   web_contents_delegate_.reset();
 }
 
-void ContextualSearchPanel::ReleaseWebContents(JNIEnv* env, jobject jboj) {
-  DCHECK(web_contents_.get());
-  web_contents_delegate_.reset();
-  ignore_result(web_contents_.release());
-}
-
 void ContextualSearchPanel::SetInterceptNavigationDelegate(
     JNIEnv* env,
     jobject obj,
@@ -141,7 +135,7 @@ bool RegisterContextualSearchPanel(JNIEnv* env) {
   return RegisterNativesImpl(env);
 }
 
-jlong Init(JNIEnv* env, jobject obj) {
+jlong Init(JNIEnv* env, const JavaParamRef<jobject>& obj) {
   ContextualSearchPanel* manager = new ContextualSearchPanel(env, obj);
   return reinterpret_cast<intptr_t>(manager);
 }

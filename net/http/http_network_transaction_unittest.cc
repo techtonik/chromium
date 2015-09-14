@@ -6,6 +6,8 @@
 
 #include <math.h>  // ceil
 #include <stdarg.h>
+#include <stdint.h>
+
 #include <string>
 #include <vector>
 
@@ -263,7 +265,8 @@ class HttpNetworkTransactionTest
     int rv;
     std::string status_line;
     std::string response_data;
-    int64 totalReceivedBytes;
+    int64_t total_received_bytes;
+    int64_t total_sent_bytes;
     LoadTimingInfo load_timing_info;
     ConnectionAttempts connection_attempts;
   };
@@ -339,6 +342,8 @@ class HttpNetworkTransactionTest
     EXPECT_EQ(ERR_IO_PENDING, rv);
 
     out.rv = callback.WaitForResult();
+    out.total_received_bytes = trans->GetTotalReceivedBytes();
+    out.total_sent_bytes = trans->GetTotalSentBytes();
 
     // Even in the failure cases that use this function, connections are always
     // successfully established before the error.
@@ -390,23 +395,30 @@ class HttpNetworkTransactionTest
     EXPECT_EQ("['Host: www.example.org','Connection: keep-alive']",
               response_headers);
 
-    out.totalReceivedBytes = trans->GetTotalReceivedBytes();
+    out.total_received_bytes = trans->GetTotalReceivedBytes();
+    // The total number of sent bytes should not have changed.
+    EXPECT_EQ(out.total_sent_bytes, trans->GetTotalSentBytes());
+
     trans->GetConnectionAttempts(&out.connection_attempts);
     return out;
   }
 
   SimpleGetHelperResult SimpleGetHelper(MockRead data_reads[],
                                         size_t reads_count) {
-    StaticSocketDataProvider reads(data_reads, reads_count, NULL, 0);
-    StaticSocketDataProvider* data[] = { &reads };
-    return SimpleGetHelperForData(data, 1);
-  }
+    MockWrite data_writes[] = {
+        MockWrite("GET / HTTP/1.1\r\n"
+                  "Host: www.example.org\r\n"
+                  "Connection: keep-alive\r\n\r\n"),
+    };
 
-  int64 ReadsSize(MockRead data_reads[], size_t reads_count) {
-    int64 size = 0;
-    for (size_t i = 0; i < reads_count; ++i)
-      size += data_reads[i].data_len;
-    return size;
+    StaticSocketDataProvider reads(data_reads, reads_count, data_writes,
+                                   arraysize(data_writes));
+    StaticSocketDataProvider* data[] = {&reads};
+    SimpleGetHelperResult out = SimpleGetHelperForData(data, 1);
+
+    EXPECT_EQ(CountWriteBytes(data_writes, arraysize(data_writes)),
+              out.total_sent_bytes);
+    return out;
   }
 
   void ConnectStatusHelperWithExpectedStatus(const MockRead& status,
@@ -677,8 +689,8 @@ TEST_P(HttpNetworkTransactionTest, SimpleGET) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.0 200 OK", out.status_line);
   EXPECT_EQ("hello world", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
   EXPECT_EQ(0u, out.connection_attempts.size());
 }
 
@@ -693,8 +705,8 @@ TEST_P(HttpNetworkTransactionTest, SimpleGETNoHeaders) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/0.9 200 OK", out.status_line);
   EXPECT_EQ("hello world", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Allow up to 4 bytes of junk to precede status line.
@@ -708,8 +720,8 @@ TEST_P(HttpNetworkTransactionTest, StatusLineJunk3Bytes) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.0 404 Not Found", out.status_line);
   EXPECT_EQ("DATA", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Allow up to 4 bytes of junk to precede status line.
@@ -723,8 +735,8 @@ TEST_P(HttpNetworkTransactionTest, StatusLineJunk4Bytes) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.0 404 Not Found", out.status_line);
   EXPECT_EQ("DATA", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Beyond 4 bytes of slop and it should fail to find a status line.
@@ -738,8 +750,8 @@ TEST_P(HttpNetworkTransactionTest, StatusLineJunk5Bytes) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/0.9 200 OK", out.status_line);
   EXPECT_EQ("xxxxxHTTP/1.1 404 Not Found\nServer: blah", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Same as StatusLineJunk4Bytes, except the read chunks are smaller.
@@ -757,8 +769,8 @@ TEST_P(HttpNetworkTransactionTest, StatusLineJunk4Bytes_Slow) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.0 404 Not Found", out.status_line);
   EXPECT_EQ("DATA", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Close the connection before enough bytes to have a status line.
@@ -772,8 +784,8 @@ TEST_P(HttpNetworkTransactionTest, StatusLinePartial) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/0.9 200 OK", out.status_line);
   EXPECT_EQ("HTT", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  EXPECT_EQ(reads_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  EXPECT_EQ(reads_size, out.total_received_bytes);
 }
 
 // Simulate a 204 response, lacking a Content-Length header, sent over a
@@ -791,9 +803,9 @@ TEST_P(HttpNetworkTransactionTest, StopsReading204) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.1 204 No Content", out.status_line);
   EXPECT_EQ("", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  int64 response_size = reads_size - strlen(junk);
-  EXPECT_EQ(response_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  int64_t response_size = reads_size - strlen(junk);
+  EXPECT_EQ(response_size, out.total_received_bytes);
 }
 
 // A simple request using chunked encoding with some extra data after.
@@ -815,9 +827,9 @@ TEST_P(HttpNetworkTransactionTest, ChunkedEncoding) {
   EXPECT_EQ(OK, out.rv);
   EXPECT_EQ("HTTP/1.1 200 OK", out.status_line);
   EXPECT_EQ("Hello world", out.response_data);
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
-  int64 response_size = reads_size - extra_data.size();
-  EXPECT_EQ(response_size, out.totalReceivedBytes);
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
+  int64_t response_size = reads_size - extra_data.size();
+  EXPECT_EQ(response_size, out.total_received_bytes);
 }
 
 // Next tests deal with http://crbug.com/56344.
@@ -1953,7 +1965,9 @@ TEST_P(HttpNetworkTransactionTest, BasicAuth) {
   EXPECT_TRUE(trans->GetLoadTimingInfo(&load_timing_info1));
   TestLoadTimingNotReused(load_timing_info1, CONNECT_TIMING_HAS_DNS_TIMES);
 
-  int64 reads_size1 = ReadsSize(data_reads1, arraysize(data_reads1));
+  int64_t writes_size1 = CountWriteBytes(data_writes1, arraysize(data_writes1));
+  EXPECT_EQ(writes_size1, trans->GetTotalSentBytes());
+  int64_t reads_size1 = CountReadBytes(data_reads1, arraysize(data_reads1));
   EXPECT_EQ(reads_size1, trans->GetTotalReceivedBytes());
 
   const HttpResponseInfo* response = trans->GetResponseInfo();
@@ -1978,7 +1992,9 @@ TEST_P(HttpNetworkTransactionTest, BasicAuth) {
             load_timing_info2.connect_timing.connect_start);
   EXPECT_NE(load_timing_info1.socket_log_id, load_timing_info2.socket_log_id);
 
-  int64 reads_size2 = ReadsSize(data_reads2, arraysize(data_reads2));
+  int64_t writes_size2 = CountWriteBytes(data_writes2, arraysize(data_writes2));
+  EXPECT_EQ(writes_size1 + writes_size2, trans->GetTotalSentBytes());
+  int64_t reads_size2 = CountReadBytes(data_reads2, arraysize(data_reads2));
   EXPECT_EQ(reads_size1 + reads_size2, trans->GetTotalReceivedBytes());
 
   response = trans->GetResponseInfo();
@@ -2024,7 +2040,9 @@ TEST_P(HttpNetworkTransactionTest, DoNotSendAuth) {
   rv = callback.WaitForResult();
   EXPECT_EQ(0, rv);
 
-  int64 reads_size = ReadsSize(data_reads, arraysize(data_reads));
+  int64_t writes_size = CountWriteBytes(data_writes, arraysize(data_writes));
+  EXPECT_EQ(writes_size, trans->GetTotalSentBytes());
+  int64_t reads_size = CountReadBytes(data_reads, arraysize(data_reads));
   EXPECT_EQ(reads_size, trans->GetTotalReceivedBytes());
 
   const HttpResponseInfo* response = trans->GetResponseInfo();
@@ -2130,7 +2148,10 @@ TEST_P(HttpNetworkTransactionTest, BasicAuthKeepAlive) {
   std::string response_data;
   rv = ReadTransaction(trans.get(), &response_data);
   EXPECT_EQ(OK, rv);
-  int64 reads_size1 = ReadsSize(data_reads1, arraysize(data_reads1));
+
+  int64_t writes_size1 = CountWriteBytes(data_writes1, arraysize(data_writes1));
+  EXPECT_EQ(writes_size1, trans->GetTotalSentBytes());
+  int64_t reads_size1 = CountReadBytes(data_reads1, arraysize(data_reads1));
   EXPECT_EQ(reads_size1, trans->GetTotalReceivedBytes());
 }
 
@@ -3946,7 +3967,7 @@ TEST_P(HttpNetworkTransactionTest,
   // CONNECT to mail.example.org:443 via SPDY.
   SpdyHeaderBlock connect2_block;
   connect2_block[spdy_util_.GetMethodKey()] = "CONNECT";
-  if (GetParam() >= kProtoHTTP2MinimumVersion) {
+  if (GetParam() == kProtoHTTP2) {
     connect2_block[spdy_util_.GetHostKey()] = "mail.example.org:443";
   } else {
     connect2_block[spdy_util_.GetPathKey()] = "mail.example.org:443";
@@ -13349,8 +13370,6 @@ class FakeStream : public HttpStream,
     return false;
   }
 
-  bool CanFindEndOfResponse() const override { return false; }
-
   bool IsConnectionReused() const override {
     ADD_FAILURE();
     return false;
@@ -13358,12 +13377,14 @@ class FakeStream : public HttpStream,
 
   void SetConnectionReused() override { ADD_FAILURE(); }
 
-  bool IsConnectionReusable() const override {
-    ADD_FAILURE();
-    return false;
-  }
+  bool CanReuseConnection() const override { return false; }
 
   int64 GetTotalReceivedBytes() const override {
+    ADD_FAILURE();
+    return 0;
+  }
+
+  int64_t GetTotalSentBytes() const override {
     ADD_FAILURE();
     return 0;
   }
@@ -13377,11 +13398,6 @@ class FakeStream : public HttpStream,
 
   void GetSSLCertRequestInfo(SSLCertRequestInfo* cert_request_info) override {
     ADD_FAILURE();
-  }
-
-  bool IsSpdyHttpStream() const override {
-    ADD_FAILURE();
-    return false;
   }
 
   void Drain(HttpNetworkSession* session) override { ADD_FAILURE(); }
@@ -13571,22 +13587,20 @@ class FakeWebSocketBasicHandshakeStream : public WebSocketHandshakeStreamBase {
     return false;
   }
 
-  bool CanFindEndOfResponse() const override {
-    return parser()->CanFindEndOfResponse();
-  }
-
   bool IsConnectionReused() const override {
     NOTREACHED();
     return false;
   }
   void SetConnectionReused() override { NOTREACHED(); }
 
-  bool IsConnectionReusable() const override {
-    NOTREACHED();
-    return false;
-  }
+  bool CanReuseConnection() const override { return false; }
 
   int64 GetTotalReceivedBytes() const override {
+    NOTREACHED();
+    return 0;
+  }
+
+  int64_t GetTotalSentBytes() const override {
     NOTREACHED();
     return 0;
   }
@@ -13600,11 +13614,6 @@ class FakeWebSocketBasicHandshakeStream : public WebSocketHandshakeStreamBase {
 
   void GetSSLCertRequestInfo(SSLCertRequestInfo* cert_request_info) override {
     NOTREACHED();
-  }
-
-  bool IsSpdyHttpStream() const override {
-    NOTREACHED();
-    return false;
   }
 
   void Drain(HttpNetworkSession* session) override { NOTREACHED(); }
@@ -14592,6 +14601,147 @@ TEST_P(HttpNetworkTransactionTest, ProxyHeadersNotSentOverWsTunnel) {
 
   trans.reset();
   session->CloseAllConnections();
+}
+
+TEST_P(HttpNetworkTransactionTest, TotalNetworkBytesPost) {
+  ScopedVector<UploadElementReader> element_readers;
+  element_readers.push_back(new UploadBytesElementReader("foo", 3));
+  ElementsUploadDataStream upload_data_stream(element_readers.Pass(), 0);
+
+  HttpRequestInfo request;
+  request.method = "POST";
+  request.url = GURL("http://www.foo.com/");
+  request.upload_data_stream = &upload_data_stream;
+
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+  MockWrite data_writes[] = {
+      MockWrite("POST / HTTP/1.1\r\n"
+                "Host: www.foo.com\r\n"
+                "Connection: keep-alive\r\n"
+                "Content-Length: 3\r\n\r\n"),
+      MockWrite("foo"),
+  };
+
+  MockRead data_reads[] = {
+      MockRead("HTTP/1.1 200 OK\r\n\r\n"), MockRead("hello world"),
+      MockRead(SYNCHRONOUS, OK),
+  };
+  StaticSocketDataProvider data(data_reads, arraysize(data_reads), data_writes,
+                                arraysize(data_writes));
+  session_deps_.socket_factory->AddSocketDataProvider(&data);
+
+  TestCompletionCallback callback;
+
+  EXPECT_EQ(ERR_IO_PENDING,
+            trans->Start(&request, callback.callback(), BoundNetLog()));
+  EXPECT_EQ(OK, callback.WaitForResult());
+
+  std::string response_data;
+  EXPECT_EQ(OK, ReadTransaction(trans.get(), &response_data));
+
+  EXPECT_EQ(CountWriteBytes(data_writes, arraysize(data_writes)),
+            trans->GetTotalSentBytes());
+  EXPECT_EQ(CountReadBytes(data_reads, arraysize(data_reads)),
+            trans->GetTotalReceivedBytes());
+}
+
+TEST_P(HttpNetworkTransactionTest, TotalNetworkBytesPost100Continue) {
+  ScopedVector<UploadElementReader> element_readers;
+  element_readers.push_back(new UploadBytesElementReader("foo", 3));
+  ElementsUploadDataStream upload_data_stream(element_readers.Pass(), 0);
+
+  HttpRequestInfo request;
+  request.method = "POST";
+  request.url = GURL("http://www.foo.com/");
+  request.upload_data_stream = &upload_data_stream;
+
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+  MockWrite data_writes[] = {
+      MockWrite("POST / HTTP/1.1\r\n"
+                "Host: www.foo.com\r\n"
+                "Connection: keep-alive\r\n"
+                "Content-Length: 3\r\n\r\n"),
+      MockWrite("foo"),
+  };
+
+  MockRead data_reads[] = {
+      MockRead("HTTP/1.1 100 Continue\r\n\r\n"),
+      MockRead("HTTP/1.1 200 OK\r\n\r\n"), MockRead("hello world"),
+      MockRead(SYNCHRONOUS, OK),
+  };
+  StaticSocketDataProvider data(data_reads, arraysize(data_reads), data_writes,
+                                arraysize(data_writes));
+  session_deps_.socket_factory->AddSocketDataProvider(&data);
+
+  TestCompletionCallback callback;
+
+  EXPECT_EQ(ERR_IO_PENDING,
+            trans->Start(&request, callback.callback(), BoundNetLog()));
+  EXPECT_EQ(OK, callback.WaitForResult());
+
+  std::string response_data;
+  EXPECT_EQ(OK, ReadTransaction(trans.get(), &response_data));
+
+  EXPECT_EQ(CountWriteBytes(data_writes, arraysize(data_writes)),
+            trans->GetTotalSentBytes());
+  EXPECT_EQ(CountReadBytes(data_reads, arraysize(data_reads)),
+            trans->GetTotalReceivedBytes());
+}
+
+TEST_P(HttpNetworkTransactionTest, TotalNetworkBytesChunkedPost) {
+  ScopedVector<UploadElementReader> element_readers;
+  element_readers.push_back(new UploadBytesElementReader("foo", 3));
+  ChunkedUploadDataStream upload_data_stream(0);
+
+  HttpRequestInfo request;
+  request.method = "POST";
+  request.url = GURL("http://www.foo.com/");
+  request.upload_data_stream = &upload_data_stream;
+
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+  // Send headers successfully, but get an error while sending the body.
+  MockWrite data_writes[] = {
+      MockWrite("POST / HTTP/1.1\r\n"
+                "Host: www.foo.com\r\n"
+                "Connection: keep-alive\r\n"
+                "Transfer-Encoding: chunked\r\n\r\n"),
+      MockWrite("1\r\nf\r\n"), MockWrite("2\r\noo\r\n"), MockWrite("0\r\n\r\n"),
+  };
+
+  MockRead data_reads[] = {
+      MockRead("HTTP/1.1 200 OK\r\n\r\n"), MockRead("hello world"),
+      MockRead(SYNCHRONOUS, OK),
+  };
+  StaticSocketDataProvider data(data_reads, arraysize(data_reads), data_writes,
+                                arraysize(data_writes));
+  session_deps_.socket_factory->AddSocketDataProvider(&data);
+
+  TestCompletionCallback callback;
+
+  EXPECT_EQ(ERR_IO_PENDING,
+            trans->Start(&request, callback.callback(), BoundNetLog()));
+
+  base::RunLoop().RunUntilIdle();
+  upload_data_stream.AppendData("f", 1, false);
+
+  base::RunLoop().RunUntilIdle();
+  upload_data_stream.AppendData("oo", 2, true);
+
+  EXPECT_EQ(OK, callback.WaitForResult());
+
+  std::string response_data;
+  EXPECT_EQ(OK, ReadTransaction(trans.get(), &response_data));
+
+  EXPECT_EQ(CountWriteBytes(data_writes, arraysize(data_writes)),
+            trans->GetTotalSentBytes());
+  EXPECT_EQ(CountReadBytes(data_reads, arraysize(data_reads)),
+            trans->GetTotalReceivedBytes());
 }
 
 }  // namespace net

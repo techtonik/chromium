@@ -23,14 +23,13 @@ void CallCallback(const mojo::Closure& callback, cc::SurfaceDrawStatus status) {
 
 }  // namespace
 
-ServerView::ServerView(ServerViewDelegate* delegate,
-                       const ViewId& id)
+ServerView::ServerView(ServerViewDelegate* delegate, const ViewId& id)
     : delegate_(delegate),
       id_(id),
       parent_(nullptr),
       visible_(false),
       opacity_(1),
-      allows_reembed_(false),
+      pending_access_policy_(mojo::ViewTree::ACCESS_POLICY_DEFAULT),
       // Don't notify newly added observers during notification. This causes
       // problems for code that adds an observer as part of an observer
       // notification (such as ServerViewDrawTracker).
@@ -40,7 +39,6 @@ ServerView::ServerView(ServerViewDelegate* delegate,
 }
 
 ServerView::~ServerView() {
-  delegate_->PrepareToDestroyView(this);
   FOR_EACH_OBSERVER(ServerViewObserver, observers_, OnWillDestroyView(this));
 
   while (!children_.empty())
@@ -94,7 +92,6 @@ void ServerView::Add(ServerView* child) {
   }
 
   ServerView* old_parent = child->parent();
-  child->delegate_->PrepareToChangeViewHierarchy(child, this, old_parent);
   FOR_EACH_OBSERVER(ServerViewObserver, child->observers_,
                     OnWillChangeViewHierarchy(child, this, old_parent));
 
@@ -113,7 +110,6 @@ void ServerView::Remove(ServerView* child) {
   DCHECK(child != this);
   DCHECK(child->parent() == this);
 
-  child->delegate_->PrepareToChangeViewHierarchy(child, NULL, this);
   FOR_EACH_OBSERVER(ServerViewObserver, child->observers_,
                     OnWillChangeViewHierarchy(child, nullptr, this));
   RemoveImpl(child);
@@ -180,7 +176,6 @@ void ServerView::SetVisible(bool value) {
   if (visible_ == value)
     return;
 
-  delegate_->PrepareToChangeViewVisibility(this);
   FOR_EACH_OBSERVER(ServerViewObserver, observers_,
                     OnWillChangeViewVisibility(this));
   visible_ = value;

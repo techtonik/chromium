@@ -15,12 +15,12 @@
 // ChromeVariationsServiceClient provides an implementation of
 // VariationsServiceClient that depends on chrome/.
 class ChromeVariationsServiceClient
-    : public chrome_variations::VariationsServiceClient {
+    : public variations::VariationsServiceClient {
  public:
   ChromeVariationsServiceClient();
   ~ChromeVariationsServiceClient() override;
 
-  // chrome_variations::VariationsServiceClient:
+  // variations::VariationsServiceClient:
   std::string GetApplicationLocale() override;
   base::SequencedWorkerPool* GetBlockingPool() override;
   base::Callback<base::Version(void)> GetVersionForSimulationCallback()
@@ -28,6 +28,7 @@ class ChromeVariationsServiceClient
   net::URLRequestContextGetter* GetURLRequestContext() override;
   network_time::NetworkTimeTracker* GetNetworkTimeTracker() override;
   version_info::Channel GetChannel() override;
+  bool OverridesRestrictParameter(std::string* parameter) override;
   void OverrideUIString(uint32_t hash, const base::string16& string) override;
   void OnInitialStartup() override;
 

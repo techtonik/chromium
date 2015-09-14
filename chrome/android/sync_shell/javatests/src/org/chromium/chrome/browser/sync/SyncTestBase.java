@@ -5,6 +5,7 @@
 package org.chromium.chrome.browser.sync;
 
 import android.accounts.Account;
+import android.app.Activity;
 import android.content.Context;
 
 import org.chromium.base.ThreadUtils;
@@ -13,6 +14,7 @@ import org.chromium.chrome.browser.identity.UniqueIdentificationGenerator;
 import org.chromium.chrome.browser.identity.UniqueIdentificationGeneratorFactory;
 import org.chromium.chrome.browser.identity.UuidBasedUniqueIdentificationGenerator;
 import org.chromium.chrome.browser.signin.AccountIdProvider;
+import org.chromium.chrome.browser.signin.AccountTrackerService;
 import org.chromium.chrome.browser.signin.SigninManager;
 import org.chromium.chrome.test.ChromeActivityTestCaseBase;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
@@ -38,6 +40,7 @@ public class SyncTestBase extends ChromeActivityTestCaseBase<ChromeActivity> {
     protected FakeServerHelper mFakeServerHelper;
     protected ProfileSyncService mProfileSyncService;
     protected MockSyncContentResolverDelegate mSyncContentResolver;
+    protected ChromeSigninController mChromeSigninController;
 
     public SyncTestBase() {
       super(ChromeActivity.class);
@@ -63,8 +66,10 @@ public class SyncTestBase extends ChromeActivityTestCaseBase<ChromeActivity> {
         setUpMockAndroidSyncSettings();
         setUpMockAccountManager();
 
-        // Initializes ChromeSigninController to use our test context.
-        ChromeSigninController.get(mContext);
+        // Initializes ChromeSigninController to use our test context and make sure there is no
+        // account is signed in yet.
+        mChromeSigninController = ChromeSigninController.get(mContext);
+        mChromeSigninController.setSignedInAccountName(null);
 
         ThreadUtils.runOnUiThreadBlocking(new Runnable() {
             @Override
@@ -94,6 +99,8 @@ public class SyncTestBase extends ChromeActivityTestCaseBase<ChromeActivity> {
             }
         });
 
+        if (mChromeSigninController.isSignedIn()) signOut();
+
         super.tearDown();
     }
 
@@ -105,6 +112,11 @@ public class SyncTestBase extends ChromeActivityTestCaseBase<ChromeActivity> {
                     @Override
                     public String getAccountId(Context ctx, String accountName) {
                         return "gaia-id-" + accountName;
+                    }
+
+                    @Override
+                    public boolean canBeUsed(Context ctx, Activity activity) {
+                        return true;
                     }
                 });
             }
@@ -126,6 +138,14 @@ public class SyncTestBase extends ChromeActivityTestCaseBase<ChromeActivity> {
             throws InterruptedException {
         Account defaultTestAccount = SyncTestUtil.setupTestAccountThatAcceptsAllAuthTokens(
                 mAccountManager, SyncTestUtil.DEFAULT_TEST_ACCOUNT, SyncTestUtil.DEFAULT_PASSWORD);
+
+        // Force refresh AccountTrackerService since accounts are changed.
+        ThreadUtils.runOnUiThreadBlocking(new Runnable() {
+            @Override
+            public void run() {
+                AccountTrackerService.get(mContext).forceRefresh();
+            }
+        });
 
         UniqueIdentificationGeneratorFactory.registerGenerator(
                 UuidBasedUniqueIdentificationGenerator.GENERATOR_ID,

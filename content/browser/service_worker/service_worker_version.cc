@@ -631,6 +631,7 @@ ServiceWorkerVersionInfo ServiceWorkerVersion::GetInfo() {
 }
 
 void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (!context_) {
     RecordStartWorkerResult(SERVICE_WORKER_ERROR_ABORT);
     RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_ABORT));
@@ -641,6 +642,17 @@ void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
     RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_REDUNDANT));
     return;
   }
+  // Check that the worker is allowed to start on the given scope. Since this
+  // worker might not be used for a specific frame/process, use -1.
+  // resource_context() can return null in unit tests.
+  if (context_->wrapper()->resource_context() &&
+      !GetContentClient()->browser()->AllowServiceWorker(
+          scope_, scope_, context_->wrapper()->resource_context(), -1, -1)) {
+    RecordStartWorkerResult(SERVICE_WORKER_ERROR_DISALLOWED);
+    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_DISALLOWED));
+    return;
+  }
+
   prestart_status_ = status_;
 
   // Ensure the live registration during starting worker so that the worker can
@@ -814,8 +826,9 @@ void ServiceWorkerVersion::DispatchFetchEvent(
   }
 }
 
-void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
-                                             const StatusCallback& callback) {
+void ServiceWorkerVersion::DispatchSyncEvent(
+    BackgroundSyncRegistrationHandle::HandleId handle_id,
+    const StatusCallback& callback) {
   OnBeginEvent();
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
@@ -823,7 +836,7 @@ void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
     StartWorker(base::Bind(
         &RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(), callback,
         base::Bind(&self::DispatchSyncEvent, weak_factory_.GetWeakPtr(),
-                   base::Passed(registration.Pass()), callback)));
+                   handle_id, callback)));
     return;
   }
 
@@ -837,8 +850,8 @@ void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
   }
 
   background_sync_dispatcher_->Sync(
-      registration.Pass(), base::Bind(&self::OnSyncEventFinished,
-                                      weak_factory_.GetWeakPtr(), request_id));
+      handle_id, base::Bind(&self::OnSyncEventFinished,
+                            weak_factory_.GetWeakPtr(), request_id));
 }
 
 void ServiceWorkerVersion::DispatchNotificationClickEvent(
@@ -1146,6 +1159,8 @@ ServiceWorkerVersion::PendingRequest<CallbackType>::~PendingRequest() {
 }
 
 void ServiceWorkerVersion::OnScriptLoaded() {
+  if (running_status() == STOPPING)
+    return;
   DCHECK_EQ(STARTING, running_status());
   // Activate ping/pong now that JavaScript execution will start.
   ping_controller_->Activate();

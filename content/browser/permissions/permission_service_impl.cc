@@ -29,6 +29,10 @@ PermissionType PermissionNameToPermissionType(PermissionName name) {
       return PermissionType::PROTECTED_MEDIA_IDENTIFIER;
     case PERMISSION_NAME_DURABLE_STORAGE:
       return PermissionType::DURABLE_STORAGE;
+    case PERMISSION_NAME_AUDIO_CAPTURE:
+      return PermissionType::AUDIO_CAPTURE;
+    case PERMISSION_NAME_VIDEO_CAPTURE:
+      return PermissionType::VIDEO_CAPTURE;
   }
 
   NOTREACHED();
@@ -125,6 +129,22 @@ void PermissionServiceImpl::RequestPermission(
       base::Bind(&PermissionServiceImpl::OnRequestPermissionResponse,
                  weak_factory_.GetWeakPtr(),
                  request_id));
+}
+
+void PermissionServiceImpl::RequestPermissions(
+    mojo::Array<PermissionName> permissions,
+    const mojo::String& origin,
+    bool user_gesture,
+    const PermissionsStatusCallback& callback) {
+  NOTIMPLEMENTED();
+
+  // TODO(lalitm,mlamouri): this is returning the current permission statuses
+  // in order for the call to successfully return. It will be changed later.
+  // See https://crbug.com/516626
+  mojo::Array<PermissionStatus> result(permissions.size());
+  for (size_t i = 0; i < permissions.size(); ++i)
+    result[i] = GetPermissionStatusFromName(permissions[i], GURL(origin));
+  callback.Run(result.Pass());
 }
 
 void PermissionServiceImpl::OnRequestPermissionResponse(

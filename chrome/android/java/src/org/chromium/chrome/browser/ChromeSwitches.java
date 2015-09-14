@@ -70,10 +70,6 @@ public abstract class ChromeSwitches {
     public static final String ENABLE_CONTEXTUAL_SEARCH_FOR_TESTING =
             "enable-contextual-search-for-testing";
 
-    /** Enable new Website Settings UI, which does not have controls for editing settings */
-    public static final String DISABLE_READ_ONLY_WEBSITE_SETTINGS_POPUP =
-            "disable-read-only-website-settings-popup";
-
     // How many thumbnails should we allow in the cache (per tab stack)?
     public static final String THUMBNAILS = "thumbnails";
 
@@ -89,12 +85,6 @@ public abstract class ChromeSwitches {
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // Native Switches
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
-    /**
-     * Sets the max number of render processes to use.
-     * Native switch - content_switches::kRendererProcessLimit.
-     */
-    public static final String RENDER_PROCESS_LIMIT = "renderer-process-limit";
 
     /**
      * Enable enhanced bookmarks feature.

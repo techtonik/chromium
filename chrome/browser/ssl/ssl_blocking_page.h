@@ -14,8 +14,8 @@
 #include "base/time/time.h"
 #include "chrome/browser/interstitials/security_interstitial_page.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ssl/certificate_error_report.h"
 #include "chrome/browser/ssl/ssl_cert_reporter.h"
+#include "components/certificate_reporting/error_report.h"
 #include "net/ssl/ssl_info.h"
 #include "url/gurl.h"
 
@@ -99,7 +99,6 @@ class SSLBlockingPage : public SecurityInterstitialPage {
  private:
   void NotifyDenyCertificate();
   void NotifyAllowCertificate();
-  CertificateErrorReport::InterstitialReason GetCertReportInterstitialReason();
 
   std::string GetUmaHistogramPrefix() const;
   std::string GetSamplingEventName() const;
@@ -129,12 +128,6 @@ class SSLBlockingPage : public SecurityInterstitialPage {
   const base::Time time_triggered_;
 
   scoped_ptr<CertReportHelper> cert_report_helper_;
-
-  // Which type of interstitial this is.
-  enum SSLInterstitialReason {
-    SSL_REASON_SSL,
-    SSL_REASON_BAD_CLOCK
-  } interstitial_reason_;
 
   DISALLOW_COPY_AND_ASSIGN(SSLBlockingPage);
 };

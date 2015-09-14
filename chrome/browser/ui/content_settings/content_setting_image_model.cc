@@ -34,6 +34,16 @@ bool UseVectorGraphics() {
 #endif
 }
 
+#if !defined(OS_MACOSX)
+// Gets a vector icon badged with |badge|.
+gfx::Image GetIcon(gfx::VectorIconId id, gfx::VectorIconId badge) {
+  SkColor icon_color;
+  ui::CommonThemeGetSystemColor(ui::NativeTheme::kColorId_ChromeIconGrey,
+                                &icon_color);
+  return gfx::Image(gfx::CreateVectorIconWithBadge(id, 16, icon_color, badge));
+}
+#endif
+
 }  // namespace
 
 class ContentSettingBlockedImageModel : public ContentSettingImageModel {
@@ -145,7 +155,6 @@ void ContentSettingBlockedImageModel::UpdateFromWebContents(
     case CONTENT_SETTINGS_TYPE_MIXEDSCRIPT:
       vector_icon_id = gfx::VectorIconId::MIXED_CONTENT;
       break;
-    // TODO(estade): change this one?
     case CONTENT_SETTINGS_TYPE_PPAPI_BROKER:
       vector_icon_id = gfx::VectorIconId::EXTENSION;
       break;
@@ -235,7 +244,13 @@ void ContentSettingBlockedImageModel::UpdateFromWebContents(
 #if !defined(OS_MACOSX)
   } else {
     DCHECK(gfx::VectorIconId::VECTOR_ICON_NONE != vector_icon_id);
-    SetIconByVectorId(vector_icon_id, content_settings->IsContentBlocked(type));
+
+    if (type == CONTENT_SETTINGS_TYPE_PPAPI_BROKER) {
+      set_icon(GetIcon(vector_icon_id, gfx::VectorIconId::WARNING_BADGE));
+    } else {
+      SetIconByVectorId(vector_icon_id,
+                        content_settings->IsContentBlocked(type));
+    }
 #endif
   }
   set_explanatory_string_id(explanation_id);
@@ -356,8 +371,12 @@ void ContentSettingMediaImageModel::UpdateFromWebContents(
 ContentSettingRPHImageModel::ContentSettingRPHImageModel()
     : ContentSettingImageModel(
         CONTENT_SETTINGS_TYPE_PROTOCOL_HANDLERS) {
-  // TODO(estade): get an MD icon for this one.
-  SetIconByResourceId(IDR_REGISTER_PROTOCOL_HANDLER);
+  if (!UseVectorGraphics())
+    SetIconByResourceId(IDR_REGISTER_PROTOCOL_HANDLER);
+#if !defined(OS_MACOSX)
+  else
+    SetIconByVectorId(gfx::VectorIconId::PROTOCOL_HANDLER, false);
+#endif
   set_tooltip(l10n_util::GetStringUTF8(IDS_REGISTER_PROTOCOL_HANDLER_TOOLTIP));
 }
 
@@ -460,11 +479,7 @@ void ContentSettingImageModel::SetIconByResourceId(int id) {
 #if !defined(OS_MACOSX)
 void ContentSettingImageModel::SetIconByVectorId(gfx::VectorIconId id,
                                                  bool blocked) {
-  SkColor icon_color;
-  ui::CommonThemeGetSystemColor(ui::NativeTheme::kColorId_ChromeIconGrey,
-                                &icon_color);
-  icon_ = gfx::Image(gfx::CreateVectorIconWithBadge(
-      id, 16, icon_color, blocked ? gfx::VectorIconId::BLOCKED_BADGE
-                                  : gfx::VectorIconId::VECTOR_ICON_NONE));
+  icon_ = GetIcon(id, blocked ? gfx::VectorIconId::BLOCKED_BADGE
+                              : gfx::VectorIconId::VECTOR_ICON_NONE);
 }
 #endif

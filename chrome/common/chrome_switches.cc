@@ -266,6 +266,9 @@ const char kDisableExtensionsFileAccessCheck[] =
 const char kDisableExtensionsHttpThrottling[] =
     "disable-extensions-http-throttling";
 
+// Comma-separated list of feature names to disable. See also kEnableFeatures.
+const char kDisableFeatures[] = "disable-features";
+
 // Disable field trial tests configured in fieldtrial_testing_config.json.
 const char kDisableFieldTrialTestingConfig[] = "disable-field-trial-config";
 
@@ -437,7 +440,10 @@ const char kEnableExtensionActivityLogTesting[] =
 // Enable the fast unload controller, which speeds up tab/window close by
 // running a tab's onunload js handler independently of the GUI -
 // crbug.com/142458 .
-const char kEnableFastUnload[]         = "enable-fast-unload";
+const char kEnableFastUnload[] = "enable-fast-unload";
+
+// Comma-separated list of feature names to enable. See also kDisableFeatures.
+const char kEnableFeatures[] = "enable-features";
 
 // Enables support for the QUIC protocol for insecure schemes (http://).
 // This is a temporary testing flag.
@@ -445,6 +451,9 @@ const char kEnableInsecureQuic[] = "enable-insecure-quic";
 
 // Enables the Material Design version of chrome://downloads.
 const char kEnableMaterialDesignDownloads[] = "enable-md-downloads";
+
+// Enables the Material Design version of chrome://extensions.
+const char kEnableMaterialDesignExtensions[] = "enable-md-extensions";
 
 // Enables the material design Settings feature.
 const char kEnableMaterialDesignSettings[]  = "enable-md-settings";
@@ -558,6 +567,14 @@ const char kEnableUserAlternateProtocolPorts[] =
 // Enables a new "web app" style frame for hosted apps (including bookmark
 // apps).
 const char kEnableWebAppFrame[] = "enable-web-app-frame";
+
+// Enables webusb notifications, which shows notifications when usb devices with
+// landing page are plugged in.
+const char kEnableWebUsbNotifications[] = "enable-webusb-notifications";
+
+// Bypasses the WebUSB permission prompt as it is not yet implemented.
+// crbug.com/529950
+const char kEnableWebUsbOnAnyOrigin[] = "enable-webusb-on-any-origin";
 
 // Enables synchronizing WiFi credentials across devices, using Chrome Sync.
 const char kEnableWifiCredentialSync[]      = "enable-wifi-credential-sync";
@@ -1313,14 +1330,23 @@ bool AboutInSettingsEnabled() {
              ::switches::kDisableAboutInSettings);
 }
 
+bool MdExtensionsEnabled() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      ::switches::kEnableMaterialDesignExtensions);
+}
+
 bool MdSettingsEnabled() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableMaterialDesignSettings);
 }
 
 bool MediaRouterEnabled() {
+#if defined(ENABLE_MEDIA_ROUTER)
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableMediaRouter);
+#else
+  return false;
+#endif
 }
 
 bool PdfMaterialUIEnabled() {

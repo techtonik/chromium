@@ -1181,7 +1181,7 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
   {
     host_impl_->active_tree()->PushPageScaleFromMainThread(
         page_scale_factor, min_page_scale, max_page_scale);
-    host_impl_->SetPageScaleOnActiveTree(page_scale_factor);
+    host_impl_->active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
     scroll_layer->SetScrollDelta(gfx::Vector2d());
 
     float page_scale_delta = 2.f;
@@ -1209,7 +1209,7 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
   {
     host_impl_->active_tree()->PushPageScaleFromMainThread(
         page_scale_factor, min_page_scale, max_page_scale);
-    host_impl_->SetPageScaleOnActiveTree(page_scale_factor);
+    host_impl_->active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
     scroll_layer->SetScrollDelta(gfx::Vector2d());
 
     float page_scale_delta = 2.f;
@@ -1447,7 +1447,7 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoomWheelBubbleBetweenViewports) {
   float page_scale_factor = 2.f;
   host_impl_->active_tree()->PushPageScaleFromMainThread(
       page_scale_factor, min_page_scale, max_page_scale);
-  host_impl_->SetPageScaleOnActiveTree(page_scale_factor);
+  host_impl_->active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
 
   // Scroll by a small amount, there should be no bubbling up to the inner
   // viewport.
@@ -2227,7 +2227,7 @@ class LayerTreeHostImplTestScrollbarAnimation : public LayerTreeHostImplTest {
 
     // Changing page scale triggers scrollbar animation.
     host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 1.f, 4.f);
-    host_impl_->SetPageScaleOnActiveTree(1.1f);
+    host_impl_->active_tree()->SetPageScaleOnActiveTree(1.1f);
     EXPECT_FALSE(did_request_animate_);
     EXPECT_FALSE(did_request_redraw_);
     EXPECT_EQ(base::TimeDelta::FromMilliseconds(20),
@@ -2442,7 +2442,7 @@ TEST_F(LayerTreeHostImplTest, CompositorFrameMetadata) {
   // Likewise if set from the main thread.
   host_impl_->ProcessScrollDeltas();
   host_impl_->active_tree()->PushPageScaleFromMainThread(4.f, 0.5f, 4.f);
-  host_impl_->SetPageScaleOnActiveTree(4.f);
+  host_impl_->active_tree()->SetPageScaleOnActiveTree(4.f);
   {
     CompositorFrameMetadata metadata =
         host_impl_->MakeCompositorFrameMetadata();
@@ -4143,7 +4143,7 @@ TEST_F(LayerTreeHostImplTest, ScrollWithoutBubbling) {
 
     // Scrolling should be adjusted from viewport space.
     host_impl_->active_tree()->PushPageScaleFromMainThread(2.f, 2.f, 2.f);
-    host_impl_->SetPageScaleOnActiveTree(2.f);
+    host_impl_->active_tree()->SetPageScaleOnActiveTree(2.f);
 
     scroll_delta = gfx::Vector2d(0, -2);
     EXPECT_EQ(InputHandler::SCROLL_STARTED,
@@ -4499,17 +4499,12 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
   TestScrollOffsetDelegate()
       : page_scale_factor_(0.f),
         min_page_scale_factor_(-1.f),
-        max_page_scale_factor_(-1.f),
-        needs_animate_(false) {}
+        max_page_scale_factor_(-1.f) {}
 
   ~TestScrollOffsetDelegate() override {}
 
   gfx::ScrollOffset GetTotalScrollOffset() override {
     return getter_return_value_;
-  }
-
-  void SetNeedsAnimate(const AnimationCallback&) override {
-    needs_animate_ = true;
   }
 
   void UpdateRootLayerState(const gfx::ScrollOffset& total_scroll_offset,
@@ -4528,12 +4523,6 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
     max_page_scale_factor_ = max_page_scale_factor;
 
     set_getter_return_value(last_set_scroll_offset_);
-  }
-
-  bool GetAndResetNeedsAnimate() {
-    bool needs_animate = needs_animate_;
-    needs_animate_ = false;
-    return needs_animate;
   }
 
   gfx::ScrollOffset last_set_scroll_offset() {
@@ -4572,10 +4561,8 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
   float page_scale_factor_;
   float min_page_scale_factor_;
   float max_page_scale_factor_;
-  bool needs_animate_;
 };
 
-// TODO(jdduke): Test root fling animation.
 TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   TestScrollOffsetDelegate scroll_delegate;
   host_impl_->SetViewportSize(gfx::Size(10, 20));
@@ -4604,11 +4591,11 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   EXPECT_EQ(2.f, scroll_delegate.page_scale_factor());
   EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
   EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
-  host_impl_->SetPageScaleOnActiveTree(2.f * 1.5f);
+  host_impl_->active_tree()->SetPageScaleOnActiveTree(2.f * 1.5f);
   EXPECT_EQ(3.f, scroll_delegate.page_scale_factor());
   EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
   EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
-  host_impl_->SetPageScaleOnActiveTree(2.f);
+  host_impl_->active_tree()->SetPageScaleOnActiveTree(2.f);
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 0.5f, 4.f);
   EXPECT_EQ(1.f, scroll_delegate.page_scale_factor());
   EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
@@ -4624,14 +4611,14 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   host_impl_->PinchGestureEnd();
   host_impl_->ScrollEnd();
 
-  // Scrolling should be relative to the offset as returned by the delegate.
+  // Scrolling should be relative to the offset as given by the delegate.
   gfx::Vector2dF scroll_delta(0.f, 10.f);
   gfx::ScrollOffset current_offset(7.f, 8.f);
 
   scroll_delegate.set_getter_return_value(current_offset);
   EXPECT_EQ(InputHandler::SCROLL_STARTED,
             host_impl_->ScrollBegin(gfx::Point(), InputHandler::GESTURE));
-  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
 
   host_impl_->ScrollBy(gfx::Point(), scroll_delta);
   EXPECT_EQ(ScrollOffsetWithDelta(current_offset, scroll_delta),
@@ -4639,13 +4626,13 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
 
   current_offset = gfx::ScrollOffset(42.f, 41.f);
   scroll_delegate.set_getter_return_value(current_offset);
-  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
   host_impl_->ScrollBy(gfx::Point(), scroll_delta);
   EXPECT_EQ(current_offset + gfx::ScrollOffset(scroll_delta),
             scroll_delegate.last_set_scroll_offset());
   host_impl_->ScrollEnd();
   scroll_delegate.set_getter_return_value(gfx::ScrollOffset());
-  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged(gfx::ScrollOffset());
 
   // Forces a full tree synchronization and ensures that the scroll delegate
   // sees the correct size of the new tree.
@@ -4660,7 +4647,7 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   // the root scrollable layer.
   current_offset = gfx::ScrollOffset(13.f, 12.f);
   scroll_delegate.set_getter_return_value(current_offset);
-  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
   host_impl_->SetRootLayerScrollOffsetDelegate(NULL);
 
   EXPECT_EQ(current_offset.ToString(),
@@ -4694,7 +4681,7 @@ TEST_F(LayerTreeHostImplTest,
   // Set external scroll delta on delegate and notify LayerTreeHost.
   gfx::ScrollOffset scroll_offset(10.f, 10.f);
   scroll_delegate.set_getter_return_value(scroll_offset);
-  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged(scroll_offset);
 
   // Check scroll delta reflected in layer.
   LayerTreeHostImpl::FrameData frame;
@@ -6123,7 +6110,7 @@ class LayerTreeHostImplTestWithDelegatingRenderer
     return FakeOutputSurface::CreateDelegating3d();
   }
 
-  void DrawFrameAndTestDamage(const gfx::RectF& expected_damage) {
+  void DrawFrameAndTestDamage(const gfx::Rect& expected_damage) {
     bool expect_to_draw = !expected_damage.IsEmpty();
 
     LayerTreeHostImpl::FrameData frame;
@@ -6144,12 +6131,12 @@ class LayerTreeHostImplTestWithDelegatingRenderer
       ASSERT_EQ(2u, root_render_pass->quad_list.size());
 
       LayerImpl* child = host_impl_->active_tree()->root_layer()->children()[0];
-      gfx::RectF expected_child_visible_rect(child->bounds());
+      gfx::Rect expected_child_visible_rect(child->bounds());
       EXPECT_EQ(expected_child_visible_rect,
                 root_render_pass->quad_list.front()->visible_rect);
 
       LayerImpl* root = host_impl_->active_tree()->root_layer();
-      gfx::RectF expected_root_visible_rect(root->bounds());
+      gfx::Rect expected_root_visible_rect(root->bounds());
       EXPECT_EQ(expected_root_visible_rect,
                 root_render_pass->quad_list.ElementAt(1)->visible_rect);
     }
@@ -6284,7 +6271,8 @@ TEST_F(LayerTreeHostImplTest, FarAwayQuadsDontNeedAA) {
   bool clipped = false, force_aa = false;
   gfx::QuadF device_layer_quad = MathUtil::MapQuad(
       quad->shared_quad_state->quad_to_target_transform,
-      gfx::QuadF(quad->shared_quad_state->visible_quad_layer_rect), &clipped);
+      gfx::QuadF(gfx::RectF(quad->shared_quad_state->visible_quad_layer_rect)),
+      &clipped);
   EXPECT_FALSE(clipped);
   bool antialiased =
       GLRendererWithSetupQuadForAntialiasing::ShouldAntialiasQuad(
@@ -6978,7 +6966,7 @@ TEST_F(LayerTreeHostImplTest, LatencyInfoPassedToCompositorFrameMetadata) {
       ui::INPUT_EVENT_LATENCY_BEGIN_RWH_COMPONENT, 0, 0);
   scoped_ptr<SwapPromise> swap_promise(
       new LatencyInfoSwapPromise(latency_info));
-  host_impl_->active_tree()->QueueSwapPromise(swap_promise.Pass());
+  host_impl_->active_tree()->QueuePinnedSwapPromise(swap_promise.Pass());
   host_impl_->SetNeedsRedraw();
 
   gfx::Rect full_frame_damage(host_impl_->DrawViewportSize());
@@ -7669,7 +7657,7 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, ScrollBothInnerAndOuterLayer) {
     gfx::ScrollOffset current_offset(70.f, 100.f);
 
     scroll_delegate.set_getter_return_value(current_offset);
-    host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+    host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
     EXPECT_EQ(gfx::ScrollOffset(25.f, 40.f), inner_scroll->MaxScrollOffset());
     EXPECT_EQ(gfx::ScrollOffset(50.f, 80.f), outer_scroll->MaxScrollOffset());
 
@@ -8176,7 +8164,7 @@ TEST_F(LayerTreeHostImplTest, WheelScrollWithPageScaleFactorOnInnerLayer) {
   {
     host_impl_->active_tree()->PushPageScaleFromMainThread(
         page_scale_factor, min_page_scale, max_page_scale);
-    host_impl_->SetPageScaleOnActiveTree(page_scale_factor);
+    host_impl_->active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
     scroll_layer->SetScrollDelta(gfx::Vector2d());
 
     float page_scale_delta = 2.f;
@@ -8479,8 +8467,7 @@ class MockReclaimResourcesOutputSurface : public FakeOutputSurface {
  public:
   static scoped_ptr<MockReclaimResourcesOutputSurface> Create3d() {
     return make_scoped_ptr(new MockReclaimResourcesOutputSurface(
-        TestContextProvider::Create(), TestContextProvider::CreateWorker(),
-        false));
+        TestContextProvider::Create(), TestContextProvider::Create(), false));
   }
 
   MOCK_METHOD0(ForceReclaimResources, void());

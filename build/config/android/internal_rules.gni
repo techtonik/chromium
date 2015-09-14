@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/android/config.gni")
+import("//third_party/ijar/ijar.gni")
 
 assert(is_android)
 
@@ -120,6 +121,14 @@ template("findbugs") {
 }
 
 # Generates a script in the output bin.java directory to run a java binary.
+#
+# Variables
+#   main_class: The class containing the progam entry point.
+#   jar_path: The path to the jar to run.
+#   script_name: Name of the script to generate.
+#   build_config: Path to .build_config for the jar (contains classpath).
+#   wrapper_script_args: List of extra arguments to pass to the executable.
+#
 template("java_binary_script") {
   set_sources_assignment_filter([])
   forward_variables_from(invoker, [ "testonly" ])
@@ -153,6 +162,9 @@ template("java_binary_script") {
       "--main-class",
       _main_class,
     ]
+    if (defined(invoker.wrapper_script_args)) {
+      args += [ "--" ] + invoker.wrapper_script_args
+    }
   }
 }
 
@@ -412,7 +424,8 @@ template("process_java_prebuilt") {
 
   _input_jar_path = invoker.input_jar_path
   _output_jar_path = invoker.output_jar_path
-  _jar_toc_path = _output_jar_path + ".TOC"
+  _output_ijar_path = get_path_info(_output_jar_path, "dir") + "/" +
+                      get_path_info(_output_jar_path, "name") + ".interface.jar"
 
   assert(invoker.build_config != "")
 
@@ -476,26 +489,10 @@ template("process_java_prebuilt") {
     }
   }
 
-  action("${target_name}__jar_toc") {
-    script = "//build/android/gyp/jar_toc.py"
-    depfile = "$target_gen_dir/$target_name.d"
-    outputs = [
-      depfile,
-      _jar_toc_path,
-      _jar_toc_path + ".md5.stamp",
-    ]
-    inputs = [
-      _output_jar_path,
-    ]
-    args = [
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-      "--jar-path",
-      rebase_path(_output_jar_path, root_build_dir),
-      "--toc-path",
-      rebase_path(_jar_toc_path, root_build_dir),
-    ]
-    public_deps = [
+  generate_interface_jar("${target_name}__ijar") {
+    input_jar = _output_jar_path
+    output_jar = _output_ijar_path
+    deps = [
       ":$_output_jar_target",
     ]
   }
@@ -503,7 +500,7 @@ template("process_java_prebuilt") {
   group(target_name) {
     forward_variables_from(invoker, [ "visibility" ])
     public_deps = [
-      ":${target_name}__jar_toc",
+      ":${target_name}__ijar",
       ":$_output_jar_target",
     ]
   }
@@ -894,7 +891,11 @@ template("java_prebuilt_impl") {
 
   assert(defined(invoker.jar_path))
   _base_path = "${target_gen_dir}/$target_name"
-  _jar_path = _base_path + ".jar"
+
+  # Jar files can be needed at runtime (by Robolectric tests or java binaries),
+  # so do not put them under gen/.
+  target_dir_name = get_label_info(":$target_name", "dir")
+  _jar_path = "$root_out_dir/lib.java$target_dir_name/$target_name.jar"
   _build_config = _base_path + ".build_config"
 
   if (_supports_android) {
@@ -994,7 +995,7 @@ template("java_prebuilt_impl") {
 #
 # Outputs:
 #  $jar_path.jar
-#  $jar_path.jar.TOC
+#  $jar_path.interface.jar
 #
 # Variables
 #   java_files: List of .java files to compile.
@@ -1064,11 +1065,6 @@ template("compile_java") {
   # Mark srcjar_deps as used.
   assert(_srcjar_deps == [] || true)
 
-  _system_jars = []
-  if (defined(invoker.android) && invoker.android) {
-    _system_jars += [ android_sdk_jar ]
-  }
-
   _rebased_build_config = rebase_path(_build_config, root_build_dir)
   _rebased_jar_path = rebase_path(_intermediate_jar_path, root_build_dir)
 
@@ -1090,14 +1086,15 @@ template("compile_java") {
       _intermediate_jar_path + ".md5.stamp",
     ]
     sources = _java_files + _java_srcjars
-    inputs = _system_jars + [ _build_config ]
+    inputs = [
+      _build_config,
+    ]
 
-    _rebased_system_jars = rebase_path(_system_jars, root_build_dir)
     _rebased_java_srcjars = rebase_path(_java_srcjars, root_build_dir)
     _rebased_depfile = rebase_path(depfile, root_build_dir)
     args = [
       "--depfile=$_rebased_depfile",
-      "--classpath=$_rebased_system_jars",
+      "--use-ijars",
       "--classpath=@FileArg($_rebased_build_config:javac:classpath)",
       "--jar-path=$_rebased_jar_path",
       "--java-srcjars=$_rebased_java_srcjars",
@@ -1105,8 +1102,11 @@ template("compile_java") {
       "--jar-excluded-classes=$_jar_excluded_patterns",
     ]
     if (_supports_android) {
-      _rebased_android_sdk_jar = rebase_path(android_sdk_jar, root_build_dir)
-      args += [ "--bootclasspath=$_rebased_android_sdk_jar" ]
+      deps += [ "//build/android:android_ijar" ]
+      _android_sdk_ijar = "$root_out_dir/lib.java/android.interface.jar"
+      inputs += [ _android_sdk_ijar ]
+      _rebased_android_sdk_ijar = rebase_path(_android_sdk_ijar, root_build_dir)
+      args += [ "--bootclasspath=$_rebased_android_sdk_ijar" ]
     }
     foreach(e, _manifest_entries) {
       args += [ "--manifest-entry=" + e ]
@@ -1155,7 +1155,11 @@ template("java_library_impl") {
       defined(invoker.java_files) || defined(invoker.DEPRECATED_java_in_dir) ||
       defined(invoker.srcjars) || defined(invoker.srcjar_deps))
   _base_path = "$target_gen_dir/$target_name"
-  _jar_path = _base_path + ".jar"
+
+  # Jar files can be needed at runtime (by Robolectric tests or java binaries),
+  # so do not put them under gen/.
+  target_dir_name = get_label_info(":$target_name", "dir")
+  _jar_path = "$root_out_dir/lib.java$target_dir_name/$target_name.jar"
   if (defined(invoker.jar_path)) {
     _jar_path = invoker.jar_path
   }
@@ -1171,6 +1175,7 @@ template("java_library_impl") {
       defined(invoker.supports_android) && invoker.supports_android
   _requires_android =
       defined(invoker.requires_android) && invoker.requires_android
+  assert(_requires_android || true)  # Mark as used.
 
   if (_supports_android) {
     _dex_path = _base_path + ".dex.jar"
@@ -1271,8 +1276,6 @@ template("java_library_impl") {
     srcjar_deps = _srcjar_deps
     srcjars = _srcjars
     chromium_code = _chromium_code
-    android = _requires_android
-
     supports_android = _supports_android
     deps = build_config_deps
   }
@@ -1280,9 +1283,13 @@ template("java_library_impl") {
   if (defined(invoker.main_class)) {
     _final_datadeps += [ ":${_template_name}__java_binary_script" ]
     java_binary_script("${_template_name}__java_binary_script") {
+      forward_variables_from(invoker,
+                             [
+                               "main_class",
+                               "wrapper_script_args",
+                             ])
       build_config = _build_config
       jar_path = _jar_path
-      main_class = invoker.main_class
       script_name = _template_name
       deps = build_config_deps
     }

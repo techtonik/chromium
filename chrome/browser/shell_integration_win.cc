@@ -134,7 +134,7 @@ base::string16 GetExpectedAppId(const base::CommandLine& command_line,
 
 void MigrateChromiumShortcutsCallback() {
   // This should run on the file thread.
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::FILE));
+  DCHECK_CURRENTLY_ON(BrowserThread::FILE);
 
   // Get full path of chrome.
   base::FilePath chrome_exe;
@@ -332,6 +332,10 @@ bool ShellIntegration::SetAsDefaultProtocolClientInteractive(
 
   VLOG(1) << "Set-default-client Windows UI completed.";
   return true;
+}
+
+bool ShellIntegration::IsElevationNeededForSettingDefaultProtocolClient() {
+  return base::win::GetVersion() < base::win::VERSION_WIN8;
 }
 
 ShellIntegration::DefaultWebClientState ShellIntegration::GetDefaultBrowser() {

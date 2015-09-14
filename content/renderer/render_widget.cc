@@ -121,7 +121,7 @@ typedef std::map<std::string, ui::TextInputMode> TextInputModeMap;
 class TextInputModeMapSingleton {
  public:
   static TextInputModeMapSingleton* GetInstance() {
-    return Singleton<TextInputModeMapSingleton>::get();
+    return base::Singleton<TextInputModeMapSingleton>::get();
   }
   TextInputModeMapSingleton() {
     map_["verbatim"] = ui::TEXT_INPUT_MODE_VERBATIM;
@@ -140,7 +140,7 @@ class TextInputModeMapSingleton {
  private:
   TextInputModeMap map_;
 
-  friend struct DefaultSingletonTraits<TextInputModeMapSingleton>;
+  friend struct base::DefaultSingletonTraits<TextInputModeMapSingleton>;
 
   DISALLOW_COPY_AND_ASSIGN(TextInputModeMapSingleton);
 };
@@ -519,7 +519,6 @@ RenderWidget::RenderWidget(CompositorDependencies* compositor_deps,
       next_output_surface_id_(0),
 #if defined(OS_ANDROID)
       text_field_is_dirty_(false),
-      body_background_color_(SK_ColorWHITE),
 #endif
       popup_origin_scale_for_emulation_(0.f),
       frame_swap_message_queue_(new FrameSwapMessageQueue()),
@@ -1022,15 +1021,10 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
 
     worker_context_provider = ContextProviderCommandBuffer::Create(
         CreateGraphicsContext3D(false), RENDER_WORKER_CONTEXT);
-    if (!worker_context_provider.get() ||
-        !worker_context_provider->BindToCurrentThread()) {
+    if (!worker_context_provider.get()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();
     }
-    worker_context_provider->SetupLock();
-    // Detach from thread to allow context to be destroyed on a different
-    // thread without being used.
-    worker_context_provider->DetachFromThread();
   }
 
   uint32 output_surface_id = next_output_surface_id_++;
@@ -1412,12 +1406,6 @@ blink::WebLayerTreeView* RenderWidget::layerTreeView() {
 }
 
 void RenderWidget::didFirstVisuallyNonEmptyLayout() {
-  // TODO(dglazkov): Remove this -- we should just pass background color
-  // in CompositorFrameMetadata.
-#if defined(OS_ANDROID)
-  DidChangeBodyBackgroundColor(webwidget_->backgroundColor());
-#endif
-
   QueueMessage(
       new ViewHostMsg_DidFirstVisuallyNonEmptyPaint(routing_id_),
       MESSAGE_DELIVERY_POLICY_WITH_VISUAL_STATE);
@@ -2134,29 +2122,8 @@ bool RenderWidget::ShouldUpdateCompositionInfo(
 }
 
 #if defined(OS_ANDROID)
-void RenderWidget::DidChangeBodyBackgroundColor(SkColor bg_color) {
-  // If not initialized, default to white. Note that 0 is different from black
-  // as black still has alpha 0xFF.
-  if (!bg_color)
-    bg_color = SK_ColorWHITE;
-
-  if (bg_color != body_background_color_) {
-    body_background_color_ = bg_color;
-    Send(new ViewHostMsg_DidChangeBodyBackgroundColor(routing_id(), bg_color));
-  }
-}
-
 bool RenderWidget::DoesRecordFullLayer() const {
-  SynchronousCompositorFactory* synchronous_compositor_factory =
-      SynchronousCompositorFactory::GetInstance();
-
-  // We assume that the absence of synchronous_compositor_factory
-  // means we are in Chrome. In chrome, we want to clip, i.e.
-  // *not* to record the full layer.
-  if (!synchronous_compositor_factory)
-    return false;
-
-  return synchronous_compositor_factory->RecordFullLayer();
+  return false;
 }
 #endif
 

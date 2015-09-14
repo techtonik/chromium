@@ -257,6 +257,10 @@ class Tab : public gfx::AnimationDelegate,
   // Returns whether the Tab should display a close button.
   bool ShouldShowCloseBox() const;
 
+  // Returns whether the tab should be rendered as a normal tab as opposed to a
+  // pinned tab.
+  bool ShouldRenderAsNormalTab() const;
+
   // Gets the throb value for the tab. When a tab is not selected the
   // active background is drawn at |GetThrobValue()|%. This is used for hover,
   // mini tab title change and pulsing.
@@ -278,6 +282,12 @@ class Tab : public gfx::AnimationDelegate,
   // Schedules repaint task for icon.
   void ScheduleIconPaint();
 
+  // Returns a |path| containing the region that matches the bitmap display of
+  // this tab, for input event hit testing.  Set |include_top_shadow| to include
+  // the mostly-transparent shadow pixels above the top edge of the tab in the
+  // path.
+  void GetHitTestMaskHelper(bool include_top_shadow, gfx::Path* path) const;
+
   // Returns the rectangle for the light bar in immersive mode.
   gfx::Rect GetImmersiveBarRect() const;
 
@@ -291,10 +301,6 @@ class Tab : public gfx::AnimationDelegate,
 
   // Performs a one-time initialization of static resources such as tab images.
   static void InitTabResources();
-
-  // Returns the minimum possible size of a single unselected Tab, not
-  // including considering touch mode.
-  static gfx::Size GetBasicMinimumUnselectedSize();
 
   // Loads the images to be used for the tab background.
   static void LoadTabImages();

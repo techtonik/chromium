@@ -29,12 +29,14 @@ PrintingTask::PrintingTask(content::WebContents* web_contents)
 PrintingTask::~PrintingTask() {
 }
 
-void PrintingTask::OnTitleChanged(content::NavigationEntry* entry) {
+void PrintingTask::UpdateTitle() {
   set_title(PrefixTitle(RendererTask::GetTitleFromWebContents(web_contents())));
 }
 
-void PrintingTask::OnFaviconChanged() {
-  set_icon(*RendererTask::GetFaviconFromWebContents(web_contents()));
+void PrintingTask::UpdateFavicon() {
+  const gfx::ImageSkia* icon =
+      RendererTask::GetFaviconFromWebContents(web_contents());
+  set_icon(icon ? *icon : gfx::ImageSkia());
 }
 
 }  // namespace task_management

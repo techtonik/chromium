@@ -50,6 +50,7 @@ class GPU_BLINK_EXPORT WebGraphicsContext3DImpl
   virtual void postSubBufferCHROMIUM(int x, int y, int width, int height);
 
   virtual void activeTexture(blink::WGC3Denum texture);
+  virtual void applyScreenSpaceAntialiasingCHROMIUM();
   virtual void attachShader(blink::WebGLId program, blink::WebGLId shader);
   virtual void bindAttribLocation(blink::WebGLId program,
                                   blink::WGC3Duint index,
@@ -517,6 +518,11 @@ class GPU_BLINK_EXPORT WebGraphicsContext3DImpl
   virtual void getQueryObjectuivEXT(blink::WebGLId query,
                                     blink::WGC3Denum pname,
                                     blink::WGC3Duint* params);
+
+  virtual void queryCounterEXT(blink::WebGLId query, blink::WGC3Denum target);
+  virtual void getQueryObjectui64vEXT(blink::WebGLId query,
+                                      blink::WGC3Denum pname,
+                                      blink::WGC3Duint64* params);
 
   void copyTextureCHROMIUM(
       blink::WGC3Denum target,

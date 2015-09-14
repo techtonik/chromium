@@ -4,17 +4,17 @@
 
 #include "components/view_manager/event_dispatcher.h"
 
-#include "components/view_manager/connection_manager.h"
 #include "components/view_manager/server_view.h"
 #include "components/view_manager/view_coordinate_conversions.h"
 #include "components/view_manager/view_locator.h"
+#include "components/view_manager/view_tree_host_impl.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_f.h"
 
 namespace view_manager {
 
-EventDispatcher::EventDispatcher(ConnectionManager* connection_manager)
-    : connection_manager_(connection_manager) {
+EventDispatcher::EventDispatcher(ViewTreeHostImpl* view_tree_host)
+    : view_tree_host_(view_tree_host) {
 }
 
 EventDispatcher::~EventDispatcher() {
@@ -24,12 +24,11 @@ void EventDispatcher::AddAccelerator(uint32_t id,
                                      mojo::KeyboardCode keyboard_code,
                                      mojo::EventFlags flags) {
 #if !defined(NDEBUG)
-  std::for_each(accelerators_.begin(), accelerators_.end(),
-                [id, keyboard_code, flags](const Entry& entry) {
-                  DCHECK(entry.first != id);
-                  DCHECK(entry.second.keyboard_code != keyboard_code ||
-                         entry.second.flags != flags);
-                });
+  for (const auto& pair : accelerators_) {
+    DCHECK(pair.first != id);
+    DCHECK(pair.second.keyboard_code != keyboard_code ||
+           pair.second.flags != flags);
+  }
 #endif
   accelerators_.insert(Entry(id, Accelerator(keyboard_code, flags)));
 }
@@ -40,50 +39,59 @@ void EventDispatcher::RemoveAccelerator(uint32_t id) {
   accelerators_.erase(it);
 }
 
-void EventDispatcher::OnEvent(ServerView* root, mojo::EventPtr event) {
+void EventDispatcher::OnEvent(mojo::EventPtr event) {
+  if (event->action == mojo::EVENT_TYPE_KEY_PRESSED &&
+      !event->key_data->is_char) {
+    uint32_t accelerator = 0u;
+    if (FindAccelerator(*event, &accelerator)) {
+      view_tree_host_->OnAccelerator(accelerator, event.Pass());
+      return;
+    }
+  }
+
+  ServerView* target = FindEventTarget(event.get());
+  if (target) {
+    // Update focus on pointer-down.
+    if (event->action == mojo::EVENT_TYPE_POINTER_DOWN)
+      view_tree_host_->SetFocusedView(target);
+    view_tree_host_->DispatchInputEventToView(target, event.Pass());
+  }
+}
+
+bool EventDispatcher::FindAccelerator(const mojo::Event& event,
+                                      uint32_t* accelerator_id) {
+  DCHECK(event.key_data);
+  for (const auto& pair : accelerators_) {
+    if (pair.second.keyboard_code == event.key_data->windows_key_code &&
+        pair.second.flags == event.flags) {
+      *accelerator_id = pair.first;
+      return true;
+    }
+  }
+  return false;
+}
+
+ServerView* EventDispatcher::FindEventTarget(mojo::Event* event) {
+  ServerView* focused_view = view_tree_host_->GetFocusedView();
   if (event->pointer_data) {
+    ServerView* root = view_tree_host_->root_view();
     const gfx::Point root_point(static_cast<int>(event->pointer_data->x),
                                 static_cast<int>(event->pointer_data->y));
-    ServerView* target = connection_manager_->GetFocusedView();
+    ServerView* target = focused_view;
     if (event->action == mojo::EVENT_TYPE_POINTER_DOWN || !target ||
         !root->Contains(target)) {
       target = FindDeepestVisibleView(root, root_point);
       CHECK(target);
-      connection_manager_->SetFocusedView(target);
     }
     const gfx::PointF local_point(ConvertPointFBetweenViews(
         root, target,
         gfx::PointF(event->pointer_data->x, event->pointer_data->y)));
     event->pointer_data->x = local_point.x();
     event->pointer_data->y = local_point.y();
-    connection_manager_->DispatchInputEventToView(target, event.Pass());
-  } else {
-    uint32_t accelerator_id = 0;
-    if (event->action == mojo::EVENT_TYPE_KEY_PRESSED &&
-        HandleAccelerator(event->key_data->windows_key_code, event->flags,
-                          &accelerator_id)) {
-      // For accelerators, normal event dispatch is bypassed.
-      connection_manager_->OnAccelerator(root, accelerator_id, event.Pass());
-      return;
-    }
-    ServerView* focused_view = connection_manager_->GetFocusedView();
-    if (focused_view)
-      connection_manager_->DispatchInputEventToView(focused_view, event.Pass());
+    return target;
   }
-}
 
-bool EventDispatcher::HandleAccelerator(mojo::KeyboardCode keyboard_code,
-                                        mojo::EventFlags flags,
-                                        uint32_t* accelerator_id) {
-  auto it = std::find_if(accelerators_.begin(), accelerators_.end(),
-                         [keyboard_code, flags](const Entry& entry) {
-                           return entry.second.keyboard_code == keyboard_code &&
-                                  entry.second.flags == flags;
-                         });
-  bool found = it != accelerators_.end();
-  if (found)
-    *accelerator_id = it->first;
-  return found;
+  return focused_view;
 }
 
 }  // namespace view_manager

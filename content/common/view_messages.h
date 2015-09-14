@@ -64,12 +64,8 @@
 #include "ui/gfx/range/range.h"
 
 #if defined(OS_MACOSX)
-#include "content/common/mac/font_descriptor.h"
+#include "third_party/WebKit/public/platform/mac/MacScrollTypes.h"
 #include "third_party/WebKit/public/web/mac/WebScrollbarTheme.h"
-#endif
-
-#if defined(ENABLE_PLUGINS)
-#include "content/common/pepper_renderer_instance_data.h"
 #endif
 
 #undef IPC_MESSAGE_EXPORT
@@ -123,11 +119,6 @@ IPC_ENUM_TRAITS_MAX_VALUE(
     blink::ScrollbarButtonsPlacement::ScrollbarButtonsPlacementLast)
 
 IPC_ENUM_TRAITS_MAX_VALUE(blink::ScrollerStyle, blink::ScrollerStyleOverlay)
-
-IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
-  IPC_STRUCT_TRAITS_MEMBER(font_name)
-  IPC_STRUCT_TRAITS_MEMBER(font_point_size)
-IPC_STRUCT_TRAITS_END()
 #endif
 
 IPC_STRUCT_TRAITS_BEGIN(blink::WebFindOptions)
@@ -229,16 +220,6 @@ IPC_STRUCT_TRAITS_BEGIN(content::FileChooserParams)
 #endif
 IPC_STRUCT_TRAITS_END()
 
-#if defined(ENABLE_PLUGINS)
-IPC_STRUCT_TRAITS_BEGIN(content::PepperRendererInstanceData)
-  IPC_STRUCT_TRAITS_MEMBER(render_process_id)
-  IPC_STRUCT_TRAITS_MEMBER(render_frame_id)
-  IPC_STRUCT_TRAITS_MEMBER(document_url)
-  IPC_STRUCT_TRAITS_MEMBER(plugin_url)
-  IPC_STRUCT_TRAITS_MEMBER(is_potentially_secure_plugin_context)
-IPC_STRUCT_TRAITS_END()
-#endif
-
 IPC_STRUCT_TRAITS_BEGIN(content::RendererPreferences)
   IPC_STRUCT_TRAITS_MEMBER(can_accept_load_drops)
   IPC_STRUCT_TRAITS_MEMBER(should_antialias_text)
@@ -262,7 +243,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::RendererPreferences)
   IPC_STRUCT_TRAITS_MEMBER(enable_referrers)
   IPC_STRUCT_TRAITS_MEMBER(enable_do_not_track)
   IPC_STRUCT_TRAITS_MEMBER(enable_webrtc_multiple_routes)
-  IPC_STRUCT_TRAITS_MEMBER(enable_webrtc_nonproxied_udp_transport)
+  IPC_STRUCT_TRAITS_MEMBER(enable_webrtc_nonproxied_udp)
   IPC_STRUCT_TRAITS_MEMBER(default_zoom_level)
   IPC_STRUCT_TRAITS_MEMBER(user_agent_override)
   IPC_STRUCT_TRAITS_MEMBER(accept_languages)
@@ -1138,11 +1119,6 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_FocusedNodeChanged,
 
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SetCursor, content::WebCursor)
 
-// Used to get the list of plugins
-IPC_SYNC_MESSAGE_CONTROL1_1(ViewHostMsg_GetPlugins,
-    bool /* refresh*/,
-    std::vector<content::WebPluginInfo> /* plugins */)
-
 #if defined(OS_WIN)
 IPC_MESSAGE_ROUTED1(ViewHostMsg_WindowlessPluginDummyWindowCreated,
                     gfx::NativeViewId /* dummy_activation_window */)
@@ -1220,85 +1196,14 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_WebUISend,
                     base::ListValue /* args */)
 
 #if defined(ENABLE_PLUGINS)
-// A renderer sends this to the browser process when it wants to create a ppapi
-// plugin.  The browser will create the plugin process if necessary, and will
-// return a handle to the channel on success.
-//
-// The plugin_child_id is the ChildProcessHost ID assigned in the browser
-// process. This ID is valid only in the context of the browser process and is
-// used to identify the proper process when the renderer notifies it that the
-// plugin is hung.
-//
-// On error an empty string and null handles are returned.
-IPC_SYNC_MESSAGE_CONTROL1_3(ViewHostMsg_OpenChannelToPepperPlugin,
-                            base::FilePath /* path */,
-                            IPC::ChannelHandle /* handle to channel */,
-                            base::ProcessId /* plugin_pid */,
-                            int /* plugin_child_id */)
-
-// Notification that a plugin has created a new plugin instance. The parameters
-// indicate:
-// -The plugin process ID that we're creating the instance for.
-// -The instance ID of the instance being created.
-// -A PepperRendererInstanceData struct which contains properties from the
-// renderer which are associated with the plugin instance. This includes the
-// routing ID of the associated render view and the URL of plugin.
-// -Whether the plugin we're creating an instance for is external or internal.
-//
-// This message must be sync even though it returns no parameters to avoid
-// a race condition with the plugin process. The plugin process sends messages
-// to the browser that assume the browser knows about the instance. We need to
-// make sure that the browser actually knows about the instance before we tell
-// the plugin to run.
-IPC_SYNC_MESSAGE_CONTROL4_0(
-    ViewHostMsg_DidCreateOutOfProcessPepperInstance,
-    int /* plugin_child_id */,
-    int32 /* pp_instance */,
-    content::PepperRendererInstanceData /* creation_data */,
-    bool /* is_external */)
-
-// Notification that a plugin has destroyed an instance. This is the opposite of
-// the "DidCreate" message above.
-IPC_MESSAGE_CONTROL3(ViewHostMsg_DidDeleteOutOfProcessPepperInstance,
-                     int /* plugin_child_id */,
-                     int32 /* pp_instance */,
-                     bool /* is_external */)
-
-// Message from the renderer to the browser indicating the in-process instance
-// has been created.
-IPC_MESSAGE_CONTROL2(ViewHostMsg_DidCreateInProcessInstance,
-                     int32 /* instance */,
-                     content::PepperRendererInstanceData /* instance_data */)
-
-// Message from the renderer to the browser indicating the in-process instance
-// has been destroyed.
-IPC_MESSAGE_CONTROL1(ViewHostMsg_DidDeleteInProcessInstance,
-                     int32 /* instance */)
-
-// A renderer sends this to the browser process when it wants to
-// create a ppapi broker.  The browser will create the broker process
-// if necessary, and will return a handle to the channel on success.
-// On error an empty string is returned.
-// The browser will respond with ViewMsg_PpapiBrokerChannelCreated.
-IPC_MESSAGE_CONTROL2(ViewHostMsg_OpenChannelToPpapiBroker,
-                     int /* routing_id */,
-                     base::FilePath /* path */)
-
 // A renderer sends this to the browser process when it wants to access a PPAPI
-// broker. In contrast to ViewHostMsg_OpenChannelToPpapiBroker, this is called
+// broker. In contrast to FrameHostMsg_OpenChannelToPpapiBroker, this is called
 // for every connection.
 // The browser will respond with ViewMsg_PpapiBrokerPermissionResult.
 IPC_MESSAGE_ROUTED3(ViewHostMsg_RequestPpapiBrokerPermission,
                     int /* routing_id */,
                     GURL /* document_url */,
                     base::FilePath /* plugin_path */)
-
-// A renderer sends this to the browser process when it throttles or unthrottles
-// a plugin instance for the Plugin Power Saver feature.
-IPC_MESSAGE_CONTROL3(ViewHostMsg_PluginInstanceThrottleStateChange,
-                     int /* plugin_child_id */,
-                     int32 /* pp_instance */,
-                     bool /* is_throttled */)
 #endif  // defined(ENABLE_PLUGINS)
 
 // Send the tooltip text for the current mouse position to the browser.
@@ -1383,20 +1288,6 @@ IPC_MESSAGE_ROUTED3(
     uint32 /* output_surface_id */,
     cc::CompositorFrame /* frame */,
     std::vector<IPC::Message> /* messages_to_deliver_with_frame */)
-
-//---------------------------------------------------------------------------
-// Request for cryptographic operation messages:
-// These are messages from the renderer to the browser to perform a
-// cryptographic operation.
-
-// Asks the browser process to generate a keypair for grabbing a client
-// certificate from a CA (<keygen> tag), and returns the signed public
-// key and challenge string.
-IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_Keygen,
-                            uint32 /* key size index */,
-                            std::string /* challenge string */,
-                            GURL /* URL of requestor */,
-                            std::string /* signed public key and challenge */)
 
 // Message sent from the renderer to the browser to request that the browser
 // cache |data| associated with |url| and |expected_response_time|.
@@ -1510,10 +1401,6 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_FindMatchRects_Reply,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_StartContentIntent,
                     GURL /* content_url */)
 
-// Message sent when the renderer changed the background color for the view.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_DidChangeBodyBackgroundColor,
-                    uint32  /* bg_color */)
-
 // This message runs the MediaCodec for decoding audio for webaudio.
 IPC_MESSAGE_CONTROL3(ViewHostMsg_RunWebAudioMediaCodec,
                      base::SharedMemoryHandle /* encoded_data_handle */,
@@ -1533,13 +1420,6 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_ShowUnhandledTapUIIfNeeded,
                     int /* y */)
 
 #elif defined(OS_MACOSX)
-// Request that the browser load a font into shared memory for us.
-IPC_SYNC_MESSAGE_CONTROL1_3(ViewHostMsg_LoadFont,
-                           FontDescriptor /* font to load */,
-                           uint32 /* buffer size */,
-                           base::SharedMemoryHandle /* font data */,
-                           uint32 /* font id */)
-
 // Informs the browser that a plugin has gained or lost focus.
 IPC_MESSAGE_ROUTED2(ViewHostMsg_PluginFocusChanged,
                     bool, /* focused */
@@ -1550,14 +1430,6 @@ IPC_MESSAGE_ROUTED0(ViewHostMsg_StartPluginIme)
 
 // Receives content of a web page as plain text.
 IPC_MESSAGE_ROUTED1(ViewMsg_GetRenderedTextCompleted, std::string);
-
-#elif defined(OS_WIN)
-// Request that the given font characters be loaded by the browser so it's
-// cached by the OS. Please see RenderMessageFilter::OnPreCacheFontCharacters
-// for details.
-IPC_SYNC_MESSAGE_CONTROL2_0(ViewHostMsg_PreCacheFontCharacters,
-                            LOGFONT /* font_data */,
-                            base::string16 /* characters */)
 #endif
 
 // Adding a new message? Stick to the sort order above: first platform

@@ -28,7 +28,6 @@
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate_factory.h"
 #include "chrome/browser/ssl/ssl_error_info.h"
-#include "chrome/browser/ui/website_settings/website_settings_infobar_delegate.h"
 #include "chrome/browser/ui/website_settings/website_settings_ui.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/url_constants.h"
@@ -55,6 +54,10 @@
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/policy/policy_cert_service.h"
 #include "chrome/browser/chromeos/policy/policy_cert_service_factory.h"
+#endif
+
+#if !defined(OS_ANDROID)
+#include "chrome/browser/ui/website_settings/website_settings_infobar_delegate.h"
 #endif
 
 using base::ASCIIToUTF16;
@@ -230,22 +233,19 @@ void WebsiteSettings::OnSitePermissionChanged(ContentSettingsType type,
                                               ContentSetting setting) {
   // Count how often a permission for a specific content type is changed using
   // the Website Settings UI.
-  ContentSettingsTypeHistogram histogram_value =
-      ContentSettingTypeToHistogramValue(type);
-  DCHECK_NE(histogram_value, CONTENT_SETTINGS_TYPE_HISTOGRAM_INVALID)
-      << "Invalid content setting type specified.";
+  size_t num_values;
+  int histogram_value = ContentSettingTypeToHistogramValue(type, &num_values);
   UMA_HISTOGRAM_ENUMERATION("WebsiteSettings.OriginInfo.PermissionChanged",
-                            histogram_value,
-                            CONTENT_SETTINGS_HISTOGRAM_NUM_TYPES);
+                            histogram_value, num_values);
 
   if (setting == ContentSetting::CONTENT_SETTING_ALLOW) {
     UMA_HISTOGRAM_ENUMERATION(
         "WebsiteSettings.OriginInfo.PermissionChanged.Allowed", histogram_value,
-        CONTENT_SETTINGS_HISTOGRAM_NUM_TYPES);
+        num_values);
   } else if (setting == ContentSetting::CONTENT_SETTING_BLOCK) {
     UMA_HISTOGRAM_ENUMERATION(
         "WebsiteSettings.OriginInfo.PermissionChanged.Blocked", histogram_value,
-        CONTENT_SETTINGS_HISTOGRAM_NUM_TYPES);
+        num_values);
     // Trigger Rappor sampling if it is a permission revoke action.
     const std::string& rappor_metric = GetRapporMetric(type);
     if (!rappor_metric.empty()) {
@@ -309,12 +309,8 @@ void WebsiteSettings::OnSitePermissionChanged(ContentSettingsType type,
 
   show_info_bar_ = true;
 
-// TODO(markusheintz): This is a temporary hack to fix issue:
-// http://crbug.com/144203.
-#if defined(OS_MACOSX)
   // Refresh the UI to reflect the new setting.
   PresentSitePermissions();
-#endif
 }
 
 void WebsiteSettings::OnSiteDataAccessed() {
@@ -322,6 +318,9 @@ void WebsiteSettings::OnSiteDataAccessed() {
 }
 
 void WebsiteSettings::OnUIClosing() {
+#if defined(OS_ANDROID)
+  NOTREACHED();
+#else
   if (show_info_bar_ && web_contents_) {
     InfoBarService* infobar_service =
         InfoBarService::FromWebContents(web_contents_);
@@ -336,6 +335,7 @@ void WebsiteSettings::OnUIClosing() {
   UMA_HISTOGRAM_ENUMERATION("interstitial.ssl.did_user_revoke_decisions",
                             user_decision,
                             END_OF_SSL_CERTIFICATE_DECISIONS_DID_REVOKE_ENUM);
+#endif
 }
 
 void WebsiteSettings::OnRevokeSSLErrorBypassButtonPressed() {
@@ -548,9 +548,9 @@ void WebsiteSettings::Init(Profile* profile,
     if (ssl.content_status) {
       bool ran_insecure_content =
           !!(ssl.content_status & content::SSLStatus::RAN_INSECURE_CONTENT);
-      site_connection_status_ = ran_insecure_content ?
-          SITE_CONNECTION_STATUS_ENCRYPTED_ERROR
-          : SITE_CONNECTION_STATUS_MIXED_CONTENT;
+      site_connection_status_ = ran_insecure_content
+                                    ? SITE_CONNECTION_STATUS_MIXED_SCRIPT
+                                    : SITE_CONNECTION_STATUS_MIXED_CONTENT;
       site_connection_details_.assign(l10n_util::GetStringFUTF16(
           IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_SENTENCE_LINK,
           site_connection_details_,

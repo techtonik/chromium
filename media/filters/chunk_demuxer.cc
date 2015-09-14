@@ -15,6 +15,7 @@
 #include "media/base/audio_decoder_config.h"
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/stream_parser_buffer.h"
+#include "media/base/timestamp_constants.h"
 #include "media/base/video_decoder_config.h"
 #include "media/filters/frame_processor.h"
 #include "media/filters/stream_parser_factory.h"
@@ -125,9 +126,9 @@ class SourceState {
               const InitSegmentReceivedCB& init_segment_received_cb);
 
   // Aborts the current append sequence and resets the parser.
-  void Abort(TimeDelta append_window_start,
-             TimeDelta append_window_end,
-             TimeDelta* timestamp_offset);
+  void ResetParserState(TimeDelta append_window_start,
+                        TimeDelta append_window_end,
+                        TimeDelta* timestamp_offset);
 
   // Calls Remove(|start|, |end|, |duration|) on all
   // ChunkDemuxerStreams managed by this object.
@@ -354,9 +355,9 @@ bool SourceState::Append(
   return result;
 }
 
-void SourceState::Abort(TimeDelta append_window_start,
-                        TimeDelta append_window_end,
-                        base::TimeDelta* timestamp_offset) {
+void SourceState::ResetParserState(TimeDelta append_window_start,
+                                   TimeDelta append_window_end,
+                                   base::TimeDelta* timestamp_offset) {
   DCHECK(timestamp_offset);
   DCHECK(!timestamp_offset_during_append_);
   timestamp_offset_during_append_ = timestamp_offset;
@@ -1512,19 +1513,19 @@ void ChunkDemuxer::AppendData(
     host_->AddBufferedTimeRange(ranges.start(i), ranges.end(i));
 }
 
-void ChunkDemuxer::Abort(const std::string& id,
-                         TimeDelta append_window_start,
-                         TimeDelta append_window_end,
-                         TimeDelta* timestamp_offset) {
-  DVLOG(1) << "Abort(" << id << ")";
+void ChunkDemuxer::ResetParserState(const std::string& id,
+                                    TimeDelta append_window_start,
+                                    TimeDelta append_window_end,
+                                    TimeDelta* timestamp_offset) {
+  DVLOG(1) << "ResetParserState(" << id << ")";
   base::AutoLock auto_lock(lock_);
   DCHECK(!id.empty());
   CHECK(IsValidId(id));
   bool old_waiting_for_data = IsSeekWaitingForData_Locked();
-  source_state_map_[id]->Abort(append_window_start,
-                               append_window_end,
-                               timestamp_offset);
-  // Abort can possibly emit some buffers.
+  source_state_map_[id]->ResetParserState(append_window_start,
+                                          append_window_end,
+                                          timestamp_offset);
+  // ResetParserState can possibly emit some buffers.
   // Need to check whether seeking can be completed.
   if (old_waiting_for_data && !IsSeekWaitingForData_Locked() &&
       !seek_cb_.is_null()) {

@@ -126,6 +126,8 @@
       'test/mock_keyboard_driver_win.h',
       'test/mock_render_process.cc',
       'test/mock_render_process.h',
+      'test/mock_ssl_host_state_delegate.cc',
+      'test/mock_ssl_host_state_delegate.h',
       'test/mock_webblob_registry_impl.cc',
       'test/mock_webblob_registry_impl.h',
       'test/mock_webclipboard_impl.cc',
@@ -280,7 +282,7 @@
       'shell/android/browsertests_apk/content_browser_tests_jni_onload.cc',
     ],
     'content_browsertests_webrtc_sources': [
-      'browser/media/webrtc_aecdump_browsertest.cc',
+      'browser/media/webrtc_audio_debug_recordings_browsertest.cc',
       'browser/media/webrtc_browsertest.cc',
       'browser/media/webrtc_getusermedia_browsertest.cc',
       'browser/media/webrtc_internals_browsertest.cc',
@@ -526,6 +528,8 @@
       'browser/renderer_host/input/web_input_event_unittest.cc',
       'browser/renderer_host/input/web_input_event_util_unittest.cc',
       'browser/renderer_host/media/audio_input_device_manager_unittest.cc',
+      'browser/renderer_host/media/audio_input_sync_writer_unittest.cc',
+      'browser/renderer_host/media/audio_output_device_enumerator_unittest.cc',
       'browser/renderer_host/media/audio_renderer_host_unittest.cc',
       'browser/renderer_host/media/media_stream_dispatcher_host_unittest.cc',
       'browser/renderer_host/media/media_stream_manager_unittest.cc',
@@ -698,6 +702,7 @@
       'browser/speech/google_streaming_remote_engine_unittest.cc',
       'browser/speech/speech_recognizer_impl_unittest.cc',
     ],
+    # Put WebRTC-related sources in the plugin+WebRTC section below.
     'content_unittests_plugins_sources': [
       'browser/plugin_loader_posix_unittest.cc',
       'browser/renderer_host/pepper/browser_ppapi_host_test.cc',
@@ -707,7 +712,6 @@
       'browser/renderer_host/pepper/pepper_printing_host_unittest.cc',
       'browser/renderer_host/pepper/quota_reservation_unittest.cc',
       'child/npapi/plugin_lib_unittest.cc',
-      'renderer/media/pepper_to_video_track_adapter_unittest.cc',
       'renderer/npapi/webplugin_impl_unittest.cc',
       'renderer/pepper/event_conversion_unittest.cc',
       'renderer/pepper/host_var_tracker_unittest.cc',
@@ -716,6 +720,7 @@
       'renderer/pepper/plugin_instance_throttler_impl_unittest.cc',
       'renderer/pepper/v8_var_converter_unittest.cc',
     ],
+    # WebRTC-specific sources. Put WebRTC plugin-related stuff further below.
     'content_unittests_webrtc_sources': [
       'browser/media/webrtc_internals_unittest.cc',
       'browser/renderer_host/media/webrtc_identity_service_host_unittest.cc',
@@ -725,6 +730,7 @@
       'browser/renderer_host/p2p/socket_host_test_utils.h',
       'browser/renderer_host/p2p/socket_host_udp_unittest.cc',
       'browser/renderer_host/p2p/socket_host_unittest.cc',
+      'renderer/media/media_recorder_handler_unittest.cc',
       'renderer/media/media_stream_audio_processor_unittest.cc',
       'renderer/media/media_stream_constraints_util_unittest.cc',
       'renderer/media/media_stream_dispatcher_unittest.cc',
@@ -745,7 +751,6 @@
       'renderer/media/speech_recognition_audio_sink_unittest.cc',
       'renderer/media/user_media_client_impl_unittest.cc',
       'renderer/media/video_track_recorder_unittest.cc',
-      'renderer/media/video_track_to_pepper_adapter_unittest.cc',
       'renderer/media/webrtc/media_stream_remote_video_source_unittest.cc',
       'renderer/media/webrtc/media_stream_track_metrics_unittest.cc',
       'renderer/media/webrtc/peer_connection_dependency_factory_unittest.cc',
@@ -760,6 +765,10 @@
       'renderer/media/webrtc_local_audio_track_unittest.cc',
       'renderer/media/webrtc_uma_histograms_unittest.cc',
       'renderer/p2p/ipc_network_manager_unittest.cc',
+    ],
+    'content_unittests_plugin_webrtc_sources': [
+      'renderer/media/pepper_to_video_track_adapter_unittest.cc',
+      'renderer/media/video_track_to_pepper_adapter_unittest.cc',
     ],
     'content_unittests_android_sources': [
       'browser/android/java/gin_java_method_invocation_helper_unittest.cc',
@@ -1091,10 +1100,9 @@
             '../third_party/libjingle/libjingle.gyp:libpeerconnection',
             '../third_party/webrtc/modules/modules.gyp:video_capture_module',
           ]
-        }, {
-          'sources!': [
-            'renderer/media/pepper_to_video_track_adapter_unittest.cc',
-          ],
+        }],
+        ['enable_webrtc==1 and enable_plugins==1', {
+          'sources': [ '<@(content_unittests_plugin_webrtc_sources)' ],
         }],
         ['enable_webrtc==1 and (OS=="linux" or OS=="mac" or OS=="win")', {
           'sources': [
@@ -1164,11 +1172,17 @@
             'browser/geolocation/network_location_provider_unittest.cc',
             'browser/geolocation/wifi_data_provider_common_unittest.cc',
             'browser/media/audio_stream_monitor_unittest.cc',
+            'browser/power_usage_monitor_impl_unittest.cc',
             'browser/renderer_host/begin_frame_observer_proxy_unittest.cc',
             'browser/webui/url_data_manager_backend_unittest.cc',
+            'renderer/media/media_recorder_handler_unittest.cc',
+            'renderer/media/video_track_recorder_unittest.cc',
           ],
           'dependencies': [
             '../testing/android/native_test.gyp:native_test_native_code',
+          ],
+          'dependencies!': [
+            '../device/battery/battery.gyp:device_battery',
           ],
         }],
         ['OS != "android" and OS != "ios"', {
@@ -1503,6 +1517,9 @@
                 'content_shell_lib',
                 '../testing/android/native_test.gyp:native_test_support',
               ],
+              'dependencies!': [
+                '../device/battery/battery.gyp:device_battery',
+              ],
             }],
             ['OS=="mac"', {
               'dependencies': [
@@ -1510,6 +1527,11 @@
               ],
               'sources': [
                 'renderer/external_popup_menu_browsertest.cc',
+              ],
+            }],
+            ['chromecast==1', {
+              'defines': [
+                'ENABLE_HEVC_DEMUXING',
               ],
             }],
             ['use_aura==1 or toolkit_views==1', {

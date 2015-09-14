@@ -19,11 +19,12 @@ Polymer({
   properties: {
     /**
      * The boolean preference object to control.
-     * @type {?PrefObject}
+     * @type {?chrome.settingsPrivate.PrefObject}
      */
     pref: {
       type: Object,
-      notify: true
+      notify: true,
+      value: null
     },
 
     inverted: {
@@ -68,7 +69,7 @@ Polymer({
   /** @private */
   checkedChanged_: function() {
     if (this.pref) {
-      this.pref.value = this.getNewValue_(this.checked);
+      this.set('pref.value', this.getNewValue_(this.checked));
     }
   },
 

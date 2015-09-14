@@ -14,6 +14,7 @@
 #include "base/thread_task_runner_handle.h"
 #include "base/threading/simple_thread.h"
 #include "base/threading/thread.h"
+#include "cc/base/histograms.h"
 #include "cc/output/compositor_frame.h"
 #include "cc/output/output_surface.h"
 #include "cc/raster/task_graph_runner.h"
@@ -106,6 +107,7 @@ GpuProcessTransportFactory::GpuProcessTransportFactory()
       task_graph_runner_(new cc::TaskGraphRunner),
       callback_factory_(this) {
   ui::Layer::InitializeUILayerSettings();
+  cc::SetClientNameForMetrics("Browser");
 
   if (UseSurfacesEnabled())
     surface_manager_ = make_scoped_ptr(new cc::SurfaceManager);
@@ -265,13 +267,6 @@ void GpuProcessTransportFactory::EstablishedGpuChannel(
         if (shared_worker_context_provider_ &&
             !shared_worker_context_provider_->BindToCurrentThread())
           shared_worker_context_provider_ = nullptr;
-
-        if (shared_worker_context_provider_) {
-          shared_worker_context_provider_->SetupLock();
-          // Detach from thread to allow context to be destroyed on a
-          // different thread without being used.
-          shared_worker_context_provider_->DetachFromThread();
-        }
       }
     }
 
@@ -321,12 +316,14 @@ void GpuProcessTransportFactory::EstablishedGpuChannel(
               CreateOverlayCandidateValidator(compositor->widget()), target,
               format, BrowserGpuMemoryBufferManager::current()));
     } else {
-      if (!surface) {
-        surface = make_scoped_ptr(new GpuBrowserCompositorOutputSurface(
-            context_provider, shared_worker_context_provider_,
-            compositor->vsync_manager(),
-            CreateOverlayCandidateValidator(compositor->widget())));
-      }
+      scoped_ptr<BrowserCompositorOverlayCandidateValidator> validator;
+#if !defined(OS_MACOSX)
+      // Overlays are only supported on surfaceless output surfaces on Mac.
+      validator = CreateOverlayCandidateValidator(compositor->widget());
+#endif
+      surface = make_scoped_ptr(new GpuBrowserCompositorOutputSurface(
+          context_provider, shared_worker_context_provider_,
+          compositor->vsync_manager(), validator.Pass()));
     }
   }
 

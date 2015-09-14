@@ -912,6 +912,15 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestWebRequestAPIExistence) {
   TestHelper("testWebRequestAPIExistence", "web_view/shim", NO_TEST_SERVER);
 }
 
+// Tests that addListener call succeeds on webview's WebRequest API events.
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestWebRequestAPIAddListener) {
+  TestHelper("testWebRequestAPIAddListener", "web_view/shim", NO_TEST_SERVER);
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestWebRequestAPIErrorOccurred) {
+  TestHelper("testWebRequestAPIErrorOccurred", "web_view/shim", NO_TEST_SERVER);
+}
+
 // http://crbug.com/315920
 #if defined(GOOGLE_CHROME_BUILD) && (defined(OS_WIN) || defined(OS_LINUX))
 #define MAYBE_Shim_TestChromeExtensionURL DISABLED_Shim_TestChromeExtensionURL
@@ -2235,7 +2244,15 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Dialog_TestAlertDialog) {
   TestHelper("testAlertDialog", "web_view/dialog", NO_TEST_SERVER);
 }
 
-IN_PROC_BROWSER_TEST_F(WebViewTest, TestConfirmDialog) {
+#if defined(OS_MACOSX)
+// http://crbug.com/530660
+#define MAYBE_TestConfirmDialog\
+    DISABLED_TestConfirmDialog
+#else
+#define MAYBE_TestConfirmDialog\
+   TestConfirmDialog
+#endif
+IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_TestConfirmDialog) {
   TestHelper("testConfirmDialog", "web_view/dialog", NO_TEST_SERVER);
 }
 
@@ -2518,6 +2535,13 @@ IN_PROC_BROWSER_TEST_F(WebViewTest,
                        Shim_TestRendererNavigationRedirectWhileUnattached) {
   TestHelper("testRendererNavigationRedirectWhileUnattached",
              "web_view/shim", NEEDS_TEST_SERVER);
+}
+
+// Tests that a WebView accessible resource can actually be loaded from a
+// webpage in a WebView.
+IN_PROC_BROWSER_TEST_F(WebViewTest, LoadWebviewAccessibleResource) {
+  TestHelper("testLoadWebviewAccessibleResource",
+             "web_view/load_webview_accessible_resource", NEEDS_TEST_SERVER);
 }
 
 #if defined(USE_AURA)

@@ -4,12 +4,12 @@
 
 package org.chromium.chrome.browser.compositor.bottombar.contextualsearch;
 
+import org.chromium.base.VisibleForTesting;
+import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.PanelState;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
-import org.chromium.components.navigation_interception.InterceptNavigationDelegate;
-import org.chromium.components.web_contents_delegate_android.WebContentsDelegateAndroid;
+import org.chromium.chrome.browser.contextualsearch.ContextualSearchContentController;
 import org.chromium.content.browser.ContentViewCore;
-import org.chromium.content_public.browser.WebContents;
 
 /**
  * The delegate that that interfaces with the {@link ContextualSearchPanel}.
@@ -83,22 +83,6 @@ public interface ContextualSearchPanelDelegate {
     void updateBasePageSelectionYPx(float y);
 
     /**
-     * Handles the onLoadStarted event in the WebContents.
-     */
-    void onLoadStarted();
-
-    /**
-     * Handles the onLoadStopped event in the WebContents.
-     */
-    void onLoadStopped();
-
-    /**
-     * Handles the onLoadProgressChanged event in the WebContents.
-     * @param progress The loading progress in percentage (from 0 to 100).
-     */
-    void onLoadProgressChanged(int progress);
-
-    /**
      * @return The panel's state.
      */
     PanelState getPanelState();
@@ -107,11 +91,6 @@ public interface ContextualSearchPanelDelegate {
      * Sets that the contextual search involved the promo.
      */
     void setDidSearchInvolvePromo();
-
-    /**
-     * Sets that the Search Content View was seen.
-     */
-    void setWasSearchContentViewSeen();
 
     /**
      * Sets whether the promo is active.
@@ -132,11 +111,6 @@ public interface ContextualSearchPanelDelegate {
     void onSearchResultsLoaded(boolean wasPrefetch);
 
     /**
-     * @return ContextualSearchControl The Android View that renders the BottomBar text.
-     */
-    ContextualSearchControl getContextualSearchControl();
-
-    /**
      * @return {@code true} Whether the close animation should run when the the panel is closed
      *                      due the panel being promoted to a tab.
      */
@@ -144,18 +118,9 @@ public interface ContextualSearchPanelDelegate {
 
     /**
      * @return The ContentViewCore associated with the panel.
+     * TODO(mdjones): Remove this method from the interface.
      */
     ContentViewCore getContentViewCore();
-
-    /**
-     * Set this panel's ContentViewCore to null.
-     */
-    void resetContentViewCore();
-
-    /**
-     * Destroy the native components of this class.
-     */
-    void destroy();
 
     /**
      * Remove the last entry from history provided it is in a given time frame.
@@ -165,24 +130,66 @@ public interface ContextualSearchPanelDelegate {
     void removeLastHistoryEntry(String historyUrl, long urlTimeMs);
 
     /**
-     * Set the WebContents
+     * Shows the search term in the BottomBar. This should be called when the search term is set
+     * without resolving a search context.
+     * @param searchTerm The string that represents the search term.
      */
-    void setWebContents(ContentViewCore contentView, WebContentsDelegateAndroid delegate);
+    void displaySearchTerm(String searchTerm);
 
     /**
-     * Destroy the web contents associated with this object.
+     * Shows the search context in the BottomBar.
+     * @param selection The portion of the context that represents the user's selection.
+     * @param start The portion of the context from its start to the selection.
+     * @param end The portion of the context the selection to its end.
      */
-    void destroyWebContents();
+    void displaySearchContext(String selection, String start, String end);
 
     /**
-     * Reset the native handle to the WebContents.
+     * Handles showing the resolved search term in the BottomBarTextControl.
+     * @param searchTerm The string that represents the search term.
      */
-    void releaseWebContents();
+    void onSearchTermResolutionResponse(String searchTerm);
 
     /**
-     * @param delegate InterceptNavigationDelegate to use.
-     * @param webContents The WebContents to associate with the delegate.
+     * @param activity The current active ChromeActivity.
      */
-    void setInterceptNavigationDelegate(
-            InterceptNavigationDelegate delegate, WebContents webContents);
+    void setChromeActivity(ChromeActivity activity);
+
+    /**
+     * Load a URL in the panel ContentViewCore.
+     * @param url The URL to load.
+     */
+    void loadUrlInPanel(String url);
+
+    /**
+     * @return True if the ContentViewCore is being shown.
+     */
+    boolean isContentViewShowing();
+
+    /**
+     * Create a new ContentViewCore for this panel.
+     */
+    void createNewPanelContentView();
+
+    /**
+     * Set the ContextualSearchContentController (for testing).
+     */
+    @VisibleForTesting
+    void setContentController(ContextualSearchContentController controller);
+
+    /**
+     * @return The current content controller.
+     */
+    @VisibleForTesting
+    ContextualSearchContentController getContentController();
+
+    /**
+     * @return True if the panel loaded a URL.
+     */
+    boolean didLoadAnyUrl();
+
+    /**
+     * Sets the top control state based on the internals of the panel.
+     */
+    void updateTopControlState();
 }

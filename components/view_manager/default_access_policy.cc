@@ -63,7 +63,8 @@ bool DefaultAccessPolicy::CanDescendIntoViewForViewTree(
 bool DefaultAccessPolicy::CanEmbed(const ServerView* view) const {
   return WasCreatedByThisConnection(view) ||
       (delegate_->IsViewKnownForAccessPolicy(view) &&
-       IsDescendantOfEmbedRoot(view));
+       IsDescendantOfEmbedRoot(view) &&
+       !delegate_->IsRootForAccessPolicy(view->id()));
 }
 
 bool DefaultAccessPolicy::CanChangeViewVisibility(
@@ -98,6 +99,10 @@ bool DefaultAccessPolicy::CanSetViewTextInputState(
 bool DefaultAccessPolicy::CanSetFocus(const ServerView* view) const {
   return WasCreatedByThisConnection(view) ||
          delegate_->IsRootForAccessPolicy(view->id());
+}
+
+bool DefaultAccessPolicy::CanSetAccessPolicy(const ServerView* view) const {
+  return false;
 }
 
 bool DefaultAccessPolicy::ShouldNotifyOnHierarchyChange(

@@ -517,16 +517,23 @@ void AddSameCenterYConstraint(UIView* parentView,
                                           constant:0]];
 }
 
-bool IsCompact() {
+bool IsCompact(id<UITraitEnvironment> environment) {
   if (base::ios::IsRunningOnIOS8OrLater()) {
-    UIViewController* rootController =
-        [UIApplication sharedApplication].keyWindow.rootViewController;
-    return [rootController.traitCollection horizontalSizeClass] ==
+    return environment.traitCollection.horizontalSizeClass ==
            UIUserInterfaceSizeClassCompact;
   } else {
     // Prior to iOS 8, iPad is always regular, iPhone is always compact.
     return !IsIPadIdiom();
   }
+}
+
+bool IsCompact() {
+  UIWindow* keyWindow = [UIApplication sharedApplication].keyWindow;
+  return IsCompact(keyWindow);
+}
+
+bool IsCompactTablet(id<UITraitEnvironment> environment) {
+  return IsIPadIdiom() && IsCompact(environment);
 }
 
 bool IsCompactTablet() {

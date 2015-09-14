@@ -15,6 +15,7 @@
 #include "media/base/media_log.h"
 #include "media/base/mock_demuxer_host.h"
 #include "media/base/test_helpers.h"
+#include "media/base/timestamp_constants.h"
 #include "media/ffmpeg/ffmpeg_common.h"
 #include "media/filters/ffmpeg_demuxer.h"
 #include "media/filters/file_data_source.h"
@@ -1069,6 +1070,22 @@ TEST_F(FFmpegDemuxerTest, NaturalSizeWithPASP) {
   EXPECT_EQ(gfx::Size(639, 360), video_config.natural_size());
 }
 
+#endif
+
+#if defined(ENABLE_HEVC_DEMUXING)
+TEST_F(FFmpegDemuxerTest, HEVC_in_MP4_container) {
+  CreateDemuxer("bear-hevc-frag.mp4");
+  InitializeDemuxer();
+
+  DemuxerStream* video = demuxer_->GetStream(DemuxerStream::VIDEO);
+  ASSERT_TRUE(video);
+
+  video->Read(NewReadCB(FROM_HERE, 3569, 66733, true));
+  message_loop_.Run();
+
+  video->Read(NewReadCB(FROM_HERE, 1042, 200200, false));
+  message_loop_.Run();
+}
 #endif
 
 }  // namespace media

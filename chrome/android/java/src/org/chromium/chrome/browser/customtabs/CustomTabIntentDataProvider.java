@@ -20,6 +20,7 @@ import android.support.customtabs.CustomTabsIntent;
 import android.text.TextUtils;
 import android.util.Pair;
 
+import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.Log;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.R;
@@ -72,6 +73,7 @@ public class CustomTabIntentDataProvider {
     public static final String EXTRA_TINT_ACTION_BUTTON =
             "android.support.customtabs.extra.TINT_ACTION_BUTTON";
 
+    private static final int MAX_CUSTOM_MENU_ITEMS = 5;
     private static final String BUNDLE_PACKAGE_NAME = "android:packageName";
     private static final String BUNDLE_ENTER_ANIMATION_RESOURCE = "android:animEnterRes";
     private static final String BUNDLE_EXIT_ANIMATION_RESOURCE = "android:animExitRes";
@@ -98,7 +100,7 @@ public class CustomTabIntentDataProvider {
         mSession = IntentUtils.safeGetBinderExtra(intent, CustomTabsIntent.EXTRA_SESSION);
         retrieveToolbarColor(intent, context);
         mEnableUrlBarHiding = IntentUtils.safeGetBooleanExtra(
-                intent, CustomTabsIntent.EXTRA_ENABLE_URLBAR_HIDING, false);
+                intent, CustomTabsIntent.EXTRA_ENABLE_URLBAR_HIDING, true);
         mKeepAliveServiceIntent = IntentUtils.safeGetParcelableExtra(intent, EXTRA_KEEP_ALIVE);
 
         Bundle actionButtonBundle =
@@ -140,7 +142,8 @@ public class CustomTabIntentDataProvider {
         List<Bundle> menuItems =
                 IntentUtils.getParcelableArrayListExtra(intent, CustomTabsIntent.EXTRA_MENU_ITEMS);
         if (menuItems != null) {
-            for (Bundle bundle : menuItems) {
+            for (int i = 0; i < Math.min(MAX_CUSTOM_MENU_ITEMS, menuItems.size()); i++) {
+                Bundle bundle = menuItems.get(i);
                 String title =
                         IntentUtils.safeGetString(bundle, CustomTabsIntent.KEY_MENU_ITEM_TITLE);
                 PendingIntent pendingIntent =
@@ -161,8 +164,10 @@ public class CustomTabIntentDataProvider {
      */
     private void retrieveToolbarColor(Intent intent, Context context) {
         int color = IntentUtils.safeGetIntExtra(intent, CustomTabsIntent.EXTRA_TOOLBAR_COLOR,
-                context.getResources().getColor(R.color.default_primary_color));
-        int defaultColor = context.getResources().getColor(R.color.default_primary_color);
+                ApiCompatibilityUtils.getColor(context.getResources(),
+                        R.color.default_primary_color));
+        int defaultColor = ApiCompatibilityUtils.getColor(context.getResources(),
+                R.color.default_primary_color);
 
         if (color == Color.TRANSPARENT) color = defaultColor;
 

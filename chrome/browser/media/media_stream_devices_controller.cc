@@ -72,6 +72,10 @@ MediaStreamDevicesController::MediaStreamDevicesController(
     : web_contents_(web_contents),
       request_(request),
       callback_(callback) {
+  if (request_.request_type == content::MEDIA_OPEN_DEVICE) {
+    UMA_HISTOGRAM_BOOLEAN("Pepper.SecureOrigin.MediaStreamRequest",
+                          content::IsOriginSecure(request_.security_origin));
+  }
   profile_ = Profile::FromBrowserContext(web_contents->GetBrowserContext());
   content_settings_ = TabSpecificContentSettings::FromWebContents(web_contents);
 
@@ -120,7 +124,7 @@ const std::string& MediaStreamDevicesController::GetSecurityOriginSpec() const {
   return request_.security_origin.spec();
 }
 
-int MediaStreamDevicesController::GetIconID() const {
+int MediaStreamDevicesController::GetIconId() const {
   if (IsAskingForVideo())
     return IDR_INFOBAR_MEDIA_STREAM_CAMERA;
 
@@ -339,9 +343,11 @@ void MediaStreamDevicesController::StorePermission(
   ContentSettingsPattern primary_pattern =
       ContentSettingsPattern::FromURLNoWildcard(request_.security_origin);
 
+  bool is_pepper_request = request_.request_type == content::MEDIA_OPEN_DEVICE;
+
   if (IsAskingForAudio() && new_audio_setting != CONTENT_SETTING_ASK) {
     if (ShouldPersistContentSetting(new_audio_setting, request_.security_origin,
-                                    request_.request_type)) {
+                                    is_pepper_request)) {
       profile_->GetHostContentSettingsMap()->SetContentSetting(
           primary_pattern, ContentSettingsPattern::Wildcard(),
           CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC, std::string(),
@@ -350,7 +356,7 @@ void MediaStreamDevicesController::StorePermission(
   }
   if (IsAskingForVideo() && new_video_setting != CONTENT_SETTING_ASK) {
     if (ShouldPersistContentSetting(new_video_setting, request_.security_origin,
-                                    request_.request_type)) {
+                                    is_pepper_request)) {
       profile_->GetHostContentSettingsMap()->SetContentSetting(
           primary_pattern, ContentSettingsPattern::Wildcard(),
           CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA, std::string(),
@@ -424,8 +430,9 @@ ContentSetting MediaStreamDevicesController::GetContentSetting(
   }
 
   if (ContentTypeIsRequested(content_type, request)) {
-    MediaPermission permission(content_type, request.request_type,
-                               request.security_origin, profile_);
+    MediaPermission permission(
+        content_type, request.request_type, request.security_origin,
+        web_contents_->GetLastCommittedURL().GetOrigin(), profile_);
     return permission.GetPermissionStatusWithDeviceRequired(requested_device_id,
                                                             denial_reason);
   }

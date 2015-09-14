@@ -4,17 +4,23 @@
 
 #include "media/capture/webm_muxer.h"
 
-#include <limits>
-
 #include "base/bind.h"
+#include "media/base/limits.h"
 #include "media/base/video_frame.h"
 
 namespace media {
 
 static double GetFrameRate(const scoped_refptr<VideoFrame>& video_frame) {
-  double frame_rate = 0.0f;
-  base::IgnoreResult(video_frame->metadata()->GetDouble(
-      VideoFrameMetadata::FRAME_RATE, &frame_rate));
+  const double kZeroFrameRate = 0.0;
+  const double kDefaultFrameRate = 30.0;
+
+  double frame_rate = kDefaultFrameRate;
+  if (!video_frame->metadata()->GetDouble(
+          VideoFrameMetadata::FRAME_RATE, &frame_rate) ||
+      frame_rate <= kZeroFrameRate ||
+      frame_rate > media::limits::kMaxFramesPerSecond) {
+    frame_rate = kDefaultFrameRate;
+  }
   return frame_rate;
 }
 
@@ -22,19 +28,14 @@ WebmMuxer::WebmMuxer(const WriteDataCB& write_data_callback)
     : track_index_(0),
       write_data_callback_(write_data_callback),
       position_(0) {
-  DCHECK(thread_checker_.CalledOnValidThread());
   DCHECK(!write_data_callback_.is_null());
-  segment_.Init(this);
-  segment_.set_mode(mkvmuxer::Segment::kLive);
-  segment_.OutputCues(false);
-
-  mkvmuxer::SegmentInfo* const info = segment_.GetSegmentInfo();
-  info->set_writing_app("Chrome");
-  info->set_muxing_app("Chrome");
+  // Creation is done on a different thread than main activities.
+  thread_checker_.DetachFromThread();
 }
 
 WebmMuxer::~WebmMuxer() {
-  DCHECK(thread_checker_.CalledOnValidThread());
+  // No need to segment_.Finalize() since is not Seekable(), i.e. a live stream,
+  // but is good practice.
   segment_.Finalize();
 }
 
@@ -42,6 +43,7 @@ void WebmMuxer::OnEncodedVideo(const scoped_refptr<VideoFrame>& video_frame,
                                const base::StringPiece& encoded_data,
                                base::TimeTicks timestamp,
                                bool is_key_frame) {
+  DVLOG(1) << __FUNCTION__ << " - " << encoded_data.size() << "B";
   DCHECK(thread_checker_.CalledOnValidThread());
   if (!track_index_) {
     // |track_index_|, cannot be zero (!), initialize WebmMuxer in that case.
@@ -53,13 +55,23 @@ void WebmMuxer::OnEncodedVideo(const scoped_refptr<VideoFrame>& video_frame,
   segment_.AddFrame(reinterpret_cast<const uint8_t*>(encoded_data.data()),
                     encoded_data.size(),
                     track_index_,
-                    (timestamp - first_frame_timestamp_).InMilliseconds(),
+                    (timestamp - first_frame_timestamp_).InMicroseconds() *
+                        base::Time::kNanosecondsPerMicrosecond,
                     is_key_frame);
 }
 
 void WebmMuxer::AddVideoTrack(const gfx::Size& frame_size, double frame_rate) {
   DCHECK(thread_checker_.CalledOnValidThread());
-  DCHECK_EQ(track_index_, 0u);
+  DCHECK_EQ(track_index_, 0u) << "WebmMuxer can only be initialised once.";
+
+  segment_.Init(this);
+  segment_.set_mode(mkvmuxer::Segment::kLive);
+  segment_.OutputCues(false);
+
+  mkvmuxer::SegmentInfo* const info = segment_.GetSegmentInfo();
+  info->set_writing_app("Chrome");
+  info->set_muxing_app("Chrome");
+
   track_index_ =
       segment_.AddVideoTrack(frame_size.width(), frame_size.height(), 0);
   DCHECK_GT(track_index_, 0u);
@@ -75,7 +87,7 @@ void WebmMuxer::AddVideoTrack(const gfx::Size& frame_size, double frame_rate) {
   DCHECK_EQ(video_track->crop_bottom(), 0ull);
 
   video_track->set_frame_rate(frame_rate);
-  video_track->set_default_duration(base::Time::kMicrosecondsPerSecond /
+  video_track->set_default_duration(base::Time::kNanosecondsPerSecond /
                                     frame_rate);
   // Segment's timestamps should be in milliseconds, DCHECK it. See
   // http://www.webmproject.org/docs/container/#muxer-guidelines

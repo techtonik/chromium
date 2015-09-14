@@ -5,6 +5,7 @@
 #ifndef COMPONENTS_HTML_VIEWER_WEB_TEST_DELEGATE_IMPL_H_
 #define COMPONENTS_HTML_VIEWER_WEB_TEST_DELEGATE_IMPL_H_
 
+#include "base/callback.h"
 #include "base/macros.h"
 #include "components/test_runner/test_preferences.h"
 #include "components/test_runner/web_test_delegate.h"
@@ -26,6 +27,9 @@ class WebTestDelegateImpl : public test_runner::WebTestDelegate {
   }
   void set_test_proxy(test_runner::WebTestProxyBase* proxy) {
     proxy_ = proxy;
+  }
+  void set_completion_callback(const base::Closure& callback) {
+    completion_callback_ = callback;
   }
 
  private:
@@ -70,6 +74,10 @@ class WebTestDelegateImpl : public test_runner::WebTestDelegate {
   void SetDeviceScaleFactor(float factor) override;
   void SetDeviceColorProfile(const std::string& name) override;
   void SetBluetoothMockDataSet(const std::string& data_set) override;
+  void SetBluetoothManualChooser() override;
+  std::vector<std::string> GetBluetoothManualChooserEvents() override;
+  void SendBluetoothManualChooserEvent(const std::string& event,
+                                       const std::string& argument) override;
   void SetGeofencingMockProvider(bool service_available) override;
   void ClearGeofencingMockProvider() override;
   void SetGeofencingMockPosition(double latitude, double longitude) override;
@@ -98,10 +106,6 @@ class WebTestDelegateImpl : public test_runner::WebTestDelegate {
                      const GURL& origin,
                      const GURL& embedding_origin) override;
   void ResetPermissions() override;
-  scoped_refptr<cc::TextureLayer> CreateTextureLayerForMailbox(
-      cc::TextureLayerClient* client) override;
-  blink::WebLayer* InstantiateWebLayer(
-      scoped_refptr<cc::TextureLayer> layer) override;
   cc::SharedBitmapManager* GetSharedBitmapManager() override;
   void DispatchBeforeInstallPromptEvent(
       int request_id,
@@ -118,6 +122,7 @@ class WebTestDelegateImpl : public test_runner::WebTestDelegate {
   test_runner::WebTestInterfaces* test_interfaces_;
   test_runner::WebTestProxyBase* proxy_;
   std::string dump_tree_;
+  base::Closure completion_callback_;
 
   DISALLOW_COPY_AND_ASSIGN(WebTestDelegateImpl);
 };

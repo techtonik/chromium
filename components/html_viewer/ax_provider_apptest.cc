@@ -10,7 +10,7 @@
 #include "components/view_manager/public/cpp/tests/view_manager_test_base.h"
 #include "components/view_manager/public/cpp/view.h"
 #include "components/view_manager/public/cpp/view_tree_connection.h"
-#include "mandoline/tab/public/interfaces/frame_tree.mojom.h"
+#include "components/web_view/public/interfaces/frame_tree.mojom.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/application_test_base.h"
 #include "net/test/spawned_test_server/spawned_test_server.h"
@@ -30,18 +30,19 @@ bool AxTreeContainsText(const Array<AxNodePtr>& tree, const String& text) {
   return false;
 }
 
-class TestFrameTreeServer : public mandoline::FrameTreeServer {
+class TestFrameTreeServer : public web_view::FrameTreeServer {
  public:
   TestFrameTreeServer() {}
   ~TestFrameTreeServer() override {}
 
-  // mandoline::FrameTreeServer:
+  // web_view::FrameTreeServer:
   void PostMessageEventToFrame(uint32_t source_frame_id,
                                uint32_t target_frame_id,
-                               mandoline::HTMLMessageEventPtr event) override {}
+                               web_view::HTMLMessageEventPtr event) override {}
   void LoadingStarted(uint32_t frame_id) override {}
   void LoadingStopped(uint32_t frame_id) override {}
   void ProgressChanged(uint32_t frame_id, double progress) override {}
+  void TitleChanged(uint32_t frame_id, const mojo::String& title) override {}
   void SetClientProperty(uint32_t frame_id,
                          const mojo::String& name,
                          mojo::Array<uint8_t> value) override {}
@@ -49,7 +50,7 @@ class TestFrameTreeServer : public mandoline::FrameTreeServer {
                       uint32_t frame_id,
                       mojo::Map<mojo::String, mojo::Array<uint8_t>>
                           client_properties) override {}
-  void RequestNavigate(mandoline::NavigationTargetType target_type,
+  void RequestNavigate(web_view::NavigationTargetType target_type,
                        uint32_t target_frame_id,
                        mojo::URLRequestPtr request) override {}
   void DidNavigateLocally(uint32_t frame_id, const mojo::String& url) override {
@@ -85,20 +86,21 @@ TEST_F(AXProviderTest, HelloWorld) {
   embed_view->Embed(tree_client.Pass());
 
   TestFrameTreeServer frame_tree_server;
-  mandoline::FrameTreeServerPtr frame_tree_server_ptr;
-  mojo::Binding<mandoline::FrameTreeServer> frame_tree_server_binding(
+  web_view::FrameTreeServerPtr frame_tree_server_ptr;
+  mojo::Binding<web_view::FrameTreeServer> frame_tree_server_binding(
       &frame_tree_server);
   frame_tree_server_binding.Bind(GetProxy(&frame_tree_server_ptr).Pass());
 
-  mojo::Array<mandoline::FrameDataPtr> array(1u);
-  array[0] = mandoline::FrameData::New().Pass();
+  mojo::Array<web_view::FrameDataPtr> array(1u);
+  array[0] = web_view::FrameData::New().Pass();
   array[0]->frame_id = embed_view->id();
   array[0]->parent_id = 0u;
 
-  mandoline::FrameTreeClientPtr frame_tree_client;
+  web_view::FrameTreeClientPtr frame_tree_client;
   connection->ConnectToService(&frame_tree_client);
-  frame_tree_client->OnConnect(frame_tree_server_ptr.Pass(), 1u,
-                               array.Pass());
+  frame_tree_client->OnConnect(
+      frame_tree_server_ptr.Pass(), 1u, embed_view->id(),
+      web_view::VIEW_CONNECT_TYPE_USE_NEW, array.Pass(), base::Closure());
 
   // Connect to the AxProvider of the HTML document and get the AxTree.
   AxProviderPtr ax_provider;

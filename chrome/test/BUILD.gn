@@ -618,6 +618,7 @@ if (!is_android) {
       # Generic telemetry deps
       # TODO(GYP): These should probably be specified somewhere else
       # and pulled in via a deps entry.
+      "//build/android/devil/",
       "//build/android/pylib/",
       "//build/util/",
       "//third_party/WebKit/PerformanceTests/resources/jquery.tablesorter.min.js",
@@ -1450,8 +1451,9 @@ if (!is_android) {
         "//components/audio_modem:test_support",
         "//components/autofill/content/browser/wallet:test_support",
         "//components/autofill/content/renderer:test_support",
-        "//components/metrics/proto",
         "//components/data_reduction_proxy/core/browser:test_support",
+        "//components/data_use_measurement/core",
+        "//components/metrics/proto",
         "//components/safe_json:test_support",
         "//components/webdata_services:test_support",
         "//components/strings",
@@ -1485,6 +1487,7 @@ if (!is_android) {
               chrome_tests_unit_gypi_values.chrome_unit_tests_non_android_sources,
               ".",
               "//chrome")
+      sources -= [ "../browser/download/download_request_infobar_delegate_unittest.cc" ]
     }
     if (is_ios || is_chromeos) {
       sources -=
@@ -1722,10 +1725,7 @@ if (!is_android) {
     }
     if (is_chromeos) {
       deps += [ "//chrome/browser/chromeos:unit_tests" ]
-      sources -= [
-        "../browser/signin/signin_global_error_unittest.cc",
-        "../browser/signin/signin_manager_unittest.cc",
-      ]
+      sources -= [ "../browser/signin/signin_manager_unittest.cc" ]
     }
     if (use_x11) {
       deps += [ "//ui/events/devices" ]
@@ -1848,7 +1848,6 @@ if (!is_android) {
         "../browser/ui/sync/sync_promo_ui_unittest.cc",
       ]
     } else {
-      sources -= [ "../browser/web_resource/promo_resource_service_mobile_ntp_unittest.cc" ]
       deps += [ "//chrome/tools/profile_reset:jtl_compiler_lib" ]
     }
     if (!is_android && !is_chromeos) {

@@ -180,12 +180,7 @@ IPC_STRUCT_BEGIN(ExtensionMsg_ExternalConnectionInfo)
   // The URL of the frame that initiated the request.
   IPC_STRUCT_MEMBER(GURL, source_url)
 
-  // The ID of the tab that is the target of the request, or -1 if there is no
-  // target tab.
-  IPC_STRUCT_MEMBER(int, target_tab_id)
-
-  // The ID of the frame that is the target of the request, or -1 if there is
-  // no target frame (implying the message is for all frames).
+  // The ID of the frame that is the target of the request.
   IPC_STRUCT_MEMBER(int, target_frame_id)
 
   // The process ID of the webview that initiated the request.
@@ -387,7 +382,7 @@ IPC_STRUCT_BEGIN(ExtensionMsg_UpdatePermissions_Params)
   IPC_STRUCT_MEMBER(ExtensionMsg_PermissionSetStruct, withheld_permissions)
 IPC_STRUCT_END()
 
-// Messages sent from the browser to the renderer.
+// Messages sent from the browser to the renderer:
 
 // The browser sends this message in response to all extension api calls. The
 // response data (if any) is one of the base::Value subclasses, wrapped as the
@@ -412,10 +407,6 @@ IPC_MESSAGE_ROUTED5(ExtensionMsg_MessageInvoke,
                     std::string /* function_name */,
                     base::ListValue /* args */,
                     bool /* delivered as part of a user gesture */)
-
-// Tell the renderer process all known extension function names.
-IPC_MESSAGE_CONTROL1(ExtensionMsg_SetFunctionNames,
-                     std::vector<std::string>)
 
 // Set the top-level frame to the provided name.
 IPC_MESSAGE_ROUTED1(ExtensionMsg_SetFrameName,
@@ -578,7 +569,11 @@ IPC_MESSAGE_CONTROL1(ExtensionMsg_WatchPages,
 IPC_MESSAGE_CONTROL1(ExtensionMsg_TransferBlobs,
                      std::vector<std::string> /* blob_uuids */)
 
-// Messages sent from the renderer to the browser.
+// Report the WebView partition ID to the WebView guest renderer process.
+IPC_MESSAGE_CONTROL1(ExtensionMsg_SetWebViewPartitionID,
+                     std::string /* webview_partition_id */)
+
+// Messages sent from the renderer to the browser:
 
 // A renderer sends this message when an extension process starts an API
 // request. The browser will always respond with a ExtensionMsg_Response.

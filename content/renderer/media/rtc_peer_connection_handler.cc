@@ -531,8 +531,9 @@ class PeerConnectionUMAObserver : public webrtc::UMAObserver {
         UMA_HISTOGRAM_ENUMERATION("WebRTC.PeerConnection.CandidatePairType_TCP",
                                   counter, counter_max);
         break;
-      case webrtc::kPeerConnectionEnumCounterMax:
-        NOTREACHED();
+      default:
+        // The default clause is expected to reach when new enum types are
+        // added.
         break;
     }
   }
@@ -555,7 +556,9 @@ class PeerConnectionUMAObserver : public webrtc::UMAObserver {
                                  value);
         break;
       default:
-        NOTREACHED();
+        // The default clause is expected to reach when new enum types are
+        // added.
+        break;
     }
   }
 };

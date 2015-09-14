@@ -31,45 +31,31 @@ Polymer({
     },
 
     /**
-     * Route for the page.
+     * The current active route.
      */
-    route: String,
-
-    /**
-     * Whether the page is a subpage.
-     */
-    subpage: {
-      type: Boolean,
-      value: false,
-      readOnly: true,
+    currentRoute: {
+      type: Array,
+      notify: true,
     },
+  },
 
-    /**
-     * ID of the page.
-     */
-    PAGE_ID: {
-      type: String,
-      value: 'privacy',
-      readOnly: true,
-    },
+  /** @private */
+  onBackTap_: function() {
+    this.$.pages.back();
+  },
 
-    /**
-     * Title for the page header and navigation menu.
-     */
-    pageTitle: {
-      type: String,
-      value: function() {
-        return loadTimeData.getString('privacyPageTitle');
-      },
-    },
+  /** @private */
+  onManageCertificatesTap_: function() {
+    this.$.pages.setSubpageChain(['manage-certificates']);
+  },
 
-    /**
-     * Name of the 'iron-icon' to show.
-     */
-    icon: {
-      type: String,
-      value: 'lock',
-      readOnly: true,
-    },
+  /** @private */
+  onSiteSettingsTap_: function() {
+    this.$.pages.setSubpageChain(['site-settings']);
+  },
+
+  /** @private */
+  onClearBrowsingDataTap_: function() {
+    // TODO(dschuyler)
   },
 });

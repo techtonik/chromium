@@ -742,11 +742,11 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_DISABLE_ENCRYPTED_MEDIA_DESCRIPTION,
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kDisableEncryptedMedia)},
-    {"disable-prefixed-encrypted-media",
-     IDS_FLAGS_DISABLE_PREFIXED_ENCRYPTED_MEDIA_NAME,
-     IDS_FLAGS_DISABLE_PREFIXED_ENCRYPTED_MEDIA_DESCRIPTION,
+    {"enable-prefixed-encrypted-media",
+     IDS_FLAGS_ENABLE_PREFIXED_ENCRYPTED_MEDIA_NAME,
+     IDS_FLAGS_ENABLE_PREFIXED_ENCRYPTED_MEDIA_DESCRIPTION,
      kOsAll,
-     SINGLE_VALUE_TYPE(switches::kDisablePrefixedEncryptedMedia)},
+     SINGLE_VALUE_TYPE(switches::kEnablePrefixedEncryptedMedia)},
     {"disable-javascript-harmony-shipping",
      IDS_FLAGS_DISABLE_JAVASCRIPT_HARMONY_SHIPPING_NAME,
      IDS_FLAGS_DISABLE_JAVASCRIPT_HARMONY_SHIPPING_DESCRIPTION,
@@ -801,6 +801,13 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_WEB_BLUETOOTH_DESCRIPTION,
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableWebBluetooth)},
+#if defined(ENABLE_EXTENSIONS)
+    {"enable-ble-advertising-in-apps",
+     IDS_FLAGS_BLE_ADVERTISING_IN_EXTENSIONS_NAME,
+     IDS_FLAGS_BLE_ADVERTISING_IN_EXTENSIONS_DESCRIPTION,
+     kOsCrOS,
+     SINGLE_VALUE_TYPE(extensions::switches::kEnableBLEAdvertising)},
+#endif
     {"enable-devtools-experiments",
      IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_NAME,
      IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_DESCRIPTION,
@@ -2067,6 +2074,20 @@ const Experiment kExperiments[] = {
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnablePushApiBackgroundMode,
                                switches::kDisablePushApiBackgroundMode)},
 #endif  // defined(ENABLE_BACKGROUND)
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
+     {"enable-webusb-notifications",
+      IDS_FLAGS_ENABLE_WEBUSB_NOTIFICATIONS_NAME,
+      IDS_FLAGS_ENABLE_WEBUSB_NOTIFICATIONS_DESCRIPTION,
+      kOsDesktop,
+      SINGLE_VALUE_TYPE(switches::kEnableWebUsbNotifications)},
+     // TODO(reillyg): Remove this flag when the permission granting UI is
+     // available. crbug.com/529950
+     {"enable-webusb-on-any-origin",
+      IDS_FLAGS_ENABLE_WEBUSB_ON_ANY_ORIGIN_NAME,
+      IDS_FLAGS_ENABLE_WEBUSB_ON_ANY_ORIGIN_DESCRIPTION,
+      kOsDesktop,
+      SINGLE_VALUE_TYPE(switches::kEnableWebUsbOnAnyOrigin)},
+#endif
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.
@@ -2094,7 +2115,7 @@ class FlagsState {
 
   // Returns the singleton instance of this class
   static FlagsState* GetInstance() {
-    return Singleton<FlagsState>::get();
+    return base::Singleton<FlagsState>::get();
   }
 
  private:

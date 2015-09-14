@@ -185,11 +185,18 @@ bool RenderFrameProxyHost::InitRenderFrameProxy() {
     CHECK_NE(parent_routing_id, MSG_ROUTING_NONE);
   }
 
+  int opener_routing_id = MSG_ROUTING_NONE;
+  if (frame_tree_node_->opener()) {
+    opener_routing_id = frame_tree_node_->render_manager()->GetOpenerRoutingID(
+        site_instance_.get());
+  }
+
   Send(new FrameMsg_NewFrameProxy(routing_id_,
-                                  parent_routing_id,
                                   frame_tree_node_->frame_tree()
                                       ->GetRenderViewHost(site_instance_.get())
                                       ->GetRoutingID(),
+                                  opener_routing_id,
+                                  parent_routing_id,
                                   frame_tree_node_
                                       ->current_replication_state()));
 
@@ -203,7 +210,7 @@ void RenderFrameProxyHost::UpdateOpener() {
   // the new opener's proxy exists in this case.
   if (frame_tree_node_->opener()) {
     frame_tree_node_->opener()->render_manager()->CreateOpenerProxies(
-        GetSiteInstance());
+        GetSiteInstance(), frame_tree_node_);
   }
 
   int opener_routing_id =

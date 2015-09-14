@@ -45,6 +45,9 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['win'], bug=485641)
     self.Fail('conformance/glsl/bugs/sampler-struct-function-arg.html',
         ['win'], bug=485642)
+    self.Flaky('conformance/glsl/constructors/' +
+               'glsl-construct-vec-mat-index.html',
+               ['win'], bug=525188)
 
     # Win7 / Intel failures
     self.Fail('conformance/rendering/gl-scissor-test.html',
@@ -134,6 +137,8 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['mountainlion', ('intel', 0x116)], bug=314997)
     self.Fail('conformance/ogles/GL/operators/operators_009_to_016.html',
         ['mountainlion', ('intel', 0x116)], bug=322795)
+    self.Flaky('conformance/ogles/*',
+        ['mountainlion', ('intel', 0x116)], bug=527250)
 
     # Mac 10.8 / Intel HD 4000 failures.
     self.Fail('conformance/context/context-hidden-alpha.html',
@@ -149,14 +154,12 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail(
         'conformance/glsl/bugs/array-of-struct-with-int-first-position.html',
         ['mac', ('nvidia', 0xfd5), ('nvidia', 0xfe9)], bug=368912)
+    self.Flaky('conformance/extensions/oes-texture-half-float-with-video.html',
+               ['mac', ('nvidia', 0xfd5), ('nvidia', 0xfe9)], bug=524717)
 
     # Mac / AMD Failures
     self.Fail('deqp/data/gles2/shaders/conversions.html',
         ['mac', 'amd'], bug=478572)
-
-    # Mac 10.10 / AMD Failures
-    self.Flaky('conformance/rendering/many-draw-calls.html',
-        ['mac', 'yosemite', 'amd', 'debug'], bug=505814)
 
     # Mac 10.8 / ATI failures
     self.Fail(
@@ -205,6 +208,8 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     # NVIDIA
     self.Fail('conformance/textures/misc/default-texture.html',
         ['linux', ('nvidia', 0x104a)], bug=422152)
+    self.Flaky('conformance/extensions/oes-element-index-uint.html',
+               ['linux', 'nvidia'], bug=524144)
     # AMD Radeon 5450
     self.Fail('conformance/programs/program-test.html',
         ['linux', ('amd', 0x68f9)], bug=436212)
@@ -496,7 +501,7 @@ class WebGLConformanceExpectations(GpuTestExpectations):
 
     self.Skip('deqp/functional/gles3/attriblocation.html', bug=483282)
     self.Skip('deqp/functional/gles3/buffercopy.html', bug=483282)
-    self.Fail('deqp/functional/gles3/builtinprecision.html', bug=483282)
+    self.Skip('deqp/functional/gles3/builtinprecision.html', bug=483282)
     self.Skip('deqp/functional/gles3/draw.html', bug=483282)
     self.Fail('deqp/functional/gles3/fbocolorbuffer.html', bug=483282)
     self.Fail('deqp/functional/gles3/fbocompleteness.html', bug=483282)
@@ -508,7 +513,7 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Skip('deqp/functional/gles3/fragmentoutput.html', bug=483282)
     self.Skip('deqp/functional/gles3/framebufferblit.html', bug=483282)
     self.Skip('deqp/functional/gles3/instancedrendering.html', bug=483282)
-    self.Fail('deqp/functional/gles3/lifetime.html', bug=483282)
+    self.Skip('deqp/functional/gles3/lifetime.html', bug=483282)
     self.Skip('deqp/functional/gles3/multisample.html', bug=483282)
     self.Skip('deqp/functional/gles3/negativebufferapi.html', bug=483282)
     self.Skip('deqp/functional/gles3/negativefragmentapi.html', bug=483282)

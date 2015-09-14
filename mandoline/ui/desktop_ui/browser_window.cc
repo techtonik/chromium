@@ -8,6 +8,7 @@
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "components/view_manager/public/cpp/scoped_view_ptr.h"
 #include "components/view_manager/public/cpp/view_tree_host_factory.h"
 #include "mandoline/ui/aura/native_widget_view_manager.h"
 #include "mandoline/ui/desktop_ui/browser_commands.h"
@@ -81,8 +82,6 @@ BrowserWindow::BrowserWindow(mojo::ApplicationImpl* app,
   mojo::CreateViewTreeHost(host_factory, host_client.Pass(), this, &host_);
 }
 
-BrowserWindow::~BrowserWindow() {}
-
 void BrowserWindow::LoadURL(const GURL& url) {
   // Haven't been embedded yet, can't embed.
   // TODO(beng): remove this.
@@ -101,6 +100,18 @@ void BrowserWindow::LoadURL(const GURL& url) {
   Embed(request.Pass());
 }
 
+void BrowserWindow::Close() {
+  if (root_)
+    mojo::ScopedViewPtr::DeleteViewOrViewManager(root_);
+  else
+    delete this;
+}
+
+BrowserWindow::~BrowserWindow() {
+  DCHECK(!root_);
+  manager_->BrowserWindowClosed(this);
+}
+
 float BrowserWindow::DIPSToPixels(float value) const {
   return value * root_->viewport_metrics().device_pixel_ratio;
 }
@@ -115,11 +126,9 @@ void BrowserWindow::OnEmbed(mojo::View* root) {
   // Record when the browser window was displayed, used for performance testing.
   const base::Time display_time = base::Time::Now();
 
-  // Make it so we get OnWillEmbed() for any Embed()s done by other apps we
-  // Embed().
-  root->connection()->SetEmbedRoot();
-
   root_ = root;
+
+  host_->SetTitle("Mandoline");
 
   content_ = root_->connection()->CreateView();
   Init(root_);
@@ -131,10 +140,12 @@ void BrowserWindow::OnEmbed(mojo::View* root) {
 
   web_view_.Init(app_, content_);
 
-  host_->AddAccelerator(BrowserCommand_FocusOmnibox, mojo::KEYBOARD_CODE_L,
-                        mojo::EVENT_FLAGS_CONTROL_DOWN);
-  host_->AddAccelerator(BrowserCommand_NewWindow, mojo::KEYBOARD_CODE_N,
-                        mojo::EVENT_FLAGS_CONTROL_DOWN);
+  host_->AddAccelerator(static_cast<uint32_t>(BrowserCommand::CLOSE),
+                        mojo::KEYBOARD_CODE_W, mojo::EVENT_FLAGS_CONTROL_DOWN);
+  host_->AddAccelerator(static_cast<uint32_t>(BrowserCommand::FOCUS_OMNIBOX),
+                        mojo::KEYBOARD_CODE_L, mojo::EVENT_FLAGS_CONTROL_DOWN);
+  host_->AddAccelerator(static_cast<uint32_t>(BrowserCommand::NEW_WINDOW),
+                        mojo::KEYBOARD_CODE_N, mojo::EVENT_FLAGS_CONTROL_DOWN);
 
   // Now that we're ready, load the default url.
   LoadURL(default_url_);
@@ -161,18 +172,21 @@ void BrowserWindow::OnEmbed(mojo::View* root) {
 
 void BrowserWindow::OnConnectionLost(mojo::ViewTreeConnection* connection) {
   root_ = nullptr;
-  manager_->BrowserWindowClosed(this);
+  delete this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // BrowserWindow, mojo::ViewTreeHostClient implementation:
 
 void BrowserWindow::OnAccelerator(uint32_t id, mojo::EventPtr event) {
-  switch (id) {
-    case BrowserCommand_NewWindow:
+  switch (static_cast<BrowserCommand>(id)) {
+    case BrowserCommand::CLOSE:
+      Close();
+      break;
+    case BrowserCommand::NEW_WINDOW:
       manager_->CreateBrowser(GURL());
       break;
-    case BrowserCommand_FocusOmnibox:
+    case BrowserCommand::FOCUS_OMNIBOX:
       ShowOmnibox();
       break;
     default:
@@ -194,6 +208,14 @@ void BrowserWindow::LoadingStateChanged(bool is_loading) {
 
 void BrowserWindow::ProgressChanged(double progress) {
   progress_bar_->SetProgress(progress);
+}
+
+void BrowserWindow::TitleChanged(const mojo::String& title) {
+  base::string16 formatted =
+      title.is_null() ? base::ASCIIToUTF16("Untitled")
+                      : title.To<base::string16>() +
+          base::ASCIIToUTF16(" - Mandoline");
+  host_->SetTitle(mojo::String::From(formatted));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -236,9 +258,8 @@ void BrowserWindow::Layout(views::View* host) {
   float inverse_device_pixel_ratio =
       1.0f / root_->viewport_metrics().device_pixel_ratio;
 
-  gfx::Rect omnibox_launcher_bounds =
-      gfx::ToEnclosingRect(gfx::ScaleRect(bounds_in_physical_pixels,
-                                          inverse_device_pixel_ratio));
+  gfx::Rect omnibox_launcher_bounds = gfx::ScaleToEnclosingRect(
+      bounds_in_physical_pixels, inverse_device_pixel_ratio);
   omnibox_launcher_bounds.Inset(10, 10, 10,
                                 omnibox_launcher_bounds.height() - 40);
   omnibox_launcher_->SetBoundsRect(omnibox_launcher_bounds);

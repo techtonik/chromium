@@ -94,6 +94,27 @@ class JavaRef : public JavaRef<jobject> {
   DISALLOW_COPY_AND_ASSIGN(JavaRef);
 };
 
+// Holds a local reference to a JNI method parameter.
+// Method parameters should not be deleted, and so this class exists purely to
+// wrap them as a JavaRef<T> in the JNI binding generator. Do not create
+// instances manually.
+template<typename T>
+class JavaParamRef : public JavaRef<T> {
+ public:
+  // Assumes that |obj| is a parameter passed to a JNI method from Java.
+  // Does not assume ownership as parameters should not be deleted.
+  JavaParamRef(JNIEnv* env, T obj) : JavaRef<T>(env, obj) {}
+
+  ~JavaParamRef() {}
+
+  // TODO(torne): remove this cast once we're using JavaRef consistently.
+  // http://crbug.com/506850
+  operator T() const { return JavaRef<T>::obj(); }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(JavaParamRef);
+};
+
 // Holds a local reference to a Java object. The local reference is scoped
 // to the lifetime of this object.
 // Instances of this class may hold onto any JNIEnv passed into it until
@@ -172,6 +193,13 @@ class ScopedJavaLocalRef : public JavaRef<T> {
   // This class is only good for use on the thread it was created on so
   // it's safe to cache the non-threadsafe JNIEnv* inside this object.
   JNIEnv* env_;
+
+  // Prevent ScopedJavaLocalRef(JNIEnv*, T obj) from being used to take
+  // ownership of a JavaParamRef's underlying object - parameters are not
+  // allowed to be deleted and so should not be owned by ScopedJavaLocalRef.
+  // TODO(torne): this can be removed once JavaParamRef no longer has an
+  // implicit conversion back to T.
+  ScopedJavaLocalRef(JNIEnv* env, const JavaParamRef<T>& other);
 };
 
 // Holds a global reference to a Java object. The global reference is scoped
@@ -205,6 +233,11 @@ class ScopedJavaGlobalRef : public JavaRef<T> {
   template<typename U>
   void Reset(const U& other) {
     this->Reset(NULL, other.obj());
+  }
+
+  template<typename U>
+  void Reset(JNIEnv* env, const JavaParamRef<U>& other) {
+    this->Reset(env, other.obj());
   }
 
   template<typename U>

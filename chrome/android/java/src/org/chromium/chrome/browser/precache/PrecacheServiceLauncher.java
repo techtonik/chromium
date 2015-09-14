@@ -19,7 +19,13 @@ import android.preference.PreferenceManager;
 import org.chromium.base.Log;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.library_loader.LibraryLoader;
+import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.components.precache.DeviceState;
+
+import java.util.ArrayDeque;
+import java.util.EnumSet;
+import java.util.Queue;
 
 /**
  * BroadcastReceiver that determines when conditions are right for precaching, and starts the
@@ -47,9 +53,18 @@ public class PrecacheServiceLauncher extends BroadcastReceiver {
 
     private DeviceState mDeviceState = DeviceState.getInstance();
 
+    private PrecacheLauncher mPrecacheLauncher = PrecacheLauncher.get();
+
+    private Queue<Integer> mFailureReasonsToRecord = new ArrayDeque<Integer>();
+
     @VisibleForTesting
     void setDeviceState(DeviceState deviceState) {
         mDeviceState = deviceState;
+    }
+
+    @VisibleForTesting
+    void setPrecacheLauncher(PrecacheLauncher precacheLauncher) {
+        mPrecacheLauncher = precacheLauncher;
     }
 
     /**
@@ -106,17 +121,61 @@ public class PrecacheServiceLauncher extends BroadcastReceiver {
         }
     }
 
+    /**
+     * Returns true if precaching is able to run. Set by PrecacheLauncher#updatePrecachingEnabled.
+     *
+     * @param context The application context.
+     */
     @VisibleForTesting
     static boolean isPrecachingEnabled(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         return prefs.getBoolean(PREF_IS_PRECACHING_ENABLED, false);
     }
 
+    /**
+     * Returns the set of reasons that the last prefetch attempt failed to start.
+     *
+     * @param context The context passed to onReceive().
+     */
+    @VisibleForTesting
+    EnumSet<FailureReason> failureReasons(Context context) {
+        EnumSet<FailureReason> reasons = EnumSet.noneOf(FailureReason.class);
+        reasons.addAll(mPrecacheLauncher.failureReasons());
+        if (!mDeviceState.isPowerConnected(context)) reasons.add(FailureReason.NO_POWER);
+        if (!mDeviceState.isWifiAvailable(context)) reasons.add(FailureReason.NO_WIFI);
+        if (mDeviceState.isInteractive(context)) reasons.add(FailureReason.SCREEN_ON);
+        if (timeSinceLastPrecacheMs(context) < WAIT_UNTIL_NEXT_PRECACHE_MS) {
+            reasons.add(FailureReason.NOT_ENOUGH_TIME_SINCE_LAST_PRECACHE);
+        }
+        return reasons;
+    }
+
+    /**
+     * Tries to record a histogram enumerating all of the return value of failureReasons().
+     *
+     * If the native libraries are not already loaded, no histogram is recorded.
+     *
+     * @param context The context passed to onReceive().
+     */
+    @VisibleForTesting
+    void recordFailureReasons(Context context) {
+        int reasons = FailureReason.bitValue(failureReasons(context));
+
+        // Queue up this failure reason, for the next time we are able to record it in UMA.
+        mFailureReasonsToRecord.add(reasons);
+
+        // If native libraries are loaded, then we are able to flush our queue to UMA.
+        if (LibraryLoader.isInitialized()) {
+            Integer reasonsToRecord;
+            while ((reasonsToRecord = mFailureReasonsToRecord.poll()) != null) {
+                RecordHistogram.recordSparseSlowlyHistogram(
+                        "Precache.Fetch.FailureReasons", reasonsToRecord);
+            }
+        }
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        // Do nothing if precaching is disabled.
-        if (!isPrecachingEnabled(context)) return;
-
         boolean isPowerConnected = mDeviceState.isPowerConnected(context);
         boolean isWifiAvailable = mDeviceState.isWifiAvailable(context);
         boolean isInteractive = mDeviceState.isInteractive(context);
@@ -124,6 +183,11 @@ public class PrecacheServiceLauncher extends BroadcastReceiver {
                 isPowerConnected && isWifiAvailable && !isInteractive;
         boolean hasEnoughTimePassedSinceLastPrecache =
                 timeSinceLastPrecacheMs(context) >= WAIT_UNTIL_NEXT_PRECACHE_MS;
+
+        recordFailureReasons(context);
+
+        // Do nothing if precaching is disabled.
+        if (!isPrecachingEnabled(context.getApplicationContext())) return;
 
         // Only start precaching when an alarm action is received. This is to prevent situations
         // such as power being connected, precaching starting, then precaching being immediately

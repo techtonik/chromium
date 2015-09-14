@@ -44,12 +44,6 @@ class CONTENT_EXPORT SynchronousCompositor {
   static void SetGpuService(
       scoped_refptr<gpu::InProcessCommandBuffer::Service> service);
 
-  // By default, synchronous compopsitor records the full layer, not only
-  // what is inside and around the view port. This can be used to switch
-  // between this record-full-layer behavior and normal record-around-viewport
-  // behavior.
-  static void SetRecordFullDocument(bool record_full_document);
-
   // Turn on using ipc-based command buffer at run time. This should be removed
   // once this feature is fully launched.
   static void SetUseIpcCommandBuffer();
@@ -84,6 +78,10 @@ class CONTENT_EXPORT SynchronousCompositor {
   // compositor won't ask for vsyncs when it's inactive. NOTE: The compositor
   // starts off as inactive and needs a SetActive(true) call to begin.
   virtual void SetIsActive(bool is_active) = 0;
+
+  // Called by the embedder to notify that the OnComputeScroll step is happening
+  // and if any input animation is active, it should tick now.
+  virtual void OnComputeScroll(base::TimeTicks animation_time) = 0;
 
  protected:
   virtual ~SynchronousCompositor() {}

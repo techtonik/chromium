@@ -41,6 +41,7 @@ QuicHttpStream::QuicHttpStream(
       response_status_(OK),
       response_headers_received_(false),
       closed_stream_received_bytes_(0),
+      closed_stream_sent_bytes_(0),
       user_buffer_len_(0),
       weak_factory_(this) {
   DCHECK(session_);
@@ -238,10 +239,6 @@ bool QuicHttpStream::IsResponseBodyComplete() const {
   return next_state_ == STATE_OPEN && !stream_;
 }
 
-bool QuicHttpStream::CanFindEndOfResponse() const {
-  return true;
-}
-
 bool QuicHttpStream::IsConnectionReused() const {
   // TODO(rch): do something smarter here.
   return stream_ && stream_->id() > 1;
@@ -251,17 +248,29 @@ void QuicHttpStream::SetConnectionReused() {
   // QUIC doesn't need an indicator here.
 }
 
-bool QuicHttpStream::IsConnectionReusable() const {
+bool QuicHttpStream::CanReuseConnection() const {
   // QUIC streams aren't considered reusable.
   return false;
 }
 
 int64 QuicHttpStream::GetTotalReceivedBytes() const {
+  // TODO(sclittle): Currently, this only includes response body bytes. Change
+  // this to include headers and QUIC overhead as well.
   if (stream_) {
     return stream_->stream_bytes_read();
   }
 
   return closed_stream_received_bytes_;
+}
+
+int64_t QuicHttpStream::GetTotalSentBytes() const {
+  // TODO(sclittle): Currently, this only includes request body bytes. Change
+  // this to include headers and QUIC overhead as well.
+  if (stream_) {
+    return stream_->stream_bytes_written();
+  }
+
+  return closed_stream_sent_bytes_;
 }
 
 bool QuicHttpStream::GetLoadTimingInfo(LoadTimingInfo* load_timing_info) const {
@@ -280,11 +289,8 @@ void QuicHttpStream::GetSSLCertRequestInfo(
   NOTIMPLEMENTED();
 }
 
-bool QuicHttpStream::IsSpdyHttpStream() const {
-  return false;
-}
-
 void QuicHttpStream::Drain(HttpNetworkSession* session) {
+  NOTREACHED();
   Close(false);
   delete this;
 }
@@ -549,6 +555,7 @@ void QuicHttpStream::ResetStream() {
   if (!stream_)
     return;
   closed_stream_received_bytes_ = stream_->stream_bytes_read();
+  closed_stream_sent_bytes_ = stream_->stream_bytes_written();
   stream_ = nullptr;
 
   // If |request_body_stream_| is non-NULL, Reset it, to abort any in progress

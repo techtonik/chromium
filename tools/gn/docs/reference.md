@@ -2,7 +2,7 @@
 
 *This page is automatically generated from* `gn help --markdown all`.
 
-## **--args**: Specifies build arguments overrides.
+## **\--args**: Specifies build arguments overrides.
 
 ```
   See "gn help buildargs" for an overview of how build arguments work.
@@ -40,7 +40,7 @@
 
 
 ```
-## **--[no]color**: Forces colored output on or off.
+## **\--[no]color**: Forces colored output on or off.
 
 ```
   Normally GN will try to detect whether it is outputting to a terminal
@@ -58,7 +58,7 @@
 
 
 ```
-## **--dotfile**: Override the name of the ".gn" file.
+## **\--dotfile**: Override the name of the ".gn" file.
 
 ```
   Normally GN loads the ".gn"file  from the source root for some basic
@@ -70,9 +70,9 @@
 
 
 ```
-## **--markdown**: write the output in the Markdown format.
+## **\--markdown**: write the output in the Markdown format.
 
-## **--[no]color**: Forces colored output on or off.
+## **\--[no]color**: Forces colored output on or off.
 
 ```
   Normally GN will try to detect whether it is outputting to a terminal
@@ -97,7 +97,7 @@
 
 
 ```
-## **--root**: Explicitly specify source root.
+## **\--root**: Explicitly specify source root.
 
 ```
   Normally GN will look up in the directory tree from the current
@@ -119,7 +119,7 @@
 
 
 ```
-## **--runtime-deps-list-file**: Save runtime dependencies for targets in file.
+## **\--runtime-deps-list-file**: Save runtime dependencies for targets in file.
 
 ```
   --runtime-deps-list-file=<filename>
@@ -154,7 +154,7 @@
 
 
 ```
-## **--time**: Outputs a summary of how long everything took.
+## **\--time**: Outputs a summary of how long everything took.
 
 ```
   Hopefully self-explanatory.
@@ -168,7 +168,7 @@
 
 
 ```
-## **--tracelog**: Writes a Chrome-compatible trace log to the given file.
+## **\--tracelog**: Writes a Chrome-compatible trace log to the given file.
 
 ```
   The trace log will show file loads, executions, scripts, and writes.
@@ -194,7 +194,7 @@
 
 
 ```
-## **gn args <out_dir> [--list] [--short] [--args]**
+## **gn args <out_dir> [\--list] [\--short] [\--args]**
 
 ```
   See also "gn help buildargs" for a more high-level overview of how
@@ -259,7 +259,7 @@
 
 
 ```
-## **gn check <out_dir> [<label_pattern>] [--force]**
+## **gn check <out_dir> [<label_pattern>] [\--force]**
 
 ```
   "gn check" is the same thing as "gn gen" with the "--check" flag
@@ -309,7 +309,7 @@
 
 
 ```
-## **gn desc <out_dir> <target label> [<what to show>] [--blame]**
+## **gn desc <out_dir> <target label> [<what to show>] [\--blame]**
 
 ```
   Displays information about a given labeled target for the given build.
@@ -474,7 +474,7 @@
 
 
 ```
-## **gn format [--dump-tree] [--in-place] [--stdin] BUILD.gn**
+## **gn format [\--dump-tree] [\--in-place] [\--stdin] BUILD.gn**
 
 ```
   Formats .gn file to a standard format.
@@ -538,7 +538,7 @@
 
 
 ```
-## **gn ls <out_dir> [<label_pattern>] [--all-toolchains] [--as=...]**
+## **gn ls <out_dir> [<label_pattern>] [\--all-toolchains] [\--as=...]**
 ```
       [--type=...] [--testonly=...]
 
@@ -642,7 +642,7 @@
 
 
 ```
-## **gn refs <out_dir> (<label_pattern>|<label>|<file>|@<response_file>)* [--all]**
+## **gn refs <out_dir> (<label_pattern>|<label>|<file>|@<response_file>)* [\--all]**
 ```
         [--all-toolchains] [--as=...] [--testonly=...] [--type=...]
 
@@ -1253,6 +1253,69 @@
 
 
 ```
+## **forward_variables_from**: Copies variables from a different scope.
+
+```
+  forward_variables_from(from_scope, variable_list_or_star)
+
+  Copies the given variables from the given scope to the local scope
+  if they exist. This is normally used in the context of templates to
+  use the values of variables defined in the template invocation to
+  a template-defined target.
+
+  The variables in the given variable_list will be copied if they exist
+  in the given scope or any enclosing scope. If they do not exist,
+  nothing will happen and they be left undefined in the current scope.
+
+  As a special case, if the variable_list is a string with the value of
+  "*", all variables from the given scope will be copied. "*" only
+  copies variables set directly on the from_scope, not enclosing ones.
+  Otherwise it would duplicate all global variables.
+
+  When an explicit list of variables is supplied, if the variable exists
+  in the current (destination) scope already, an error will be thrown.
+  If "*" is specified, variables in the current scope will be
+  clobbered (the latter is important because most targets have an
+  implicit configs list, which means it wouldn't work at all if it
+  didn't clobber).
+
+  The sources assignment filter (see "gn help set_sources_assignment_filter")
+  is never applied by this function. It's assumed than any desired
+  filtering was already done when sources was set on the from_scope.
+
+```
+
+### **Examples**
+
+```
+  # This is a common action template. It would invoke a script with
+  # some given parameters, and wants to use the various types of deps
+  # and the visibility from the invoker if it's defined. It also injects
+  # an additional dependency to all targets.
+  template("my_test") {
+    action(target_name) {
+      forward_variables_from(invoker, [ "data_deps", "deps",
+                                        "public_deps", "visibility" ])
+      # Add our test code to the dependencies.
+      # "deps" may or may not be defined at this point.
+      if (defined(deps)) {
+        deps += [ "//tools/doom_melon" ]
+      } else {
+        deps = [ "//tools/doom_melon" ]
+      }
+    }
+  }
+
+  # This is a template around either a target whose type depends on a
+  # global variable. It forwards all values from the invoker.
+  template("my_wrapper") {
+    target(my_wrapper_target_type, target_name) {
+      forward_variables_from(invoker, "*")
+    }
+ }
+
+
+```
 ## **get_label_info**: Get an attribute from a target's label.
 
 ```
@@ -1386,7 +1449,7 @@
 
   "abspath"
       The full absolute path name to the file or directory. It will be
-      resolved relative to the currebt directory, and then the source-
+      resolved relative to the current directory, and then the source-
       absolute version will be returned. If the input is system-
       absolute, the same input will be returned.
         "foo/bar.txt" => "//mydir/foo/bar.txt"
@@ -1995,6 +2058,41 @@
 
 
 ```
+## **target**: Declare an target with the given programmatic type.
+
+```
+  target(target_type_string, target_name_string) { ... }
+
+  The target() function is a way to invoke a built-in target or template
+  with a type determined at runtime. This is useful for cases where the
+  type of a target might not be known statically.
+
+  Only templates and built-in target functions are supported for the
+  target_type_string parameter. Arbitrary functions, configs, and
+  toolchains are not supported.
+
+  The call:
+    target("source_set", "doom_melon") {
+  Is equivalent to:
+    source_set("doom_melon") {
+
+```
+
+### **Example**
+
+```
+  if (foo_build_as_shared) {
+    my_type = "shared_library"
+  } else {
+    my_type = "source_set"
+  }
+
+  target(my_type, "foo") {
+    ...
+  }
+
+
+```
 ## **template**: Define a template rule.
 
 ```
@@ -2011,7 +2109,7 @@
 
 ```
 
-### **More details**:
+### **Variables and templates**:
 
 ```
   When you call template() it creates a closure around all variables
@@ -2027,6 +2125,19 @@
   current directory will be that of the invoking code, since typically
   that code specifies the file names. This means all files internal
   to the template should use absolute names.
+
+  A template will typically forward some or all variables from the
+  invoking scope to a target that it defines. Often, such variables
+  might be optional. Use the pattern:
+
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+
+  The function forward_variables_from() provides a shortcut to forward
+  one or more or possibly all variables in this manner:
+
+    forward_variables_from(invoker, ["deps", "public_deps"])
 
 ```
 
@@ -2046,8 +2157,8 @@
   have globally unique names, or you will get collisions.
 
   Access the invoking name in your template via the implicit
-  "target_name" variable. This should also be the basis of how other
-  targets that a template expands to to ensure uniquness.
+  "target_name" variable. This should also be the basis for how other
+  targets that a template expands to ensure uniqueness.
 
   A typical example would be a template that defines an action to
   generate some source files, and a source_set to compile that source.
@@ -4341,10 +4452,11 @@
   A string literal represents a string value consisting of the quoted
   characters with possible escape sequences and variable expansions.
 
-      string    = `"` { char | escape | expansion } `"` .
-      escape    = `\` ( "$" | `"` | char ) .
-      expansion = "$" ( identifier | "{" identifier "}" ) .
-      char      = /* any character except "$", `"`, or newline */ .
+      string           = `"` { char | escape | expansion } `"` .
+      escape           = `\` ( "$" | `"` | char ) .
+      BracketExpansion = "{" ( identifier | ArrayAccess | ScopeAccess ) "}" .
+      expansion        = "$" ( identifier | BracketExpansion ) .
+      char             = /* any character except "$", `"`, or newline */ .
 
   After a backslash, certain sequences represent special characters:
 
@@ -4383,11 +4495,12 @@
       Block         = "{" StatementList "}" .
       StatementList = { Statement } .
 
+      ArrayAccess = identifier "[" { identifier | integer } "]" .
+      ScopeAccess = identifier "." identifier .
       Expr        = UnaryExpr | Expr BinaryOp Expr .
       UnaryExpr   = PrimaryExpr | UnaryOp UnaryExpr .
       PrimaryExpr = identifier | integer | string | Call
-                  | identifier "[" Expr "]"
-                  | identifier "." identifier
+                  | ArrayAccess | ScopeAccess
                   | "(" Expr ")"
                   | "[" [ ExprList [ "," ] ] "]" .
       ExprList    = Expr { "," Expr } .
@@ -4512,7 +4625,7 @@
 
 ```
 
-### **Details**
+### **Executables**
 
 ```
   Executable targets and those executable targets' transitive
@@ -4520,6 +4633,11 @@
   "data_deps". Otherwise, GN assumes that the executable (and
   everything it requires) is a build-time dependency only.
 
+```
+
+### **Actions and copies**
+
+```
   Action and copy targets that are listed as "data_deps" will have all
   of their outputs and data files considered as runtime dependencies.
   Action and copy targets that are "deps" or "public_deps" will have
@@ -4527,6 +4645,35 @@
   targets can list an output file in both the "outputs" and "data"
   lists to force an output file as a runtime dependency in all cases.
 
+  The different rules for deps and data_deps are to express build-time
+  (deps) vs. run-time (data_deps) outputs. If GN counted all build-time
+  copy steps as data dependencies, there would be a lot of extra stuff,
+  and if GN counted all run-time dependencies as regular deps, the
+  build's parallelism would be unnecessarily constrained.
+
+  This rule can sometimes lead to unintuitive results. For example,
+  given the three targets:
+    A  --[data_deps]-->  B  --[deps]-->  ACTION
+  GN would say that A does not have runtime deps on the result of the
+  ACTION, which is often correct. But the purpose of the B target might
+  be to collect many actions into one logic unit, and the "data"-ness
+  of A's dependency is lost. Solutions:
+
+   - List the outputs of the action in it's data section (if the
+     results of that action are always runtime files).
+   - Have B list the action in data_deps (if the outputs of the actions
+     are always runtime files).
+   - Have B list the action in both deps and data deps (if the outputs
+     might be used in both contexts and you don't care about unnecessary
+     entries in the list of files required at runtime).
+   - Split B into run-time and build-time versions with the appropriate
+     "deps" for each.
+
+```
+
+### **Static libraries and source sets**
+
+```
   The results of static_library or source_set targets are not considered
   runtime dependencies since these are assumed to be intermediate
   targets only. If you need to list a static library as a runtime
@@ -4534,10 +4681,16 @@
   current platform and list it in the "data" list of a target
   (possibly on the static library target itself).
 
+```
+
+### **Multiple outputs**
+
+```
   When a tool produces more than one output, only the first output
   is considered. For example, a shared library target may produce a
   .dll and a .lib file on Windows. Only the .dll file will be considered
-  a runtime dependency.
+  a runtime dependency. This applies only to linker tools, scripts and
+  copy steps with multiple outputs will also get all outputs listed.
 
 
 ```
@@ -4664,17 +4817,17 @@
 
 ```
 
-**  --args**: Specifies build arguments overrides.
-**  --color**: Force colored output.
-**  --dotfile**: Override the name of the ".gn" file.
-**  --markdown**: write the output in the Markdown format.
-**  --nocolor**: Force non-colored output.
+**  \--args**: Specifies build arguments overrides.
+**  \--color**: Force colored output.
+**  \--dotfile**: Override the name of the ".gn" file.
+**  \--markdown**: write the output in the Markdown format.
+**  \--nocolor**: Force non-colored output.
 **  -q**: Quiet mode. Don't print output on success.
-**  --root**: Explicitly specify source root.
-**  --runtime-deps-list-file**: Save runtime dependencies for targets in file.
-**  --time**: Outputs a summary of how long everything took.
-**  --tracelog**: Writes a Chrome-compatible trace log to the given file.
+**  \--root**: Explicitly specify source root.
+**  \--runtime-deps-list-file**: Save runtime dependencies for targets in file.
+**  \--time**: Outputs a summary of how long everything took.
+**  \--tracelog**: Writes a Chrome-compatible trace log to the given file.
 **  -v**: Verbose logging.
-**  --version**: Prints the GN version number and exits.
+**  \--version**: Prints the GN version number and exits.
 
 ```

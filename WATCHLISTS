@@ -128,6 +128,9 @@
                   'content/test/data/battery_status/|'\
                   'device/battery/',
     },
+    'blimp': {
+      'filepath': '^blimp/',
+    },
     'bookmarks': {
       'filepath': 'chrome/browser/bookmarks/' \
                   '|chrome/browser/extensions/api/bookmark_manager_private/' \
@@ -166,7 +169,8 @@
     },
     'bubble': {
       'filepath': 'ui/views/bubble/|'\
-                  'chrome/browser/ui/views/bubble/',
+                  'chrome/browser/ui/views/bubble/|'\
+                  'components/bubble/',
     },
     'cache_storage': {
       'filepath': 'cache_storage',
@@ -466,8 +470,8 @@
     },
     'md_settings': {
       'filepath': 'ui/webui/resources/cr_element'\
-                  '|chrome/browser/resources/md_settings/'\
-                  '|chrome/browser/resources/settings/',
+                  '|chrome/browser/resources/settings/'\
+                  '|chrome/browser/ui/webui/settings/',
     },
     'media': {
       'filepath': 'media/|third_party/(ffmpeg|openmax)/|webmediaplayer|'\
@@ -835,7 +839,7 @@
                   'content/common/gpu/media/|'\
                   'content/renderer/media/|'\
                   'media/base/android/|'\
-                  'media/video/|'\
+                  'media/capture/|'\
                   'video.*_accelerat',
     },
     'webrtc_browser_tests': {
@@ -909,7 +913,7 @@
     'autofill': ['bondd+autofillwatch@chromium.org',
                  'estade+watch@chromium.org',
                  'jdonnelly+autofillwatch@chromium.org',
-                 'rouslan+autofillwatch@chromium.org'],
+                 'rouslan+autofill@chromium.org'],
     'automation': ['robertshield@chromium.org'],
     'background_sync': ['jkarlin+watch@chromium.org'],
     'base_allocator': ['dmikurube@chromium.org',
@@ -917,6 +921,9 @@
     'base_memory': ['gavinp+memory@chromium.org'],
     'base_win': ['grt+watch@chromium.org', 'wfh+watch@chromium.org'],
     'battery_status': ['timvolodine@chromium.org'],
+    'blimp' : ['maniscalco+watch-blimp@chromium.org',
+               'nyquist+watch-blimp@chromium.org',
+               'kmarshall+watch-blimp@chromium.org'],
     'bookmarks': ['noyau+watch@chromium.org', 'tfarina@chromium.org'],
     'browser_chromeos': ['davemoore+watch@chromium.org'],
     'browser_components': ['browser-components-watch@chromium.org'],
@@ -924,7 +931,10 @@
                            'piman+watch@chromium.org'],
     'browser_resources': ['arv+watch@chromium.org'],
     'browsing_data': ['markusheintz@chromium.org'],
-    'bubble': ['alicet@chromium.org', 'msw+watch@chromium.org'],
+    'bubble': ['msw+watch@chromium.org',
+               'rouslan+bubble@chromium.org',
+               'hcarmona+bubble@chromium.org',
+               'groby+bubble@chromium.org'],
     'cache_storage': ['jkarlin+watch@chromium.org', 'nhiroki@chromium.org'],
     'cast': ['avayvod+watch@chromium.org',
              'imcheng+watch@chromium.org',
@@ -935,7 +945,9 @@
     'cc': ['cc-bugs@chromium.org'],
     'chrome_elf': ['caitkp+watch@chromium.org',],
     'chrome_views': ['tfarina@chromium.org'],
-    'chromecast': ['gunsch+watch@chromium.org', 'lcwu+watch@chromium.org'],
+    'chromecast': ['gunsch+watch@chromium.org',
+                   'halliwell+watch@chromium.org',
+                   'lcwu+watch@chromium.org'],
     'chromedriver': ['samuong+watch@chromium.org'],
     'chromeos' : ['oshima+watch@chromium.org'],
     'chromeos_attestation' : ['dkrahn+watch@chromium.org'],
@@ -943,7 +955,8 @@
     'chromeos_dbus': ['hashimoto+watch@chromium.org'],
     'chromeos_net' : ['stevenjb+watch@chromium.org'],
     'chromeos_power' : ['derat+watch@chromium.org'],
-    'chromeos_login' : ['dzhioev+watch@chromium.org'],
+    'chromeos_login' : ['achuith+watch@chromium.org',
+                        'dzhioev+watch@chromium.org'],
     'clang_update': ['ukai+watch@chromium.org',
                      'dmikurube+clang@chromium.org',
                      'eugenis+clang@chromium.org',
@@ -1106,7 +1119,7 @@
                       'nasko+codewatch@chromium.org'],
     'spellcheck': ['groby+spellwatch@chromium.org',
                    'rlp+watch@chromium.org',
-                   'rouslan+spellwatch@chromium.org'],
+                   'rouslan+spell@chromium.org'],
     'streams': ['zork+watch@chromium.org'],
     'sync': ['tim+watch@chromium.org',
              'maxbogue+watch@chromium.org',
@@ -1144,8 +1157,7 @@
     'views_core': ['tdanderson+views@chromium.org'],
     'virtual_keyboard': ['dfaden+virtualkb@google.com',
                          'groby+virtualkb@chromium.org'],
-    'webrtc_media': ['wjia+watch@chromium.org',
-                     'mcasas+watch@chromium.org',
+    'webrtc_media': ['mcasas+watch@chromium.org',
                      'posciak+watch@chromium.org'],
     'webrtc_browser_tests': ['phoglund+watch@chromium.org',
                              'tnakamura+watch@chromium.org'],

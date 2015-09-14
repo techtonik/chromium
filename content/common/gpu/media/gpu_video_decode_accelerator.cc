@@ -358,7 +358,9 @@ scoped_ptr<media::VideoDecodeAccelerator>
 GpuVideoDecodeAccelerator::CreateVTVDA() {
   scoped_ptr<media::VideoDecodeAccelerator> decoder;
 #if defined(OS_MACOSX)
-  decoder.reset(new VTVideoDecodeAccelerator(make_context_current_));
+  decoder.reset(new VTVideoDecodeAccelerator(
+      make_context_current_, base::Bind(&GpuVideoDecodeAccelerator::BindImage,
+                                        base::Unretained(this))));
 #endif
   return decoder.Pass();
 }
@@ -421,7 +423,10 @@ GpuVideoDecodeAccelerator::GetSupportedProfiles() {
 // Runs on IO thread if video_decode_accelerator_->CanDecodeOnIOThread() is
 // true, otherwise on the main thread.
 void GpuVideoDecodeAccelerator::OnDecode(
-    base::SharedMemoryHandle handle, int32 id, uint32 size) {
+    base::SharedMemoryHandle handle,
+    int32 id,
+    uint32 size,
+    base::TimeDelta presentation_timestamp) {
   DCHECK(video_decode_accelerator_.get());
   if (id < 0) {
     DLOG(ERROR) << "BitstreamBuffer id " << id << " out of range";
@@ -436,7 +441,8 @@ void GpuVideoDecodeAccelerator::OnDecode(
     }
     return;
   }
-  video_decode_accelerator_->Decode(media::BitstreamBuffer(id, handle, size));
+  video_decode_accelerator_->Decode(
+      media::BitstreamBuffer(id, handle, size, presentation_timestamp));
 }
 
 void GpuVideoDecodeAccelerator::OnAssignPictureBuffers(

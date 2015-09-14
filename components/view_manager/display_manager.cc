@@ -127,7 +127,8 @@ DefaultDisplayManager::DefaultDisplayManager(
       surfaces_state_(surfaces_state),
       delegate_(nullptr),
       draw_timer_(false, false),
-      frame_pending_(false) {
+      frame_pending_(false),
+      weak_factory_(this) {
   metrics_.size_in_pixels = mojo::Size::New();
   metrics_.size_in_pixels->width = 800;
   metrics_.size_in_pixels->height = 600;
@@ -155,8 +156,13 @@ void DefaultDisplayManager::Init(DisplayManagerDelegate* delegate) {
 }
 
 DefaultDisplayManager::~DefaultDisplayManager() {
+  // Invalidate WeakPtrs now to avoid callbacks back into the
+  // DefaultDisplayManager during destruction of |top_level_display_client_|.
+  weak_factory_.InvalidateWeakPtrs();
+  top_level_display_client_.reset();
   // Destroy the PlatformWindow early on as it may call us back during
-  // destruction and we want to be in a known state.
+  // destruction and we want to be in a known state. But destroy the surface
+  // first because it can still be using the platform window.
   platform_window_.reset();
 }
 
@@ -175,6 +181,10 @@ void DefaultDisplayManager::SchedulePaint(const ServerView* view,
 
 void DefaultDisplayManager::SetViewportSize(const gfx::Size& size) {
   platform_window_->SetBounds(gfx::Rect(size));
+}
+
+void DefaultDisplayManager::SetTitle(const base::string16& title) {
+  platform_window_->SetTitle(title);
 }
 
 const mojo::ViewportMetrics& DefaultDisplayManager::GetViewportMetrics() {
@@ -216,7 +226,8 @@ void DefaultDisplayManager::Draw() {
   if (top_level_display_client_) {
     top_level_display_client_->SubmitCompositorFrame(
         frame.Pass(),
-        base::Bind(&DefaultDisplayManager::DidDraw, base::Unretained(this)));
+        base::Bind(&DefaultDisplayManager::DidDraw,
+                   weak_factory_.GetWeakPtr()));
   }
   dirty_rect_ = gfx::Rect();
 }
@@ -233,7 +244,7 @@ void DefaultDisplayManager::WantToDraw() {
 
   draw_timer_.Start(
       FROM_HERE, base::TimeDelta(),
-      base::Bind(&DefaultDisplayManager::Draw, base::Unretained(this)));
+      base::Bind(&DefaultDisplayManager::Draw, weak_factory_.GetWeakPtr()));
 }
 
 void DefaultDisplayManager::UpdateMetrics(const gfx::Size& size,
