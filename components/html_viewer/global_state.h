@@ -9,10 +9,15 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/threading/thread.h"
 #include "components/html_viewer/discardable_memory_allocator.h"
+#include "components/mus/gles2/mojo_gpu_memory_buffer_manager.h"
+#include "components/mus/gles2/raster_thread_helper.h"
 #include "components/resource_provider/public/cpp/resource_loader.h"
-#include "components/view_manager/gles2/mojo_gpu_memory_buffer_manager.h"
-#include "components/view_manager/gles2/raster_thread_helper.h"
+#include "skia/ext/refptr.h"
 #include "ui/gfx/geometry/size.h"
+
+namespace font_service {
+class FontLoader;
+}
 
 namespace mojo {
 class ApplicationImpl;
@@ -106,6 +111,10 @@ class GlobalState {
   gles2::RasterThreadHelper raster_thread_helper_;
   gles2::MojoGpuMemoryBufferManager gpu_memory_buffer_manager_;
   scoped_ptr<MediaFactory> media_factory_;
+
+#if defined(OS_LINUX) && !defined(OS_ANDROID)
+  skia::RefPtr<font_service::FontLoader> font_loader_;
+#endif
 
   DISALLOW_COPY_AND_ASSIGN(GlobalState);
 };

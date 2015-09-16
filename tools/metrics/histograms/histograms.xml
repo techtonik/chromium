@@ -5577,7 +5577,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="DataReductionProxy.ConfigFetchLostBytesCL">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Size of the response body. This is the actual number of bytes received,
@@ -5588,7 +5587,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="DataReductionProxy.ConfigFetchLostBytesDiff">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     The difference between the size specified in the X-Original-Content-Length
@@ -5601,7 +5599,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="DataReductionProxy.ConfigFetchLostBytesOCL">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Size specified in the X-Original-Content-Length header. If this header is
@@ -5613,7 +5610,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="DataReductionProxy.ConfigService.AuthExpired"
     enum="BooleanExpired">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Total number of authentication required responses received from the Data
@@ -5623,7 +5619,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram
     name="DataReductionProxy.ConfigService.FetchFailedAttemptsBeforeSuccess">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     The number of failed attempts when retrieving the configuration from the
@@ -5633,7 +5628,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="DataReductionProxy.ConfigService.FetchLatency"
     units="milliseconds">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Time from when the Data Reduction Proxy configuration request starts until
@@ -5643,7 +5637,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="DataReductionProxy.ConfigService.FetchResponseCode"
     enum="HttpResponseCode">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Count per HttpResponseCode when attempting to retrieve the Data Reduction
@@ -5877,7 +5870,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="DataReductionProxy.SecureProxyCheck.Latency"
     units="milliseconds">
-  <owner>jeremyim@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     Time from when the Data Reduction Proxy secure proxy check starts until it
@@ -13837,6 +13829,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="GoogleSearch.AccessPoint" enum="SearchAccessPoint">
+  <obsolete>
+    Deprecated 2015/08.
+  </obsolete>
   <owner>kmadhusu@chromium.org</owner>
   <summary>
     Counts number of Google searches from various access points in the browser.
@@ -25022,7 +25017,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Removed 7/21/2015. No longer tracked.
   </obsolete>
-  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
   <summary>
     Counts of specific error codes returned when opening an SSL connection for
     an endpoint which is eligible for fastradio padding.
@@ -38722,7 +38717,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="SBClientPhishing.CancelClassificationReason"
     enum="SBClientPhishingCancelClassificationReason">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>nparker@chromium.org</owner>
   <summary>
     The counts for various reasons why an in-progress phishing classification
     was canceled.
@@ -38730,7 +38725,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.CheckNoPendingClassificationFailed">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
+  <obsolete>
+    Removed in M47.
+  </obsolete>
   <summary>
     The number of times client-side phishing classifier expected to have no
     pending classifications running but that check failed.
@@ -38738,7 +38736,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.ClassificationStart" enum="BooleanHit">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of pages that we could have possibly classified (essentially the
     number of top page navigations by users with SBClientPhishing enabled). The
@@ -38759,7 +38757,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="SBClientPhishing.ClientModelStatus"
     enum="SBClientPhishingClientModelStatus">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>nparker@chromium.org</owner>
   <summary>
     The counts for various model status codes that we get after loading a new
     client-side phishing model.
@@ -38815,12 +38813,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.GrabPhishingThumbnail" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
+  <obsolete>
+    Removed in M47
+  </obsolete>
   <summary>Time spent generating the thumbnail.</summary>
 </histogram>
 
 <histogram name="SBClientPhishing.IllegalFeatureValue">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>nparker@chromium.org</owner>
   <summary>
     The number of features which were omitted from phishing classification
     because they were added with an illegal value.  This would indicate a bug.
@@ -38861,7 +38862,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.ReportLimitSkipped" enum="BooleanHit">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of phishing classifications that were previously cached as being
     phishing but that will get re-classified (to possibly fix false positives).
@@ -38869,7 +38870,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.RequestNotSerialized">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of phishing classifier pingbacks that were skipped because
     serializing the request protocol buffer to string failed.
@@ -38877,7 +38878,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.RequestSatisfiedFromCache" enum="BooleanHit">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of times that a cached phishing classification result was used,
     rather than pinging the server.
@@ -38886,7 +38887,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="SBClientPhishing.ScorerCreationStatus"
     enum="SBClientPhishingScorerCreationStatus">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     Records the status when we create a scorer object for the client-side
     phishing detection classifier.
@@ -38894,7 +38895,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.TermFeatureBreakIterError">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of phishing classifications that were aborted because the term
     feature extractor failed to initialize an ICU break iterator.
@@ -38902,21 +38903,21 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.TermFeatureChunkTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The time that an individual chunk of term feature extraction work took.
   </summary>
 </histogram>
 
 <histogram name="SBClientPhishing.TermFeatureIterations">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of iterations that the term feature extractor took to finish.
   </summary>
 </histogram>
 
 <histogram name="SBClientPhishing.TermFeatureTimeout">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of phishing classification that were aborted because term feature
     extraction took too long.
@@ -38924,7 +38925,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.TermFeatureTotalTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The time that the term feature extarctor took to finish, summed across all
     chunks of work.
@@ -38932,7 +38933,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.TooManyFeatures">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The number of times that the limit on the number of phishing classifier
     features for a page was reached.  This may indicate a bug, or that
@@ -38941,7 +38942,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SBClientPhishing.URLFeatureTime" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>noelutz@chromium.org</owner>
   <summary>
     The time taken to extract URL features for the phishing classifier.
   </summary>
@@ -50948,6 +50949,25 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="WebCore.ScriptedIdleTaskController.IdleCallbackDeadline"
+    units="milliseconds">
+  <owner>rmcilroy@chromium.org</owner>
+  <summary>
+    The amount of time allotted to a requestIdleCallback callback, i.e., the
+    difference between the time when it is called and when its deadline expires.
+  </summary>
+</histogram>
+
+<histogram name="WebCore.ScriptedIdleTaskController.IdleCallbackOverrun"
+    units="milliseconds">
+  <owner>rmcilroy@chromium.org</owner>
+  <summary>
+    The amount of time by which a requestIdleCallback callback overran its
+    deadline. Callbacks which don't overrun their deadline will report an
+    overrun of 0.
+  </summary>
+</histogram>
+
 <histogram name="WebCore.Scripts.Async.NotStreamingReason"
     enum="NotStreamingReason">
   <owner>marja@chromium.org</owner>
@@ -56657,6 +56677,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="4" label="SCRIPT_DOWNLOADING"/>
   <int value="5" label="SCRIPT_LOADED"/>
   <int value="6" label="SCRIPT_EVALUATED"/>
+  <int value="7" label="THREAD_STARTED"/>
 </enum>
 
 <enum name="EnhancedBookmarkViewMode" type="int">
@@ -60767,6 +60788,18 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="940" label="HTMLImportsHasStyleSheets"/>
   <int value="941" label="WebkitTextInClipProperty"/>
   <int value="942" label="WebkitTextInColorProperty"/>
+  <int value="943" label="HeaderValueNotMatchingRFC7230"/>
+  <int value="944" label="ClipPathOfPositionedElement"/>
+  <int value="945" label="ClipCssOfPositionedElement"/>
+  <int value="946" label="NetInfoType"/>
+  <int value="947" label="NetInfoDownlinkMax"/>
+  <int value="948" label="NetInfoOnChange"/>
+  <int value="949" label="NetInfoOnTypeChange"/>
+  <int value="950" label="V8Window_Alert_Method"/>
+  <int value="951" label="V8Window_Confirm_Method"/>
+  <int value="952" label="V8Window_Prompt_Method"/>
+  <int value="953" label="V8Window_Print_Method"/>
+  <int value="954" label="V8Window_RequestIdleCallback_Method"/>
 </enum>
 
 <enum name="FetchRequestMode" type="int">
@@ -64089,6 +64122,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2067166422" label="enable-slimming-paint-v2"/>
   <int value="-2063352474" label="enable-new-task-manager"/>
   <int value="-2063014275" label="enable-web-bluetooth"/>
+  <int value="-2048732429" label="enable-alternative-services"/>
   <int value="-2047822258" label="enable-avfoundation"/>
   <int value="-2025367104" label="enable-material-design-ntp"/>
   <int value="-2020721975" label="smart-virtual-keyboard"/>
@@ -65496,6 +65530,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="4"
       label="Autoplay enabled through a user-gesture triggered load() call."/>
   <int value="5" label="Autoplay disabled by sandbox flags."/>
+  <int value="6" label="Gesture requirement overridden during initial load."/>
+  <int value="7" label="Gesture requirement overridden in play()."/>
+  <int value="8"
+      label="Gesture req. overridden after scroll for deferred attribute."/>
+  <int value="9"
+      label="Gesture req. overridden after scroll for deferred play()."/>
+  <int value="10" label="play() call failed due to gesture requirement."/>
+  <int value="11" label="Any playback started."/>
+  <int value="12" label="Any playback paused."/>
+  <int value="13" label="Any playback bailed out."/>
 </enum>
 
 <enum name="MediaGalleriesUsageType" type="int">
@@ -68309,6 +68353,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Essential Cross-Origin Big"/>
   <int value="3" label="Essential Cross-Origin Whitelisted"/>
   <int value="4" label="Essential Cross-Origin Tiny"/>
+  <int value="5" label="Essential Unknown Size"/>
 </enum>
 
 <enum name="PluginPowerSaverPosterParamPresence" type="int">
@@ -70604,6 +70649,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="MODEL_PARSE_ERROR"/>
   <int value="6" label="MODEL_MISSING_FIELDS"/>
   <int value="7" label="MODEL_INVALID_VERSION_NUMBER"/>
+  <int value="8" label="BAD_HASH_IDS"/>
 </enum>
 
 <enum name="SBClientPhishingScorerCreationStatus" type="int">

@@ -82,6 +82,8 @@
       'browser_watcher/window_hang_monitor_win_unittest.cc',
     ],
     'bubble_unittest_sources': [
+      'bubble/bubble_manager_mocks.cc',
+      'bubble/bubble_manager_mocks.h',
       'bubble/bubble_manager_unittest.cc',
     ],
     'captive_portal_unittest_sources': [
@@ -568,6 +570,7 @@
       'scheduler/renderer/deadline_task_runner_unittest.cc',
       'scheduler/renderer/renderer_scheduler_impl_unittest.cc',
       'scheduler/renderer/task_cost_estimator_unittest.cc',
+      'scheduler/renderer/user_model_unittest.cc',
       'scheduler/renderer/webthread_impl_for_renderer_scheduler_unittest.cc',
       'scheduler/test/test_always_fail_time_source.cc',
       'scheduler/test/test_always_fail_time_source.h',
@@ -643,6 +646,10 @@
       'sync_driver/system_encryptor_unittest.cc',
       'sync_driver/tab_node_pool_unittest.cc',
       'sync_driver/ui_data_type_controller_unittest.cc',
+    ],
+    'syncable_prefs_unittest_sources': [
+      'syncable_prefs/pref_model_associator_unittest.cc',
+      'syncable_prefs/pref_service_syncable_unittest.cc',
     ],
     'tracing_unittest_sources': [
       'tracing/trace_config_file_unittest.cc',
@@ -724,20 +731,20 @@
       'web_resource/resource_request_allowed_notifier_unittest.cc',
     ],
     'webcrypto_unittest_sources': [
-      'webcrypto/test/aes_cbc_unittest.cc',
-      'webcrypto/test/aes_ctr_unittest.cc',
-      'webcrypto/test/aes_gcm_unittest.cc',
-      'webcrypto/test/aes_kw_unittest.cc',
-      'webcrypto/test/ecdh_unittest.cc',
-      'webcrypto/test/ecdsa_unittest.cc',
-      'webcrypto/test/hmac_unittest.cc',
-      'webcrypto/test/rsa_oaep_unittest.cc',
-      'webcrypto/test/rsa_pss_unittest.cc',
-      'webcrypto/test/rsa_ssa_unittest.cc',
-      'webcrypto/test/sha_unittest.cc',
-      'webcrypto/test/status_unittest.cc',
-      'webcrypto/test/test_helpers.cc',
-      'webcrypto/test/test_helpers.h',
+      'webcrypto/algorithms/aes_cbc_unittest.cc',
+      'webcrypto/algorithms/aes_ctr_unittest.cc',
+      'webcrypto/algorithms/aes_gcm_unittest.cc',
+      'webcrypto/algorithms/aes_kw_unittest.cc',
+      'webcrypto/algorithms/ecdh_unittest.cc',
+      'webcrypto/algorithms/ecdsa_unittest.cc',
+      'webcrypto/algorithms/hmac_unittest.cc',
+      'webcrypto/algorithms/rsa_oaep_unittest.cc',
+      'webcrypto/algorithms/rsa_pss_unittest.cc',
+      'webcrypto/algorithms/rsa_ssa_unittest.cc',
+      'webcrypto/algorithms/sha_unittest.cc',
+      'webcrypto/algorithms/test_helpers.cc',
+      'webcrypto/algorithms/test_helpers.h',
+      'webcrypto/status_unittest.cc',
     ],
     'webdata_unittest_sources': [
       'webdata/common/web_database_migration_unittest.cc',
@@ -833,6 +840,7 @@
         '<@(signin_unittest_sources)',
         '<@(suggestions_unittest_sources)',
         '<@(sync_driver_unittest_sources)',
+        '<@(syncable_prefs_unittest_sources)',
         '<@(translate_unittest_sources)',
         '<@(undo_unittest_sources)',
         '<@(update_client_unittest_sources)',
@@ -949,6 +957,7 @@
         'components.gyp:signin_core_browser_test_support',
         'components.gyp:suggestions',
         'components.gyp:sync_driver_test_support',
+        'components.gyp:syncable_prefs_test_support',
         'components.gyp:translate_core_browser',
         'components.gyp:translate_core_common',
         'components.gyp:translate_core_language_detection',
@@ -1081,8 +1090,12 @@
           'conditions': [
             ['OS=="android"', {
               'dependencies': [
-                'components.gyp:policy_java',
                 '../build/android/ndk.gyp:cpu_features',
+              ],
+            }],
+            ['OS=="android" and configuration_policy == 1', {
+              'dependencies': [
+                'components.gyp:policy_java',
               ],
             }],
             ['use_openssl==1', {
@@ -1667,10 +1680,16 @@
           'type': 'none',
           'dependencies': [
             'components.gyp:invalidation_java',
-            'components.gyp:policy_java',
             '../base/base.gyp:base_java',
             '../base/base.gyp:base_java_test_support',
             '../testing/android/junit/junit_test.gyp:junit_test_support',
+          ],
+          'conditions': [
+            ['configuration_policy == 1', {
+              'dependencies': [
+                'components.gyp:policy_java',
+              ],
+            }],
           ],
           'variables': {
             'main_class': 'org.chromium.testing.local.JunitTestMain',

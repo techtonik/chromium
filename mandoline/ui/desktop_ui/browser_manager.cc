@@ -5,8 +5,8 @@
 #include "mandoline/ui/desktop_ui/browser_manager.h"
 
 #include "base/command_line.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_observer.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_observer.h"
 #include "mandoline/ui/desktop_ui/browser_window.h"
 
 namespace mandoline {
@@ -49,7 +49,7 @@ void BrowserManager::Initialize(mojo::ApplicationImpl* app) {
   app_ = app;
 
   mojo::URLRequestPtr request(mojo::URLRequest::New());
-  request->url = "mojo:view_manager";
+  request->url = "mojo:mus";
   app_->ConnectToService(request.Pass(), &host_factory_);
 
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();

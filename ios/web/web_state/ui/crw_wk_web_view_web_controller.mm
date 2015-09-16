@@ -206,6 +206,9 @@ WKWebViewErrorSource WKWebViewErrorSourceFromError(NSError* error) {
 - (void)updatePendingNavigationTypeForMainFrameFromNavigationAction:
     (WKNavigationAction*)action;
 
+// Discards the pending navigation type.
+- (void)discardPendingNavigationTypeForMainFrame;
+
 // Returns the WKBackForwardListItemHolder for the current navigation item.
 - (web::WKBackForwardListItemHolder*)currentBackForwardListItemHolder;
 
@@ -406,6 +409,17 @@ WKWebViewErrorSource WKWebViewErrorSourceFromError(NSError* error) {
                                              [self useDesktopUserAgent]);
 }
 
+- (BOOL)isCurrentNavigationItemPOST {
+  // |_pendingNavigationTypeForMainFrame| will be nil if
+  // |decidePolicyForNavigationAction| was not reached.
+  WKNavigationType type =
+      (_pendingNavigationTypeForMainFrame)
+          ? *_pendingNavigationTypeForMainFrame
+          : [self currentBackForwardListItemHolder]->navigation_type();
+  return type == WKNavigationTypeFormSubmitted ||
+         type == WKNavigationTypeFormResubmitted;
+}
+
 // The core.js cannot pass messages back to obj-c  if it is injected
 // to |WEB_VIEW_DOCUMENT| because it does not support iframe creation used
 // by core.js to communicate back. That functionality is only supported
@@ -471,18 +485,17 @@ WKWebViewErrorSource WKWebViewErrorSourceFromError(NSError* error) {
     [self loadRequest:[self requestForCurrentNavigationItem]];
   };
 
-  // If there is no corresponding WKBackForwardListItem, fall back to
-  // the standard loading mechanism.
+  // If there is no corresponding WKBackForwardListItem, or the item is not in
+  // the current WKWebView's back-forward list, navigating using WKWebView API
+  // is not possible. In this case, fall back to the default navigation
+  // mechanism.
   web::WKBackForwardListItemHolder* holder =
       [self currentBackForwardListItemHolder];
-  if (!holder->back_forward_list_item()) {
+  if (!holder->back_forward_list_item() ||
+      ![self isBackForwardListItemValid:holder->back_forward_list_item()]) {
     defaultNavigationBlock();
     return;
   }
-
-  // The current back-forward list item MUST be in the WKWebView's back-forward
-  // list to be valid.
-  DCHECK([self isBackForwardListItemValid:holder->back_forward_list_item()]);
 
   ProceduralBlock webViewNavigationBlock = ^{
     // If the current navigation URL is the same as the URL of the visible
@@ -715,6 +728,10 @@ WKWebViewErrorSource WKWebViewErrorSourceFromError(NSError* error) {
   if (action.targetFrame.mainFrame)
     _pendingNavigationTypeForMainFrame.reset(
         new WKNavigationType(action.navigationType));
+}
+
+- (void)discardPendingNavigationTypeForMainFrame {
+  _pendingNavigationTypeForMainFrame.reset();
 }
 
 - (web::WKBackForwardListItemHolder*)currentBackForwardListItemHolder {
@@ -1312,6 +1329,8 @@ WKWebViewErrorSource WKWebViewErrorSourceFromError(NSError* error) {
   else
 #endif
     [self handleLoadError:error inMainFrame:YES];
+
+  [self discardPendingNavigationTypeForMainFrame];
 }
 
 - (void)webView:(WKWebView *)webView

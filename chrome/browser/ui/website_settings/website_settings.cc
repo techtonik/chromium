@@ -22,6 +22,7 @@
 #include "chrome/browser/browsing_data/browsing_data_file_system_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_indexed_db_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_local_storage_helper.h"
+#include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
@@ -30,6 +31,7 @@
 #include "chrome/browser/ssl/ssl_error_info.h"
 #include "chrome/browser/ui/website_settings/website_settings_ui.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
@@ -39,6 +41,7 @@
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/rappor/rappor_utils.h"
+#include "components/url_formatter/elide_url.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cert_store.h"
 #include "content/public/browser/user_metrics.h"
@@ -144,6 +147,13 @@ WebsiteSettings::SiteIdentityStatus GetSiteIdentityStatusByCTInfo(
                : WebsiteSettings::SITE_IDENTITY_STATUS_CERT;
 }
 
+base::string16 GetSimpleSiteName(const GURL& url, Profile* profile) {
+  std::string languages;
+  if (profile)
+    languages = profile->GetPrefs()->GetString(prefs::kAcceptLanguages);
+  return url_formatter::FormatUrlForSecurityDisplayOmitScheme(url, languages);
+}
+
 }  // namespace
 
 WebsiteSettings::WebsiteSettings(
@@ -164,10 +174,11 @@ WebsiteSettings::WebsiteSettings(
       cert_id_(0),
       site_connection_status_(SITE_CONNECTION_STATUS_UNKNOWN),
       cert_store_(cert_store),
-      content_settings_(profile->GetHostContentSettingsMap()),
+      content_settings_(HostContentSettingsMapFactory::GetForProfile(profile)),
       chrome_ssl_host_state_delegate_(
           ChromeSSLHostStateDelegateFactory::GetForProfile(profile)),
-      did_revoke_user_ssl_decisions_(false) {
+      did_revoke_user_ssl_decisions_(false),
+      profile_(profile) {
   Init(profile, url, ssl);
 
   PresentSitePermissions();
@@ -362,15 +373,8 @@ void WebsiteSettings::Init(Profile* profile,
     return;
   }
 
-  scoped_refptr<net::X509Certificate> cert;
-
   // Identity section.
-  base::string16 subject_name(UTF8ToUTF16(url.host()));
-  if (subject_name.empty()) {
-    subject_name.assign(
-        l10n_util::GetStringUTF16(IDS_PAGE_INFO_SECURITY_TAB_UNKNOWN_PARTY));
-  }
-
+  scoped_refptr<net::X509Certificate> cert;
   cert_id_ = ssl.cert_id;
 
   if (ssl.cert_id &&
@@ -503,6 +507,12 @@ void WebsiteSettings::Init(Profile* profile,
   // TODO(wtc): Bug 1198735: report mixed/unsafe content for unencrypted and
   // weakly encrypted connections.
   site_connection_status_ = SITE_CONNECTION_STATUS_UNKNOWN;
+
+  base::string16 subject_name(GetSimpleSiteName(url, profile_));
+  if (subject_name.empty()) {
+    subject_name.assign(
+        l10n_util::GetStringUTF16(IDS_PAGE_INFO_SECURITY_TAB_UNKNOWN_PARTY));
+  }
 
   if (ssl.security_style == content::SECURITY_STYLE_UNKNOWN) {
     // Page is still loading, so SSL status is not yet available. Say nothing.
@@ -717,7 +727,7 @@ void WebsiteSettings::PresentSiteIdentity() {
   if (site_identity_status_ == SITE_IDENTITY_STATUS_EV_CERT)
     info.site_identity = UTF16ToUTF8(organization_name());
   else
-    info.site_identity = site_url_.host();
+    info.site_identity = UTF16ToUTF8(GetSimpleSiteName(site_url_, profile_));
 
   info.connection_status = site_connection_status_;
   info.connection_status_description =

@@ -121,6 +121,7 @@
 #include "content/common/in_process_child_thread_params.h"
 #include "content/common/mojo/channel_init.h"
 #include "content/common/mojo/mojo_messages.h"
+#include "content/common/render_process_messages.h"
 #include "content/common/resource_messages.h"
 #include "content/common/site_isolation_policy.h"
 #include "content/common/view_messages.h"
@@ -1276,7 +1277,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableRGBA4444Textures,
     switches::kDisableSeccompFilterSandbox,
     switches::kDisableSharedWorkers,
-    switches::kDisableSlimmingPaint,
     switches::kDisableSpeechAPI,
     switches::kDisableSVG1DOM,
     switches::kDisableThreadedCompositing,
@@ -1320,7 +1320,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableRTCSmoothnessAlgorithm,
     switches::kEnableSeccompFilterSandbox,
     switches::kEnableSkiaBenchmarking,
-    switches::kEnableSlimmingPaint,
     switches::kEnableSlimmingPaintV2,
     switches::kEnableSmoothScrolling,
     switches::kEnableStatsTable,
@@ -1329,7 +1328,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableTouchEditing,
     switches::kEnableUnsafeES3APIs,
     switches::kEnableViewport,
-    switches::kInvertViewportScrollOrder,
     switches::kEnableVtune,
     switches::kEnableWebBluetooth,
     switches::kEnableWebGLDraftExtensions,
@@ -1563,7 +1561,7 @@ bool RenderProcessHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_BEGIN_MESSAGE_MAP(RenderProcessHostImpl, msg)
       IPC_MESSAGE_HANDLER(ChildProcessHostMsg_ShutdownRequest,
                           OnShutdownRequest)
-      IPC_MESSAGE_HANDLER(ViewHostMsg_SuddenTerminationChanged,
+      IPC_MESSAGE_HANDLER(RenderProcessHostMsg_SuddenTerminationChanged,
                           SuddenTerminationChanged)
       IPC_MESSAGE_HANDLER(ViewHostMsg_UserMetricsRecordAction,
                           OnUserMetricsRecordAction)

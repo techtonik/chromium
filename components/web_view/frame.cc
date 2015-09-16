@@ -10,8 +10,8 @@
 #include "base/bind.h"
 #include "base/callback.h"
 #include "base/stl_util.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_property.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_property.h"
 #include "components/web_view/frame_tree.h"
 #include "components/web_view/frame_tree_delegate.h"
 #include "components/web_view/frame_user_data.h"
@@ -157,7 +157,7 @@ void Frame::InitClient(
     embedded_connection_id_ = kInvalidConnectionId;
     embed_weak_ptr_factory_.InvalidateWeakPtrs();
     view_->Embed(
-        view_tree_client.Pass(),
+        view_tree_client.Pass(), mojo::ViewTree::ACCESS_POLICY_DEFAULT,
         base::Bind(&Frame::OnEmbedAck, embed_weak_ptr_factory_.GetWeakPtr()));
   }
 
@@ -425,9 +425,17 @@ void Frame::OnViewDestroying(mojo::View* view) {
 }
 
 void Frame::OnViewEmbeddedAppDisconnected(mojo::View* view) {
-  if (tree_->root() != this)
-    delete this;
-  // TODO(sky): the root case should go to the delegate.
+  // See FrameTreeDelegate::OnViewEmbeddedAppDisconnected() for details of when
+  // this happens.
+  //
+  // Currently we have no way to distinguish between the cases that lead to this
+  // being called, so we assume we can continue on. Continuing on is important
+  // for html as it's entirely possible for a page to create a frame, navigate
+  // to a bogus url and expect the frame to still exist.
+  //
+  // TODO(sky): notify the delegate on this? At a minimum the delegate cares
+  // if the root is unembedded as this would correspond to a sab tab.
+  tree_->delegate_->OnViewEmbeddedInFrameDisconnected(this);
 }
 
 void Frame::PostMessageEventToFrame(uint32_t source_frame_id,

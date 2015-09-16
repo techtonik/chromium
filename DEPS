@@ -31,31 +31,31 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': 'fbb3af7c287b13843d993776d0190c361445daf5', # from svn revision 202228
+  'webkit_revision': 'fed103d519fd622060dd11f83c8446e298725fbf', # from svn revision 202367
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': 'ac1772e3db5c885b554f6a72ca9dbac4245cb0e2',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '995b4bddd9a1eef933b0acb3ff03c98e7864a8f9',
+  'skia_revision': '5d08d44c68f65c71c9fdbbdda601119d87a7beb6',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': 'f8eb3135f2d004eee01931ed2f8af769c223afbd',
+  'v8_revision': 'aa06153c83bfaa44216e19412d333295b5c31c11',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
-  'swarming_revision': '49f046853671bbd5ab65509a8049d36ac0224714',
+  'swarming_revision': '1d87b2fd3c2e024ef769699682b29ab839b4434b',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '4a693565dcfaba92f053db5c95e9338eac949245',
+  'angle_revision': 'cc54ab3635320660216cf0e6eff17fa80dbe1abc',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  'buildtools_revision': '565d04e8741429fb1b4f26d102f2c6c3b849edeb',
+  'buildtools_revision': 'f7310ee61725e68b1c8921e381830362cf4f0999',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '89d8b4681ce98894a1ee1a6cf4bae77e00d28797',
+  'pdfium_revision': '615d7aba0f7d53a78eb05fbd4ae0e1a7e1d3b103',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -108,7 +108,7 @@ deps = {
    Var('chromium_git') + '/chromium/buildtools.git' + '@' +  Var('buildtools_revision'),
 
   'src/sdch/open-vcdiff':
-   Var('chromium_git') + '/external/github.com/google/open-vcdiff.git' + '@' + '39ff500790fa8038f80bd2fdcd10c35568a12529',
+   Var('chromium_git') + '/external/github.com/google/open-vcdiff.git' + '@' + '21d7d0b9c3d0c3ccbdb221c85ae889373f0a2a58',
 
   'src/testing/gtest':
    Var('chromium_git') + '/external/googletest.git' + '@' + '9855a87157778d39b95eccfb201a9dc90f6d61c6', # from svn revision 746
@@ -123,7 +123,7 @@ deps = {
    Var('chromium_git') + '/external/colorama.git' + '@' + '799604a1041e9b3bc5d2789ecbd7e8db2e18e6b8',
 
   'src/third_party/crashpad/crashpad':
-   Var('chromium_git') + '/crashpad/crashpad.git' + '@' + '5069c2903a1be6e717c526595c85f8736033e5e8',
+   Var('chromium_git') + '/crashpad/crashpad.git' + '@' + '595803e1be18aa789ba561aa06db73cfc3c2e7a2',
 
   'src/third_party/WebKit':
    Var('chromium_git') + '/chromium/blink.git' + '@' +  Var('webkit_revision'),
@@ -225,7 +225,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/open-source-parsers/jsoncpp.git' + '@' + 'f572e8e42e22cfcf5ab0aea26574f408943edfa4', # from svn 248
 
   'src/third_party/libyuv':
-    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + '602fdbef9408f496dbf55481fb467aa9fb462929', # from version 1481
+    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + 'fcacbfb27f4cdc71a4b8f636a16235f6b9af465c', # from version 1483
 
   'src/third_party/smhasher/src':
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',
@@ -279,7 +279,7 @@ deps = {
 
   'src/third_party/catapult':
     Var('chromium_git') + '/external/github.com/catapult-project/catapult.git' + '@' +
-    '4582fa970cdc43607c9ef2fcef6a45bf99fdea68',
+    '7bdbcba774b0b906b413be4c2f083958ffefa481',
 }
 
 
@@ -393,7 +393,7 @@ deps_os = {
 
     # Note that this is different from Android's freetype repo.
     'src/third_party/freetype2/src':
-     Var('chromium_git') + '/chromium/src/third_party/freetype2.git' + '@' + '1dd5f5f4a909866f15c92a45c9702bce290a0151',
+     Var('chromium_git') + '/chromium/src/third_party/freetype2.git' + '@' + 'fc1532a7c4c592f24a4c1a0261d2845524ca5cff',
 
     # Build tools for Chrome OS.
     'src/third_party/chromite':
@@ -413,6 +413,10 @@ deps_os = {
     # ANGLE uses dEQP for GPU testing
     'src/third_party/deqp/src':
      Var('deqp_url') + '@' + Var('deqp_revision'),
+
+    # Graphics buffer allocator for Chrome OS.
+    'src/third_party/minigbm/src':
+     Var('chromium_git') + '/chromiumos/platform/minigbm.git' + '@' + 'f9d2ab79a15a1bb6a1307f3b608964c81c27791b',
   },
   'android': {
     'src/third_party/android_protobuf/src':
@@ -458,7 +462,7 @@ deps_os = {
       Var('chromium_git') + '/external/junit.git' + '@' + '45a44647e7306262162e1346b750c3209019f2e1',
 
     'src/third_party/mockito/src':
-      Var('chromium_git') + '/external/mockito/mockito.git' + '@' + 'ed99a52e94a84bd7c467f2443b475a22fcc6ba8e',
+      Var('chromium_git') + '/external/mockito/mockito.git' + '@' + '4d987dcd923b81525c42b1333e6c4e07440776c3',
 
     'src/third_party/robolectric/lib':
       Var('chromium_git') + '/chromium/third_party/robolectric.git' + '@' + '6b63c99a8b6967acdb42cbed0adb067c80efc810',

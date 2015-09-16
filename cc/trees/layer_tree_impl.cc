@@ -124,8 +124,12 @@ void LayerTreeImpl::DidUpdateScrollOffset(int layer_id) {
   if (layer_id != outer_layer_id && layer_id != inner_layer_id)
     return;
 
-  if (root_layer_scroll_offset_delegate_)
-    UpdateRootScrollOffsetDelegate();
+  if (root_layer_scroll_offset_delegate_) {
+    root_layer_scroll_offset_delegate_->UpdateRootLayerState(
+        TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
+        current_page_scale_factor(), min_page_scale_factor(),
+        max_page_scale_factor());
+  }
 }
 
 void LayerTreeImpl::SetRootLayer(scoped_ptr<LayerImpl> layer) {
@@ -439,8 +443,12 @@ void LayerTreeImpl::DidUpdatePageScale() {
 
   set_needs_update_draw_properties();
 
-  if (root_layer_scroll_offset_delegate_)
-    UpdateRootScrollOffsetDelegate();
+  if (root_layer_scroll_offset_delegate_) {
+    root_layer_scroll_offset_delegate_->UpdateRootLayerState(
+        TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
+        current_page_scale_factor(), min_page_scale_factor(),
+        max_page_scale_factor());
+  }
 
   if (PageScaleLayer() && PageScaleLayer()->transform_tree_index() != -1) {
     TransformNode* node = property_trees_.transform_tree.Node(
@@ -851,10 +859,6 @@ FrameRateCounter* LayerTreeImpl::frame_rate_counter() const {
   return layer_tree_host_impl_->fps_counter();
 }
 
-PaintTimeCounter* LayerTreeImpl::paint_time_counter() const {
-  return layer_tree_host_impl_->paint_time_counter();
-}
-
 MemoryHistory* LayerTreeImpl::memory_history() const {
   return layer_tree_host_impl_->memory_history();
 }
@@ -1035,19 +1039,11 @@ void LayerTreeImpl::SetRootLayerScrollOffsetDelegate(
   root_layer_scroll_offset_delegate_ = root_layer_scroll_offset_delegate;
 
   if (root_layer_scroll_offset_delegate_) {
-    UpdateRootScrollOffsetDelegate();
-
-    DistributeRootScrollOffset(
-        root_layer_scroll_offset_delegate_->GetTotalScrollOffset());
+    root_layer_scroll_offset_delegate_->UpdateRootLayerState(
+        TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
+        current_page_scale_factor(), min_page_scale_factor(),
+        max_page_scale_factor());
   }
-}
-
-void LayerTreeImpl::UpdateRootScrollOffsetDelegate() {
-  DCHECK(root_layer_scroll_offset_delegate_);
-  root_layer_scroll_offset_delegate_->UpdateRootLayerState(
-      TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
-      current_page_scale_factor(), min_page_scale_factor(),
-      max_page_scale_factor());
 }
 
 void LayerTreeImpl::DistributeRootScrollOffset(
@@ -1067,6 +1063,7 @@ void LayerTreeImpl::DistributeRootScrollOffset(
       OuterViewportScrollLayer()->CurrentScrollOffset();
 
   // It may be nothing has changed.
+  DCHECK(inner_viewport_offset + outer_viewport_offset == TotalScrollOffset());
   if (inner_viewport_offset + outer_viewport_offset == root_offset)
     return;
 
@@ -1083,7 +1080,10 @@ void LayerTreeImpl::DistributeRootScrollOffset(
   InnerViewportScrollLayer()->SetCurrentScrollOffsetFromDelegate(
       inner_viewport_offset);
 
-  UpdateRootScrollOffsetDelegate();
+  root_layer_scroll_offset_delegate_->UpdateRootLayerState(
+      TotalScrollOffset(), TotalMaxScrollOffset(), ScrollableSize(),
+      current_page_scale_factor(), min_page_scale_factor(),
+      max_page_scale_factor());
 }
 
 void LayerTreeImpl::QueueSwapPromise(scoped_ptr<SwapPromise> swap_promise) {

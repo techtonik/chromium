@@ -43,7 +43,6 @@
 #include "content/common/gpu/gpu_process_launch_causes.h"
 #include "content/common/mime_registry_messages.h"
 #include "content/common/render_process_messages.h"
-#include "content/common/view_messages.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/service_registry.h"
 #include "content/public/common/webplugininfo.h"
@@ -263,6 +262,15 @@ RendererBlinkPlatformImpl::~RendererBlinkPlatformImpl() {
   WebFileSystemImpl::DeleteThreadSpecificInstance();
 }
 
+void RendererBlinkPlatformImpl::Shutdown() {
+#if !defined(OS_ANDROID) && !defined(OS_WIN)
+  // SandboxSupport contains a map of WebFontFamily objects, which hold
+  // WebCStrings, which become invalidated when blink is shut down. Hence, we
+  // need to clear that map now, just before blink::shutdown() is called.
+  sandbox_support_.reset();
+#endif
+}
+
 //------------------------------------------------------------------------------
 
 blink::WebThread* RendererBlinkPlatformImpl::currentThread() {
@@ -355,8 +363,9 @@ void RendererBlinkPlatformImpl::cacheMetadata(const blink::WebURL& url,
   // browser may cache it and return it on subsequent responses to speed
   // the processing of this resource.
   std::vector<char> copy(data, data + size);
-  RenderThread::Get()->Send(new ViewHostMsg_DidGenerateCacheableMetadata(
-      url, base::Time::FromInternalValue(response_time), copy));
+  RenderThread::Get()->Send(
+      new RenderProcessHostMsg_DidGenerateCacheableMetadata(
+          url, base::Time::FromInternalValue(response_time), copy));
 }
 
 WebString RendererBlinkPlatformImpl::defaultLocale() {
@@ -380,7 +389,7 @@ void RendererBlinkPlatformImpl::suddenTerminationChanged(bool enabled) {
 
   RenderThread* thread = RenderThread::Get();
   if (thread)  // NULL in unittests.
-    thread->Send(new ViewHostMsg_SuddenTerminationChanged(enabled));
+    thread->Send(new RenderProcessHostMsg_SuddenTerminationChanged(enabled));
 }
 
 WebStorageNamespace* RendererBlinkPlatformImpl::createLocalStorageNamespace() {
@@ -538,7 +547,7 @@ bool RendererBlinkPlatformImpl::SandboxSupport::loadFont(NSFont* src_font,
   uint32 font_data_size;
   FontDescriptor src_font_descriptor(src_font);
   base::SharedMemoryHandle font_data;
-  if (!RenderThread::Get()->Send(new FrameHostMsg_LoadFont(
+  if (!RenderThread::Get()->Send(new RenderProcessHostMsg_LoadFont(
         src_font_descriptor, &font_data_size, &font_data, font_id))) {
     *out = NULL;
     *font_id = 0;
@@ -547,7 +556,7 @@ bool RendererBlinkPlatformImpl::SandboxSupport::loadFont(NSFont* src_font,
 
   if (font_data_size == 0 || font_data == base::SharedMemory::NULLHandle() ||
       *font_id == 0) {
-    LOG(ERROR) << "Bad response from FrameHostMsg_LoadFont() for " <<
+    LOG(ERROR) << "Bad response from RenderProcessHostMsg_LoadFont() for " <<
         src_font_descriptor.font_name;
     *out = NULL;
     *font_id = 0;
@@ -839,7 +848,7 @@ void RendererBlinkPlatformImpl::screenColorProfile(
   // safe send to avoid crashing trying to access RenderThread::Get(),
   // which is not accessible from arbitrary threads.
   thread_safe_sender_->Send(
-      new ViewHostMsg_GetMonitorColorProfile(&profile));
+      new RenderProcessHostMsg_GetMonitorColorProfile(&profile));
   *to_profile = profile;
 #else
   // On other platforms, the primary monitor color profile can be read
@@ -939,7 +948,8 @@ bool RendererBlinkPlatformImpl::processMemorySizesInBytes(
     size_t* private_bytes,
     size_t* shared_bytes) {
   content::RenderThread::Get()->Send(
-      new ViewHostMsg_GetProcessMemorySizes(private_bytes, shared_bytes));
+      new RenderProcessHostMsg_GetProcessMemorySizes(
+          private_bytes, shared_bytes));
   return true;
 }
 

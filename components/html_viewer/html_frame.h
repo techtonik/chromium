@@ -11,7 +11,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "components/html_viewer/html_frame_tree_manager.h"
 #include "components/html_viewer/replicated_frame_state.h"
-#include "components/view_manager/public/cpp/view_observer.h"
+#include "components/mus/public/cpp/view_observer.h"
 #include "components/web_view/public/interfaces/frame_tree.mojom.h"
 #include "mojo/services/tracing/public/interfaces/tracing.mojom.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
@@ -171,7 +171,6 @@ class HTMLFrame : public blink::WebFrameClient,
   virtual void didNavigateWithinPage(blink::WebLocalFrame* frame,
                                      const blink::WebHistoryItem& history_item,
                                      blink::WebHistoryCommitType commit_type);
-  virtual void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame* frame);
   virtual blink::WebGeolocationClient* geolocationClient();
   virtual blink::WebEncryptedMediaClient* encryptedMediaClient();
   virtual void didStartLoading(bool to_different_document);

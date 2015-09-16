@@ -2,7 +2,7 @@ PRAGMA foreign_keys=OFF;
 BEGIN TRANSACTION;
 CREATE TABLE meta(key LONGVARCHAR NOT NULL UNIQUE PRIMARY KEY, value LONGVARCHAR);
 INSERT INTO "meta" VALUES('last_compatible_version','1');
-INSERT INTO "meta" VALUES('version','12');
+INSERT INTO "meta" VALUES('version','13');
 CREATE TABLE logins (
 origin_url VARCHAR NOT NULL,
 action_url VARCHAR,

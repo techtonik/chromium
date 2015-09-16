@@ -6,15 +6,15 @@
 #include "base/callback.h"
 #include "base/containers/hash_tables.h"
 #include "base/memory/scoped_ptr.h"
-#include "components/view_manager/public/cpp/types.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_observer.h"
-#include "components/view_manager/public/cpp/view_surface.h"
-#include "components/view_manager/public/cpp/view_tree_connection.h"
-#include "components/view_manager/public/cpp/view_tree_delegate.h"
-#include "components/view_manager/public/interfaces/compositor_frame.mojom.h"
-#include "components/view_manager/public/interfaces/gpu.mojom.h"
-#include "components/view_manager/public/interfaces/surface_id.mojom.h"
+#include "components/mus/public/cpp/types.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_observer.h"
+#include "components/mus/public/cpp/view_surface.h"
+#include "components/mus/public/cpp/view_tree_connection.h"
+#include "components/mus/public/cpp/view_tree_delegate.h"
+#include "components/mus/public/interfaces/compositor_frame.mojom.h"
+#include "components/mus/public/interfaces/gpu.mojom.h"
+#include "components/mus/public/interfaces/surface_id.mojom.h"
 #include "gpu/GLES2/gl2chromium.h"
 #include "gpu/GLES2/gl2extchromium.h"
 #include "mojo/application/public/cpp/application_connection.h"
@@ -79,7 +79,7 @@ class BitmapUploader : public mojo::SurfaceClient {
 
     mojo::ServiceProviderPtr gpu_service_provider;
     mojo::URLRequestPtr request2(mojo::URLRequest::New());
-    request2->url = mojo::String::From("mojo:view_manager");
+    request2->url = mojo::String::From("mojo:mus");
     shell->ConnectToApplication(request2.Pass(),
                                 mojo::GetProxy(&gpu_service_provider), nullptr,
                                 nullptr, base::Bind(&OnGotContentHandlerID));

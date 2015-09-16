@@ -32,7 +32,6 @@
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/policy/profile_policy_connector_factory.h"
 #include "chrome/browser/prefs/browser_prefs.h"
-#include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/prerender/prerender_manager.h"
 #include "chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h"
@@ -47,7 +46,6 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/history_index_restore_observer.h"
-#include "chrome/test/base/testing_pref_service_syncable.h"
 #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/common/bookmark_constants.h"
@@ -67,6 +65,8 @@
 #include "components/omnibox/browser/in_memory_url_index.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/proxy_config/pref_proxy_config_tracker.h"
+#include "components/syncable_prefs/pref_service_syncable.h"
+#include "components/syncable_prefs/testing_pref_service_syncable.h"
 #include "components/ui/zoom/zoom_event_manager.h"
 #include "components/user_prefs/user_prefs.h"
 #include "components/webdata_services/web_data_service_wrapper.h"
@@ -856,12 +856,6 @@ content::ResourceContext* TestingProfile::GetResourceContext() {
   if (!resource_context_)
     resource_context_ = new content::MockResourceContext();
   return resource_context_;
-}
-
-HostContentSettingsMap* TestingProfile::GetHostContentSettingsMap() {
-  // TODO(peconn): Get rid of this function
-  // Don't forget to remove the #include "host_content_settings_map_factory"!
-  return HostContentSettingsMapFactory::GetForProfile(this);
 }
 
 content::BrowserPluginGuestManager* TestingProfile::GetGuestManager() {

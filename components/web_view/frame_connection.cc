@@ -7,9 +7,9 @@
 #include "base/bind.h"
 #include "base/callback.h"
 #include "components/clipboard/public/interfaces/clipboard.mojom.h"
+#include "components/mus/public/interfaces/gpu.mojom.h"
+#include "components/mus/public/interfaces/view_tree_host.mojom.h"
 #include "components/resource_provider/public/interfaces/resource_provider.mojom.h"
-#include "components/view_manager/public/interfaces/gpu.mojom.h"
-#include "components/view_manager/public/interfaces/view_tree_host.mojom.h"
 #include "components/web_view/frame_tree.h"
 #include "components/web_view/frame_utils.h"
 #include "components/web_view/test_runner/public/interfaces/layout_test_runner.mojom.h"
@@ -94,7 +94,7 @@ void FrameConnection::Init(mojo::ApplicationImpl* app,
   mojo::Array<mojo::String> view_manager_interfaces;
   view_manager_interfaces.push_back(mojo::Gpu::Name_);
   view_manager_interfaces.push_back(mojo::ViewTreeHostFactory::Name_);
-  filter->filter.insert("mojo:view_manager", view_manager_interfaces.Pass());
+  filter->filter.insert("mojo:mus", view_manager_interfaces.Pass());
 
   mojo::Array<mojo::String> test_runner_interfaces;
   test_runner_interfaces.push_back(LayoutTestRunner::Name_);
