@@ -49,9 +49,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   friend BluetoothDevice;  // For InvalidateConnectionReference.
 
   // Sets this object to no longer have a reference maintaining the connection.
-  // Only to be called by BluetoothDevice::~BluetoothDevice to avoid reentrant
-  // code to RemoveGattConnection in that destructor after BluetoothDevice
-  // subclasses have already been destroyed.
+  // Only to be called by BluetoothDevice to avoid reentrant code to
+  // RemoveGattConnection in that destructor after BluetoothDevice subclasses
+  // have already been destroyed.
   void InvalidateConnectionReference();
 
   // The Bluetooth adapter that this connection is associated with. A reference
