@@ -170,12 +170,10 @@ WebPreferences::WebPreferences()
       smart_insert_delete_enabled(false),
 #endif
       spatial_navigation_enabled(false),
-      invert_viewport_scroll_order(false),
       pinch_overlay_scrollbar_thickness(0),
       use_solid_color_scrollbars(false),
       navigate_on_drag_drop(true),
       v8_cache_options(V8_CACHE_OPTIONS_DEFAULT),
-      slimming_paint_enabled(false),
       slimming_paint_v2_enabled(false),
       cookie_enabled(true),
       pepper_accelerated_video_decode_enabled(false),

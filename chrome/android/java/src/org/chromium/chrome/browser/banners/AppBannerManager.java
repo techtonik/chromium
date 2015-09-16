@@ -50,7 +50,7 @@ public class AppBannerManager extends EmptyTabObserver {
     public static boolean isEnabled() {
         if (sIsEnabled == null) {
             Context context = ApplicationStatus.getApplicationContext();
-            sIsEnabled = nativeIsEnabled() && ShortcutHelper.isAddToHomeIntentSupported(context);
+            sIsEnabled = ShortcutHelper.isAddToHomeIntentSupported(context);
         }
         return sIsEnabled;
     }
@@ -69,9 +69,7 @@ public class AppBannerManager extends EmptyTabObserver {
      * @param tab Tab that the AppBannerManager will be attached to.
      */
     public AppBannerManager(Tab tab, Context context) {
-        mNativePointer = nativeInit(
-                ShortcutHelper.getIdealSplashImageSizeInDp(context.getResources()),
-                ShortcutHelper.getIdealIconSizeInDp(context.getResources()));
+        mNativePointer = nativeInit();
         mTab = tab;
         updatePointers();
     }
@@ -108,10 +106,15 @@ public class AppBannerManager extends EmptyTabObserver {
      * @param packageName Name of the package that is being advertised.
      */
     @CalledByNative
-    private void fetchAppDetails(String url, String packageName, String referrer, int iconSize) {
+    private void fetchAppDetails(
+            String url, String packageName, String referrer, int iconSizeInDp) {
         if (sAppDetailsDelegate == null) return;
+
+        Context context = ApplicationStatus.getApplicationContext();
+        int iconSizeInPx = Math.round(
+                context.getResources().getDisplayMetrics().density * iconSizeInDp);
         sAppDetailsDelegate.getAppDetailsAsynchronously(
-                createAppDetailsObserver(), url, packageName, referrer, iconSize);
+                createAppDetailsObserver(), url, packageName, referrer, iconSizeInPx);
     }
 
     private AppDetailsDelegate.Observer createAppDetailsObserver() {
@@ -164,8 +167,7 @@ public class AppBannerManager extends EmptyTabObserver {
         return nativeIsFetcherActive(mNativePointer);
     }
 
-    private static native boolean nativeIsEnabled();
-    private native long nativeInit(int idealSplashImageSizeInDp, int idealIconSizeInDp);
+    private native long nativeInit();
     private native void nativeDestroy(long nativeAppBannerManagerAndroid);
     private native void nativeReplaceWebContents(long nativeAppBannerManagerAndroid,
             WebContents webContents);

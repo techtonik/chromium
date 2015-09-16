@@ -28,7 +28,6 @@
 #include "chrome/browser/plugins/chrome_plugin_service_filter.h"
 #include "chrome/browser/plugins/plugin_prefs.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
-#include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/prefs/pref_service_syncable_util.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ssl/chrome_ssl_host_state_delegate.h"
@@ -42,6 +41,7 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/proxy_config/pref_proxy_config_tracker.h"
+#include "components/syncable_prefs/pref_service_syncable.h"
 #include "components/ui/zoom/zoom_event_manager.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/browser_thread.h"
@@ -374,13 +374,6 @@ net::SSLConfigService* OffTheRecordProfileImpl::GetSSLConfigService() {
   return profile_->GetSSLConfigService();
 }
 
-HostContentSettingsMap* OffTheRecordProfileImpl::GetHostContentSettingsMap() {
-  // TODO(peconn): Once HostContentSettingsMapFactory works for TestingProfiles
-  // remove Profile::GetHostContentSettingsMap and replace all references to it.
-  // Don't forget to remove the #include "host_content_settings_map_factory"!
-  return HostContentSettingsMapFactory::GetForProfile(this);
-}
-
 content::BrowserPluginGuestManager* OffTheRecordProfileImpl::GetGuestManager() {
 #if defined(ENABLE_EXTENSIONS)
   return guest_view::GuestViewManager::FromBrowserContext(this);
@@ -555,6 +548,10 @@ void OffTheRecordProfileImpl::UpdateDefaultZoomLevel() {
   double default_zoom_level =
       profile_->GetZoomLevelPrefs()->GetDefaultZoomLevelPref();
   host_zoom_map->SetDefaultZoomLevel(default_zoom_level);
+  // HostZoomMap does not trigger zoom notification events when the default
+  // zoom level is set, so we need to do it here.
+  ui_zoom::ZoomEventManager::GetForBrowserContext(this)
+      ->OnDefaultZoomLevelChanged();
 }
 
 PrefProxyConfigTracker* OffTheRecordProfileImpl::CreateProxyConfigTracker() {

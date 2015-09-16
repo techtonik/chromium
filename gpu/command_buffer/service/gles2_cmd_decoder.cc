@@ -1650,6 +1650,24 @@ class GLES2DecoderImpl : public GLES2Decoder,
   void DoUniformMatrix4fv(
       GLint fake_location, GLsizei count, GLboolean transpose,
       const GLfloat* value);
+  void DoUniformMatrix2x3fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
+  void DoUniformMatrix2x4fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
+  void DoUniformMatrix3x2fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
+  void DoUniformMatrix3x4fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
+  void DoUniformMatrix4x2fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
+  void DoUniformMatrix4x3fv(
+      GLint fake_location, GLsizei count, GLboolean transpose,
+      const GLfloat* value);
 
   template <typename T>
   bool SetVertexAttribValue(
@@ -3516,9 +3534,8 @@ void GLES2DecoderImpl::DeleteTexturesHelper(
         framebuffer_state_.clear_state_dirty = true;
       }
       // Unbind texture_ref from texture_ref units.
-      for (size_t jj = 0; jj < state_.texture_units.size(); ++jj) {
-        state_.texture_units[jj].Unbind(texture_ref);
-      }
+      state_.UnbindTexture(texture_ref);
+
       // Unbind from current framebuffers.
       if (supports_separate_framebuffer_binds) {
         if (framebuffer_state_.bound_read_framebuffer.get()) {
@@ -7219,6 +7236,102 @@ void GLES2DecoderImpl::DoUniformMatrix4fv(
     return;
   }
   glUniformMatrix4fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix2x3fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix2x3fv",
+                                   Program::kUniformMatrix2x3f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix2x3fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix2x4fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix2x4fv",
+                                   Program::kUniformMatrix2x4f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix2x4fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix3x2fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix3x2fv",
+                                   Program::kUniformMatrix3x2f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix3x2fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix3x4fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix3x4fv",
+                                   Program::kUniformMatrix3x4f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix3x4fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix4x2fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix4x2fv",
+                                   Program::kUniformMatrix4x2f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix4x2fv(real_location, count, transpose, value);
+}
+
+void GLES2DecoderImpl::DoUniformMatrix4x3fv(
+    GLint fake_location, GLsizei count, GLboolean transpose,
+    const GLfloat* value) {
+  GLenum type = 0;
+  GLint real_location = -1;
+  if (!PrepForSetUniformByLocation(fake_location,
+                                   "glUniformMatrix4x3fv",
+                                   Program::kUniformMatrix4x3f,
+                                   &real_location,
+                                   &type,
+                                   &count)) {
+    return;
+  }
+  glUniformMatrix4x3fv(real_location, count, transpose, value);
 }
 
 void GLES2DecoderImpl::DoUseProgram(GLuint program_id) {
@@ -13068,7 +13181,8 @@ void GLES2DecoderImpl::DoCopySubTextureCHROMIUM(
   bool unpack_premultiply_alpha_change =
       (unpack_premultiply_alpha ^ unpack_unmultiply_alpha) != 0;
   if (image && !unpack_flip_y && !unpack_premultiply_alpha_change) {
-    glBindTexture(GL_TEXTURE_2D, dest_texture->service_id());
+    ScopedTextureBinder binder(
+        &state_, dest_texture->service_id(), GL_TEXTURE_2D);
     if (image->CopyTexSubImage(GL_TEXTURE_2D, gfx::Point(xoffset, yoffset),
                                gfx::Rect(x, y, width, height))) {
       return;

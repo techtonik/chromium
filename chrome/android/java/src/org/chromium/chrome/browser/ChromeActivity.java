@@ -17,8 +17,6 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -92,6 +90,7 @@ import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
 import org.chromium.chrome.browser.nfc.BeamController;
 import org.chromium.chrome.browser.nfc.BeamProvider;
+import org.chromium.chrome.browser.offlinepages.OfflinePageUtils;
 import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
@@ -99,9 +98,7 @@ import org.chromium.chrome.browser.preferences.PreferencesLauncher;
 import org.chromium.chrome.browser.printing.TabPrinter;
 import org.chromium.chrome.browser.share.ShareHelper;
 import org.chromium.chrome.browser.snackbar.LoFiBarPopupController;
-import org.chromium.chrome.browser.snackbar.Snackbar;
 import org.chromium.chrome.browser.snackbar.SnackbarManager;
-import org.chromium.chrome.browser.snackbar.SnackbarManager.SnackbarController;
 import org.chromium.chrome.browser.snackbar.SnackbarManager.SnackbarManageable;
 import org.chromium.chrome.browser.sync.ProfileSyncService;
 import org.chromium.chrome.browser.sync.SyncController;
@@ -502,45 +499,10 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
             }
 
             @Override
-            public void onPageLoadStarted(Tab tab, String url) {
-                // If an offline page is being opened, show the hint.
-                if (tab.isOfflinePage()) {
-                    ConnectivityManager connectivityManager =
-                            (ConnectivityManager) getBaseContext().getSystemService(
-                                    Context.CONNECTIVITY_SERVICE);
-                    NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
-                    boolean hasConnection = networkInfo != null && networkInfo.isConnected();
-
-                    final String originalUrl = tab.getOfflinePageOriginalUrl();
-                    boolean showButton = hasConnection && originalUrl != null;
-                    final int tabId = tab.getId();
-
-                    getSnackbarManager().showSnackbar(Snackbar.make(
-                            getString(R.string.enhanced_bookmark_viewing_offline_page),
-                            new SnackbarController() {
-                                @Override
-                                public void onAction(Object actionData) {
-                                    Tab tab = mTabModelSelector.getTabById(tabId);
-                                    if (tab != null) {
-                                        tab.loadUrl(new LoadUrlParams(originalUrl,
-                                                PageTransition.RELOAD));
-                                    }
-                                }
-
-                                @Override
-                                public void onDismissNoAction(Object actionData) {}
-
-                                @Override
-                                public void onDismissForEachType(boolean isTimeout) {}
-                            })
-                            .setAction(showButton ? getString(R.string.reload) : null, null));
-                }
-            }
-
-            @Override
             public void onPageLoadFinished(Tab tab) {
                 postDeferredStartupIfNeeded();
                 showUpdateInfoBarIfNecessary();
+                OfflinePageUtils.showOfflineSnackbarIfNecessary(ChromeActivity.this, tab);
             }
 
             @Override
@@ -761,36 +723,50 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
     @SuppressLint("NewApi")
     @Override
     protected final void onDestroy() {
-        if (mReaderModeActivityDelegate != null) mReaderModeActivityDelegate.destroy();
-        if (mContextualSearchManager != null) mContextualSearchManager.destroy();
-        if (mTabModelSelectorTabObserver != null) mTabModelSelectorTabObserver.destroy();
+        if (mReaderModeActivityDelegate != null) {
+            mReaderModeActivityDelegate.destroy();
+            mReaderModeActivityDelegate = null;
+        }
+
+        if (mContextualSearchManager != null) {
+            mContextualSearchManager.destroy();
+            mContextualSearchManager = null;
+        }
+
+        if (mTabModelSelectorTabObserver != null) {
+            mTabModelSelectorTabObserver.destroy();
+            mTabModelSelectorTabObserver = null;
+        }
+
         if (mCompositorViewHolder != null) {
             if (mCompositorViewHolder.getLayoutManager() != null) {
                 mCompositorViewHolder.getLayoutManager().removeSceneChangeObserver(this);
             }
             mCompositorViewHolder.shutDown();
+            mCompositorViewHolder = null;
         }
+
         onDestroyInternal();
+
+        if (mToolbarManager != null) {
+            mToolbarManager.destroy();
+            mToolbarManager = null;
+        }
 
         TabModelSelector selector = getTabModelSelector();
         if (selector != null) selector.destroy();
 
-        if (mWindowAndroid != null) mWindowAndroid.destroy();
-        if (!Locale.getDefault().equals(mCurrentLocale)) {
-            // This is a hack to relaunch renderer processes. Killing the main process also kills
-            // its dependent (renderer) processes, and Android's activity manager service seems to
-            // still relaunch the activity even when process dies in onDestroy().
-            // This shouldn't be moved to ChromeActivity since it may cause a crash if
-            // you kill the process from EmbedContentViewActivity since Preferences looks up
-            // ChildAccountManager#hasChildAccount() when it is not set.
-            // TODO(changwan): Implement a more generic and safe relaunch mechanism such as
-            // killing dependent processes on onDestroy and launching them at onCreate().
-            Log.w(TAG, "Forcefully killing process...");
-            Process.killProcess(Process.myPid());
+        if (mWindowAndroid != null) {
+            mWindowAndroid.destroy();
+            mWindowAndroid = null;
         }
+
         getChromeApplication().removePolicyChangeListener(this);
-        if (mTabContentManager != null) mTabContentManager.destroy();
-        if (mTabModelSelectorTabObserver != null) mTabModelSelectorTabObserver.destroy();
+
+        if (mTabContentManager != null) {
+            mTabContentManager.destroy();
+            mTabContentManager = null;
+        }
 
         AccessibilityManager manager = (AccessibilityManager)
                 getBaseContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
@@ -798,7 +774,18 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             manager.removeTouchExplorationStateChangeListener(mTouchExplorationStateChangeListener);
         }
+
         super.onDestroy();
+
+        if (!Locale.getDefault().equals(mCurrentLocale)) {
+            // This is a hack to relaunch renderer processes. Killing the main process also kills
+            // its dependent (renderer) processes, and Android's activity manager service seems to
+            // still relaunch the activity even when process dies in onDestroy().
+            // TODO(changwan): Implement a more generic and safe relaunch mechanism, like killing
+            //                 dependent processes in onDestroy() and launching them at onCreate().
+            Log.w(TAG, "Forcefully killing process...");
+            Process.killProcess(Process.myPid());
+        }
     }
 
     /**
@@ -810,7 +797,6 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
      * by the {@link WindowAndroid}.
      */
     protected void onDestroyInternal() {
-        if (mToolbarManager != null) mToolbarManager.destroy();
     }
 
     /**
@@ -1035,6 +1021,19 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
             }
             startActivity(intent);
         }
+    }
+
+    /**
+     * Saves an offline copy for the specified tab that is bookmarked.
+     * @param tab The tab that needs to save an offline copy.
+     */
+    public void saveBookmarkOffline(Tab tab) {
+        if (tab == null || tab.isFrozen()) {
+            return;
+        }
+
+        EnhancedBookmarkUtils.saveBookmarkOffline(tab.getUserBookmarkId(),
+                new EnhancedBookmarksModel(), tab, getSnackbarManager(), ChromeActivity.this);
     }
 
     /**

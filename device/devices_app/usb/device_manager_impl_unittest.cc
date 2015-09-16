@@ -35,10 +35,13 @@ class TestPermissionProvider : public PermissionProvider {
   ~TestPermissionProvider() override {}
 
   void HasDevicePermission(
-      mojo::Array<mojo::String> requested_guids,
+      mojo::Array<DeviceInfoPtr> requested_devices,
       const HasDevicePermissionCallback& callback) override {
     // Permission to access all devices granted.
-    callback.Run(requested_guids.Pass());
+    mojo::Array<mojo::String> allowed_guids(requested_devices.size());
+    for (size_t i = 0; i < requested_devices.size(); ++i)
+      allowed_guids[i] = requested_devices[i]->guid;
+    callback.Run(allowed_guids.Pass());
   }
 
  private:
@@ -126,7 +129,7 @@ void ExpectDeviceChangesAndThen(
   EXPECT_EQ(expected_removed_guids.size(), results->devices_removed.size());
   std::set<std::string> actual_removed_guids;
   for (size_t i = 0; i < results->devices_removed.size(); ++i)
-    actual_removed_guids.insert(results->devices_removed[i]);
+    actual_removed_guids.insert(results->devices_removed[i]->guid);
   EXPECT_EQ(expected_removed_guids, actual_removed_guids);
   continuation.Run();
 }

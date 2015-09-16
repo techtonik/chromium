@@ -53,7 +53,7 @@ source_set("mojo_runner_lib") {
 
     deps += [
       ":jni_headers",
-      "//components/view_manager",
+      "//components/mus",
       "//mojo/shell",
       "//ui/gl",
       "//ui/platform_window/android",
@@ -96,8 +96,6 @@ source_set("in_process_native_runner") {
 
 source_set("lib") {
   sources = [
-    "about_fetcher.cc",
-    "about_fetcher.h",
     "child_process.cc",
     "child_process.h",
     "child_process_host.cc",
@@ -112,8 +110,6 @@ source_set("lib") {
     "scoped_user_data_dir.h",
     "task_runners.cc",
     "task_runners.h",
-    "url_resolver.cc",
-    "url_resolver.h",
   ]
 
   deps = [
@@ -127,6 +123,7 @@ source_set("lib") {
     "//components/devtools_service/public/interfaces",
     "//mojo/application/public/cpp",
     "//mojo/common:tracing_impl",
+    "//mojo/fetcher",
     "//mojo/message_pump",
     "//mojo/services/network/public/interfaces",
     "//mojo/services/tracing/public/cpp",
@@ -174,7 +171,7 @@ source_set("lib") {
     deps += [
       ":jni_headers",
       ":run_android_application_function",
-      "//components/view_manager/gles2",
+      "//components/mus/gles2",
       "//mojo/application/public/cpp:content_handler",
     ]
   }
@@ -304,8 +301,8 @@ if (is_android) {
       ":bootstrap",
       ":bootstrap_java",
       "//components/clipboard:apptests",
+      "//components/mus:apptests",
       "//components/resource_provider:apptests",
-      "//components/view_manager:apptests",
       "//mojo/services/network:apptests",
     ]
 
@@ -317,9 +314,9 @@ if (is_android) {
     apptest_outputs = [
       "clipboard",
       "clipboard_apptests",
+      "mus_apptests",
       "resource_provider",
       "resource_provider_apptests",
-      "view_manager_apptests",
       "network_service",
       "network_service_apptests",
     ]
@@ -419,7 +416,9 @@ mojom("child_process_bindings") {
 
 test("mojo_runner_unittests") {
   sources = [
-    "about_fetcher_unittest.cc",
+    "../fetcher/about_fetcher_unittest.cc",
+    "../fetcher/network_fetcher_unittest.cc",
+    "../fetcher/url_resolver_unittest.cc",
     "child_process_host_unittest.cc",
     "data_pipe_peek_unittest.cc",
     "in_process_native_runner_unittest.cc",
@@ -429,7 +428,6 @@ test("mojo_runner_unittests") {
     "shell_test_base_android.cc",
     "shell_test_base_unittest.cc",
     "shell_test_main.cc",
-    "url_resolver_unittest.cc",
   ]
 
   deps = [
@@ -441,6 +439,7 @@ test("mojo_runner_unittests") {
     "//mojo/application/public/cpp",
     "//mojo/common",
     "//mojo/environment:chromium",
+    "//mojo/fetcher",
     "//mojo/message_pump",
     "//mojo/services/test_service:bindings",
     "//mojo/shell",

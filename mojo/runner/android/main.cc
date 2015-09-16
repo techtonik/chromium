@@ -20,7 +20,7 @@
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "build/build_config.h"
-#include "components/view_manager/android_loader.h"
+#include "components/mus/android_loader.h"
 #include "jni/ShellMain_jni.h"
 #include "mojo/message_pump/message_pump_mojo.h"
 #include "mojo/runner/android/android_handler_loader.h"
@@ -59,7 +59,7 @@ void ConfigureAndroidServices(Context* context) {
       make_scoped_ptr(new UIApplicationLoader(
           make_scoped_ptr(new view_manager::AndroidLoader()),
           g_java_message_loop.Get().get())),
-      GURL("mojo:view_manager"));
+      GURL("mojo:mus"));
 
   // Android handler is bundled with the Mojo shell, because it uses the
   // MojoShell application as the JNI bridge to bootstrap execution of other
@@ -132,9 +132,9 @@ static void Init(JNIEnv* env,
   // We want ~MessageLoop to happen prior to ~Context. Initializing
   // LazyInstances is akin to stack-allocating objects; their destructors
   // will be invoked first-in-last-out.
-  Context* shell_context = new Context();
-  shell_context->SetShellFileRoot(base::FilePath(
-      base::android::ConvertJavaStringToUTF8(env, j_local_apps_directory)));
+  base::FilePath shell_file_root(
+      base::android::ConvertJavaStringToUTF8(env, j_local_apps_directory));
+  Context* shell_context = new Context(shell_file_root);
   g_context.Get().reset(shell_context);
 
   g_java_message_loop.Get().reset(new base::MessageLoopForUI);

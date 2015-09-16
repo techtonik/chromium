@@ -4,11 +4,11 @@
 
 #include "chrome/browser/notifications/platform_notification_service_impl.h"
 
-#include "base/command_line.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/notifications/desktop_notification_profile_util.h"
 #include "chrome/browser/notifications/notification_object_proxy.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
@@ -24,7 +24,6 @@
 #include "content/public/browser/notification_event_dispatcher.h"
 #include "content/public/browser/platform_notification_context.h"
 #include "content/public/browser/storage_partition.h"
-#include "content/public/common/content_switches.h"
 #include "content/public/common/platform_notification_data.h"
 #include "ui/message_center/notifier_settings.h"
 #include "url/url_constants.h"
@@ -238,7 +237,7 @@ void PlatformNotificationServiceImpl::DisplayNotification(
                    notification.delegate_id(),
                    NotificationUIManager::GetProfileID(profile));
 
-  profile->GetHostContentSettingsMap()->UpdateLastUsage(
+  HostContentSettingsMapFactory::GetForProfile(profile)->UpdateLastUsage(
       origin, origin, CONTENT_SETTINGS_TYPE_NOTIFICATIONS);
 }
 
@@ -265,7 +264,7 @@ void PlatformNotificationServiceImpl::DisplayPersistentNotification(
 
   GetNotificationUIManager()->Add(notification, profile);
 
-  profile->GetHostContentSettingsMap()->UpdateLastUsage(
+  HostContentSettingsMapFactory::GetForProfile(profile)->UpdateLastUsage(
       origin, origin, CONTENT_SETTINGS_TYPE_NOTIFICATIONS);
 }
 
@@ -348,11 +347,8 @@ Notification PlatformNotificationServiceImpl::CreateNotificationFromData(
   // On desktop, notifications with require_interaction==true stay on-screen
   // rather than minimizing to the notification center after a timeout.
   // On mobile, this is ignored (notifications are minimized at all times).
-  if (notification_data.require_interaction ||
-      !base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableExperimentalWebPlatformFeatures)) {
+  if (notification_data.require_interaction)
     notification.set_never_timeout(true);
-  }
 
   return notification;
 }

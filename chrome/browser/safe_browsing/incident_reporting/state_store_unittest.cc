@@ -13,8 +13,6 @@
 #include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "chrome/browser/prefs/browser_prefs.h"
-#include "chrome/browser/prefs/pref_service_syncable.h"
-#include "chrome/browser/prefs/pref_service_syncable_factory.h"
 #include "chrome/browser/safe_browsing/incident_reporting/incident.h"
 #include "chrome/browser/safe_browsing/incident_reporting/platform_state_store.h"
 #include "chrome/common/pref_names.h"
@@ -22,6 +20,8 @@
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
 #include "components/pref_registry/pref_registry_syncable.h"
+#include "components/syncable_prefs/pref_service_syncable.h"
+#include "components/syncable_prefs/pref_service_syncable_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if defined(OS_WIN)
@@ -182,6 +182,37 @@ TEST_F(StateStoreTest, ClearForType) {
       ASSERT_TRUE(
           state_store.HasBeenReported(data.type, data.key, data.digest));
     }
+  }
+}
+
+TEST_F(StateStoreTest, ClearAll) {
+  StateStore state_store(profile_);
+  // Write some state to the store.
+  {
+    StateStore::Transaction transaction(&state_store);
+    for (const auto& data : kTestData_)
+      transaction.MarkAsReported(data.type, data.key, data.digest);
+  }
+
+  StateStore::Transaction(&state_store).ClearAll();
+
+  for (const auto& data : kTestData_) {
+    ASSERT_FALSE(state_store.HasBeenReported(data.type, data.key, data.digest));
+  }
+
+  // Run tasks to write prefs out to the JsonPrefStore.
+  task_runner_->RunUntilIdle();
+
+  // Delete the profile.
+  DeleteProfile();
+
+  // Recreate the profile.
+  CreateProfile();
+
+  StateStore store_2(profile_);
+  for (const auto& data : kTestData_) {
+    // Verify that the state did not survive through the Platform State Store.
+    ASSERT_FALSE(store_2.HasBeenReported(data.type, data.key, data.digest));
   }
 }
 

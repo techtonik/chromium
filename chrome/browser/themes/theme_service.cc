@@ -291,18 +291,22 @@ int ThemeService::GetDisplayProperty(int id) const {
     return result;
   }
 
-  if (id == Properties::NTP_LOGO_ALTERNATE) {
-    if (UsingDefaultTheme() || UsingSystemTheme())
-      return 0;  // Colorful logo.
+  switch (id) {
+    case Properties::NTP_BACKGROUND_ALIGNMENT:
+      return Properties::ALIGN_CENTER;
 
-    if (HasCustomImage(IDR_THEME_NTP_BACKGROUND))
-      return 1;  // White logo.
+    case Properties::NTP_BACKGROUND_TILING:
+      return Properties::NO_REPEAT;
 
-    SkColor background_color = GetColor(Properties::COLOR_NTP_BACKGROUND);
-    return IsColorGrayscale(background_color) ? 0 : 1;
+    case Properties::NTP_LOGO_ALTERNATE:
+      return UsingDefaultTheme() || UsingSystemTheme() ||
+          (!HasCustomImage(IDR_THEME_NTP_BACKGROUND) &&
+           IsColorGrayscale(GetColor(Properties::COLOR_NTP_BACKGROUND))) ?
+          0 : 1;
+
+    default:
+      return -1;
   }
-
-  return Properties::GetDefaultDisplayProperty(id);
 }
 
 bool ThemeService::ShouldUseNativeFrame() const {
@@ -389,7 +393,13 @@ void ThemeService::SetTheme(const Extension* extension) {
   content::RecordAction(UserMetricsAction("Themes_Installed"));
 
   if (previous_theme_id != kDefaultThemeID &&
-      previous_theme_id != extension->id()) {
+      previous_theme_id != extension->id() &&
+      service->GetInstalledExtension(previous_theme_id)) {
+    // Do not disable the previous theme if it is already uninstalled. Sending
+    // NOTIFICATION_BROWSER_THEME_CHANGED causes the previous theme to be
+    // uninstalled when the notification causes the remaining infobar to close
+    // and does not open any new infobars. See crbug.com/468280.
+
     // Disable the old theme.
     service->DisableExtension(previous_theme_id,
                               extensions::Extension::DISABLE_USER_ACTION);

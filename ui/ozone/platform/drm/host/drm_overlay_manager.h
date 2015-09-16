@@ -13,18 +13,15 @@ class DrmGpuPlatformSupportHost;
 
 class DrmOverlayManager : public OverlayManagerOzone {
  public:
-  DrmOverlayManager(bool allow_surfaceless,
-                    DrmGpuPlatformSupportHost* platform_support_host);
+  DrmOverlayManager(DrmGpuPlatformSupportHost* platform_support_host);
   ~DrmOverlayManager() override;
 
   // OverlayManagerOzone:
   scoped_ptr<OverlayCandidatesOzone> CreateOverlayCandidates(
       gfx::AcceleratedWidget w) override;
-  bool CanShowPrimaryPlaneAsOverlay() override;
 
  private:
   DrmGpuPlatformSupportHost* platform_support_host_;
-  bool allow_surfaceless_;
   bool is_supported_;
 
   DISALLOW_COPY_AND_ASSIGN(DrmOverlayManager);

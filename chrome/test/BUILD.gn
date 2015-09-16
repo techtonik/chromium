@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/chrome_build.gni")
+import("//build/config/compiler/compiler.gni")
 import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
@@ -67,8 +68,6 @@ source_set("test_support") {
     "base/testing_browser_process_platform_part.h",
     "base/testing_io_thread_state.cc",
     "base/testing_io_thread_state.h",
-    "base/testing_pref_service_syncable.cc",
-    "base/testing_pref_service_syncable.h",
     "base/testing_profile.cc",
     "base/testing_profile.h",
     "base/testing_profile_manager.cc",
@@ -118,6 +117,7 @@ source_set("test_support") {
     "//components/search_engines:test_support",
     "//components/signin/core/browser:test_support",
     "//components/sync_driver:test_support",
+    "//components/syncable_prefs:test_support",
     "//components/update_client:test_support",
     "//content/public/app:both",
     "//ui/gfx:test_support",
@@ -1637,6 +1637,8 @@ if (!is_android) {
       if (!is_android && !is_ios) {
         sources +=
             [ "../browser/download/download_dir_policy_handler_unittest.cc" ]
+
+        deps += [ "//components/bubble:test_support" ]
       }
     }
     if (enable_web_speech) {

@@ -7,9 +7,9 @@
 #include "base/command_line.h"
 #include "base/memory/ref_counted.h"
 #include "base/message_loop/message_loop.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/prefs/browser_prefs.h"
-#include "chrome/browser/prefs/pref_service_mock_factory.h"
-#include "chrome/browser/prefs/pref_service_syncable.h"
+#include "chrome/browser/prefs/command_line_pref_store.h"
 #include "chrome/common/chrome_switches.h"
 #include "components/policy/core/common/external_data_fetcher.h"
 #include "components/policy/core/common/mock_configuration_policy_provider.h"
@@ -18,6 +18,8 @@
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/proxy_config/proxy_config_dictionary.h"
 #include "components/proxy_config/proxy_config_pref_names.h"
+#include "components/syncable_prefs/pref_service_mock_factory.h"
+#include "components/syncable_prefs/pref_service_syncable.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "policy/policy_constants.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -97,9 +99,12 @@ class ProxyPolicyTest : public testing::Test {
 
   scoped_ptr<PrefService> CreatePrefService(bool with_managed_policies) {
     PrefServiceMockFactory factory;
-    factory.SetCommandLine(&command_line_);
-    if (with_managed_policies)
-      factory.SetManagedPolicies(policy_service_.get());
+    factory.set_command_line_prefs(new CommandLinePrefStore(&command_line_));
+    if (with_managed_policies) {
+      factory.SetManagedPolicies(policy_service_.get(),
+                                 g_browser_process->browser_policy_connector());
+    }
+
     scoped_refptr<user_prefs::PrefRegistrySyncable> registry(
         new user_prefs::PrefRegistrySyncable);
     scoped_ptr<PrefServiceSyncable> prefs =

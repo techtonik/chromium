@@ -5139,14 +5139,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
       </if>
 
-      <!-- chrome://md-settings/ - the Material Design Settings page -->
-      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_SETTINGS_NAME" desc="Name for the flag to enable the material design Settings page.">
-          Enable Material Design settings
-      </message>
-      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_SETTINGS_DESCRIPTION" desc="Description for the flag to enable the material design Settings page.">
-          If enabled, the chrome://md-settings/ URL loads the Material Design settings page.
-      </message>
-
       <!-- Material Design version of chrome://downloads -->
       <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_DOWNLOADS_NAME" desc="Name for the flag to enable the material design downloads page.">
           Enable Material Design downloads
@@ -5771,6 +5763,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_QUIC_DESCRIPTION" desc="Description for the flag to enable QUIC.">
         Enable experimental QUIC protocol support.
       </message>
+      <message name="IDS_FLAGS_ENABLE_ALTSVC_NAME" desc="Title for the flag to enable alternative services.">
+        Alternative services.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_ALTSVC_DESCRIPTION" desc="Description for the flag to enable alternative services.">
+        Enable experimental HTTP alternative services support.
+      </message>
       <message name="IDS_FLAGS_DISABLE_MEDIA_SOURCE_NAME" desc="Title for the flag to disable the Media Source API.">
         Disable Media Source API.
       </message>
@@ -5837,18 +5835,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_FLAGS_DISABLE_TOUCH_FEEDBACK_DESCRIPTION" desc="Description for the flag that disables additional visual feedback for touch.">
           Certain UI components will stop displaying visual feedback upon touch interactions.
-        </message>
-        <message name="IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_CIRCLE" desc="Description for the flag that sets material design ink drop to a circle.">
-          Circle Ink Drop
-        </message>
-        <message name="IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_SQUARE" desc="Description for the flag that sets material design ink drop to a square.">
-          Square Ink Drop
-        </message>
-        <message name="IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_NAME" desc="Name for the flag that sets the material design ink drop.">
-          Material Design Ink Drop
-        </message>
-        <message name="IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_DESCRIPTION" desc="Description for the flag that sets the material design ink drop.">
-          Experimental touch feedback animations for material design.
         </message>
         <message name="IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_ANIMATION_FAST" desc="Description for the flag that sets material design ink drop animation speed of fast.">
           Fast
@@ -6059,7 +6045,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Enable the experimental Credential Manager API.
       </message>
       <message name="IDS_FLAGS_CREDENTIAL_MANAGER_API_DESCRIPTION" desc="Description for the flag to enable 'navigator.credentials'.">
-        Enables an experimental implementation of the Credential Manager API. No promises that this won't expose all your passwords to every site on the web; don't enable this unless you know what you're doing.
+        Enables an experimental implementation of the Credential Manager API. Don't enable this unless you know what you're doing.
       </message>
       <message name="IDS_FLAGS_REDUCED_REFERRER_GRANULARITY_NAME" desc="Name for the flag to reduce referer granularity.">
         Reduce default 'referer' header granularity.
@@ -6574,12 +6560,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_DISABLE_THREADED_SCROLLING_DESCRIPTION" desc="Description for the flag to disable threaded scrolling.">
         Disabled threaded handling of scroll-related input events, forcing all such scroll events to be handled on the main thread. Note that this can dramatically hurt scrolling performance of most websites and is intended for testing purposes only.
       </message>
-      <message name="IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_NAME" desc="Title for the flag to enable the viewport scroll order experiment.">
-        Invert Viewport Scroll Order.
-      </message>
-      <message name="IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_DESCRIPTION" desc="Description for the flag to enable the viewport scroll order experiment.">
-        Enables flipped viewport scroll order in some situations. Namely, during a pinch-zoom, the visual viewport should be scrolled first, then the layout viewport.
-      </message>
       <message name="IDS_FLAGS_BLEEDING_RENDERER_NAME" desc="Name of the 'Stacked Tabs' lab.">
         Bleeding Edge Renderer Paths - LIKELY TO CRASH YOUR BROWSER
       </message>
@@ -6821,9 +6801,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_WEBRTC_LOGS_LOG_LOCAL_FILE_LABEL_FORMAT" desc="Format for local log entry label on chrome://webrtc-logs">
         Local file:
-      </message>
-      <message name="IDS_WEBRTC_LOGS_LOG_LOCAL_FILE_FORMAT" desc="Format for file in local log entry on chrome://webrtc-logs">
-        <ph name="WEBRTC_LOG_LOCAL_FILE">$1<ex>/path/to/file</ex></ph>
       </message>
       <message name="IDS_WEBRTC_LOGS_NO_LOCAL_LOG_FILE_MESSAGE" desc="The explanatory message for chrome://webrtc-logs when there is no local log file">
         No local log file.
@@ -7362,9 +7339,16 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_TOOLTIP_LOCATION_ICON" desc="The tooltip for location icon in the omnibox">
         View site information
       </message>
-      <message name="IDS_TOOLTIP_NEW_TAB" desc="The tooltip for the new tab button">
-        New tab
-      </message>
+      <if expr="not use_titlecase">
+        <message name="IDS_TOOLTIP_NEW_TAB" desc="The tooltip for the new tab button">
+          New tab
+        </message>
+      </if>
+      <if expr="use_titlecase">
+        <message name="IDS_TOOLTIP_NEW_TAB" desc="The tooltip for the new tab button">
+          New Tab
+        </message>
+       </if>
       <message name="IDS_TOOLTIP_MIC_SEARCH" desc="The tooltip for search-by-voice button">
         Search by voice
       </message>
@@ -9284,10 +9268,6 @@ I don't think this site should be blocked!
         Unable to look up
         <ph name="HOST_NAME">&lt;strong jscontent="hostName"&gt;&lt;/strong&gt;<ex>www.whatever.com</ex></ph>.
         Trying to diagnose the problem...
-      </message>
-
-      <message name="IDS_ERRORPAGES_ERROR_CODE" desc="At the bottom of error pages, a non-internationalized string or numeric code is displayed for debugging purposes">
-        <ph name="ERROR_NAME">$1<ex>ERR_FILE_NOT_FOUND</ex></ph>
       </message>
 
       <message name="IDS_ERRORPAGES_DETAILS_TIMED_OUT" desc="The error message displayed when a page takes too long to load.">
@@ -12758,9 +12738,6 @@ Some features may be unavailable.  Please check that the profile exists and you 
         <message name="IDS_MESSAGE_CENTER_FOOTER_WITH_PRODUCT_TITLE" desc="The label in the footer of the message center tray, with the product title.">
           <ph name="product_name">$1<ex>Chrome</ex></ph> Notifications
         </message>
-        <message name="IDS_NOTIFIER_WELCOME_BODY" desc="Notification body for when a new notifier service is introduced.">
-          Now on your desktop
-        </message>
         <message name="IDS_NOTIFIER_WELCOME_BUTTON" desc="Notification body for when a new notifier service is introduced.">
           Turn off these notifications
         </message>
@@ -13308,12 +13285,6 @@ Some features may be unavailable.  Please check that the profile exists and you 
         </message>
         <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_INFOBAR_QUESTION" desc="Question asked on the infobar whenever URL wants to access protected media identifier. It shows the origin of the URL.">
           <ph name="URL">$1<ex>https://www.youtube.com</ex></ph> needs to uniquely identify your device to play premium content.
-        </message>
-        <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_ALLOW_BUTTON" desc="A button in the protected media identifier infobar for allowing access to a protected media identifier for a given origin.">
-          Allow
-        </message>
-        <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_DENY_BUTTON" desc="A button in the protected media identifier infobar for denying access to a protected media identifier for a given origin.">
-          Deny
         </message>
       </if>
 
@@ -15423,8 +15394,8 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_MANAGE_PASSWORDS_TITLE_DIFFERENT_DOMAIN" desc="The title text that is used in the manage passwords bubble when a password is autofilled or after a user has stored a password.">
         Saved passwords for <ph name="ORIGIN">$1<ex>example.com</ex></ph>:
-      </message> 
-      
+      </message>
+
     <if expr="is_win or is_macosx">
       <!-- Tab discarding -->
       <message name="IDS_FLAGS_ENABLE_TAB_DISCARDING_NAME" desc="Name for the flag to enable tab discarding.">

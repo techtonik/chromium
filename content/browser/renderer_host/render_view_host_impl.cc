@@ -443,8 +443,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
 
   prefs.pinch_overlay_scrollbar_thickness = 10;
   prefs.use_solid_color_scrollbars = ui::IsOverlayScrollbarEnabled();
-  prefs.invert_viewport_scroll_order =
-      command_line.HasSwitch(switches::kInvertViewportScrollOrder);
 
 #if defined(OS_ANDROID)
   // On Android, user gestures are normally required, unless that requirement
@@ -455,6 +453,11 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.user_gesture_required_for_media_playback = !command_line.HasSwitch(
       switches::kDisableGestureRequirementForMediaPlayback) &&
           (autoplay_group_name.empty() || autoplay_group_name != "Enabled");
+
+  // Handle autoplay gesture override experiment.
+  // Note that anything but a well-formed string turns the experiment off.
+  prefs.autoplay_experiment_mode = base::FieldTrialList::FindFullName(
+      "MediaElementGestureOverrideExperiment");
 #endif
 
   prefs.touch_enabled = ui::AreTouchEventsEnabled();
@@ -474,14 +477,7 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.touch_adjustment_enabled =
       !command_line.HasSwitch(switches::kDisableTouchAdjustment);
 
-  const std::string slimming_group =
-      base::FieldTrialList::FindFullName("SlimmingPaint");
-  prefs.slimming_paint_enabled =
-      (command_line.HasSwitch(switches::kEnableSlimmingPaint) ||
-      !command_line.HasSwitch(switches::kDisableSlimmingPaint)) &&
-      (slimming_group != "DisableSlimmingPaint");
   prefs.slimming_paint_v2_enabled =
-      prefs.slimming_paint_enabled &&
       command_line.HasSwitch(switches::kEnableSlimmingPaintV2);
 
 #if defined(OS_MACOSX) || defined(OS_CHROMEOS)

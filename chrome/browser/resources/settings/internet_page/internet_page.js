@@ -26,7 +26,7 @@ Polymer({
      * The current active route.
      */
     currentRoute: {
-      type: Array,
+      type: Object,
       notify: true,
     },
 
@@ -45,11 +45,6 @@ Polymer({
       type: String,
       value: '',
     },
-  },
-
-  /** @private */
-  onBackTap_: function() {
-    this.$.pages.back();
   },
 
   /**

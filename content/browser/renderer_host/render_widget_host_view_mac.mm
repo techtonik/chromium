@@ -36,6 +36,7 @@
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/browser/gpu/compositor_util.h"
+#include "content/browser/renderer_host/input/web_input_event_builders_mac.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_helper.h"
 #include "content/browser/renderer_host/render_widget_host_delegate.h"
@@ -63,7 +64,6 @@
 #include "skia/ext/skia_utils_mac.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
-#include "third_party/WebKit/public/web/mac/WebInputEventFactory.h"
 #import "third_party/mozilla/ComplexTextInputPanel.h"
 #include "ui/accelerated_widget_mac/io_surface_layer.h"
 #include "ui/accelerated_widget_mac/surface_handle_types.h"
@@ -97,8 +97,10 @@ using content::RenderWidgetHostViewMac;
 using content::RenderWidgetHostViewMacEditCommandHelper;
 using content::TextInputClientMac;
 using content::WebContents;
+using content::WebGestureEventBuilder;
+using content::WebMouseEventBuilder;
+using content::WebMouseWheelEventBuilder;
 using blink::WebInputEvent;
-using blink::WebInputEventFactory;
 using blink::WebMouseEvent;
 using blink::WebMouseWheelEvent;
 using blink::WebGestureEvent;
@@ -1286,8 +1288,7 @@ void RenderWidgetHostViewMac::SetShowingContextMenu(bool showing) {
                                    eventNumber:0
                                     clickCount:0
                                       pressure:0];
-  WebMouseEvent web_event =
-      WebInputEventFactory::mouseEvent(event, cocoa_view_);
+  WebMouseEvent web_event = WebMouseEventBuilder::Build(event, cocoa_view_);
   if (showing)
     web_event.type = WebInputEvent::MouseLeave;
   ForwardMouseEvent(web_event);
@@ -1561,6 +1562,11 @@ void RenderWidgetHostViewMac::OnSwapCompositorFrame(
     bad_message::ReceivedBadMessage(render_widget_host_->GetProcess(),
                                     bad_message::RWHVM_UNEXPECTED_FRAME_TYPE);
   }
+}
+
+void RenderWidgetHostViewMac::ClearCompositorFrame() {
+  if (delegated_frame_host_)
+    delegated_frame_host_->ClearDelegatedFrame();
 }
 
 void RenderWidgetHostViewMac::GetScreenInfo(blink::WebScreenInfo* results) {
@@ -1976,8 +1982,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   if ([self shouldIgnoreMouseEvent:theEvent]) {
     // If this is the first such event, send a mouse exit to the host view.
     if (!mouseEventWasIgnored_ && renderWidgetHostView_->render_widget_host_) {
-      WebMouseEvent exitEvent =
-          WebInputEventFactory::mouseEvent(theEvent, self);
+      WebMouseEvent exitEvent = WebMouseEventBuilder::Build(theEvent, self);
       exitEvent.type = WebInputEvent::MouseLeave;
       exitEvent.button = WebMouseEvent::ButtonNone;
       renderWidgetHostView_->ForwardMouseEvent(exitEvent);
@@ -1990,8 +1995,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     // If this is the first mouse event after a previous event that was ignored
     // due to the hitTest, send a mouse enter event to the host view.
     if (renderWidgetHostView_->render_widget_host_) {
-      WebMouseEvent enterEvent =
-          WebInputEventFactory::mouseEvent(theEvent, self);
+      WebMouseEvent enterEvent = WebMouseEventBuilder::Build(theEvent, self);
       enterEvent.type = WebInputEvent::MouseMove;
       enterEvent.button = WebMouseEvent::ButtonNone;
       if (renderWidgetHostView_->render_widget_host_->delegate() &&
@@ -2030,7 +2034,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     [self confirmComposition];
   }
 
-  WebMouseEvent event = WebInputEventFactory::mouseEvent(theEvent, self);
+  WebMouseEvent event = WebMouseEventBuilder::Build(theEvent, self);
   if (renderWidgetHostView_->render_widget_host_->delegate() &&
       renderWidgetHostView_->render_widget_host_->delegate()
           ->GetInputEventRouter()) {
@@ -2363,7 +2367,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     // Allow rubber-banding in both directions.
     bool canRubberbandLeft = true;
     bool canRubberbandRight = true;
-    WebMouseWheelEvent webEvent = WebInputEventFactory::mouseWheelEvent(
+    WebMouseWheelEvent webEvent = WebMouseWheelEventBuilder::Build(
         event, self, canRubberbandLeft, canRubberbandRight);
     webEvent.railsMode = mouseWheelFilter_.UpdateRailsMode(webEvent);
     renderWidgetHostView_->render_widget_host_->ForwardWheelEvent(webEvent);
@@ -2378,7 +2382,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
 - (void)beginGestureWithEvent:(NSEvent*)event {
   [responderDelegate_ beginGestureWithEvent:event];
   gestureBeginEvent_.reset(
-      new WebGestureEvent(WebInputEventFactory::gestureEvent(event, self)));
+      new WebGestureEvent(WebGestureEventBuilder::Build(event, self)));
 
   // If the page is at the minimum zoom level, require a threshold be reached
   // before the pinch has an effect.
@@ -2396,7 +2400,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     return;
 
   if (gestureBeginPinchSent_) {
-    WebGestureEvent endEvent(WebInputEventFactory::gestureEvent(event, self));
+    WebGestureEvent endEvent(WebGestureEventBuilder::Build(event, self));
     endEvent.type = WebInputEvent::GesturePinchEnd;
     renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(endEvent);
     gestureBeginPinchSent_ = NO;
@@ -2421,7 +2425,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
 
 - (void)smartMagnifyWithEvent:(NSEvent*)event {
   const WebGestureEvent& smartMagnifyEvent =
-      WebInputEventFactory::gestureEvent(event, self);
+      WebGestureEventBuilder::Build(event, self);
   if (renderWidgetHostView_ && renderWidgetHostView_->render_widget_host_) {
     renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(
         smartMagnifyEvent);
@@ -2494,7 +2498,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   if (renderWidgetHostView_->render_widget_host_) {
     BOOL canRubberbandLeft = [responderDelegate_ canRubberbandLeft:self];
     BOOL canRubberbandRight = [responderDelegate_ canRubberbandRight:self];
-    WebMouseWheelEvent webEvent = WebInputEventFactory::mouseWheelEvent(
+    WebMouseWheelEvent webEvent = WebMouseWheelEventBuilder::Build(
         event, self, canRubberbandLeft, canRubberbandRight);
     webEvent.railsMode = mouseWheelFilter_.UpdateRailsMode(webEvent);
     if (renderWidgetHostView_->render_widget_host_->delegate() &&
@@ -2535,8 +2539,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   }
 
   // Send a GesturePinchUpdate event.
-  WebGestureEvent updateEvent =
-      WebInputEventFactory::gestureEvent(event, self);
+  WebGestureEvent updateEvent = WebGestureEventBuilder::Build(event, self);
   updateEvent.data.pinchUpdate.zoomDisabled = !pinchHasReachedZoomThreshold_;
   renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(updateEvent);
 }
