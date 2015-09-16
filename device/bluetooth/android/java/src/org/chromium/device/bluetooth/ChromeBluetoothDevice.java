@@ -31,7 +31,7 @@ final class ChromeBluetoothDevice {
     final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
-    final private BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
+    private final BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
 
     private ChromeBluetoothDevice(
             long nativeBluetoothDeviceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
