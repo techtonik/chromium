@@ -31,11 +31,11 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': 'fed103d519fd622060dd11f83c8446e298725fbf', # from svn revision 202367
+  'webkit_revision': 'e9c36eb54f1b46e845665d048d50ecb4652eef96', # from svn revision 202385
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': 'ac1772e3db5c885b554f6a72ca9dbac4245cb0e2',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '5d08d44c68f65c71c9fdbbdda601119d87a7beb6',
+  'skia_revision': '3322a8137d12255258a937897389ea90ca1ee6fa',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
@@ -204,7 +204,7 @@ deps = {
    Var('chromium_git') + '/chromium/deps/yasm/patched-yasm.git' + '@' + '4671120cd8558ce62ee8672ebf3eb6f5216f909b',
 
   'src/third_party/libjpeg_turbo':
-   Var('chromium_git') + '/chromium/deps/libjpeg_turbo.git' + '@' + '631e2dd119d49794e3572b6ca3f16ee39d59f372',
+   Var('chromium_git') + '/chromium/deps/libjpeg_turbo.git' + '@' + 'e4e75037f29745f1546b6ebf5cf532e841c04c2c',
 
   'src/third_party/flac':
    Var('chromium_git') + '/chromium/deps/flac.git' + '@' + '2c4b86af352b23498315c016dc207e3fb2733fc0',
