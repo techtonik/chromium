@@ -6,10 +6,12 @@
 
 #include "components/html_viewer/global_state.h"
 #include "components/html_viewer/ime_controller.h"
+#include "components/html_viewer/stats_collection_controller.h"
 #include "components/html_viewer/web_layer_tree_view_impl.h"
 #include "components/html_viewer/web_storage_namespace_impl.h"
-#include "components/view_manager/public/cpp/view.h"
+#include "components/mus/public/cpp/view.h"
 #include "mojo/application/public/cpp/application_impl.h"
+#include "mojo/services/tracing/public/interfaces/tracing.mojom.h"
 #include "third_party/WebKit/public/web/WebFrameWidget.h"
 #include "third_party/WebKit/public/web/WebSettings.h"
 #include "third_party/WebKit/public/web/WebView.h"
@@ -32,7 +34,7 @@ void InitializeWebLayerTreeView(WebLayerTreeViewImpl* web_layer_tree_view,
                                 blink::WebWidget* widget) {
   DCHECK(view);
   mojo::URLRequestPtr request(mojo::URLRequest::New());
-  request->url = mojo::String::From("mojo:view_manager");
+  request->url = mojo::String::From("mojo:mus");
   mojo::GpuPtr gpu_service;
   app->ConnectToService(request.Pass(), &gpu_service);
   web_layer_tree_view->Initialize(gpu_service.Pass(), view, widget);
@@ -115,6 +117,18 @@ void HTMLWidgetRootLocal::initializeLayerTreeView() {
 
 blink::WebLayerTreeView* HTMLWidgetRootLocal::layerTreeView() {
   return web_layer_tree_view_impl_.get();
+}
+
+void HTMLWidgetRootLocal::didFirstVisuallyNonEmptyLayout() {
+  static bool called = false;
+  if (!called) {
+    const int64 time = base::Time::Now().ToInternalValue();
+    tracing::StartupPerformanceDataCollectorPtr collector =
+        StatsCollectionController::ConnectToDataCollector(app_);
+    if (collector)
+      collector->SetFirstVisuallyNonEmptyLayoutTime(time);
+    called = true;
+  }
 }
 
 void HTMLWidgetRootLocal::resetInputMethod() {

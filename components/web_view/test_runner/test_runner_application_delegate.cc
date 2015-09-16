@@ -15,10 +15,10 @@
 #include "base/path_service.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/threading/thread_restrictions.h"
-#include "components/view_manager/public/cpp/scoped_view_ptr.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_tree_connection.h"
-#include "components/view_manager/public/cpp/view_tree_host_factory.h"
+#include "components/mus/public/cpp/scoped_view_ptr.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_tree_connection.h"
+#include "components/mus/public/cpp/view_tree_host_factory.h"
 #include "mojo/application/public/cpp/application_connection.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
@@ -44,7 +44,6 @@ TestRunnerApplicationDelegate::~TestRunnerApplicationDelegate() {
 
 void TestRunnerApplicationDelegate::LaunchURL(const GURL& test_url) {
   if (!web_view_) {
-    content_->SetAccessPolicy(mojo::ViewTree::ACCESS_POLICY_EMBED_ROOT);
     web_view_.reset(new WebView(this));
     web_view_->Init(app_, content_);
   }
@@ -123,6 +122,9 @@ void TestRunnerApplicationDelegate::TopLevelNavigate(
 
 void TestRunnerApplicationDelegate::LoadingStateChanged(bool is_loading) {}
 void TestRunnerApplicationDelegate::ProgressChanged(double progress) {}
+void TestRunnerApplicationDelegate::BackForwardChanged(
+    mojom::ButtonState back_button,
+    mojom::ButtonState forward_button) {}
 void TestRunnerApplicationDelegate::TitleChanged(const mojo::String& title) {}
 
 ////////////////////////////////////////////////////////////////////////////////

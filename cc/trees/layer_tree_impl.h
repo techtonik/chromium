@@ -42,7 +42,6 @@ class LayerTreeSettings;
 class MemoryHistory;
 class OutputSurface;
 class PageScaleAnimation;
-class PaintTimeCounter;
 class PictureLayerImpl;
 class Proxy;
 class ResourceProvider;
@@ -83,7 +82,6 @@ class CC_EXPORT LayerTreeImpl {
   ResourceProvider* resource_provider() const;
   TileManager* tile_manager() const;
   FrameRateCounter* frame_rate_counter() const;
-  PaintTimeCounter* paint_time_counter() const;
   MemoryHistory* memory_history() const;
   gfx::Size device_viewport_size() const;
   float device_scale_factor() const;
@@ -274,7 +272,6 @@ class CC_EXPORT LayerTreeImpl {
 
   void SetRootLayerScrollOffsetDelegate(
       LayerScrollOffsetDelegate* root_layer_scroll_offset_delegate);
-  void UpdateRootScrollOffsetDelegate();
   // Distribute the root scroll between outer and inner viewport scroll layer.
   // The outer viewport scroll layer scrolls first.
   void DistributeRootScrollOffset(const gfx::ScrollOffset& root_offset);

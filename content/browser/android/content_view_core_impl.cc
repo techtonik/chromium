@@ -21,7 +21,6 @@
 #include "content/browser/android/interstitial_page_delegate_android.h"
 #include "content/browser/android/java/gin_java_bridge_dispatcher_host.h"
 #include "content/browser/android/load_url_params.h"
-#include "content/browser/android/popup_touch_handle_drawable.h"
 #include "content/browser/frame_host/interstitial_page_impl.h"
 #include "content/browser/geolocation/geolocation_service_context.h"
 #include "content/browser/media/media_web_contents_observer.h"
@@ -516,13 +515,6 @@ void ContentViewCoreImpl::OnGestureEventAck(const blink::WebGestureEvent& event,
         // listeners know that scrolling has ended.
         Java_ContentViewCore_onScrollEndEventAck(env, j_obj.obj());
       }
-
-      if (ack_result == INPUT_EVENT_ACK_STATE_NO_CONSUMER_EXISTS) {
-        // The view expects the fling velocity in pixels/s.
-        Java_ContentViewCore_onFlingStartEventHadNoConsumer(env, j_obj.obj(),
-            event.data.flingStart.velocityX * dpi_scale(),
-            event.data.flingStart.velocityY * dpi_scale());
-      }
       break;
     case WebInputEvent::GestureFlingCancel:
       Java_ContentViewCore_onFlingCancelEventAck(env, j_obj.obj());
@@ -619,19 +611,6 @@ void ContentViewCoreImpl::OnSelectionEvent(ui::SelectionEventType event,
       env, j_obj.obj(), event, selection_anchor_pix.x(),
       selection_anchor_pix.y(), selection_rect_pix.x(), selection_rect_pix.y(),
       selection_rect_pix.right(), selection_rect_pix.bottom());
-}
-
-scoped_ptr<ui::TouchHandleDrawable>
-ContentViewCoreImpl::CreatePopupTouchHandleDrawable() {
-  JNIEnv* env = AttachCurrentThread();
-  ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
-  if (obj.is_null()) {
-    NOTREACHED();
-    return scoped_ptr<ui::TouchHandleDrawable>();
-  }
-  return scoped_ptr<ui::TouchHandleDrawable>(new PopupTouchHandleDrawable(
-      Java_ContentViewCore_createPopupTouchHandleDrawable(env, obj.obj()),
-      dpi_scale_));
 }
 
 void ContentViewCoreImpl::ShowPastePopup(int x_dip, int y_dip) {

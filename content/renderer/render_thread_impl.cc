@@ -68,6 +68,7 @@
 #include "content/common/gpu/gpu_messages.h"
 #include "content/common/gpu/gpu_process_launch_causes.h"
 #include "content/common/render_frame_setup.mojom.h"
+#include "content/common/render_process_messages.h"
 #include "content/common/resource_messages.h"
 #include "content/common/service_worker/embedded_worker_setup.mojom.h"
 #include "content/common/view_messages.h"
@@ -864,8 +865,10 @@ void RenderThreadImpl::Shutdown() {
   // the message loop after this.
   renderer_scheduler_->Shutdown();
   main_message_loop_.reset();
-  if (blink_platform_impl_)
+  if (blink_platform_impl_) {
+    blink_platform_impl_->Shutdown();
     blink::shutdown();
+  }
 
   lazy_tls.Pointer()->Set(NULL);
 }
@@ -1338,6 +1341,11 @@ RenderThreadImpl::GetGpuFactories() {
   scoped_refptr<media::GpuVideoAcceleratorFactories> gpu_factories;
   scoped_refptr<base::SingleThreadTaskRunner> media_task_runner =
       GetMediaThreadTaskRunner();
+  if (gpu_va_context_provider_.get() && !gpu_channel_host.get()) {
+    // The GPU channel was lost. It's possible that |gpu_va_context_provider_|
+    // has not been made aware of that, so always create a new one.
+    gpu_va_context_provider_ = nullptr;
+  }
   if (!gpu_va_context_provider_.get() ||
       gpu_va_context_provider_->DestroyedOnMainThread()) {
     if (!gpu_channel_host.get()) {
@@ -1371,11 +1379,6 @@ RenderThreadImpl::GetGpuFactories() {
     const bool parsed_image_texture_target =
         base::StringToUint(image_texture_target_string, &image_texture_target);
     DCHECK(parsed_image_texture_target);
-    CHECK(gpu_channel_.get()) << "Have gpu_va_context_provider but no "
-                                 "gpu_channel_. See crbug.com/495185.";
-    CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but lost "
-                                     "gpu_channel_. See crbug.com/495185.";
-
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
         gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
         enable_gpu_memory_buffer_video_frames, image_texture_target,
@@ -1456,7 +1459,7 @@ base::WaitableEvent* RenderThreadImpl::GetShutdownEvent() {
 #if defined(OS_WIN)
 void RenderThreadImpl::PreCacheFontCharacters(const LOGFONT& log_font,
                                               const base::string16& str) {
-  Send(new FrameHostMsg_PreCacheFontCharacters(log_font, str));
+  Send(new RenderProcessHostMsg_PreCacheFontCharacters(log_font, str));
 }
 
 #endif  // OS_WIN

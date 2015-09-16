@@ -244,12 +244,9 @@ void RenderWidgetCompositor::Initialize() {
       !cmd->HasSwitch(cc::switches::kDisableMainFrameBeforeActivation);
   settings.accelerated_animation_enabled =
       compositor_deps_->IsThreadedAnimationEnabled();
-  const std::string slimming_group =
-      base::FieldTrialList::FindFullName("SlimmingPaint");
-  settings.use_display_lists =
-      (cmd->HasSwitch(switches::kEnableSlimmingPaint) ||
-      !cmd->HasSwitch(switches::kDisableSlimmingPaint)) &&
-      (slimming_group != "DisableSlimmingPaint");
+
+  settings.use_display_lists = true;
+
   if (cmd->HasSwitch(switches::kEnableCompositorAnimationTimelines)) {
     settings.use_compositor_animation_timelines = true;
     blink::WebRuntimeFeatures::enableCompositorAnimationTimelines(true);
@@ -370,9 +367,6 @@ void RenderWidgetCompositor::Initialize() {
         kMaxSlowDownScaleFactor,
         &settings.initial_debug_state.slow_down_raster_scale_factor);
   }
-
-  settings.invert_viewport_scroll_order =
-      cmd->HasSwitch(switches::kInvertViewportScrollOrder);
 
   settings.strict_layer_property_change_checking =
       cmd->HasSwitch(cc::switches::kStrictLayerPropertyChangeChecking);
@@ -826,12 +820,6 @@ void RenderWidgetCompositor::setShowPaintRects(bool show) {
 void RenderWidgetCompositor::setShowDebugBorders(bool show) {
   cc::LayerTreeDebugState debug_state = layer_tree_host_->debug_state();
   debug_state.show_debug_borders = show;
-  layer_tree_host_->SetDebugState(debug_state);
-}
-
-void RenderWidgetCompositor::setContinuousPaintingEnabled(bool enabled) {
-  cc::LayerTreeDebugState debug_state = layer_tree_host_->debug_state();
-  debug_state.continuous_painting = enabled;
   layer_tree_host_->SetDebugState(debug_state);
 }
 

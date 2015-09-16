@@ -34,14 +34,9 @@ Polymer({
      * The current active route.
      */
     currentRoute: {
-      type: Array,
+      type: Object,
       notify: true,
     },
-  },
-
-  /** @private */
-  onBackTap_: function() {
-    this.$.pages.back();
   },
 
   /** @private */

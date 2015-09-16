@@ -7,14 +7,26 @@
 
 #include <string>
 
+#include "base/memory/shared_memory.h"
 #include "ipc/ipc_message_macros.h"
 #include "ipc/ipc_message_utils.h"
 #include "url/gurl.h"
+
+#if defined(OS_MACOSX)
+#include "content/common/mac/font_descriptor.h"
+#endif
 
 #undef IPC_MESSAGE_EXPORT
 #define IPC_MESSAGE_EXPORT CONTENT_EXPORT
 
 #define IPC_MESSAGE_START RenderProcessMsgStart
+
+#if defined(OS_MACOSX)
+IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
+  IPC_STRUCT_TRAITS_MEMBER(font_name)
+  IPC_STRUCT_TRAITS_MEMBER(font_point_size)
+IPC_STRUCT_TRAITS_END()
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Messages sent from the browser to the render process.
@@ -30,3 +42,40 @@ IPC_SYNC_MESSAGE_CONTROL3_1(RenderProcessHostMsg_Keygen,
                             std::string /* challenge string */,
                             GURL /* URL of requestor */,
                             std::string /* signed public key and challenge */)
+
+// Message sent from the renderer to the browser to request that the browser
+// cache |data| associated with |url| and |expected_response_time|.
+IPC_MESSAGE_CONTROL3(RenderProcessHostMsg_DidGenerateCacheableMetadata,
+                     GURL /* url */,
+                     base::Time /* expected_response_time */,
+                     std::vector<char> /* data */)
+
+// Notify the browser that this render process can or can't be suddenly
+// terminated.
+IPC_MESSAGE_CONTROL1(RenderProcessHostMsg_SuddenTerminationChanged,
+                     bool /* enabled */)
+
+// Asks the browser for the renderer process memory size stats.
+IPC_SYNC_MESSAGE_CONTROL0_2(RenderProcessHostMsg_GetProcessMemorySizes,
+                            size_t /* private_bytes */,
+                            size_t /* shared_bytes */)
+
+#if defined(OS_MACOSX)
+// Request that the browser load a font into shared memory for us.
+IPC_SYNC_MESSAGE_CONTROL1_3(RenderProcessHostMsg_LoadFont,
+                            FontDescriptor /* font to load */,
+                            uint32 /* buffer size */,
+                            base::SharedMemoryHandle /* font data */,
+                            uint32 /* font id */)
+#elif defined(OS_WIN)
+// Request that the given font characters be loaded by the browser so it's
+// cached by the OS. Please see RenderMessageFilter::OnPreCacheFontCharacters
+// for details.
+IPC_SYNC_MESSAGE_CONTROL2_0(RenderProcessHostMsg_PreCacheFontCharacters,
+                            LOGFONT /* font_data */,
+                            base::string16 /* characters */)
+
+// Asks the browser for the user's monitor profile.
+IPC_SYNC_MESSAGE_CONTROL0_1(RenderProcessHostMsg_GetMonitorColorProfile,
+                            std::vector<char> /* profile */)
+#endif

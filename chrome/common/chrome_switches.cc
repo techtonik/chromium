@@ -455,9 +455,6 @@ const char kEnableMaterialDesignDownloads[] = "enable-md-downloads";
 // Enables the Material Design version of chrome://extensions.
 const char kEnableMaterialDesignExtensions[] = "enable-md-extensions";
 
-// Enables the material design Settings feature.
-const char kEnableMaterialDesignSettings[]  = "enable-md-settings";
-
 // Enables Media Router.
 const char kEnableMediaRouter[]             = "enable-media-router";
 
@@ -521,6 +518,9 @@ const char kEnableQuic[]                    = "enable-quic";
 // Enable use of Chromium's port selection for the ephemeral port via bind().
 // This only has an effect if QUIC protocol is enabled.
 const char kEnableQuicPortSelection[]       = "enable-quic-port-selection";
+
+// Enables support for HTTP alternative services.
+const char kEnableAlternativeServices[] = "enable-alternative-services";
 
 // Enables save password prompt bubble.
 const char kEnableSavePasswordBubble[]      = "enable-save-password-bubble";
@@ -1333,11 +1333,6 @@ bool AboutInSettingsEnabled() {
 bool MdExtensionsEnabled() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableMaterialDesignExtensions);
-}
-
-bool MdSettingsEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      ::switches::kEnableMaterialDesignSettings);
 }
 
 bool MediaRouterEnabled() {

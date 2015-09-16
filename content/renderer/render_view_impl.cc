@@ -940,7 +940,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setJavaScriptCanAccessClipboard(
       prefs.javascript_can_access_clipboard);
   WebRuntimeFeatures::enableXSLT(prefs.xslt_enabled);
-  WebRuntimeFeatures::enableSlimmingPaint(prefs.slimming_paint_enabled);
   WebRuntimeFeatures::enableSlimmingPaintV2(prefs.slimming_paint_v2_enabled);
   settings->setXSSAuditorEnabled(prefs.xss_auditor_enabled);
   settings->setDNSPrefetchingEnabled(prefs.dns_prefetching_enabled);
@@ -1053,7 +1052,9 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
 
   settings->setSupportsMultipleWindows(prefs.supports_multiple_windows);
 
-  settings->setInvertViewportScrollOrder(prefs.invert_viewport_scroll_order);
+  // TODO(bokan): Remove once Blink side is gone.
+  settings->setInvertViewportScrollOrder(true);
+
   settings->setViewportEnabled(prefs.viewport_enabled);
   settings->setLoadWithOverviewMode(prefs.initialize_at_minimum_page_scale);
   settings->setViewportMetaEnabled(prefs.viewport_meta_enabled);
@@ -1116,6 +1117,8 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setMainFrameClipsContent(!prefs.record_whole_document);
   settings->setShrinksViewportContentToFit(true);
   settings->setUseMobileViewportStyle(true);
+  settings->setAutoplayExperimentMode(
+      blink::WebString::fromUTF8(prefs.autoplay_experiment_mode));
 #endif
 
   WebNetworkStateNotifier::setOnLine(prefs.is_online);

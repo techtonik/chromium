@@ -32,10 +32,10 @@
 #include "components/html_viewer/web_layer_tree_view_impl.h"
 #include "components/html_viewer/web_storage_namespace_impl.h"
 #include "components/html_viewer/web_url_loader_impl.h"
-#include "components/view_manager/ids.h"
-#include "components/view_manager/public/cpp/scoped_view_ptr.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_tree_connection.h"
+#include "components/mus/ids.h"
+#include "components/mus/public/cpp/scoped_view_ptr.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_tree_connection.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/connect.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
@@ -394,15 +394,6 @@ void HTMLFrame::didNavigateWithinPage(blink::WebLocalFrame* frame,
                                       blink::WebHistoryCommitType commit_type) {
   GetLocalRoot()->server_->DidNavigateLocally(id_,
                                               history_item.urlString().utf8());
-}
-
-void HTMLFrame::didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame* frame) {
-  static bool recorded = false;
-  if (!recorded && startup_performance_data_collector_) {
-    startup_performance_data_collector_->SetFirstVisuallyNonEmptyLayoutTime(
-        base::Time::Now().ToInternalValue());
-    recorded = true;
-  }
 }
 
 blink::WebGeolocationClient* HTMLFrame::geolocationClient() {

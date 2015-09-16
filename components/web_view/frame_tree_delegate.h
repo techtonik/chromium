@@ -9,7 +9,7 @@
 
 #include "base/callback_forward.h"
 #include "base/memory/scoped_ptr.h"
-#include "components/view_manager/public/interfaces/view_tree.mojom.h"
+#include "components/mus/public/interfaces/view_tree.mojom.h"
 #include "components/web_view/public/interfaces/frame_tree.mojom.h"
 #include "mojo/services/network/public/interfaces/url_loader.mojom.h"
 
@@ -64,6 +64,15 @@ class FrameTreeDelegate {
   // tests.
   virtual void DidCreateFrame(Frame* frame);
   virtual void DidDestroyFrame(Frame* frame);
+
+  // Invoked when the View embedded in a Frame premuturely stops rendering
+  // to |frame|'s View. This could mean any of the following:
+  // . The app crashed.
+  // . There is no app that renders the url.
+  // . The app is still alive, but is shutting down.
+  // Frame does nothing in response to this, but the delegate may wish to take
+  // action.
+  virtual void OnViewEmbeddedInFrameDisconnected(Frame* frame);
 
  protected:
   virtual ~FrameTreeDelegate() {}

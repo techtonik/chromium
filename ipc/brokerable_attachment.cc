@@ -8,27 +8,50 @@
 
 namespace IPC {
 
-BrokerableAttachment::BrokerableAttachment(const AttachmentId& id,
-                                           bool needs_brokering)
-    : id_(id), needs_brokering_(needs_brokering) {}
-
-BrokerableAttachment::~BrokerableAttachment() {
+#if !USE_ATTACHMENT_BROKER
+BrokerableAttachment::AttachmentId::AttachmentId() {
+  CHECK(false) << "Not allowed to construct an attachment id if the platform "
+                  "does not support attachment brokering.";
 }
+#endif
+
+BrokerableAttachment::AttachmentId::AttachmentId(const char* start_address,
+                                                 size_t size) {
+  DCHECK(size == BrokerableAttachment::kNonceSize);
+  for (size_t i = 0; i < BrokerableAttachment::kNonceSize; ++i)
+    nonce[i] = start_address[i];
+}
+
+void BrokerableAttachment::AttachmentId::SerializeToBuffer(char* start_address,
+                                                           size_t size) {
+  DCHECK(size == BrokerableAttachment::kNonceSize);
+  for (size_t i = 0; i < BrokerableAttachment::kNonceSize; ++i)
+    start_address[i] = nonce[i];
+}
+
+BrokerableAttachment::BrokerableAttachment() {}
+
+BrokerableAttachment::BrokerableAttachment(const AttachmentId& id) : id_(id) {}
+
+BrokerableAttachment::~BrokerableAttachment() {}
 
 BrokerableAttachment::AttachmentId BrokerableAttachment::GetIdentifier() const {
   return id_;
 }
 
 bool BrokerableAttachment::NeedsBrokering() const {
-  return needs_brokering_;
-}
-
-void BrokerableAttachment::SetNeedsBrokering(bool needs_brokering) {
-  needs_brokering_ = needs_brokering;
+  return GetBrokerableType() == PLACEHOLDER;
 }
 
 BrokerableAttachment::Type BrokerableAttachment::GetType() const {
   return TYPE_BROKERABLE_ATTACHMENT;
 }
+
+#if defined(OS_POSIX)
+base::PlatformFile BrokerableAttachment::TakePlatformFile() {
+  NOTREACHED();
+  return base::PlatformFile();
+}
+#endif  // OS_POSIX
 
 }  // namespace IPC
