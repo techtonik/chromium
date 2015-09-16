@@ -203,7 +203,7 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
   if (gatt_connected_) {
     DidConnectGatt();
   } else {
-    // TODO(scheib) Increase BluetoothDevice::ConnectErrorCode enums for
+    // TODO(scheib) Create new BluetoothDevice::ConnectErrorCode enums for
     // android values not yet represented. http://crbug.com/531058
     switch (status) {   // Constants are from android.bluetooth.BluetoothGatt.
       case 0x00000101:  // GATT_FAILURE

@@ -27,11 +27,11 @@ import java.util.List;
 final class ChromeBluetoothDevice {
     private static final String TAG = "cr.Bluetooth";
 
-    private long mNativeBluetoothDeviceAndroid;
+    private final long mNativeBluetoothDeviceAndroid;
     final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
-    BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
+    final private BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
 
     private ChromeBluetoothDevice(
             long nativeBluetoothDeviceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {

@@ -207,7 +207,8 @@ class Fakes {
                 Wrappers.BluetoothGattCallbackWrapper callback) {
             if (mGattCallback != null && mGattCallback != callback) {
                 throw new IllegalArgumentException(
-                        "Multiple callbacks provided to connectGatt unsupported.");
+                        "BluetoothGattWrapper doesn't support calls to connectGatt() with "
+                        + "multiple distinct callbacks.");
             }
             mGattCallback = callback;
             return new FakeBluetoothGatt();

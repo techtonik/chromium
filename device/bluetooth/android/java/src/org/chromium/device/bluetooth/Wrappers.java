@@ -287,7 +287,7 @@ class Wrappers {
     }
 
     /**
-     * Wraper alternative to android.bluetooth.BluetoothGattCallback allowing clients and Fakes to
+     * Wrapper alternative to android.bluetooth.BluetoothGattCallback allowing clients and Fakes to
      * work on older SDK versions without having a dependency on the class not defined there.
      *
      * BluetoothGatt gatt parameters are omitted from methods as each call would

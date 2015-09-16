@@ -201,10 +201,11 @@ void BluetoothAdapter::DiscoverySessionBecameInactive(
 }
 
 void BluetoothAdapter::DeleteDeviceForTesting(const std::string& address) {
-  std::map<const std::string, BluetoothDevice*>::iterator device =
+  std::map<const std::string, BluetoothDevice*>::iterator device_iterator =
       devices_.find(address);
-  devices_.erase(device);
-  delete device->second;
+  BluetoothDevice* device = device_iterator->second;
+  devices_.erase(device_iterator);
+  delete device;
 }
 
 scoped_ptr<BluetoothDiscoveryFilter>
