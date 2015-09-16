@@ -316,9 +316,10 @@ void BluetoothDevice::DidDisconnectGatt() {
   DidFailToConnectGatt(ERROR_FAILED);
 
   // Invalidate all BluetoothGattConnection objects.
-  for (auto connection : gatt_connections_) {
+  for (BluetoothGattConnection* connection : gatt_connections_) {
     connection->InvalidateConnectionReference();
   }
+  gatt_connections_.clear();
 }
 
 void BluetoothDevice::AddGattConnection(BluetoothGattConnection* connection) {

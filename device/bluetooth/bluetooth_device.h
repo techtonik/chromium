@@ -456,12 +456,17 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   // subclasses actions initiated in CreateGattConnectionImpl or related
   // disconnection events. These may be called at any time, even multiple times,
   // to ensure a change in platform state is correctly tracked.
+  //
+  // Under normal behavior it is expected that after CreateGattConnectionImpl
+  // an platform will call DidConnectGatt or DidFailToConnectGatt, but not
+  // DidDisconnectGatt.
   void DidConnectGatt();
   void DidFailToConnectGatt(ConnectErrorCode);
   void DidDisconnectGatt();
 
-  // Maintains GattConnection reference count by tracking friend class
-  // BluetoothGattConnection instances.
+  // Maintains GattConnection reference count, being called from friend class
+  // BluetoothGattConnection instances which must call Add/RemoveGattConnection
+  // upon creation & deletion.
   void AddGattConnection(BluetoothGattConnection*);
   void RemoveGattConnection(BluetoothGattConnection*);
 
