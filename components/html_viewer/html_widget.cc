@@ -4,6 +4,7 @@
 
 #include "components/html_viewer/html_widget.h"
 
+#include "base/command_line.h"
 #include "components/html_viewer/global_state.h"
 #include "components/html_viewer/ime_controller.h"
 #include "components/html_viewer/stats_collection_controller.h"
@@ -20,6 +21,8 @@
 namespace html_viewer {
 namespace {
 
+const char kDisableWebGLSwitch[] = "disable-webgl";
+
 scoped_ptr<WebLayerTreeViewImpl> CreateWebLayerTreeView(
     GlobalState* global_state) {
   return make_scoped_ptr(new WebLayerTreeViewImpl(
@@ -30,7 +33,7 @@ scoped_ptr<WebLayerTreeViewImpl> CreateWebLayerTreeView(
 
 void InitializeWebLayerTreeView(WebLayerTreeViewImpl* web_layer_tree_view,
                                 mojo::ApplicationImpl* app,
-                                mojo::View* view,
+                                mus::View* view,
                                 blink::WebWidget* widget) {
   DCHECK(view);
   mojo::URLRequestPtr request(mojo::URLRequest::New());
@@ -40,7 +43,7 @@ void InitializeWebLayerTreeView(WebLayerTreeViewImpl* web_layer_tree_view,
   web_layer_tree_view->Initialize(gpu_service.Pass(), view, widget);
 }
 
-void UpdateWebViewSizeFromViewSize(mojo::View* view,
+void UpdateWebViewSizeFromViewSize(mus::View* view,
                                    blink::WebWidget* web_widget,
                                    WebLayerTreeViewImpl* web_layer_tree_view) {
   const gfx::Size size_in_pixels(view->bounds().width, view->bounds().height);
@@ -57,6 +60,10 @@ void ConfigureSettings(blink::WebSettings* settings) {
   settings->setDefaultFontSize(16);
   settings->setLoadsImagesAutomatically(true);
   settings->setJavaScriptEnabled(true);
+
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  settings->setExperimentalWebGLEnabled(
+      !command_line->HasSwitch(kDisableWebGLSwitch));
 }
 
 }  // namespace
@@ -74,13 +81,13 @@ blink::WebWidget* HTMLWidgetRootRemote::GetWidget() {
   return web_view_;
 }
 
-void HTMLWidgetRootRemote::OnViewBoundsChanged(mojo::View* view) {}
+void HTMLWidgetRootRemote::OnViewBoundsChanged(mus::View* view) {}
 
 // HTMLWidgetRootLocal --------------------------------------------------------
 
 HTMLWidgetRootLocal::CreateParams::CreateParams(mojo::ApplicationImpl* app,
                                                 GlobalState* global_state,
-                                                mojo::View* view)
+                                                mus::View* view)
     : app(app), global_state(global_state), view(view) {}
 
 HTMLWidgetRootLocal::CreateParams::~CreateParams() {}
@@ -153,7 +160,7 @@ blink::WebWidget* HTMLWidgetRootLocal::GetWidget() {
   return web_view_;
 }
 
-void HTMLWidgetRootLocal::OnViewBoundsChanged(mojo::View* view) {
+void HTMLWidgetRootLocal::OnViewBoundsChanged(mus::View* view) {
   UpdateWebViewSizeFromViewSize(view, web_view_,
                                 web_layer_tree_view_impl_.get());
 }
@@ -162,7 +169,7 @@ void HTMLWidgetRootLocal::OnViewBoundsChanged(mojo::View* view) {
 
 HTMLWidgetLocalRoot::HTMLWidgetLocalRoot(mojo::ApplicationImpl* app,
                                          GlobalState* global_state,
-                                         mojo::View* view,
+                                         mus::View* view,
                                          blink::WebLocalFrame* web_local_frame)
     : app_(app), global_state_(global_state), web_frame_widget_(nullptr) {
   web_frame_widget_ = blink::WebFrameWidget::create(this, web_local_frame);
@@ -185,7 +192,7 @@ blink::WebWidget* HTMLWidgetLocalRoot::GetWidget() {
   return web_frame_widget_;
 }
 
-void HTMLWidgetLocalRoot::OnViewBoundsChanged(mojo::View* view) {
+void HTMLWidgetLocalRoot::OnViewBoundsChanged(mus::View* view) {
   UpdateWebViewSizeFromViewSize(view, web_frame_widget_,
                                 web_layer_tree_view_impl_.get());
 }

@@ -40,7 +40,7 @@ public class BluetoothChooserDialog implements ItemChooserDialog.ItemSelectedCal
     String mOrigin;
 
     // The security level of the connection to the site wanting to pair with the
-    // bluetooth devices. For valid values see connection_security::SecurityLevel.
+    // bluetooth devices. For valid values see SecurityStateModel::SecurityLevel.
     int mSecurityLevel;
 
     // A pointer back to the native part of the implementation for this dialog.
@@ -128,7 +128,6 @@ public class BluetoothChooserDialog implements ItemChooserDialog.ItemSelectedCal
         // The type of link this span represents.
         private LinkType mLinkType;
 
-        // TODO(finnur): Remove this variable when toasts have been eliminated.
         private Context mContext;
 
         NoUnderlineClickableSpan(LinkType linkType, Context context) {

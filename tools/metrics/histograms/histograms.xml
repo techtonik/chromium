@@ -14771,6 +14771,31 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="HttpCache.AccessToDone" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction with a pattern (see HttpCache.Pattern), the
+    time from the first access to the disk cache until the transaction was done.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.AccessToDone.SentRequest" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction in which a network request was sent, the
+    time from the first access to the disk cache until the transaction was done.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.AccessToDone.Used" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction for a cached entry used without validation,
+    the time from the first access to the disk cache until the transaction was
+    done.
+  </summary>
+</histogram>
+
 <histogram name="HttpCache.AsyncValidationDuration" units="milliseconds">
   <obsolete>
     Deprecated as of 3/2015.
@@ -14785,8 +14810,53 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="HttpCache.BeforeSend" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction in which a network request was sent, the
+    time spent between first accessing the disk cache and sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.BeforeSend.CantConditionalize" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource cached, but not
+    possible to conditionalize, the time spent between first accessing the disk
+    cache and sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.BeforeSend.NotCached" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource not previously
+    cached, the time spent between first accessing the disk cache and sending
+    the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.BeforeSend.Updated" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource previously cached and
+    updating it, the time spent between first accessing the disk cache and
+    sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.BeforeSend.Validated" units="milliseconds">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource previously cached and
+    validating it, the time spent between first accessing the disk cache and
+    sending the request.
+  </summary>
+</histogram>
+
 <histogram name="HttpCache.EntryLockWait" units="milliseconds">
   <owner>jkarlin@chromium.org</owner>
+  <owner>gavinp@chromium.org</owner>
   <summary>
     The time spent waiting for write lock on a disk cache entry.
   </summary>
@@ -14809,6 +14879,55 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Result of a main page HttpCacheTransaction if offline mode had been enabled.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.Pattern" enum="HttpCachePattern">
+  <owner>gavinp@chromium.org</owner>
+  <summary>For each http cache transaction, the recorded pattern.</summary>
+</histogram>
+
+<histogram name="HttpCache.PercentBeforeSend" units="%">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache in which a network request was sent, the percentage of
+    time spent between first accessing the disk cache and sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.PercentBeforeSend.CantConditionalize" units="%">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource cached, but not
+    possible to conditionalize, the percentage of total transaction time spent
+    between first accessing the disk cache and sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.PercentBeforeSend.NotCached" units="%">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache retrieving a resource not previously cached, the
+    percentage of time spent between first accessing the disk cache and sending
+    the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.PercentBeforeSend.Updated" units="%">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource previously cached and
+    updating it, the percentage of time spent between first accessing the disk
+    cache and sending the request.
+  </summary>
+</histogram>
+
+<histogram name="HttpCache.PercentBeforeSend.Validated" units="%">
+  <owner>gavinp@chromium.org</owner>
+  <summary>
+    For every http cache transaction retrieving a resource previously cached and
+    successfully validating it, the percentage of time spent between first
+    accessing the disk cache and sending the request.
   </summary>
 </histogram>
 
@@ -18044,6 +18163,19 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 <histogram name="Media.VideoVisibleWidth">
   <owner>scherkus@chromium.org</owner>
   <summary>Visible width of HTML5 video.</summary>
+</histogram>
+
+<histogram name="Media.Vpx.VideoDecoderBuffersInUseByDecoder">
+  <owner>dcastagna@chromium.org</owner>
+  <summary>Number of frame buffers used by Vpx decoder.</summary>
+</histogram>
+
+<histogram name="Media.Vpx.VideoDecoderBuffersInUseByDecoderAndVideoFrame">
+  <owner>dcastagna@chromium.org</owner>
+  <summary>
+    Number of frame buffers currently in use by both Vpx decoder and a
+    VideoFrame.
+  </summary>
 </histogram>
 
 <histogram name="Media.VTVDA.HardwareAccelerated"
@@ -28445,6 +28577,18 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="NQE.ExternalEstimateProviderStatus"
+    enum="NQEExternalEstimateProviderStatus">
+  <owner>bengr@chromium.org</owner>
+  <owner>tbansal@chromium.org</owner>
+  <summary>
+    Records the interaction (availability and query count) of Network Quality
+    Estimator with external estimates provider. Logged on network change events,
+    everytime external estimate provider is queried for an updated estimate, and
+    when it proactively notifies that an updated estimate is available.
+  </summary>
+</histogram>
+
 <histogram name="NQE.FastestRTT" units="milliseconds">
   <owner>bengr@chromium.org</owner>
   <owner>tbansal@chromium.org</owner>
@@ -38311,6 +38455,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Whether the user has Safe Browsing extended reporting enabled at the time a
     Safe Browsing warning was dismissed.  This tracks the fraction of all SB
     interstitials that had reporting enabled.
+  </summary>
+</histogram>
+
+<histogram name="SB2.ResourceTypes" enum="ContentResourceType">
+  <owner>nparker@chromium.org</owner>
+  <summary>
+    Resource types of resources that were inspected by Safe Browsing in the
+    SafeBrowsingResourceThrottle.
   </summary>
 </histogram>
 
@@ -59242,6 +59394,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1080" label="CERTIFICATEPROVIDERINTERNAL_REPORTSIGNATURE"/>
   <int value="1081" label="CERTIFICATEPROVIDERINTERNAL_REPORTCERTIFICATES"/>
   <int value="1082" label="BLUETOOTHPRIVATE_PAIR"/>
+  <int value="1083" label="EASYUNLOCKPRIVATE_FINDSETUPCONNECTION"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -62172,6 +62325,16 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="13" label="Negotiate Secure Proxy"/>
   <int value="14" label="Negotiate Server"/>
   <int value="15" label="Negotiate Secure Server"/>
+</enum>
+
+<enum name="HttpCachePattern" type="int">
+  <int value="0" label="Undefined"/>
+  <int value="1" label="Not Covered"/>
+  <int value="2" label="Not Cached"/>
+  <int value="3" label="Used"/>
+  <int value="4" label="Validated"/>
+  <int value="5" label="Updated"/>
+  <int value="6" label="CantConditionalize"/>
 </enum>
 
 <enum name="HttpHeaderParserEvent" type="int">
@@ -66754,6 +66917,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   </int>
   <int value="1" label="Disabled">NPAPI is disabled</int>
   <int value="2" label="Enabled">NPAPI is enabled</int>
+</enum>
+
+<enum name="NQEExternalEstimateProviderStatus" type="int">
+  <int value="0" label="External estimate provider was not available"/>
+  <int value="1" label="External estimate provider was available"/>
+  <int value="2" label="External estimate provider was queried"/>
+  <int value="3" label="Query to external estimate provider was successful"/>
+  <int value="4" label="Callback received from external estimate provider"/>
 </enum>
 
 <enum name="NtpFollowAction" type="int">
@@ -78892,6 +79063,26 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="UnwantedSoftware" label="UnwantedSoftware"/>
   <affected-histogram name="SB2.DatabaseSizeKilobytes"/>
   <affected-histogram name="SB2.PrefixSetSizeKilobytes"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="SB2ResourceTypes" separator=".">
+  <suffix name="Checked"
+      label="Resources that were checked. Logged before the resource starts
+             loading and again for each redirect."/>
+  <suffix name="Safe"
+      label="Resources that were checked and deemed safe. Logged when the URL
+             check is completed."/>
+  <suffix name="Skipped"
+      label="Resources that were not checked because they are not active-ish
+             content types. Only used on mobile. Logged before the resource
+             request starts."/>
+  <suffix name="Unsafe"
+      label="Resources that were checked and classified as unsafe. Logged
+             when the URL check is completed."/>
+  <suffix name="UnsafePrefetchCanceled"
+      label="Pre-fetched resources that were checked and classified as
+             unsafe. Logged as the request is canceled."/>
+  <affected-histogram name="SB2.ResourceTypes"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="SBInterstitial">
