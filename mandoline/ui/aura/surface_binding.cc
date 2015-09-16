@@ -14,9 +14,9 @@
 #include "cc/output/output_surface_client.h"
 #include "cc/output/software_output_device.h"
 #include "cc/resources/shared_bitmap_manager.h"
-#include "components/view_manager/public/cpp/view.h"
-#include "components/view_manager/public/cpp/view_tree_connection.h"
-#include "components/view_manager/public/interfaces/gpu.mojom.h"
+#include "components/mus/public/cpp/view.h"
+#include "components/mus/public/cpp/view_tree_connection.h"
+#include "components/mus/public/interfaces/gpu.mojom.h"
 #include "mandoline/ui/aura/window_tree_host_mojo.h"
 #include "mojo/application/public/cpp/connect.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
@@ -123,7 +123,7 @@ SurfaceBinding::PerConnectionState::~PerConnectionState() {
 void SurfaceBinding::PerConnectionState::Init() {
   mojo::ServiceProviderPtr service_provider;
   mojo::URLRequestPtr request(mojo::URLRequest::New());
-  request->url = mojo::String::From("mojo:view_manager");
+  request->url = mojo::String::From("mojo:mus");
   shell_->ConnectToApplication(request.Pass(), GetProxy(&service_provider),
                                nullptr, nullptr,
                                base::Bind(&OnGotContentHandlerID));

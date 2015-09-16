@@ -123,8 +123,9 @@ void ViscaWebcam::OpenOnIOThread(const OpenCompleteCallback& open_callback) {
   options.persistent.reset(new bool(false));
   options.bitrate.reset(new int(9600));
   options.cts_flow_control.reset(new bool(false));
-  options.receive_timeout.reset(new int(0));
-  options.send_timeout.reset(new int(0));
+  // Enable send and receive timeout error.
+  options.receive_timeout.reset(new int(3000));
+  options.send_timeout.reset(new int(3000));
   options.data_bits = api::serial::DATA_BITS_EIGHT;
   options.parity_bit = api::serial::PARITY_BIT_NO;
   options.stop_bits = api::serial::STOP_BITS_ONE;
@@ -272,14 +273,14 @@ void ViscaWebcam::OnInquiryCompleted(InquiryType type,
         pan_ = ((int(response[2]) & 0x0F) << 12) +
                ((int(response[3]) & 0x0F) << 8) +
                ((int(response[4]) & 0x0F) << 4) + (int(response[5]) & 0x0F);
-        value = pan_;
+        value = pan_ < 0x8000 ? pan_ : pan_ - 0xFFFF;
         break;
       case INQUIRY_TILT:
         // See kGetPanTiltCommand for the format of response.
         tilt_ = ((int(response[6]) & 0x0F) << 12) +
                 ((int(response[7]) & 0x0F) << 8) +
                 ((int(response[8]) & 0x0F) << 4) + (int(response[9]) & 0x0F);
-        value = tilt_;
+        value = tilt_ < 0x8000 ? tilt_ : tilt_ - 0xFFFF;
         break;
       case INQUIRY_ZOOM:
         // See kGetZoomCommand for the format of response.
@@ -328,17 +329,20 @@ void ViscaWebcam::SetPan(int value,
   pan_speed = std::min(pan_speed, MAX_PAN_SPEED);
   pan_speed = pan_speed > 0 ? pan_speed : MAX_PAN_SPEED / 2;
   pan_ = value;
+  uint16_t pan = (uint16_t)pan_;
+  uint16_t tilt = (uint16_t)tilt_;
+
   std::vector<char> command = kSetPanTiltCommand;
   command[4] |= pan_speed;
   command[5] |= (MAX_TILT_SPEED / 2);
-  command[6] |= ((pan_ & 0xF000) >> 12);
-  command[7] |= ((pan_ & 0x0F00) >> 8);
-  command[8] |= ((pan_ & 0x00F0) >> 4);
-  command[9] |= (pan_ & 0x000F);
-  command[10] |= ((tilt_ & 0xF000) >> 12);
-  command[11] |= ((tilt_ & 0x0F00) >> 8);
-  command[12] |= ((tilt_ & 0x00F0) >> 4);
-  command[13] |= (tilt_ & 0x000F);
+  command[6] |= ((pan & 0xF000) >> 12);
+  command[7] |= ((pan & 0x0F00) >> 8);
+  command[8] |= ((pan & 0x00F0) >> 4);
+  command[9] |= (pan & 0x000F);
+  command[10] |= ((tilt & 0xF000) >> 12);
+  command[11] |= ((tilt & 0x0F00) >> 8);
+  command[12] |= ((tilt & 0x00F0) >> 4);
+  command[13] |= (tilt & 0x000F);
   Send(command, base::Bind(&ViscaWebcam::OnCommandCompleted,
                            weak_ptr_factory_.GetWeakPtr(), callback));
 }
@@ -349,22 +353,26 @@ void ViscaWebcam::SetTilt(int value,
   tilt_speed = std::min(tilt_speed, MAX_TILT_SPEED);
   tilt_speed = tilt_speed > 0 ? tilt_speed : MAX_TILT_SPEED / 2;
   tilt_ = value;
+  uint16_t pan = (uint16_t)pan_;
+  uint16_t tilt = (uint16_t)tilt_;
+
   std::vector<char> command = kSetPanTiltCommand;
   command[4] |= (MAX_PAN_SPEED / 2);
   command[5] |= tilt_speed;
-  command[6] |= ((pan_ & 0xF000) >> 12);
-  command[7] |= ((pan_ & 0x0F00) >> 8);
-  command[8] |= ((pan_ & 0x00F0) >> 4);
-  command[9] |= (pan_ & 0x000F);
-  command[10] |= ((tilt_ & 0xF000) >> 12);
-  command[11] |= ((tilt_ & 0x0F00) >> 8);
-  command[12] |= ((tilt_ & 0x00F0) >> 4);
-  command[13] |= (tilt_ & 0x000F);
+  command[6] |= ((pan & 0xF000) >> 12);
+  command[7] |= ((pan & 0x0F00) >> 8);
+  command[8] |= ((pan & 0x00F0) >> 4);
+  command[9] |= (pan & 0x000F);
+  command[10] |= ((tilt & 0xF000) >> 12);
+  command[11] |= ((tilt & 0x0F00) >> 8);
+  command[12] |= ((tilt & 0x00F0) >> 4);
+  command[13] |= (tilt & 0x000F);
   Send(command, base::Bind(&ViscaWebcam::OnCommandCompleted,
                            weak_ptr_factory_.GetWeakPtr(), callback));
 }
 
 void ViscaWebcam::SetZoom(int value, const SetPTZCompleteCallback& callback) {
+  value = value > 0 ? value : 0;
   std::vector<char> command = kSetZoomCommand;
   command[4] |= ((value & 0xF000) >> 12);
   command[5] |= ((value & 0x0F00) >> 8);
@@ -433,7 +441,8 @@ void ViscaWebcam::Reset(bool pan,
                     weak_ptr_factory_.GetWeakPtr(), callback));
   }
   if (zoom) {
-    const int default_zoom = 1;
+    // Set the default zoom value to 100 to be consistent with V4l2 webcam.
+    const int default_zoom = 100;
     SetZoom(default_zoom, callback);
   }
 }

@@ -7,9 +7,9 @@
 
 #include "base/command_line.h"
 #include "base/memory/scoped_ptr.h"
+#include "components/mus/public/cpp/view_tree_delegate.h"
+#include "components/mus/public/interfaces/view_tree_host.mojom.h"
 #include "components/test_runner/test_info_extractor.h"
-#include "components/view_manager/public/cpp/view_tree_delegate.h"
-#include "components/view_manager/public/interfaces/view_tree_host.mojom.h"
 #include "components/web_view/public/cpp/web_view.h"
 #include "components/web_view/public/interfaces/web_view.mojom.h"
 #include "components/web_view/test_runner/public/interfaces/layout_test_runner.mojom.h"
@@ -52,6 +52,8 @@ class TestRunnerApplicationDelegate
   void TopLevelNavigate(mojo::URLRequestPtr request) override;
   void LoadingStateChanged(bool is_loading) override;
   void ProgressChanged(double progress) override;
+  void BackForwardChanged(mojom::ButtonState back_button,
+                          mojom::ButtonState forward_button) override;
   void TitleChanged(const mojo::String& title) override;
 
   // LayoutTestRunner:

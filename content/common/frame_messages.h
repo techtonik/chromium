@@ -5,7 +5,6 @@
 // IPC messages for interacting with frames.
 // Multiply-included message file, hence no include guard.
 
-#include "base/memory/shared_memory.h"
 #include "cc/surfaces/surface_id.h"
 #include "cc/surfaces/surface_sequence.h"
 #include "content/common/content_export.h"
@@ -32,10 +31,6 @@
 #include "ui/gfx/ipc/gfx_param_traits.h"
 #include "url/gurl.h"
 #include "url/origin.h"
-
-#if defined(OS_MACOSX)
-#include "content/common/mac/font_descriptor.h"
-#endif
 
 #if defined(ENABLE_PLUGINS)
 #include "content/common/pepper_renderer_instance_data.h"
@@ -422,13 +417,6 @@ IPC_STRUCT_BEGIN(FrameHostMsg_ShowPopup_Params)
 IPC_STRUCT_END()
 #endif
 
-#if defined(OS_MACOSX)
-IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
-  IPC_STRUCT_TRAITS_MEMBER(font_name)
-  IPC_STRUCT_TRAITS_MEMBER(font_point_size)
-IPC_STRUCT_TRAITS_END()
-#endif
-
 #if defined(ENABLE_PLUGINS)
 IPC_STRUCT_TRAITS_BEGIN(content::PepperRendererInstanceData)
   IPC_STRUCT_TRAITS_MEMBER(render_process_id)
@@ -681,7 +669,7 @@ IPC_MESSAGE_ROUTED4(FrameMsg_FailedNavigation,
 #if defined(ENABLE_PLUGINS)
 // Notifies the renderer of updates to the Plugin Power Saver origin whitelist.
 IPC_MESSAGE_ROUTED1(FrameMsg_UpdatePluginContentOriginWhitelist,
-                    std::set<GURL> /* origin_whitelist */)
+                    std::set<url::Origin> /* origin_whitelist */)
 #endif  // defined(ENABLE_PLUGINS)
 
 // -----------------------------------------------------------------------------
@@ -907,7 +895,7 @@ IPC_SYNC_MESSAGE_CONTROL4_3(FrameHostMsg_GetPluginInfo,
 // is specific to a top level frame, and is cleared when the whitelisting
 // RenderFrame is destroyed.
 IPC_MESSAGE_ROUTED1(FrameHostMsg_PluginContentOriginAllowed,
-                    GURL /* content_origin */)
+                    url::Origin /* content_origin */)
 
 // A renderer sends this to the browser process when it wants to
 // create a plugin.  The browser will create the plugin process if
@@ -1171,22 +1159,6 @@ IPC_MESSAGE_ROUTED1(FrameHostMsg_ShowPopup,
                     FrameHostMsg_ShowPopup_Params)
 IPC_MESSAGE_ROUTED0(FrameHostMsg_HidePopup)
 
-#endif
-
-#if defined(OS_MACOSX)
-// Request that the browser load a font into shared memory for us.
-IPC_SYNC_MESSAGE_CONTROL1_3(FrameHostMsg_LoadFont,
-                            FontDescriptor /* font to load */,
-                            uint32 /* buffer size */,
-                            base::SharedMemoryHandle /* font data */,
-                            uint32 /* font id */)
-#elif defined(OS_WIN)
-// Request that the given font characters be loaded by the browser so it's
-// cached by the OS. Please see RenderMessageFilter::OnPreCacheFontCharacters
-// for details.
-IPC_SYNC_MESSAGE_CONTROL2_0(FrameHostMsg_PreCacheFontCharacters,
-                            LOGFONT /* font_data */,
-                            base::string16 /* characters */)
 #endif
 
 // Adding a new message? Stick to the sort order above: first platform

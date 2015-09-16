@@ -10,10 +10,10 @@
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "base/test/test_timeouts.h"
-#include "components/view_manager/public/cpp/view_observer.h"
-#include "components/view_manager/public/cpp/view_tree_connection.h"
-#include "components/view_manager/public/cpp/view_tree_delegate.h"
-#include "components/view_manager/public/cpp/view_tree_host_factory.h"
+#include "components/mus/public/cpp/view_observer.h"
+#include "components/mus/public/cpp/view_tree_connection.h"
+#include "components/mus/public/cpp/view_tree_delegate.h"
+#include "components/mus/public/cpp/view_tree_host_factory.h"
 #include "components/web_view/frame.h"
 #include "components/web_view/frame_connection.h"
 #include "components/web_view/frame_tree.h"
@@ -370,20 +370,18 @@ TEST_F(FrameTest, ChildFrameClientConnectData) {
   EXPECT_EQ(frame_tree()->root()->id(), frames_in_child[1]->parent_id);
 }
 
-TEST_F(FrameTest, DisconnectingViewDestroysFrame) {
+TEST_F(FrameTest, OnViewEmbeddedInFrameDisconnected) {
   scoped_ptr<ViewAndFrame> child_view_and_frame(
       CreateChildViewAndFrame(root_view_and_frame()));
   ASSERT_TRUE(child_view_and_frame);
 
   // Delete the ViewTreeConnection for the child, which should trigger
-  // destroying
-  // the frame. Deleting the ViewTreeConnection triggers
-  // Frame::OnViewEmbeddedAppDisconnected.
+  // notification.
   delete child_view_and_frame->view()->connection();
   ASSERT_EQ(1u, frame_tree()->root()->children().size());
-  ASSERT_NO_FATAL_FAILURE(frame_tree_delegate()->WaitForDestroyFrame(
+  ASSERT_NO_FATAL_FAILURE(frame_tree_delegate()->WaitForFrameDisconnected(
       frame_tree()->root()->children()[0]));
-  ASSERT_EQ(0u, frame_tree()->root()->children().size());
+  ASSERT_EQ(1u, frame_tree()->root()->children().size());
 }
 
 TEST_F(FrameTest, CantSendProgressChangeTargettingWrongApp) {

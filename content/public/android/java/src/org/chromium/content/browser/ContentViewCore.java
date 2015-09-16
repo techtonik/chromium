@@ -70,8 +70,6 @@ import org.chromium.content.browser.input.JoystickScrollProvider;
 import org.chromium.content.browser.input.LegacyPastePopupMenu;
 import org.chromium.content.browser.input.PastePopupMenu;
 import org.chromium.content.browser.input.PastePopupMenu.PastePopupMenuDelegate;
-import org.chromium.content.browser.input.PopupTouchHandleDrawable;
-import org.chromium.content.browser.input.PopupTouchHandleDrawable.PopupTouchHandleDrawableDelegate;
 import org.chromium.content.browser.input.SelectPopup;
 import org.chromium.content.browser.input.SelectPopupDialog;
 import org.chromium.content.browser.input.SelectPopupDropdown;
@@ -498,10 +496,6 @@ public class ContentViewCore implements
     private PastePopupMenu mPastePopupMenu;
     private boolean mWasPastePopupShowingOnInsertionDragStart;
 
-    private PopupTouchHandleDrawableDelegate mTouchHandleDelegate;
-
-    private PositionObserver mPositionObserver;
-
     // Size of the viewport in physical pixels as set from onSizeChanged.
     private int mViewportWidthPix;
     private int mViewportHeightPix;
@@ -900,7 +894,6 @@ public class ContentViewCore implements
             }
 
             mContainerView = containerView;
-            mPositionObserver = new ViewPositionObserver(mContainerView);
             mContainerView.setClickable(true);
             mViewAndroidDelegate.updateCurrentContainerView(mContainerView);
             for (ContainerViewObserver observer : mContainerViewObservers) {
@@ -1029,9 +1022,11 @@ public class ContentViewCore implements
         mJavaScriptInterfaces.clear();
         mRetainedJavaScriptObjects.clear();
         unregisterAccessibilityContentObserver();
+        for (mGestureStateListenersIterator.rewind(); mGestureStateListenersIterator.hasNext();) {
+            mGestureStateListenersIterator.next().onDestroyed();
+        }
         mGestureStateListeners.clear();
         ScreenOrientationListener.getInstance().removeObserver(this);
-        mPositionObserver.clearListener();
         mContainerViewObservers.clear();
         hidePopupsAndPreserveSelection();
         mPastePopupMenu = null;
@@ -1200,6 +1195,15 @@ public class ContentViewCore implements
         return onTouchEventImpl(event, isTouchHandleEvent);
     }
 
+    /**
+     * Called by PopupWindow-based touch handles.
+     * @param event the MotionEvent targeting the handle.
+     */
+    public boolean onTouchHandleEvent(MotionEvent event) {
+        final boolean isTouchHandleEvent = true;
+        return onTouchEventImpl(event, isTouchHandleEvent);
+    }
+
     private boolean onTouchEventImpl(MotionEvent event, boolean isTouchHandleEvent) {
         TraceEvent.begin("onTouchEvent");
         try {
@@ -1265,27 +1269,29 @@ public class ContentViewCore implements
                 || eventAction == MotionEvent.ACTION_POINTER_UP;
     }
 
+    /**
+     * @return Whether a scroll targeting web content is in progress.
+     */
     public boolean isScrollInProgress() {
         return mTouchScrollInProgress || mPotentiallyActiveFlingCount > 0;
     }
 
-    @SuppressWarnings("unused")
-    @CalledByNative
-    private void onFlingStartEventConsumed(int vx, int vy) {
-        mTouchScrollInProgress = false;
-        mPotentiallyActiveFlingCount++;
-        for (mGestureStateListenersIterator.rewind();
-                    mGestureStateListenersIterator.hasNext();) {
-            mGestureStateListenersIterator.next().onFlingStartGesture(
-                    vx, vy, computeVerticalScrollOffset(), computeVerticalScrollExtent());
-        }
+    private void setTouchScrollInProgress(boolean inProgress) {
+        if (mTouchScrollInProgress == inProgress) return;
+        mTouchScrollInProgress = inProgress;
         updateActionModeVisibility();
     }
 
     @SuppressWarnings("unused")
     @CalledByNative
-    private void onFlingStartEventHadNoConsumer(int vx, int vy) {
-        mTouchScrollInProgress = false;
+    private void onFlingStartEventConsumed(int vx, int vy) {
+        mPotentiallyActiveFlingCount++;
+        setTouchScrollInProgress(false);
+        for (mGestureStateListenersIterator.rewind();
+                    mGestureStateListenersIterator.hasNext();) {
+            mGestureStateListenersIterator.next().onFlingStartGesture(
+                    vx, vy, computeVerticalScrollOffset(), computeVerticalScrollExtent());
+        }
     }
 
     @SuppressWarnings("unused")
@@ -1297,11 +1303,10 @@ public class ContentViewCore implements
     @SuppressWarnings("unused")
     @CalledByNative
     private void onScrollBeginEventAck() {
-        mTouchScrollInProgress = true;
+        setTouchScrollInProgress(true);
         hidePastePopup();
         mZoomControlsDelegate.invokeZoomPicker();
         updateGestureStateListener(GestureEventType.SCROLL_START);
-        updateActionModeVisibility();
     }
 
     @SuppressWarnings("unused")
@@ -1317,10 +1322,8 @@ public class ContentViewCore implements
     @SuppressWarnings("unused")
     @CalledByNative
     private void onScrollEndEventAck() {
-        if (!mTouchScrollInProgress) return;
-        mTouchScrollInProgress = false;
+        setTouchScrollInProgress(false);
         updateGestureStateListener(GestureEventType.SCROLL_END);
-        updateActionModeVisibility();
     }
 
     @SuppressWarnings("unused")
@@ -1692,6 +1695,9 @@ public class ContentViewCore implements
     public void onWindowFocusChanged(boolean hasWindowFocus) {
         if (!hasWindowFocus) resetGestureDetection();
         if (mActionMode != null) mActionMode.onWindowFocusChanged(hasWindowFocus);
+        for (mGestureStateListenersIterator.rewind(); mGestureStateListenersIterator.hasNext();) {
+            mGestureStateListenersIterator.next().onWindowFocusChanged(hasWindowFocus);
+        }
     }
 
     public void onFocusChanged(boolean gainFocus) {
@@ -2570,36 +2576,6 @@ public class ContentViewCore implements
         return new MotionEventSynthesizer(this);
     }
 
-    @SuppressWarnings("unused")
-    @CalledByNative
-    private PopupTouchHandleDrawable createPopupTouchHandleDrawable() {
-        if (mTouchHandleDelegate == null) {
-            mTouchHandleDelegate = new PopupTouchHandleDrawableDelegate() {
-                @Override
-                public View getParent() {
-                    return getContainerView();
-                }
-
-                @Override
-                public PositionObserver getParentPositionObserver() {
-                    return mPositionObserver;
-                }
-
-                @Override
-                public boolean onTouchHandleEvent(MotionEvent event) {
-                    final boolean isTouchHandleEvent = true;
-                    return onTouchEventImpl(event, isTouchHandleEvent);
-                }
-
-                @Override
-                public boolean isScrollInProgress() {
-                    return ContentViewCore.this.isScrollInProgress();
-                }
-            };
-        }
-        return new PopupTouchHandleDrawable(mTouchHandleDelegate);
-    }
-
     /**
      * Initialize the view with an overscroll refresh handler.
      * @param handler The refresh handler.
@@ -3203,12 +3179,10 @@ public class ContentViewCore implements
         final boolean touchScrollInProgress = mTouchScrollInProgress;
         final int potentiallyActiveFlingCount = mPotentiallyActiveFlingCount;
 
-        mTouchScrollInProgress = false;
+        setTouchScrollInProgress(false);
         mPotentiallyActiveFlingCount = 0;
-
         if (touchScrollInProgress) updateGestureStateListener(GestureEventType.SCROLL_END);
         if (potentiallyActiveFlingCount > 0) updateGestureStateListener(GestureEventType.FLING_END);
-        updateActionModeVisibility();
     }
 
     private float getWheelScrollFactorInPixels() {
@@ -3241,11 +3215,10 @@ public class ContentViewCore implements
     private void onNativeFlingStopped() {
         // Note that mTouchScrollInProgress should normally be false at this
         // point, but we reset it anyway as another failsafe.
-        mTouchScrollInProgress = false;
+        setTouchScrollInProgress(false);
         if (mPotentiallyActiveFlingCount <= 0) return;
         mPotentiallyActiveFlingCount--;
         updateGestureStateListener(GestureEventType.FLING_END);
-        updateActionModeVisibility();
     }
 
     @Override

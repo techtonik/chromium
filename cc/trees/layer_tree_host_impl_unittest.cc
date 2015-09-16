@@ -1235,7 +1235,6 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
 
 TEST_F(LayerTreeHostImplTest, ViewportScrollOrder) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.invert_viewport_scroll_order = true;
   CreateHostImpl(settings,
                  CreateOutputSurface());
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 0.25f, 4.f);
@@ -1296,7 +1295,6 @@ TEST_F(LayerTreeHostImplTest, ViewportScrollOrder) {
 // to the outer viewport.
 TEST_F(LayerTreeHostImplTest, ScrollDuringPinchGesture) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.invert_viewport_scroll_order = true;
   CreateHostImpl(settings,
                  CreateOutputSurface());
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 1.f, 2.f);
@@ -1353,7 +1351,6 @@ TEST_F(LayerTreeHostImplTest, ScrollDuringPinchGesture) {
 // should assume the user means to scroll into the edge of the screen.
 TEST_F(LayerTreeHostImplTest, PinchZoomSnapsToScreenEdge) {
   LayerTreeSettings settings = DefaultSettings();
-  settings.invert_viewport_scroll_order = true;
   CreateHostImpl(settings,
                  CreateOutputSurface());
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 1.f, 2.f);
@@ -1449,7 +1446,7 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoomWheelBubbleBetweenViewports) {
       page_scale_factor, min_page_scale, max_page_scale);
   host_impl_->active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
 
-  // Scroll by a small amount, there should be no bubbling up to the inner
+  // Scroll by a small amount, there should be no bubbling to the outer
   // viewport.
   host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
   host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(10.f, 20.f));
@@ -1457,28 +1454,28 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoomWheelBubbleBetweenViewports) {
 
   EXPECT_VECTOR_EQ(
       gfx::Vector2dF(5, 10),
-      outer_scroll_layer->CurrentScrollOffset());
+      inner_scroll_layer->CurrentScrollOffset());
   EXPECT_VECTOR_EQ(
       gfx::Vector2dF(),
-      inner_scroll_layer->CurrentScrollOffset());
+      outer_scroll_layer->CurrentScrollOffset());
 
-  // Scroll by the outer viewport's max scroll extent, there the remainder
-  // should bubble up to the inner viewport.
+  // Scroll by the inner viewport's max scroll extent, the remainder
+  // should bubble up to the outer viewport.
   host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
-  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(200.f, 200.f));
+  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(100.f, 100.f));
   host_impl_->ScrollEnd();
 
   EXPECT_VECTOR_EQ(
-      gfx::Vector2dF(100, 100),
-      outer_scroll_layer->CurrentScrollOffset());
+      gfx::Vector2dF(50, 50),
+      inner_scroll_layer->CurrentScrollOffset());
   EXPECT_VECTOR_EQ(
       gfx::Vector2dF(5, 10),
-      inner_scroll_layer->CurrentScrollOffset());
+      outer_scroll_layer->CurrentScrollOffset());
 
-  // Scroll by the inner viewport's max scroll extent, it should all go to the
-  // inner viewport.
+  // Scroll by the outer viewport's max scroll extent, it should all go to the
+  // outer viewport.
   host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
-  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(90.f, 80.f));
+  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(190.f, 180.f));
   host_impl_->ScrollEnd();
 
   EXPECT_VECTOR_EQ(
@@ -1716,6 +1713,10 @@ TEST_F(LayerTreeHostImplTest, PinchGesture) {
     host_impl_->PinchGestureBegin();
     host_impl_->PinchGestureUpdate(2.f, gfx::Point(0, 0));
     host_impl_->PinchGestureUpdate(1.f, gfx::Point(0, 0));
+
+    // Needed so layer transform includes page scale.
+    DrawFrame();
+
     host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2d(10, 10));
     host_impl_->PinchGestureUpdate(1.f, gfx::Point(10, 10));
     host_impl_->PinchGestureEnd();
@@ -1725,7 +1726,7 @@ TEST_F(LayerTreeHostImplTest, PinchGesture) {
         host_impl_->ProcessScrollDeltas();
     EXPECT_EQ(scroll_info->page_scale_delta, 2.f);
     EXPECT_TRUE(ScrollInfoContains(*scroll_info, scroll_layer->id(),
-                                   gfx::Vector2d(20, 20)));
+                                   gfx::Vector2d(10, 10)));
   }
 }
 
@@ -3236,12 +3237,12 @@ TEST_F(LayerTreeHostImplTopControlsTest,
   // Now when we continue scrolling, make sure the outer viewport gets scrolled
   // since it wasn't scrollable when the scroll began.
   host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(0.f, -20.f));
-  EXPECT_EQ(15.f, outer_scroll->CurrentScrollOffset().y());
-  EXPECT_EQ(25.f, inner_scroll->CurrentScrollOffset().y());
+  EXPECT_EQ(25.f, outer_scroll->CurrentScrollOffset().y());
+  EXPECT_EQ(15.f, inner_scroll->CurrentScrollOffset().y());
 
   host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(0.f, -30.f));
-  EXPECT_EQ(0.f, outer_scroll->CurrentScrollOffset().y());
-  EXPECT_EQ(25.f, inner_scroll->CurrentScrollOffset().y());
+  EXPECT_EQ(25.f, outer_scroll->CurrentScrollOffset().y());
+  EXPECT_EQ(0.f, inner_scroll->CurrentScrollOffset().y());
 
   host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(0.f, -50.f));
   host_impl_->ScrollEnd();
@@ -3824,7 +3825,7 @@ TEST_F(LayerTreeHostImplTest, ScrollBlockedByContentLayer) {
 }
 
 TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnMainThread) {
-  gfx::Size viewport_size(10, 10);
+  gfx::Size viewport_size(20, 20);
   float page_scale = 2.f;
 
   SetupScrollAndContentsLayers(viewport_size);
@@ -3833,12 +3834,14 @@ TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnMainThread) {
   host_impl_->active_tree()->InnerViewportScrollLayer()->parent()->SetBounds(
       viewport_size);
   host_impl_->active_tree()->OuterViewportScrollLayer()->SetBounds(
-      gfx::Size(20, 20));
+      gfx::Size(40, 40));
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 1.f, 2.f);
   DrawFrame();
 
   LayerImpl* root_scroll =
       host_impl_->active_tree()->OuterViewportScrollLayer();
+  LayerImpl* inner_scroll =
+      host_impl_->active_tree()->InnerViewportScrollLayer();
   EXPECT_EQ(viewport_size, root_scroll->scroll_clip_layer()->bounds());
 
   gfx::Vector2d scroll_delta(0, 10);
@@ -3853,7 +3856,7 @@ TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnMainThread) {
   host_impl_->active_tree()->PushPageScaleFromMainThread(page_scale, 1.f, 2.f);
 
   scoped_ptr<ScrollAndScaleSet> scroll_info = host_impl_->ProcessScrollDeltas();
-  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), root_scroll->id(),
+  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), inner_scroll->id(),
                                  expected_scroll_delta));
 
   // The scroll range should also have been updated.
@@ -3865,7 +3868,7 @@ TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnMainThread) {
 }
 
 TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnImplThread) {
-  gfx::Size viewport_size(10, 10);
+  gfx::Size viewport_size(20, 20);
   float page_scale = 2.f;
 
   SetupScrollAndContentsLayers(viewport_size);
@@ -3874,12 +3877,14 @@ TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnImplThread) {
   host_impl_->active_tree()->InnerViewportScrollLayer()->parent()->SetBounds(
       viewport_size);
   host_impl_->active_tree()->OuterViewportScrollLayer()->SetBounds(
-      gfx::Size(20, 20));
+      gfx::Size(40, 40));
   host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 1.f, 2.f);
   DrawFrame();
 
   LayerImpl* root_scroll =
       host_impl_->active_tree()->OuterViewportScrollLayer();
+  LayerImpl* inner_scroll =
+      host_impl_->active_tree()->InnerViewportScrollLayer();
   EXPECT_EQ(viewport_size, root_scroll->scroll_clip_layer()->bounds());
 
   gfx::Vector2d scroll_delta(0, 10);
@@ -3900,7 +3905,7 @@ TEST_F(LayerTreeHostImplTest, ScrollRootAndChangePageScaleOnImplThread) {
 
   // The scroll delta is not scaled because the main thread did not scale.
   scoped_ptr<ScrollAndScaleSet> scroll_info = host_impl_->ProcessScrollDeltas();
-  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), root_scroll->id(),
+  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), inner_scroll->id(),
                                  expected_scroll_delta));
 
   // The scroll range should also have been updated.
@@ -3962,10 +3967,10 @@ TEST_F(LayerTreeHostImplTest, PageScaleDeltaAppliedToRootScrollLayerOnly) {
 }
 
 TEST_F(LayerTreeHostImplTest, ScrollChildAndChangePageScaleOnMainThread) {
-  gfx::Size surface_size(30, 30);
-  SetupScrollAndContentsLayers(surface_size);
+  SetupScrollAndContentsLayers(gfx::Size(30, 30));
 
   LayerImpl* outer_scroll = host_impl_->OuterViewportScrollLayer();
+  LayerImpl* inner_scroll = host_impl_->InnerViewportScrollLayer();
 
   // Make the outer scroll layer scrollable.
   outer_scroll->SetBounds(gfx::Size(50, 50));
@@ -3987,7 +3992,7 @@ TEST_F(LayerTreeHostImplTest, ScrollChildAndChangePageScaleOnMainThread) {
   DrawOneFrame();
 
   scoped_ptr<ScrollAndScaleSet> scroll_info = host_impl_->ProcessScrollDeltas();
-  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), outer_scroll->id(),
+  EXPECT_TRUE(ScrollInfoContains(*scroll_info.get(), inner_scroll->id(),
                                  expected_scroll_delta));
 
   // The scroll range should not have changed.
@@ -4503,10 +4508,6 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
 
   ~TestScrollOffsetDelegate() override {}
 
-  gfx::ScrollOffset GetTotalScrollOffset() override {
-    return getter_return_value_;
-  }
-
   void UpdateRootLayerState(const gfx::ScrollOffset& total_scroll_offset,
                             const gfx::ScrollOffset& max_scroll_offset,
                             const gfx::SizeF& scrollable_size,
@@ -4521,16 +4522,10 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
     page_scale_factor_ = page_scale_factor;
     min_page_scale_factor_ = min_page_scale_factor;
     max_page_scale_factor_ = max_page_scale_factor;
-
-    set_getter_return_value(last_set_scroll_offset_);
   }
 
   gfx::ScrollOffset last_set_scroll_offset() {
     return last_set_scroll_offset_;
-  }
-
-  void set_getter_return_value(const gfx::ScrollOffset& value) {
-    getter_return_value_ = value;
   }
 
   gfx::ScrollOffset max_scroll_offset() const {
@@ -4555,7 +4550,6 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
 
  private:
   gfx::ScrollOffset last_set_scroll_offset_;
-  gfx::ScrollOffset getter_return_value_;
   gfx::ScrollOffset max_scroll_offset_;
   gfx::SizeF scrollable_size_;
   float page_scale_factor_;
@@ -4615,7 +4609,6 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   gfx::Vector2dF scroll_delta(0.f, 10.f);
   gfx::ScrollOffset current_offset(7.f, 8.f);
 
-  scroll_delegate.set_getter_return_value(current_offset);
   EXPECT_EQ(InputHandler::SCROLL_STARTED,
             host_impl_->ScrollBegin(gfx::Point(), InputHandler::GESTURE));
   host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
@@ -4625,13 +4618,11 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
             scroll_delegate.last_set_scroll_offset());
 
   current_offset = gfx::ScrollOffset(42.f, 41.f);
-  scroll_delegate.set_getter_return_value(current_offset);
   host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
   host_impl_->ScrollBy(gfx::Point(), scroll_delta);
   EXPECT_EQ(current_offset + gfx::ScrollOffset(scroll_delta),
             scroll_delegate.last_set_scroll_offset());
   host_impl_->ScrollEnd();
-  scroll_delegate.set_getter_return_value(gfx::ScrollOffset());
   host_impl_->OnRootLayerDelegatedScrollOffsetChanged(gfx::ScrollOffset());
 
   // Forces a full tree synchronization and ensures that the scroll delegate
@@ -4646,7 +4637,6 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   // Un-setting the delegate should propagate the delegate's current offset to
   // the root scrollable layer.
   current_offset = gfx::ScrollOffset(13.f, 12.f);
-  scroll_delegate.set_getter_return_value(current_offset);
   host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
   host_impl_->SetRootLayerScrollOffsetDelegate(NULL);
 
@@ -4680,7 +4670,6 @@ TEST_F(LayerTreeHostImplTest,
 
   // Set external scroll delta on delegate and notify LayerTreeHost.
   gfx::ScrollOffset scroll_offset(10.f, 10.f);
-  scroll_delegate.set_getter_return_value(scroll_offset);
   host_impl_->OnRootLayerDelegatedScrollOffsetChanged(scroll_offset);
 
   // Check scroll delta reflected in layer.
@@ -7656,7 +7645,6 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, ScrollBothInnerAndOuterLayer) {
 
     gfx::ScrollOffset current_offset(70.f, 100.f);
 
-    scroll_delegate.set_getter_return_value(current_offset);
     host_impl_->OnRootLayerDelegatedScrollOffsetChanged(current_offset);
     EXPECT_EQ(gfx::ScrollOffset(25.f, 40.f), inner_scroll->MaxScrollOffset());
     EXPECT_EQ(gfx::ScrollOffset(50.f, 80.f), outer_scroll->MaxScrollOffset());
@@ -7671,9 +7659,9 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, ScrollBothInnerAndOuterLayer) {
 }
 
 TEST_F(LayerTreeHostImplVirtualViewportTest, FlingScrollBubblesToInner) {
-  gfx::Size content_size = gfx::Size(100, 160);
-  gfx::Size outer_viewport = gfx::Size(50, 80);
-  gfx::Size inner_viewport = gfx::Size(25, 40);
+  gfx::Size content_size = gfx::Size(200, 320);
+  gfx::Size outer_viewport = gfx::Size(100, 160);
+  gfx::Size inner_viewport = gfx::Size(50, 80);
 
   SetupVirtualViewportLayers(content_size, outer_viewport, inner_viewport);
 
@@ -7686,16 +7674,18 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, FlingScrollBubblesToInner) {
     EXPECT_VECTOR_EQ(inner_expected, inner_scroll->CurrentScrollOffset());
     EXPECT_VECTOR_EQ(outer_expected, outer_scroll->CurrentScrollOffset());
 
-    // Make sure the fling goes to the outer viewport first
+    // Scrolling the viewport always sets the outer scroll layer as the
+    // currently scrolling layer.
     EXPECT_EQ(InputHandler::SCROLL_STARTED,
               host_impl_->ScrollBegin(gfx::Point(), InputHandler::GESTURE));
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
     EXPECT_EQ(InputHandler::SCROLL_STARTED, host_impl_->FlingScrollBegin());
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
 
-    gfx::Vector2d scroll_delta(inner_viewport.width(), inner_viewport.height());
+    gfx::Vector2d scroll_delta(inner_viewport.width() / 2.f,
+                               inner_viewport.height() / 2.f);
     host_impl_->ScrollBy(gfx::Point(), scroll_delta);
-    outer_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
+    inner_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
     EXPECT_EQ(host_impl_->CurrentlyScrollingLayer(), outer_scroll);
 
     host_impl_->ScrollEnd();
@@ -7704,7 +7694,7 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, FlingScrollBubblesToInner) {
     EXPECT_VECTOR_EQ(inner_expected, inner_scroll->CurrentScrollOffset());
     EXPECT_VECTOR_EQ(outer_expected, outer_scroll->CurrentScrollOffset());
 
-    // Fling past the outer viewport boundry, make sure inner viewport scrolls.
+    // Fling past the inner viewport boundry, make sure outer viewport scrolls.
     EXPECT_EQ(InputHandler::SCROLL_STARTED,
               host_impl_->ScrollBegin(gfx::Point(), InputHandler::GESTURE));
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
@@ -7712,11 +7702,11 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, FlingScrollBubblesToInner) {
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
 
     host_impl_->ScrollBy(gfx::Point(), scroll_delta);
-    outer_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
+    inner_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
 
     host_impl_->ScrollBy(gfx::Point(), scroll_delta);
-    inner_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
+    outer_expected += gfx::Vector2dF(scroll_delta.x(), scroll_delta.y());
     EXPECT_EQ(outer_scroll, host_impl_->CurrentlyScrollingLayer());
 
     host_impl_->ScrollEnd();
@@ -7729,9 +7719,9 @@ TEST_F(LayerTreeHostImplVirtualViewportTest, FlingScrollBubblesToInner) {
 
 TEST_F(LayerTreeHostImplVirtualViewportTest,
        DiagonalScrollBubblesPerfectlyToInner) {
-  gfx::Size content_size = gfx::Size(100, 160);
-  gfx::Size outer_viewport = gfx::Size(50, 80);
-  gfx::Size inner_viewport = gfx::Size(25, 40);
+  gfx::Size content_size = gfx::Size(200, 320);
+  gfx::Size outer_viewport = gfx::Size(100, 160);
+  gfx::Size inner_viewport = gfx::Size(50, 80);
 
   SetupVirtualViewportLayers(content_size, outer_viewport, inner_viewport);
 
@@ -7744,7 +7734,7 @@ TEST_F(LayerTreeHostImplVirtualViewportTest,
     EXPECT_VECTOR_EQ(inner_expected, inner_scroll->CurrentScrollOffset());
     EXPECT_VECTOR_EQ(outer_expected, outer_scroll->CurrentScrollOffset());
 
-    // Make sure the scroll goes to the outer viewport first.
+    // Make sure the scroll goes to the inner viewport first.
     EXPECT_EQ(InputHandler::SCROLL_STARTED,
               host_impl_->ScrollBegin(gfx::Point(), InputHandler::GESTURE));
     EXPECT_EQ(InputHandler::SCROLL_STARTED, host_impl_->FlingScrollBegin());
@@ -7752,9 +7742,10 @@ TEST_F(LayerTreeHostImplVirtualViewportTest,
                                                         InputHandler::GESTURE));
 
     // Scroll near the edge of the outer viewport.
-    gfx::Vector2d scroll_delta(inner_viewport.width(), inner_viewport.height());
+    gfx::Vector2d scroll_delta(inner_viewport.width() / 2.f,
+                               inner_viewport.height() / 2.f);
     host_impl_->ScrollBy(gfx::Point(), scroll_delta);
-    outer_expected += scroll_delta;
+    inner_expected += scroll_delta;
     EXPECT_TRUE(host_impl_->IsCurrentlyScrollingLayerAt(gfx::Point(),
                                                         InputHandler::GESTURE));
 

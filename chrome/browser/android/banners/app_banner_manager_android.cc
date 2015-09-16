@@ -6,9 +6,8 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
-#include "base/command_line.h"
-#include "base/metrics/field_trial.h"
 #include "chrome/browser/android/banners/app_banner_data_fetcher_android.h"
+#include "chrome/browser/android/shortcut_helper.h"
 #include "chrome/browser/banners/app_banner_metrics.h"
 #include "chrome/common/chrome_constants.h"
 #include "content/public/browser/web_contents.h"
@@ -33,11 +32,8 @@ namespace banners {
 
 AppBannerManagerAndroid::AppBannerManagerAndroid(
     JNIEnv* env,
-    jobject obj,
-    int ideal_splash_image_size_in_dp,
-    int ideal_icon_size_in_dp)
-    : AppBannerManager(ideal_icon_size_in_dp),
-      ideal_splash_image_size_in_dp_(ideal_splash_image_size_in_dp),
+    jobject obj)
+    : AppBannerManager(),
       weak_java_banner_view_manager_(env, obj) {
 }
 
@@ -93,9 +89,10 @@ bool AppBannerManagerAndroid::HandleNonWebApp(const std::string& platform,
       ConvertUTF8ToJavaString(env, id));
   ScopedJavaLocalRef<jstring> jreferrer(
       ConvertUTF8ToJavaString(env, referrer));
-  Java_AppBannerManager_fetchAppDetails(env, jobj.obj(), jurl.obj(),
-                                        jpackage.obj(), jreferrer.obj(),
-                                        ideal_icon_size_in_dp());
+  Java_AppBannerManager_fetchAppDetails(
+      env, jobj.obj(), jurl.obj(),
+      jpackage.obj(), jreferrer.obj(),
+      ShortcutHelper::GetIdealHomescreenIconSizeInDp());
   return true;
 }
 
@@ -143,11 +140,14 @@ std::string AppBannerManagerAndroid::ExtractQueryValueForName(
 }
 
 AppBannerDataFetcher* AppBannerManagerAndroid::CreateAppBannerDataFetcher(
-    base::WeakPtr<Delegate> weak_delegate,
-    const int ideal_icon_size_in_dp) {
-  return new AppBannerDataFetcherAndroid(web_contents(), weak_delegate,
-                                         ideal_splash_image_size_in_dp_,
-                                         ideal_icon_size_in_dp);
+    base::WeakPtr<Delegate> weak_delegate) {
+  return new AppBannerDataFetcherAndroid(
+      web_contents(),
+      weak_delegate,
+      ShortcutHelper::GetIdealHomescreenIconSizeInDp(),
+      ShortcutHelper::GetMinimumHomescreenIconSizeInDp(),
+      ShortcutHelper::GetIdealSplashImageSizeInDp(),
+      ShortcutHelper::GetMinimumSplashImageSizeInDp());
 }
 
 bool AppBannerManagerAndroid::OnAppDetailsRetrieved(JNIEnv* env,
@@ -181,12 +181,8 @@ bool AppBannerManagerAndroid::Register(JNIEnv* env) {
 }
 
 jlong Init(JNIEnv* env,
-           const JavaParamRef<jobject>& obj,
-           jint ideal_splash_image_size_in_dp,
-           jint ideal_icon_size_in_dp) {
-  AppBannerManagerAndroid* manager =
-      new AppBannerManagerAndroid(env, obj,
-          ideal_splash_image_size_in_dp, ideal_icon_size_in_dp);
+           const JavaParamRef<jobject>& obj) {
+  AppBannerManagerAndroid* manager = new AppBannerManagerAndroid(env, obj);
   return reinterpret_cast<intptr_t>(manager);
 }
 
@@ -207,10 +203,6 @@ void SetEngagementWeights(JNIEnv* env,
                           jdouble indirect_engagement) {
   AppBannerManager::SetEngagementWeights(direct_engagement,
                                          indirect_engagement);
-}
-
-jboolean IsEnabled(JNIEnv* env, const JavaParamRef<jclass>& clazz) {
-  return base::FieldTrialList::FindFullName("AppBanners") == "Enabled";
 }
 
 }  // namespace banners

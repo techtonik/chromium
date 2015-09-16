@@ -35,7 +35,7 @@
 #if defined(OS_MACOSX)
 #include "content/browser/frame_host/popup_menu_helper_mac.h"
 #elif defined(OS_WIN)
-#include "content/renderer/render_font_warmup_win.h"
+#include "content/common/font_warmup_win.h"
 #include "third_party/WebKit/public/web/win/WebFontRendering.h"
 #include "third_party/skia/include/ports/SkFontMgr.h"
 #include "ui/gfx/win/direct_write.h"
@@ -92,6 +92,7 @@ RenderFrameImpl* CreateWebFrameTestProxy(
 // DirectWrite only has access to %WINDIR%\Fonts by default. For developer
 // side-loading, support kRegisterFontFiles to allow access to additional fonts.
 void RegisterSideloadedTypefaces(SkFontMgr* fontmgr) {
+  RenderThreadImpl::current()->EnsureWebKitInitialized();
   std::vector<std::string> files = switches::GetSideloadFontFiles();
   for (std::vector<std::string>::const_iterator i(files.begin());
        i != files.end();

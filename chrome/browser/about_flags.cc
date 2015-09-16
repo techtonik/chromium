@@ -419,14 +419,6 @@ const Experiment::Choice kTopChromeMaterialDesignChoices[] = {
 #endif
 
 #if defined(OS_CHROMEOS)
-const Experiment::Choice kAshMaterialDesignInkDrop[] = {
-    {IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", ""},
-    {IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_CIRCLE,
-     switches::kMaterialDesignInkDrop,
-     switches::kMaterialDesignInkDropCircle},
-    {IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_SQUARE,
-     switches::kMaterialDesignInkDrop,
-     switches::kMaterialDesignInkDropSquare}};
 
 const Experiment::Choice kAshMaterialDesignInkDropAnimationSpeed[] = {
     {IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", ""},
@@ -732,6 +724,11 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_QUIC_DESCRIPTION,
      kOsAll,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableQuic, switches::kDisableQuic)},
+    {"enable-alternative-services",
+     IDS_FLAGS_ENABLE_ALTSVC_NAME,
+     IDS_FLAGS_ENABLE_ALTSVC_DESCRIPTION,
+     kOsAll,
+     SINGLE_VALUE_TYPE(switches::kEnableAlternativeServices)},
     {"disable-media-source",
      IDS_FLAGS_DISABLE_MEDIA_SOURCE_NAME,
      IDS_FLAGS_DISABLE_MEDIA_SOURCE_DESCRIPTION,
@@ -776,16 +773,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_GPU_RASTERIZATION_MSAA_SAMPLE_COUNT_DESCRIPTION,
      kOsAll,
      MULTI_VALUE_TYPE(kGpuRasterizationMSAASampleCountChoices)},
-    {"disable-slimming-paint",
-     IDS_FLAGS_DISABLE_SLIMMING_PAINT_NAME,
-     IDS_FLAGS_DISABLE_SLIMMING_PAINT_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kDisableSlimmingPaint)},
-    {"enable-slimming-paint",
-     IDS_FLAGS_ENABLE_SLIMMING_PAINT_NAME,
-     IDS_FLAGS_ENABLE_SLIMMING_PAINT_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kEnableSlimmingPaint)},
      {"enable-slimming-paint-v2",
       IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_NAME,
       IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_DESCRIPTION,
@@ -1019,11 +1006,6 @@ const Experiment kExperiments[] = {
     },
 #endif  // defined(USE_ASH)
 #if defined(OS_CHROMEOS)
-    {"material-design-ink-drop",
-     IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_NAME,
-     IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_DESCRIPTION,
-     kOsCrOS,
-     MULTI_VALUE_TYPE(kAshMaterialDesignInkDrop)},
     {"material-design-ink-drop-animation-speed",
      IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_ANIMATION_SPEED_NAME,
      IDS_FLAGS_MATERIAL_DESIGN_INK_DROP_ANIMATION_SPEED_DESCRIPTION,
@@ -1562,11 +1544,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_DISABLE_THREADED_SCROLLING_DESCRIPTION,
      kOsWin | kOsLinux | kOsCrOS | kOsAndroid | kOsMac,
      SINGLE_VALUE_TYPE(switches::kDisableThreadedScrolling)},
-    {"invert-viewport-scroll-order",
-     IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_NAME,
-     IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kInvertViewportScrollOrder)},
     {"bleeding-edge-renderer-mode",
      IDS_FLAGS_BLEEDING_RENDERER_NAME,
      IDS_FLAGS_BLEEDING_RENDERER_DESCRIPTION,
@@ -1674,13 +1651,6 @@ const Experiment kExperiments[] = {
      kOsDesktop,
      SINGLE_VALUE_TYPE(
          switches::kEnableMessageCenterAlwaysScrollUpUponNotificationRemoval)},
-#endif
-#if !defined(OS_ANDROID) && !defined(OS_IOS)
-    {"enable-md-settings",
-     IDS_FLAGS_ENABLE_MATERIAL_DESIGN_SETTINGS_NAME,
-     IDS_FLAGS_ENABLE_MATERIAL_DESIGN_SETTINGS_DESCRIPTION,
-     kOsDesktop,
-     SINGLE_VALUE_TYPE(switches::kEnableMaterialDesignSettings)},
 #endif
 #if defined(OS_CHROMEOS)
     {"memory-pressure-thresholds",
