@@ -27,7 +27,6 @@ BluetoothDeviceAndroid* BluetoothDeviceAndroid::Create(
 }
 
 BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
-  DisconnectGatt();
 }
 
 bool BluetoothDeviceAndroid::UpdateAdvertisedUUIDs(jobject advertised_uuids) {
