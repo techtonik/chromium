@@ -191,6 +191,7 @@
       'browser/extensions/api/processes/processes_apitest.cc',
       'browser/extensions/api/proxy/proxy_apitest.cc',
       'browser/extensions/api/reading_list_private/reading_list_private_apitest.cc',
+      'browser/extensions/api/resources_private/resources_private_apitest.cc',
       'browser/extensions/api/screenlock_private/screenlock_private_apitest.cc',
       'browser/extensions/api/search_engines_private/search_engines_private_apitest.cc',
       'browser/extensions/api/sessions/sessions_apitest.cc',
@@ -966,6 +967,7 @@
       'test/data/webui/polymer_browser_test_base.js',
       'test/data/webui/print_preview.js',
       'test/data/webui/sandboxstatus_browsertest.js',
+      'test/data/webui/settings/cr_settings_browsertest.js',
     ],
     # TODO(rockot) bug 505926: These should be moved to a target in
     # //extensions but have old dependencies on chrome files. The chrome
@@ -1013,6 +1015,7 @@
       'browser/ui/cocoa/apps/quit_with_apps_controller_mac_interactive_uitest.mm',
       'browser/ui/cocoa/extensions/browser_action_button_interactive_uitest.mm',
       'browser/ui/cocoa/panels/panel_cocoa_browsertest.mm',
+      'browser/ui/cocoa/translate/translate_bubble_test_utils_cocoa.mm',
       'browser/ui/exclusive_access/flash_fullscreen_interactive_browsertest.cc',
       'browser/ui/exclusive_access/fullscreen_controller_interactive_browsertest.cc',
       'browser/ui/exclusive_access/fullscreen_controller_state_interactive_browsertest.cc',
@@ -1038,6 +1041,7 @@
       'browser/ui/startup/startup_browser_creator_interactive_uitest.cc',
       'browser/ui/toolbar/test_toolbar_model.cc',
       'browser/ui/toolbar/test_toolbar_model.h',
+      'browser/ui/translate/translate_bubble_test_utils.h',
       'browser/ui/views/accessibility/navigation_accessibility_uitest_win.cc',
       'browser/ui/webui/options/language_dictionary_interactive_uitest.cc',
       'browser/ui/webui/options/language_options_interactive_uitest.cc',
@@ -1127,6 +1131,7 @@
       'browser/ui/views/toolbar/toolbar_action_view_interactive_uitest.cc',
       'browser/ui/views/toolbar/toolbar_button_test.cc',
       'browser/ui/views/toolbar/toolbar_view_interactive_uitest.cc',
+      'browser/ui/views/translate/translate_bubble_test_utils_views.cc',
     ],
     'chrome_interactive_ui_test_notifications_sources': [
       'browser/extensions/api/notifications/notifications_apitest.cc',

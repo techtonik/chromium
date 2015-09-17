@@ -5,6 +5,7 @@
 #include "ui/ozone/demo/surfaceless_gl_renderer.h"
 
 #include "base/bind.h"
+#include "base/trace_event/trace_event.h"
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_image.h"
@@ -75,9 +76,11 @@ void SurfacelessGlRenderer::BufferWrapper::SchedulePlane() {
                                gfx::Rect(size_), gfx::RectF(0, 0, 1, 1));
 }
 
-SurfacelessGlRenderer::SurfacelessGlRenderer(gfx::AcceleratedWidget widget,
-                                             const gfx::Size& size)
-    : GlRenderer(widget, size), weak_ptr_factory_(this) {}
+SurfacelessGlRenderer::SurfacelessGlRenderer(
+    gfx::AcceleratedWidget widget,
+    const scoped_refptr<gfx::GLSurface>& surface,
+    const gfx::Size& size)
+    : GlRenderer(widget, surface, size), weak_ptr_factory_(this) {}
 
 SurfacelessGlRenderer::~SurfacelessGlRenderer() {
   // Need to make current when deleting the framebuffer resources allocated in
@@ -98,6 +101,8 @@ bool SurfacelessGlRenderer::Initialize() {
 }
 
 void SurfacelessGlRenderer::RenderFrame() {
+  TRACE_EVENT0("ozone", "SurfacelessGlRenderer::RenderFrame");
+
   float fraction = NextFraction();
 
   context_->MakeCurrent(surface_.get());
@@ -112,10 +117,6 @@ void SurfacelessGlRenderer::RenderFrame() {
   if (!surface_->SwapBuffersAsync(base::Bind(&GlRenderer::PostRenderFrameTask,
                                              weak_ptr_factory_.GetWeakPtr())))
     LOG(FATAL) << "Failed to swap buffers";
-}
-
-scoped_refptr<gfx::GLSurface> SurfacelessGlRenderer::CreateSurface() {
-  return gfx::GLSurface::CreateSurfacelessViewGLSurface(widget_);
 }
 
 }  // namespace ui

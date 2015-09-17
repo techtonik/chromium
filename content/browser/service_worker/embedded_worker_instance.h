@@ -5,9 +5,7 @@
 #ifndef CONTENT_BROWSER_SERVICE_WORKER_EMBEDDED_WORKER_INSTANCE_H_
 #define CONTENT_BROWSER_SERVICE_WORKER_EMBEDDED_WORKER_INSTANCE_H_
 
-#include <map>
 #include <string>
-#include <vector>
 
 #include "base/basictypes.h"
 #include "base/callback.h"
@@ -41,7 +39,6 @@ class MessagePortMessageFilter;
 class ServiceRegistry;
 class ServiceRegistryImpl;
 class ServiceWorkerContextCore;
-struct ServiceWorkerFetchRequest;
 
 // This gives an interface to control one EmbeddedWorker instance, which
 // may be 'in-waiting' or running in one of the child processes added by
@@ -236,7 +233,13 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
                               int line_number,
                               const GURL& source_url);
 
+  // Resets all running state. After this function is called, |status_| is
+  // STOPPED.
   void ReleaseProcess();
+  // Called when the startup sequence failed. Calls ReleaseProcess() and invokes
+  // |callback| with |status|. May destroy |this|.
+  void OnStartFailed(const StatusCallback& callback,
+                     ServiceWorkerStatusCode status);
 
   base::WeakPtr<ServiceWorkerContextCore> context_;
   scoped_refptr<EmbeddedWorkerRegistry> registry_;

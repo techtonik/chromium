@@ -25,6 +25,7 @@
       'shell/identity.cc',
       'shell/identity.h',
       'shell/native_runner.h',
+      'shell/package_manager.h',
       'shell/query_util.cc',
       'shell/query_util.h',
       'shell/static_application_loader.cc',
@@ -50,8 +51,8 @@
     'sources': [
       'fetcher/about_fetcher.cc',
       'fetcher/about_fetcher.h',
-      'fetcher/base_application_fetcher.cc',
-      'fetcher/base_application_fetcher.h',
+      'fetcher/data_fetcher.cc',
+      'fetcher/data_fetcher.h',
       'fetcher/local_fetcher.cc',
       'fetcher/local_fetcher.h',
       'fetcher/network_fetcher.cc',
@@ -62,6 +63,8 @@
       'fetcher/update_fetcher.h',
       'fetcher/url_resolver.cc',
       'fetcher/url_resolver.h',
+      'package_manager/package_manager_impl.cc',
+      'package_manager/package_manager_impl.h',
     ],
     'dependencies': [
       '<(DEPTH)/base/base.gyp:base',
@@ -75,6 +78,7 @@
       '<(DEPTH)/mojo/mojo_services.gyp:network_service_bindings_lib',
       '<(DEPTH)/mojo/mojo_services.gyp:updater_bindings_lib',
       '<(DEPTH)/mojo/mojo_shell.gyp:mojo_shell_lib',
+      '<(DEPTH)/net/net.gyp:net',
       '<(DEPTH)/url/url.gyp:url_lib',
     ]
   }, {
@@ -84,6 +88,8 @@
       'shell/application_manager_unittest.cc',
       'shell/capability_filter_unittest.cc',
       'shell/query_util_unittest.cc',
+      'shell/test_package_manager.cc',
+      'shell/test_package_manager.h',
     ],
     'dependencies': [
       '<(DEPTH)/mojo/mojo_shell.gyp:mojo_shell_lib',

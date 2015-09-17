@@ -40,6 +40,7 @@
 #include "components/version_info/version_info.h"
 #include "content/public/browser/user_metrics.h"
 #include "media/base/media_switches.h"
+#include "media/midi/midi_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/display/display_switches.h"
@@ -1368,14 +1369,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_ACCESSIBILITY_TAB_SWITCHER_DESCRIPTION,
      kOsAndroid,
      SINGLE_VALUE_TYPE(switches::kEnableAccessibilityTabSwitcher)},
-    {// TODO(dmazzoni): remove this flag when native android accessibility
-     // ships in the stable channel. http://crbug.com/356775
-     "enable-accessibility-script-injection",
-     IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME,
-     IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION,
-     kOsAndroid,
-     // Java-only switch: ContentSwitches.ENABLE_ACCESSIBILITY_SCRIPT_INJECTION.
-     SINGLE_VALUE_TYPE("enable-accessibility-script-injection")},
 #endif
     {"enable-zero-copy",
      IDS_FLAGS_ENABLE_ZERO_COPY_NAME,
@@ -1555,12 +1548,14 @@ const Experiment kExperiments[] = {
      kOsDesktop,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSettingsWindow,
                                switches::kDisableSettingsWindow)},
+#if defined(OS_MACOSX)
     {"enable-save-password-bubble",
      IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_NAME,
      IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_DESCRIPTION,
-     kOsWin | kOsLinux | kOsCrOS | kOsMac,
+     kOsMac,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSavePasswordBubble,
                                switches::kDisableSavePasswordBubble)},
+#endif
     {"enable-apps-file-associations",
      IDS_FLAGS_ENABLE_APPS_FILE_ASSOCIATIONS_NAME,
      IDS_FLAGS_ENABLE_APPS_FILE_ASSOCIATIONS_DESCRIPTION,
@@ -2028,6 +2023,11 @@ const Experiment kExperiments[] = {
      kOsAndroid,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableNTPPopularSites,
                                switches::kDisableNTPPopularSites)},
+    {"use-android-midi-api",
+     IDS_FLAGS_USE_ANDROID_MIDI_API_NAME,
+     IDS_FLAGS_USE_ANDROID_MIDI_API_DESCRIPTION,
+     kOsAndroid,
+     SINGLE_VALUE_TYPE(switches::kUseAndroidMidiApi)},
 #endif  // defined(OS_ANDROID)
 #if defined(OS_WIN)
      {"trace-export-events-to-etw",

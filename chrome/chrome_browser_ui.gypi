@@ -695,11 +695,8 @@
       'browser/ui/views/frame/desktop_browser_frame_aura.h',
       'browser/ui/views/message_center/message_center_frame_view.cc',
       'browser/ui/views/message_center/message_center_frame_view.h',
-      'browser/ui/views/message_center/message_center_widget_delegate.cc',
-      'browser/ui/views/message_center/message_center_widget_delegate.h',
       'browser/ui/views/message_center/web_notification_tray.cc',
       'browser/ui/views/message_center/web_notification_tray.h',
-      'browser/ui/views/message_center/web_notification_tray_win.cc',
     ],
     # ChromeOS-only sources that don't end in _chromeos or live in a chromeos
     # directory.
@@ -1625,6 +1622,8 @@
       'browser/ui/panels/stacked_panel_collection.h',
       'browser/ui/panels/stacked_panel_drag_handler.cc',
       'browser/ui/panels/stacked_panel_drag_handler.h',
+      'browser/ui/passwords/manage_passwords_view_utils_desktop.cc',
+      'browser/ui/passwords/manage_passwords_view_utils_desktop.h',
       'browser/ui/pdf/adobe_reader_info_win.cc',
       'browser/ui/pdf/adobe_reader_info_win.h',
       'browser/ui/pdf/chrome_pdf_web_contents_helper_client.cc',
@@ -2006,8 +2005,6 @@
       'browser/ui/views/website_settings/permission_selector_view.cc',
       'browser/ui/views/website_settings/permission_selector_view.h',
       'browser/ui/views/website_settings/permission_selector_view_observer.h',
-      'browser/ui/views/website_settings/permissions_bubble_view.cc',
-      'browser/ui/views/website_settings/permissions_bubble_view.h',
       'browser/ui/views/website_settings/website_settings_popup_view.cc',
       'browser/ui/views/website_settings/website_settings_popup_view.h',
     ],
@@ -2211,7 +2208,6 @@
       'browser/ui/views/infobars/infobar_container_view.h',
       'browser/ui/views/infobars/infobar_view.cc',
       'browser/ui/views/infobars/infobar_view.h',
-      'browser/ui/views/infobars/save_password_infobar.cc',
       'browser/ui/views/layout_constants.cc',
       'browser/ui/views/layout_constants.h',
       'browser/ui/views/load_complete_listener.cc',
@@ -2382,6 +2378,8 @@
       'browser/ui/views/validation_message_bubble_delegate.h',
       'browser/ui/views/validation_message_bubble_view.cc',
       'browser/ui/views/validation_message_bubble_view.h',
+      'browser/ui/views/website_settings/permissions_bubble_view.cc',
+      'browser/ui/views/website_settings/permissions_bubble_view.h',
       'browser/ui/views/web_contents_modal_dialog_manager_views.cc',
     ],
     'chrome_browser_ui_views_extensions_non_mac_sources': [
@@ -2422,6 +2420,7 @@
     # migrate from mac_views_browser to a chrome://flag.
     'chrome_browser_ui_views_mac_experimental_sources': [
       'browser/ui/views/apps/chrome_app_window_client_views_mac.mm',
+      'browser/ui/views/infobars/save_password_infobar.cc',
     ],
     # Windows-only. Assume ash/aura/views.
     'chrome_browser_ui_win_sources': [

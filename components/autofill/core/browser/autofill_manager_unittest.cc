@@ -151,7 +151,7 @@ class TestPersonalDataManager : public PersonalDataManager {
     ClearCreditCards();
     CreditCard* credit_card = new CreditCard;
     test::SetCreditCardInfo(credit_card, "Miku Hatsune",
-                            "4234567890654321", // Visa
+                            "4234567890654321",  // Visa
                             month, year);
     credit_card->set_guid("00000000-0000-0000-0000-000000000007");
     local_credit_cards_.push_back(credit_card);
@@ -378,7 +378,7 @@ class MockAutofillDriver : public TestAutofillDriver {
 class TestAutofillManager : public AutofillManager {
  public:
   TestAutofillManager(AutofillDriver* driver,
-                      autofill::AutofillClient* client,
+                      AutofillClient* client,
                       TestPersonalDataManager* personal_data)
       : AutofillManager(driver, client, personal_data),
         personal_data_(personal_data),
@@ -843,7 +843,7 @@ TEST_F(AutofillManagerTest, GetProfileSuggestionsMatchCharacter) {
   FormsSeen(forms);
 
   FormFieldData field;
-  test::CreateTestFormField("First Name", "firstname", "E", "text",&field);
+  test::CreateTestFormField("First Name", "firstname", "E", "text", &field);
   GetAutofillSuggestions(form, field);
 
   // No suggestions provided, so send an empty vector as the results.
@@ -854,6 +854,89 @@ TEST_F(AutofillManagerTest, GetProfileSuggestionsMatchCharacter) {
   external_delegate_->CheckSuggestions(
       kDefaultPageID,
       Suggestion("Elvis", "3734 Elvis Presley Blvd.", "", 1));
+}
+
+// Tests that we return address profile suggestions values when the section
+// is already autofilled, and that we merge identical values.
+TEST_F(AutofillManagerTest,
+       GetProfileSuggestions_AlreadyAutofilledMergeValues) {
+  // Set up our form data.
+  FormData form;
+  test::CreateTestAddressFormData(&form);
+  std::vector<FormData> forms(1, form);
+  FormsSeen(forms);
+
+  // First name is already autofilled which will make the section appear as
+  // "already autofilled".
+  form.fields[0].is_autofilled = true;
+
+  // Two profiles have the same last name, and the third shares the same first
+  // letter for last name.
+  AutofillProfile* profile1 = new AutofillProfile;
+  profile1->set_guid("00000000-0000-0000-0000-000000000103");
+  profile1->SetInfo(AutofillType(NAME_FIRST), ASCIIToUTF16("Robin"), "en-US");
+  profile1->SetInfo(AutofillType(NAME_LAST), ASCIIToUTF16("Grimes"), "en-US");
+  profile1->SetInfo(AutofillType(ADDRESS_HOME_LINE1),
+                    ASCIIToUTF16("1234 Smith Blvd."), "en-US");
+  autofill_manager_->AddProfile(profile1);
+
+  AutofillProfile* profile2 = new AutofillProfile;
+  profile2->set_guid("00000000-0000-0000-0000-000000000124");
+  profile2->SetInfo(AutofillType(NAME_FIRST), ASCIIToUTF16("Carl"), "en-US");
+  profile2->SetInfo(AutofillType(NAME_LAST), ASCIIToUTF16("Grimes"), "en-US");
+  profile2->SetInfo(AutofillType(ADDRESS_HOME_LINE1),
+                    ASCIIToUTF16("1234 Smith Blvd."), "en-US");
+  autofill_manager_->AddProfile(profile2);
+
+  AutofillProfile* profile3 = new AutofillProfile;
+  profile3->set_guid("00000000-0000-0000-0000-000000000126");
+  profile3->SetInfo(AutofillType(NAME_FIRST), ASCIIToUTF16("Aaron"), "en-US");
+  profile3->SetInfo(AutofillType(NAME_LAST), ASCIIToUTF16("Googler"), "en-US");
+  profile3->SetInfo(AutofillType(ADDRESS_HOME_LINE1),
+                    ASCIIToUTF16("1600 Amphitheater pkwy"), "en-US");
+  autofill_manager_->AddProfile(profile3);
+
+  FormFieldData field;
+  test::CreateTestFormField("Last Name", "lastname", "G", "text", &field);
+  GetAutofillSuggestions(form, field);
+
+  // No suggestions provided, so send an empty vector as the results.
+  // This triggers the combined message send.
+  AutocompleteSuggestionsReturned(std::vector<base::string16>());
+
+  // Test that we sent the right values to the external delegate. No labels,
+  // with duplicate values "Grimes" merged.
+  external_delegate_->CheckSuggestions(
+      kDefaultPageID,
+      Suggestion("Grimes", "" /* no label */, "", 1),
+      Suggestion("Googler", "" /* no label */, "", 3));
+}
+
+// Tests that we return address profile suggestions values when the section
+// is already autofilled, and that they have no label.
+TEST_F(AutofillManagerTest, GetProfileSuggestions_AlreadyAutofilledNoLabels) {
+  // Set up our form data.
+  FormData form;
+  test::CreateTestAddressFormData(&form);
+  std::vector<FormData> forms(1, form);
+  FormsSeen(forms);
+
+  // First name is already autofilled which will make the section appear as
+  // "already autofilled".
+  form.fields[0].is_autofilled = true;
+
+  FormFieldData field;
+  test::CreateTestFormField("First Name", "firstname", "E", "text", &field);
+  GetAutofillSuggestions(form, field);
+
+  // No suggestions provided, so send an empty vector as the results.
+  // This triggers the combined message send.
+  AutocompleteSuggestionsReturned(std::vector<base::string16>());
+
+  // Test that we sent the right values to the external delegate. No labels.
+  external_delegate_->CheckSuggestions(
+      kDefaultPageID,
+      Suggestion("Elvis", "" /* no label */, "", 1));
 }
 
 // Test that we return no suggestions when the form has no relevant fields.
@@ -1403,9 +1486,8 @@ TEST_F(AutofillManagerTest, FillAddressForm) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000001");
-  AutofillProfile* profile =
-      autofill_manager_->GetProfileWithGUID(guid.c_str());
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
+  AutofillProfile* profile = autofill_manager_->GetProfileWithGUID(guid);
   ASSERT_TRUE(profile);
   EXPECT_EQ(0U, profile->use_count());
   EXPECT_EQ(base::Time(), profile->use_date());
@@ -1476,7 +1558,7 @@ TEST_F(AutofillManagerTest, FillCreditCardForm) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000004");
+  const char guid[] = "00000000-0000-0000-0000-000000000004";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1498,7 +1580,7 @@ TEST_F(AutofillManagerTest, FillCreditCardFormNoYearNoMonth) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000007");
+  const char guid[] = "00000000-0000-0000-0000-000000000007";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1521,7 +1603,7 @@ TEST_F(AutofillManagerTest, FillCreditCardFormNoYearMonth) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000007");
+  const char guid[] = "00000000-0000-0000-0000-000000000007";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1543,7 +1625,7 @@ TEST_F(AutofillManagerTest, FillCreditCardFormYearNoMonth) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000007");
+  const char guid[] = "00000000-0000-0000-0000-000000000007";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1566,7 +1648,7 @@ TEST_F(AutofillManagerTest, FillCreditCardFormYearMonth) {
   std::vector<FormData> forms(1, form);
   FormsSeen(forms);
 
-  std::string guid("00000000-0000-0000-0000-000000000007");
+  const char guid[] = "00000000-0000-0000-0000-000000000007";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1586,7 +1668,7 @@ TEST_F(AutofillManagerTest, FillAddressAndCreditCardForm) {
   FormsSeen(forms);
 
   // First fill the address data.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   {
@@ -1600,7 +1682,7 @@ TEST_F(AutofillManagerTest, FillAddressAndCreditCardForm) {
 
   // Now fill the credit card data.
   const int kPageID2 = 2;
-  std::string guid2("00000000-0000-0000-0000-000000000004");
+  const char guid2[] = "00000000-0000-0000-0000-000000000004";
   response_page_id = 0;
   {
     FillAutofillFormDataAndSaveResults(kPageID2, form, form.fields.back(),
@@ -1646,7 +1728,7 @@ TEST_F(AutofillManagerTest, FillFormWithNonFocusableFields) {
   FormsSeen(forms);
 
   // Fill the form
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -1686,7 +1768,7 @@ TEST_F(AutofillManagerTest, FillFormWithMultipleSections) {
   FormsSeen(forms);
 
   // Fill the first section.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -1709,7 +1791,7 @@ TEST_F(AutofillManagerTest, FillFormWithMultipleSections) {
   // Fill the second section, with the initiating field somewhere in the middle
   // of the section.
   const int kPageID2 = 2;
-  std::string guid2("00000000-0000-0000-0000-000000000001");
+  const char guid2[] = "00000000-0000-0000-0000-000000000001";
   ASSERT_LT(9U, kAddressFormSize);
   response_page_id = 0;
   FillAutofillFormDataAndSaveResults(
@@ -1800,7 +1882,7 @@ TEST_F(AutofillManagerTest, FillFormWithAuthorSpecifiedSections) {
   FormsSeen(forms);
 
   // Fill the unnamed section.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[1],
@@ -1832,7 +1914,7 @@ TEST_F(AutofillManagerTest, FillFormWithAuthorSpecifiedSections) {
 
   // Fill the address portion of the billing section.
   const int kPageID2 = 2;
-  std::string guid2("00000000-0000-0000-0000-000000000001");
+  const char guid2[] = "00000000-0000-0000-0000-000000000001";
   response_page_id = 0;
   FillAutofillFormDataAndSaveResults(kPageID2, form, form.fields[0],
                                      MakeFrontendID(std::string(), guid2),
@@ -1863,7 +1945,7 @@ TEST_F(AutofillManagerTest, FillFormWithAuthorSpecifiedSections) {
 
   // Fill the credit card portion of the billing section.
   const int kPageID3 = 3;
-  std::string guid3("00000000-0000-0000-0000-000000000004");
+  const char guid3[] = "00000000-0000-0000-0000-000000000004";
   response_page_id = 0;
   FillAutofillFormDataAndSaveResults(
       kPageID3, form, form.fields[form.fields.size() - 2],
@@ -1906,7 +1988,7 @@ TEST_F(AutofillManagerTest, FillFormWithMultipleEmails) {
   FormsSeen(forms);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -1935,7 +2017,7 @@ TEST_F(AutofillManagerTest, FillAutofilledForm) {
   FormsSeen(forms);
 
   // First fill the address data.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, *form.fields.begin(),
@@ -1950,7 +2032,7 @@ TEST_F(AutofillManagerTest, FillAutofilledForm) {
 
   // Now fill the credit card data.
   const int kPageID2 = 2;
-  std::string guid2("00000000-0000-0000-0000-000000000004");
+  const char guid2[] = "00000000-0000-0000-0000-000000000004";
   response_page_id = 0;
   FillAutofillFormDataAndSaveResults(kPageID2, form, form.fields.back(),
                                      MakeFrontendID(guid2, std::string()),
@@ -2118,7 +2200,7 @@ TEST_F(AutofillManagerTest, FormChangesRemoveField) {
   // Now, after the call to |FormsSeen|, we remove the field before filling.
   form.fields.erase(form.fields.begin() + 3);
 
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2149,7 +2231,7 @@ TEST_F(AutofillManagerTest, FormChangesAddField) {
   // Now, after the call to |FormsSeen|, we restore the field before filling.
   form.fields.insert(pos, field);
 
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2168,7 +2250,7 @@ TEST_F(AutofillManagerTest, FormSubmitted) {
   FormsSeen(forms);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2193,7 +2275,7 @@ TEST_F(AutofillManagerTest, FormWillSubmitDoesNotSaveData) {
   FormsSeen(forms);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2308,7 +2390,7 @@ TEST_F(AutofillManagerTest, FormSubmittedServerTypes) {
   autofill_manager_->AddSeenForm(form_structure);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2333,7 +2415,7 @@ TEST_F(AutofillManagerTest, FormSubmittedPossibleTypesTwoSubmissions) {
   test::CreateTestAddressFormData(&form, &expected_types);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[0],
@@ -2404,7 +2486,7 @@ TEST_F(AutofillManagerTest, FormSubmittedWithDefaultValues) {
   FormsSeen(forms);
 
   // Fill the form.
-  std::string guid("00000000-0000-0000-0000-000000000001");
+  const char guid[] = "00000000-0000-0000-0000-000000000001";
   int response_page_id = 0;
   FormData response_data;
   FillAutofillFormDataAndSaveResults(kDefaultPageID, form, form.fields[3],
@@ -2762,29 +2844,29 @@ TEST_F(AutofillManagerTest, DeterminePossibleFieldTypesForUpload) {
 TEST_F(AutofillManagerTest, RemoveProfile) {
   // Add and remove an Autofill profile.
   AutofillProfile* profile = new AutofillProfile;
-  std::string guid = "00000000-0000-0000-0000-000000000102";
-  profile->set_guid(guid.c_str());
+  const char guid[] = "00000000-0000-0000-0000-000000000102";
+  profile->set_guid(guid);
   autofill_manager_->AddProfile(profile);
 
   int id = MakeFrontendID(std::string(), guid);
 
   autofill_manager_->RemoveAutofillProfileOrCreditCard(id);
 
-  EXPECT_FALSE(autofill_manager_->GetProfileWithGUID(guid.c_str()));
+  EXPECT_FALSE(autofill_manager_->GetProfileWithGUID(guid));
 }
 
-TEST_F(AutofillManagerTest, RemoveCreditCard){
+TEST_F(AutofillManagerTest, RemoveCreditCard) {
   // Add and remove an Autofill credit card.
   CreditCard* credit_card = new CreditCard;
-  std::string guid = "00000000-0000-0000-0000-000000100007";
-  credit_card->set_guid(guid.c_str());
+  const char guid[] = "00000000-0000-0000-0000-000000100007";
+  credit_card->set_guid(guid);
   autofill_manager_->AddCreditCard(credit_card);
 
   int id = MakeFrontendID(guid, std::string());
 
   autofill_manager_->RemoveAutofillProfileOrCreditCard(id);
 
-  EXPECT_FALSE(autofill_manager_->GetCreditCardWithGUID(guid.c_str()));
+  EXPECT_FALSE(autofill_manager_->GetCreditCardWithGUID(guid));
 }
 
 // Test our external delegate is called at the right time.
@@ -2993,7 +3075,7 @@ TEST_F(AutofillManagerTest, FillInUpdatedExpirationDate) {
 TEST_F(AutofillManagerTest, DisplaySuggestionsWithMatchingTokens) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;
@@ -3017,7 +3099,7 @@ TEST_F(AutofillManagerTest, DisplaySuggestionsWithMatchingTokens) {
 TEST_F(AutofillManagerTest, DisplaySuggestionsWithMatchingTokens_CaseIgnored) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;
@@ -3040,7 +3122,7 @@ TEST_F(AutofillManagerTest, DisplaySuggestionsWithMatchingTokens_CaseIgnored) {
 TEST_F(AutofillManagerTest, NoSuggestionForNonPrefixTokenMatch) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;
@@ -3059,7 +3141,7 @@ TEST_F(AutofillManagerTest, NoSuggestionForNonPrefixTokenMatch) {
 TEST_F(AutofillManagerTest, DisplayCreditCardSuggestionsWithMatchingTokens) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;
@@ -3094,7 +3176,7 @@ TEST_F(AutofillManagerTest, DisplayCreditCardSuggestionsWithMatchingTokens) {
 TEST_F(AutofillManagerTest, NoCreditCardSuggestionsForNonPrefixTokenMatch) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;
@@ -3116,7 +3198,7 @@ TEST_F(AutofillManagerTest,
        DisplaySuggestionsWithPrefixesPrecedeSubstringMatched) {
   // Token matching is currently behind a flag.
   base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      autofill::switches::kEnableSuggestionsWithSubstringMatch);
+      switches::kEnableSuggestionsWithSubstringMatch);
 
   // Set up our form data.
   FormData form;

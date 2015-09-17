@@ -924,6 +924,8 @@
       'browser/media/protected_media_identifier_permission_context_factory.h',
       'browser/metrics/chromeos_metrics_provider.cc',
       'browser/metrics/chromeos_metrics_provider.h',
+      'browser/metrics/perf/random_selector.cc',
+      'browser/metrics/perf/random_selector.h',
       'browser/metrics/perf/windowed_incognito_observer.cc',
       'browser/metrics/perf/windowed_incognito_observer.h',
       # This is technically also dependent on enable_plugins but we don't
@@ -1982,7 +1984,6 @@
       'browser/notifications/desktop_notification_profile_util.h',
       'browser/notifications/login_state_notification_blocker_chromeos.cc',
       'browser/notifications/login_state_notification_blocker_chromeos.h',
-      'browser/notifications/message_center_notification_manager_win.cc',
       'browser/notifications/notification.cc',
       'browser/notifications/notification.h',
       'browser/notifications/notification_delegate.h',
@@ -2062,10 +2063,13 @@
       'browser/password_manager/password_store_win.h',
       'browser/password_manager/password_store_x.cc',
       'browser/password_manager/password_store_x.h',
-      'browser/password_manager/save_password_infobar_delegate.cc',
-      'browser/password_manager/save_password_infobar_delegate.h',
       'browser/password_manager/simple_password_store_mac.cc',
       'browser/password_manager/simple_password_store_mac.h',
+    ],
+    # Used on Mac and Android platforms.
+    'chrome_browser_password_manager_mac_android_sources': [
+      'browser/password_manager/save_password_infobar_delegate.cc',
+      'browser/password_manager/save_password_infobar_delegate.h',
     ],
     'chrome_browser_permissions_sources': [
       'browser/permissions/permission_bubble_request_impl.cc',
@@ -2865,8 +2869,6 @@
       'browser/sync/glue/bookmark_data_type_controller.h',
       'browser/sync/glue/bookmark_model_associator.cc',
       'browser/sync/glue/bookmark_model_associator.h',
-      'browser/sync/glue/browser_thread_model_worker.cc',
-      'browser/sync/glue/browser_thread_model_worker.h',
       'browser/sync/glue/chrome_report_unrecoverable_error.cc',
       'browser/sync/glue/chrome_report_unrecoverable_error.h',
       'browser/sync/glue/extensions_activity_monitor.cc',
@@ -3267,6 +3269,7 @@
             '../content/app/resources/content_resources.gyp:content_resources',
             '../gpu/gpu.gyp:gpu',
             '../media/media.gyp:media',
+            '../media/midi/midi.gyp:midi',
             '../media/mojo/interfaces/mojo_bindings.gyp:platform_verification_api',
             '../mojo/mojo_base.gyp:mojo_application_base',
             '../mojo/mojo_base.gyp:mojo_common_lib',
@@ -3383,6 +3386,11 @@
             'browser_app_shim',
           ],
           'sources': [ '<@(chrome_browser_mac_sources)' ]
+        }],
+        ['OS=="mac" or OS=="android"', {
+          'sources': [
+            '<@(chrome_browser_password_manager_mac_android_sources)',
+          ],
         }],
         ['chromeos==1', {
           'sources!': [

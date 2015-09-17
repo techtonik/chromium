@@ -4,10 +4,6 @@
 
 #include "content/browser/service_worker/embedded_worker_instance.h"
 
-#include <algorithm>
-#include <string>
-#include <utility>
-
 #include "base/bind_helpers.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/threading/non_thread_safe.h"
@@ -28,14 +24,6 @@
 namespace content {
 
 namespace {
-
-// Functor to sort by the .second element of a struct.
-struct SecondGreater {
-  template <typename Value>
-  bool operator()(const Value& lhs, const Value& rhs) {
-    return lhs.second > rhs.second;
-  }
-};
 
 void NotifyWorkerReadyForInspectionOnUI(int worker_process_id,
                                         int worker_route_id) {
@@ -155,6 +143,7 @@ void EmbeddedWorkerInstance::Start(int64 service_worker_version_id,
                                    const StatusCallback& callback) {
   if (!context_) {
     callback.Run(SERVICE_WORKER_ERROR_ABORT);
+    // |this| may be destroyed by the callback.
     return;
   }
   DCHECK(status_ == STOPPED);
@@ -284,11 +273,7 @@ void EmbeddedWorkerInstance::ProcessAllocated(
                          params.get(),
                          "Status", status);
   if (status != SERVICE_WORKER_OK) {
-    Status old_status = status_;
-    status_ = STOPPED;
-    service_registry_.reset();
-    callback.Run(status);
-    FOR_EACH_OBSERVER(Listener, listener_list_, OnStopped(old_status));
+    OnStartFailed(callback, status);
     return;
   }
   const int64 service_worker_version_id = params->service_worker_version_id;
@@ -318,8 +303,7 @@ void EmbeddedWorkerInstance::SendStartWorker(
   // process, making process_id_ and other state invalid. If that happened,
   // abort instead of trying to send the IPC.
   if (status_ != STARTING) {
-    callback.Run(SERVICE_WORKER_ERROR_ABORT);
-    ReleaseProcess();
+    OnStartFailed(callback, SERVICE_WORKER_ERROR_ABORT);
     return;
   }
 
@@ -354,7 +338,7 @@ void EmbeddedWorkerInstance::SendStartWorker(
   ServiceWorkerStatusCode status =
       registry_->SendStartWorker(params.Pass(), process_id_);
   if (status != SERVICE_WORKER_OK) {
-    callback.Run(status);
+    OnStartFailed(callback, status);
     return;
   }
   DCHECK(start_callback_.is_null());
@@ -414,9 +398,11 @@ void EmbeddedWorkerInstance::OnScriptEvaluated(bool success) {
     UMA_HISTOGRAM_TIMES("EmbeddedWorkerInstance.ScriptEvaluate",
                         base::TimeTicks::Now() - start_timing_);
   }
-  start_callback_.Run(success ? SERVICE_WORKER_OK
-                              : SERVICE_WORKER_ERROR_SCRIPT_EVALUATE_FAILED);
+  StatusCallback callback = start_callback_;
   start_callback_.Reset();
+  callback.Run(success ? SERVICE_WORKER_OK
+                       : SERVICE_WORKER_ERROR_SCRIPT_EVALUATE_FAILED);
+  // |this| may be destroyed by the callback.
 }
 
 void EmbeddedWorkerInstance::OnStarted() {
@@ -506,6 +492,17 @@ void EmbeddedWorkerInstance::ReleaseProcess() {
   thread_id_ = -1;
   service_registry_.reset();
   start_callback_.Reset();
+}
+
+void EmbeddedWorkerInstance::OnStartFailed(const StatusCallback& callback,
+                                           ServiceWorkerStatusCode status) {
+  Status old_status = status_;
+  ReleaseProcess();
+  base::WeakPtr<EmbeddedWorkerInstance> weak_this = weak_factory_.GetWeakPtr();
+  callback.Run(status);
+  if (weak_this && old_status != STOPPED)
+    FOR_EACH_OBSERVER(Listener, weak_this->listener_list_,
+                      OnStopped(old_status));
 }
 
 // static

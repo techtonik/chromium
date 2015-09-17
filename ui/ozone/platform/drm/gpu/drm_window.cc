@@ -4,11 +4,13 @@
 
 #include "ui/ozone/platform/drm/gpu/drm_window.h"
 
+#include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkDevice.h"
 #include "third_party/skia/include/core/SkSurface.h"
 #include "ui/ozone/common/gpu/ozone_gpu_message_params.h"
+#include "ui/ozone/platform/drm/gpu/crtc_controller.h"
 #include "ui/ozone/platform/drm/gpu/drm_buffer.h"
 #include "ui/ozone/platform/drm/gpu/drm_device.h"
 #include "ui/ozone/platform/drm/gpu/drm_device_manager.h"
@@ -124,8 +126,7 @@ void DrmWindow::QueueOverlayPlane(const OverlayPlane& plane) {
   pending_planes_.push_back(plane);
 }
 
-bool DrmWindow::SchedulePageFlip(bool is_sync,
-                                 const SwapCompletionCallback& callback) {
+bool DrmWindow::SchedulePageFlip(const SwapCompletionCallback& callback) {
   if (force_buffer_reallocation_) {
     // Clear pending planes otherwise the next call to queue planes will just
     // add on top.
@@ -137,11 +138,10 @@ bool DrmWindow::SchedulePageFlip(bool is_sync,
 
   last_submitted_planes_.clear();
   last_submitted_planes_.swap(pending_planes_);
-  last_swap_sync_ = is_sync;
 
   if (controller_) {
-    return controller_->SchedulePageFlip(last_submitted_planes_, is_sync, false,
-                                         callback);
+    return controller_->SchedulePageFlip(last_submitted_planes_,
+                                         false /* test_only */, callback);
   }
 
   callback.Run(gfx::SwapResult::SWAP_ACK);
@@ -175,12 +175,34 @@ bool DrmWindow::TestPageFlip(const std::vector<OverlayCheck_Params>& overlays,
                                   overlay.transform, overlay.display_rect,
                                   overlay.crop_rect));
   }
-  return controller_->SchedulePageFlip(planes, true, true,
+  return controller_->SchedulePageFlip(planes, true /* test_only */,
                                        base::Bind(&EmptyFlipCallback));
 }
 
 const OverlayPlane* DrmWindow::GetLastModesetBuffer() {
   return OverlayPlane::GetPrimaryPlane(last_submitted_planes_);
+}
+
+void DrmWindow::GetVSyncParameters(
+    const gfx::VSyncProvider::UpdateVSyncCallback& callback) const {
+  if (!controller_)
+    return;
+
+  // If we're in mirror mode the 2 CRTCs should have similar modes with the same
+  // refresh rates.
+  CrtcController* crtc = controller_->crtc_controllers()[0];
+  // The value is invalid, so we can't update the parameters.
+  if (controller_->GetTimeOfLastFlip() == 0 || crtc->mode().vrefresh == 0)
+    return;
+
+  // Stores the time of the last refresh.
+  base::TimeTicks timebase =
+      base::TimeTicks::FromInternalValue(controller_->GetTimeOfLastFlip());
+  // Stores the refresh rate.
+  base::TimeDelta interval =
+      base::TimeDelta::FromSeconds(1) / crtc->mode().vrefresh;
+
+  callback.Run(timebase, interval);
 }
 
 void DrmWindow::ResetCursor(bool bitmap_only) {
