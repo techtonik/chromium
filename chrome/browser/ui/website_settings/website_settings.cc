@@ -179,7 +179,7 @@ WebsiteSettings::WebsiteSettings(
           ChromeSSLHostStateDelegateFactory::GetForProfile(profile)),
       did_revoke_user_ssl_decisions_(false),
       profile_(profile) {
-  Init(profile, url, ssl);
+  Init(url, ssl);
 
   PresentSitePermissions();
   PresentSiteData();
@@ -356,9 +356,7 @@ void WebsiteSettings::OnRevokeSSLErrorBypassButtonPressed() {
   did_revoke_user_ssl_decisions_ = true;
 }
 
-void WebsiteSettings::Init(Profile* profile,
-                           const GURL& url,
-                           const content::SSLStatus& ssl) {
+void WebsiteSettings::Init(const GURL& url, const content::SSLStatus& ssl) {
   bool isChromeUINativeScheme = false;
 #if defined(OS_ANDROID)
   isChromeUINativeScheme = url.SchemeIs(chrome::kChromeUINativeScheme);
@@ -384,7 +382,7 @@ void WebsiteSettings::Init(Profile* profile,
     // There are no major errors. Check for minor errors.
 #if defined(OS_CHROMEOS)
     policy::PolicyCertService* service =
-        policy::PolicyCertServiceFactory::GetForProfile(profile);
+        policy::PolicyCertServiceFactory::GetForProfile(profile_);
     const bool used_policy_certs = service && service->UsedPolicyCertificates();
 #else
     const bool used_policy_certs = false;
@@ -624,7 +622,7 @@ void WebsiteSettings::Init(Profile* profile,
   // Check if a user decision has been made to allow or deny certificates with
   // errors on this site.
   ChromeSSLHostStateDelegate* delegate =
-      ChromeSSLHostStateDelegateFactory::GetForProfile(profile);
+      ChromeSSLHostStateDelegateFactory::GetForProfile(profile_);
   DCHECK(delegate);
   // Only show an SSL decision revoke button if the user has chosen to bypass
   // SSL host errors for this host in the past.
@@ -639,6 +637,7 @@ void WebsiteSettings::Init(Profile* profile,
   WebsiteSettingsUI::TabId tab_id = WebsiteSettingsUI::TAB_ID_PERMISSIONS;
   if (site_connection_status_ == SITE_CONNECTION_STATUS_ENCRYPTED_ERROR ||
       site_connection_status_ == SITE_CONNECTION_STATUS_MIXED_CONTENT ||
+      site_connection_status_ == SITE_CONNECTION_STATUS_MIXED_SCRIPT ||
       site_identity_status_ == SITE_IDENTITY_STATUS_ERROR ||
       site_identity_status_ == SITE_IDENTITY_STATUS_CERT_REVOCATION_UNKNOWN ||
       site_identity_status_ == SITE_IDENTITY_STATUS_ADMIN_PROVIDED_CERT ||

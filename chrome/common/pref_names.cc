@@ -809,6 +809,13 @@ const char kForceMaximizeOnFirstRun[] = "ui.force_maximize_on_first_run";
 // A dictionary pref mapping public keys that identify platform keys to its
 // properties like whether it's meant for corporate usage.
 const char kPlatformKeys[] = "platform_keys";
+
+// A boolean pref. If set to true, the Unified Desktop feature is made
+// available and turned on by default, which allows applications to span
+// multiple screens. Users may turn the feature off and on in the settings
+// while this is set to true.
+const char kUnifiedDesktopEnabledByDefault[] =
+    "settings.display.unified_desktop_enabled_by_default";
 #endif  // defined(OS_CHROMEOS)
 
 // A boolean pref set to true if a Home button to open the Home pages should be
@@ -1897,18 +1904,6 @@ const char kFactoryResetRequested[] = "FactoryResetRequested";
 
 // Indicates that debugging features were requested from oobe screen.
 const char kDebuggingFeaturesRequested[] = "DebuggingFeaturesRequested";
-
-// Boolean recording whether we have showed a balloon that calls out the message
-// center for desktop notifications.
-const char kMessageCenterShowedFirstRunBalloon[] =
-    "message_center.showed_first_run_balloon";
-
-// Boolean recording whether the user has disabled the notifications
-// menubar or systray icon.
-const char kMessageCenterShowIcon[] = "message_center.show_icon";
-
-const char kMessageCenterForcedOnTaskbar[] =
-    "message_center.was_forced_on_taskbar";
 
 #if defined(OS_CHROMEOS)
 // This setting starts periodic timezone refresh when not in user session.

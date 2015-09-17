@@ -199,10 +199,10 @@ void AutofillManager::ShowAutofillSettings() {
 bool AutofillManager::ShouldShowScanCreditCard(const FormData& form,
                                                const FormFieldData& field) {
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          autofill::switches::kEnableCreditCardScan) &&
+          switches::kEnableCreditCardScan) &&
       (base::FieldTrialList::FindFullName("CreditCardScan") != "Enabled" ||
        base::CommandLine::ForCurrentProcess()->HasSwitch(
-           autofill::switches::kDisableCreditCardScan))) {
+           switches::kDisableCreditCardScan))) {
     return false;
   }
 
@@ -426,10 +426,18 @@ void AutofillManager::OnQueryFormFieldAutofill(int query_id,
           // If the relevant section is auto-filled and the renderer is querying
           // for suggestions, then the user is editing the value of a field.
           // In this case, mimic autocomplete: don't display labels or icons,
-          // as that information is redundant.
-          for (size_t i = 0; i < suggestions.size(); i++) {
-            suggestions[i].label = base::string16();
-            suggestions[i].icon = base::string16();
+          // as that information is redundant. Moreover, filter out duplicate
+          // suggestions.
+          std::set<base::string16> seen_values;
+          for (auto iter = suggestions.begin(); iter != suggestions.end();) {
+            if (!seen_values.insert(iter->value).second) {
+              // If we've seen this suggestion value before, remove it.
+              iter = suggestions.erase(iter);
+            } else {
+              iter->label.clear();
+              iter->icon.clear();
+              ++iter;
+            }
           }
         }
 
@@ -1404,8 +1412,9 @@ void AutofillManager::ParseForms(const std::vector<FormData>& forms) {
       AutofillMetrics::LogPasswordFormQueryVolume(
           AutofillMetrics::CURRENT_QUERY);
       form_structures_.push_back(form_structure.release());
-    } else
+    } else {
       non_queryable_forms.push_back(form_structure.release());
+    }
   }
 
   if (!form_structures_.empty() && download_manager_) {
@@ -1533,7 +1542,7 @@ void AutofillManager::DumpAutofillData(bool imported_cc) const {
 
   fputs("------------------------------------------------------\n", file);
   if (imported_cc)
-   fputs("Got a new credit card on CC form:\n", file);
+    fputs("Got a new credit card on CC form:\n", file);
   else
     fputs("Submitted form:\n", file);
   for (int i = static_cast<int>(recently_autofilled_forms_.size()) - 1;

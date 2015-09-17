@@ -4713,6 +4713,12 @@ Even if you have downloaded files from this website before, the website might ha
         <message name="IDS_EXTENSIONS_SHOW_BUTTON" desc="The text for the Show link.">
           Show button
         </message>
+        <message name="IDS_MD_EXTENSIONS_TOOLBAR_TITLE" desc="The text displayed in the toolbar of the chrome://extensions page.">
+          Extensions &amp; Apps
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SEARCH" desc="The text displayed in the search box on the chrome://extensions page.">
+          Search
+        </message>
         <if expr="not use_titlecase">
           <message name="IDS_EXTENSIONS_ALWAYS_RUN" desc="The text for the 'always run' item in context menus (sentence case).">
             Always run
@@ -5490,12 +5496,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_TAB_SWITCHER_DESCRIPTION" desc="Description of the flag to enable the accessibility tab switcher.">
           Enable the accessibility tab switcher for Android.
         </message>
-        <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME" desc="Name of the flag to enable script injection for accessibility.">
-          Enable Script Injection For Accessibility.
-        </message>
-        <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION" desc="Description of the flag to enable script injection for accessibility.">
-          Enable script injection instead of native Android accessibility.
-        </message>
       </if>
       <message name="IDS_TOUCH_EVENTS_NAME" desc="Title of the touch-events flag." >
         Enable touch events
@@ -6139,6 +6139,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_PASSWORD_MANAGER_ACCOUNT_CHOOSER_TITLE" desc="The title of the password bubble when a credential should be chosen.">
         Choose an account to login
+      </message>
+      <message name="IDS_PASSWORD_MANAGER_SAVE_PROMPT_FIRST_RUN_EXPERIENCE" desc="The message which explains to the user what is Smart Lock, when the user sees the branded title of the Save prompt for the first time.">
+        Smart Lock helps you quickly sign in to apps and sites using passwords you have saved with Google.
       </message>
       <message name="IDS_SAVE_PASSWORD" desc="The title of the save password bubble when a password can be saved.">
         Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for this site?
@@ -10307,6 +10310,12 @@ I don't think this site should be blocked!
         </message>
         <message name="IDS_OPTIONS_PASSWORDS_AND_FORMS_GROUP_NAME" desc="The title of the 'Passwords and forms' group">
           Passwords and forms
+        </message>
+        <message name="IDS_OPTIONS_PASSWORD_MANAGER_REMEMBER_ENABLE" desc="The label of a checkbox in Chrome's settings to enable saving passwords.">
+          Remember website passwords.
+        </message>
+        <message name="IDS_OPTIONS_PASSWORD_MANAGER_SMART_LOCK_REMEMBER_ENABLE" desc="The label of a checkbox in Chrome's settings to enable saving passwords if Smart Lock is enabled.">
+          Use Smart Lock for Passwords to remember passwords for apps and sites.
         </message>
         <message name="IDS_OPTIONS_PASSWORD_MANAGER_ENABLE" desc="The label of the password manager checkbox">
           Offer to save your web passwords.
@@ -15407,7 +15416,13 @@ After you create a new supervised user, you can manage their settings at any tim
       <message name="IDS_FLAGS_NTP_POPULAR_SITES_DESCRIPTION" desc="Description for the flag to enable showing non-personalized popular suggestions on the New Tab Page, when no personal suggestions are available yet.">
         Pre-populate the New Tab page with popular sites.
       </message>
-    </if>
+      <message name="IDS_FLAGS_USE_ANDROID_MIDI_API_NAME" desc="Name for the flag to use android midi api.">
+        Use Android Midi API
+      </message>
+      <message name="IDS_FLAGS_USE_ANDROID_MIDI_API_DESCRIPTION" desc="Description for the flag to use android midi api.">
+        Use Android Midi API for WebMIDI (effective only with Android M+ devices).
+      </message>
+   </if>
 
     <if expr="is_win">
       <!-- Exporting tracing events to ETW -->

@@ -149,7 +149,6 @@
       'browser/net/net_error_tab_helper_unittest.cc',
       'browser/net/net_log_temp_file_unittest.cc',
       'browser/net/predictor_unittest.cc',
-      'browser/net/pref_proxy_config_tracker_impl_unittest.cc',
       'browser/net/probe_message_unittest.cc',
       'browser/net/quota_policy_channel_id_store_unittest.cc',
       'browser/net/safe_search_util_unittest.cc',
@@ -163,7 +162,6 @@
       'browser/password_manager/password_store_proxy_mac_unittest.cc',
       'browser/password_manager/password_store_win_unittest.cc',
       'browser/password_manager/password_store_x_unittest.cc',
-      'browser/password_manager/save_password_infobar_delegate_unittest.cc',
       'browser/password_manager/simple_password_store_mac_unittest.cc',
       'browser/permissions/permission_context_base_unittest.cc',
       'browser/permissions/permission_manager_unittest.cc',
@@ -408,7 +406,6 @@
       'browser/ui/cocoa/location_bar/zoom_decoration_unittest.mm',
       'browser/ui/cocoa/media_picker/desktop_media_picker_controller_unittest.mm',
       'browser/ui/cocoa/menu_button_unittest.mm',
-      'browser/ui/cocoa/notifications/message_center_tray_bridge_unittest.mm',
       'browser/ui/cocoa/nsmenuitem_additions_unittest.mm',
       'browser/ui/cocoa/omnibox/omnibox_popup_cell_unittest.mm',
       'browser/ui/cocoa/omnibox/omnibox_popup_matrix_unittest.mm',
@@ -557,6 +554,9 @@
       '../tools/json_schema_compiler/test/idl_schemas_unittest.cc',
       '../tools/json_schema_compiler/test/objects_unittest.cc',
       '../tools/json_schema_compiler/test/simple_api_unittest.cc',
+    ],
+    'chrome_unit_tests_mac_android_sources': [
+      'browser/password_manager/save_password_infobar_delegate_unittest.cc',
     ],
     'chrome_unit_tests_spellchecker_sources': [
       'browser/spellchecker/feedback_sender_unittest.cc',
@@ -1311,6 +1311,7 @@
       'browser/extensions/api/log_private/syslog_parser_unittest.cc',
       'browser/extensions/updater/local_extension_cache_unittest.cc',
       'browser/metrics/chromeos_metrics_provider_unittest.cc',
+      'browser/metrics/perf/random_selector_unittest.cc',
       'browser/notifications/login_state_notification_blocker_chromeos_unittest.cc',
       'browser/ui/browser_finder_chromeos_unittest.cc',
       # TODO(zturner): Enable this on Windows. See
@@ -1532,6 +1533,7 @@
       'browser/ui/omnibox/omnibox_controller_unittest.cc',
       'browser/ui/omnibox/omnibox_edit_unittest.cc',
       'browser/ui/panels/panel_mouse_watcher_unittest.cc',
+      'browser/ui/passwords/manage_passwords_view_utils_desktop_unittest.cc',
       'browser/ui/search/instant_page_unittest.cc',
       'browser/ui/search/instant_search_prerenderer_unittest.cc',
       'browser/ui/search/search_delegate_unittest.cc',
@@ -2525,6 +2527,9 @@
           # but when we tried to pull it up to the common.gypi level, it broke
           # other things like the ui and startup tests. *shrug*
           'xcode_settings': {'OTHER_LDFLAGS': ['-Wl,-ObjC']},
+        }],
+        ['OS=="mac" or OS=="android"', {
+          'sources': [ '<@(chrome_unit_tests_mac_android_sources)' ],
         }],
         ['OS!="mac" and OS!="ios"', {
           'dependencies': [
