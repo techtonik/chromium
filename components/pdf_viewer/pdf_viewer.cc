@@ -88,6 +88,7 @@ class BitmapUploader : public mojo::SurfaceClient {
     gpu_service_->CreateOffscreenGLES2Context(GetProxy(&gles2_client));
     gles2_context_ = MojoGLES2CreateContext(
         gles2_client.PassInterface().PassHandle().release().value(),
+        nullptr,
         &LostContext, NULL, mojo::Environment::GetDefaultAsyncWaiter());
     MojoGLES2MakeCurrent(gles2_context_);
   }
@@ -380,17 +381,20 @@ class PDFView : public mojo::ApplicationDelegate,
       return;
     }
 
+    // TODO(rjkroege): Make panning and scrolling more performant and
+    // responsive to gesture events.
     if ((event->key_data &&
          event->key_data->windows_key_code == mojo::KEYBOARD_CODE_DOWN) ||
-        (event->pointer_data && event->pointer_data->vertical_wheel < 0)) {
+        (event->wheel_data && event->wheel_data &&
+         event->wheel_data->delta_y < 0)) {
       if (current_page_ < (page_count_ - 1)) {
         current_page_++;
         DrawBitmap(embedder_for_roots_[view]);
       }
     } else if ((event->key_data &&
                 event->key_data->windows_key_code == mojo::KEYBOARD_CODE_UP) ||
-               (event->pointer_data &&
-                event->pointer_data->vertical_wheel > 0)) {
+               (event->pointer_data && event->wheel_data &&
+                event->wheel_data->delta_y > 0)) {
       if (current_page_ > 0) {
         current_page_--;
         DrawBitmap(embedder_for_roots_[view]);

@@ -407,15 +407,15 @@ blink::WebEncryptedMediaClient* HTMLFrame::encryptedMediaClient() {
 }
 
 void HTMLFrame::didStartLoading(bool to_different_document) {
-  GetLocalRoot()->server_->LoadingStarted(id_);
+  GetLocalRoot()->server_->LoadingStateChanged(id_, true, 0.0);
 }
 
 void HTMLFrame::didStopLoading() {
-  GetLocalRoot()->server_->LoadingStopped(id_);
+  GetLocalRoot()->server_->LoadingStateChanged(id_, false, 1.0);
 }
 
 void HTMLFrame::didChangeLoadProgress(double load_progress) {
-  GetLocalRoot()->server_->ProgressChanged(id_, load_progress);
+  GetLocalRoot()->server_->LoadingStateChanged(id_, true, load_progress);
 }
 
 void HTMLFrame::didChangeName(blink::WebLocalFrame* frame,
@@ -631,10 +631,12 @@ void HTMLFrame::OnViewDestroyed(View* view) {
 void HTMLFrame::OnViewInputEvent(View* view, const mojo::EventPtr& event) {
   if (event->pointer_data) {
     // Blink expects coordintes to be in DIPs.
-    event->pointer_data->x /= global_state()->device_pixel_ratio();
-    event->pointer_data->y /= global_state()->device_pixel_ratio();
-    event->pointer_data->screen_x /= global_state()->device_pixel_ratio();
-    event->pointer_data->screen_y /= global_state()->device_pixel_ratio();
+    event->pointer_data->location->x /= global_state()->device_pixel_ratio();
+    event->pointer_data->location->y /= global_state()->device_pixel_ratio();
+    event->pointer_data->location->screen_x /=
+        global_state()->device_pixel_ratio();
+    event->pointer_data->location->screen_y /=
+        global_state()->device_pixel_ratio();
   }
 
   blink::WebWidget* web_widget = GetWebWidget();

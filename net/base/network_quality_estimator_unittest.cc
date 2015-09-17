@@ -23,24 +23,14 @@
 #include "net/base/load_flags.h"
 #include "net/base/network_change_notifier.h"
 #include "net/http/http_status_code.h"
-#include "net/test/spawned_test_server/spawned_test_server.h"
+#include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
 #include "net/url_request/url_request_test_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
 
 namespace {
-
-#if !defined(OS_IOS)
-// SpawnedTestServer is not supported on iOS.
-// Less verbose way of running a simple testserver for the tests below.
-class LocalHttpTestServer : public net::SpawnedTestServer {
- public:
-  LocalHttpTestServer()
-      : net::SpawnedTestServer(net::SpawnedTestServer::TYPE_HTTP,
-                               net::SpawnedTestServer::kLocalhost,
-                               base::FilePath()) {}
-};
-#endif  // !defined(OS_IOS)
 
 // Helps in setting the current network type and id.
 class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
@@ -52,10 +42,12 @@ class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
                                 variation_params,
                                 true,
                                 true) {
-#if !defined(OS_IOS)
-    // Set up test server.
-    DCHECK(test_server_.Start());
-#endif  // !defined(OS_IOS)
+    // Set up embedded test server.
+    embedded_test_server_.ServeFilesFromDirectory(
+        base::FilePath(FILE_PATH_LITERAL("net/data/url_request_unittest")));
+    EXPECT_TRUE(embedded_test_server_.InitializeAndWaitUntilReady());
+    embedded_test_server_.RegisterRequestHandler(base::Bind(
+        &TestNetworkQualityEstimator::HandleRequest, base::Unretained(this)));
   }
 
   explicit TestNetworkQualityEstimator(
@@ -75,10 +67,21 @@ class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
     OnConnectionTypeChanged(type);
   }
 
-#if !defined(OS_IOS)
+  // Called by embedded server when a HTTP request is received.
+  scoped_ptr<net::test_server::HttpResponse> HandleRequest(
+      const net::test_server::HttpRequest& request) {
+    scoped_ptr<net::test_server::BasicHttpResponse> http_response(
+        new net::test_server::BasicHttpResponse());
+    http_response->set_code(net::HTTP_OK);
+    http_response->set_content("hello");
+    http_response->set_content_type("text/plain");
+    return http_response.Pass();
+  }
+
   // Returns a GURL hosted at embedded test server.
-  const GURL GetEchoURL() const { return test_server_.GetURL("/echo.html"); }
-#endif  // !defined(OS_IOS)
+  const GURL GetEchoURL() const {
+    return embedded_test_server_.GetURL("/echo.html");
+  }
 
   using NetworkQualityEstimator::ReadCachedNetworkQualityEstimate;
   using NetworkQualityEstimator::OnConnectionTypeChanged;
@@ -94,10 +97,8 @@ class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
   net::NetworkChangeNotifier::ConnectionType current_network_type_;
   std::string current_network_id_;
 
-#if !defined(OS_IOS)
-  // Test server used for testing.
-  LocalHttpTestServer test_server_;
-#endif  // !defined(OS_IOS)
+  // Embedded server used for testing.
+  net::test_server::EmbeddedTestServer embedded_test_server_;
 
   DISALLOW_COPY_AND_ASSIGN(TestNetworkQualityEstimator);
 };
@@ -106,8 +107,6 @@ class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
 
 namespace net {
 
-#if !defined(OS_IOS)
-// SpawnedTestServer is not supported on iOS.
 TEST(NetworkQualityEstimatorTest, TestKbpsRTTUpdates) {
   base::HistogramTester histogram_tester;
   // Enable requests to local host to be used for network quality estimation.
@@ -232,7 +231,6 @@ TEST(NetworkQualityEstimatorTest, StoreObservations) {
   EXPECT_EQ(0U, estimator.downstream_throughput_kbps_observations_.Size());
   EXPECT_EQ(0U, estimator.rtt_msec_observations_.Size());
 }
-#endif  // !defined(OS_IOS)
 
 // Verifies that the percentiles are correctly computed. All observations have
 // the same timestamp. Kbps percentiles must be in decreasing order. RTT
@@ -343,8 +341,6 @@ TEST(NetworkQualityEstimatorTest, PercentileDifferentTimestamps) {
 // This test notifies NetworkQualityEstimator of received data. Next,
 // throughput and RTT percentiles are checked for correctness by doing simple
 // verifications.
-#if !defined(OS_IOS)
-// SpawnedTestServer is not supported on iOS.
 TEST(NetworkQualityEstimatorTest, ComputedPercentiles) {
   std::map<std::string, std::string> variation_params;
   TestNetworkQualityEstimator estimator(variation_params);
@@ -389,7 +385,6 @@ TEST(NetworkQualityEstimatorTest, ComputedPercentiles) {
     }
   }
 }
-#endif  // !defined(OS_IOS)
 
 TEST(NetworkQualityEstimatorTest, ObtainOperatingParams) {
   std::map<std::string, std::string> variation_params;
@@ -897,8 +892,6 @@ TEST(NetworkQualityEstimatorTest, TestExternalEstimateProvider) {
 
 // Tests if the estimate from the external estimate provider is merged with the
 // observations collected from the HTTP requests.
-#if !defined(OS_IOS)
-// SpawnedTestServer is not supported on iOS.
 TEST(NetworkQualityEstimatorTest, TestExternalEstimateProviderMergeEstimates) {
   const base::TimeDelta external_estimate_provider_rtt =
       base::TimeDelta::FromMilliseconds(1);
@@ -940,6 +933,5 @@ TEST(NetworkQualityEstimatorTest, TestExternalEstimateProviderMergeEstimates) {
   EXPECT_EQ(2U, estimator.rtt_msec_observations_.Size());
   EXPECT_EQ(2U, estimator.downstream_throughput_kbps_observations_.Size());
 }
-#endif  // !defined(OS_IOS)
 
 }  // namespace net

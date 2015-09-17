@@ -272,6 +272,7 @@ extern const char kWakeOnWifiSsid[];
 extern const char kCaptivePortalAuthenticationIgnoresProxy[];
 extern const char kForceMaximizeOnFirstRun[];
 extern const char kPlatformKeys[];
+extern const char kUnifiedDesktopEnabledByDefault[];
 #endif  // defined(OS_CHROMEOS)
 extern const char kShowHomeButton[];
 extern const char kRecentlySelectedEncoding[];
@@ -712,10 +713,6 @@ extern const char kDevicePolicyRefreshRate[];
 
 extern const char kFactoryResetRequested[];
 extern const char kDebuggingFeaturesRequested[];
-
-extern const char kMessageCenterShowedFirstRunBalloon[];
-extern const char kMessageCenterShowIcon[];
-extern const char kMessageCenterForcedOnTaskbar[];
 
 #if defined(OS_CHROMEOS)
 extern const char kResolveDeviceTimezoneByGeolocation[];

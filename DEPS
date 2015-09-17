@@ -31,15 +31,15 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': 'e9c36eb54f1b46e845665d048d50ecb4652eef96', # from svn revision 202385
+  'webkit_revision': '53d974d2f28d9dabf8fe330594bbe4c6f5d1f74c', # from svn revision 202456
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': 'ac1772e3db5c885b554f6a72ca9dbac4245cb0e2',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '3322a8137d12255258a937897389ea90ca1ee6fa',
+  'skia_revision': '2582dc539542b1c50e7a16e2a5b460fbb12074e5',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': 'aa06153c83bfaa44216e19412d333295b5c31c11',
+  'v8_revision': 'b8e2feec616b3c9415179baed94d1c70596055a3',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -55,7 +55,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '615d7aba0f7d53a78eb05fbd4ae0e1a7e1d3b103',
+  'pdfium_revision': '6f34355e9d091fd4e031e9354fdfa778000b0d4a',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -189,7 +189,7 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libvpx.git' + '@' +  Var('libvpx_revision'),
 
   'src/third_party/ffmpeg':
-   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '2d9eb2814143a958f9781b32a112f814a596e70e',
+   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '27691135a3b84c9e3f934c73679743fe2843c7b3',
 
   'src/third_party/libjingle/source/talk':
     Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '90294bd3b9efff9738119befe3294fbf049b65c3', # commit position 9934

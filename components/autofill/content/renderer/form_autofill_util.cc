@@ -205,8 +205,7 @@ base::string16 FindChildTextInner(const WebNode& node,
   if (node.nodeType() == WebNode::CommentNode)
     return FindChildTextInner(node.nextSibling(), depth - 1, divs_to_skip);
 
-  if (node.nodeType() != WebNode::ElementNode &&
-      node.nodeType() != WebNode::TextNode)
+  if (!node.isElementNode() && !node.isTextNode())
     return base::string16();
 
   // Ignore elements known not to contain inferable labels.
@@ -231,14 +230,14 @@ base::string16 FindChildTextInner(const WebNode& node,
   // Preserve inter-element whitespace separation.
   base::string16 child_text =
       FindChildTextInner(node.firstChild(), depth - 1, divs_to_skip);
-  bool add_space = node.nodeType() == WebNode::TextNode && node_text.empty();
+  bool add_space = node.isTextNode() && node_text.empty();
   node_text = CombineAndCollapseWhitespace(node_text, child_text, add_space);
 
   // Recursively compute the siblings' text.
   // Again, preserve inter-element whitespace separation.
   base::string16 sibling_text =
       FindChildTextInner(node.nextSibling(), depth - 1, divs_to_skip);
-  add_space = node.nodeType() == WebNode::TextNode && node_text.empty();
+  add_space = node.isTextNode() && node_text.empty();
   node_text = CombineAndCollapseWhitespace(node_text, sibling_text, add_space);
 
   return node_text;
@@ -282,13 +281,11 @@ base::string16 InferLabelFromSibling(const WebFormControlElement& element,
       break;
 
     // Skip over comments.
-    WebNode::NodeType node_type = sibling.nodeType();
-    if (node_type == WebNode::CommentNode)
+    if (sibling.nodeType() == WebNode::CommentNode)
       continue;
 
     // Otherwise, only consider normal HTML elements and their contents.
-    if (node_type != WebNode::TextNode &&
-        node_type != WebNode::ElementNode)
+    if (!sibling.isElementNode() && !sibling.isTextNode())
       break;
 
     // A label might be split across multiple "lightweight" nodes.
@@ -1547,8 +1544,7 @@ void PreviewSuggestion(const base::string16& suggestion,
                        blink::WebFormControlElement* input_element) {
   size_t selection_start = user_input.length();
   if (IsFeatureSubstringMatchEnabled()) {
-    size_t offset =
-        autofill::GetTextSelectionStart(suggestion, user_input, false);
+    size_t offset = GetTextSelectionStart(suggestion, user_input, false);
     // Zero selection start is for password manager, which can show usernames
     // that do not begin with the user input value.
     selection_start = (offset == base::string16::npos) ? 0 : offset;
