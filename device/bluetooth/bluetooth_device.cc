@@ -4,7 +4,6 @@
 
 #include "device/bluetooth/bluetooth_device.h"
 
-#include <limits>
 #include <string>
 
 #include "base/stl_util.h"
