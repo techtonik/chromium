@@ -12,7 +12,6 @@
 
 #include "base/callback.h"
 #include "base/memory/ref_counted.h"
-#include "base/numerics/safe_math.h"
 #include "base/strings/string16.h"
 #include "device/bluetooth/bluetooth_export.h"
 #include "device/bluetooth/bluetooth_uuid.h"
@@ -464,9 +463,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   void DidFailToConnectGatt(ConnectErrorCode);
   void DidDisconnectGatt();
 
-  // Maintains GattConnection reference count, being called from friend class
-  // BluetoothGattConnection instances which must call Add/RemoveGattConnection
-  // upon creation & deletion.
+  // Tracks BluetoothGattConnection instances that act as a reference count
+  // keeping the GATT connection open. Instances call Add/RemoveGattConnection
+  // at creation & deletion.
   void AddGattConnection(BluetoothGattConnection*);
   void RemoveGattConnection(BluetoothGattConnection*);
 
