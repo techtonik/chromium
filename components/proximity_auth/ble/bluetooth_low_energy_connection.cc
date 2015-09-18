@@ -349,7 +349,7 @@ void BluetoothLowEnergyConnection::OnGattConnectionCreated(
   DCHECK(sub_status() == SubStatus::WAITING_GATT_CONNECTION);
   PA_LOG(INFO) << "GATT connection with " << gatt_connection->GetDeviceAddress()
                << " created.";
-LOG(WARNING) << __FUNCTION__ << __LINE__;
+
   gatt_connection_ = gatt_connection.Pass();
   SetSubStatus(SubStatus::WAITING_CHARACTERISTICS);
   characteristic_finder_.reset(CreateCharacteristicsFinder(
