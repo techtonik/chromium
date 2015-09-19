@@ -30,18 +30,20 @@ class Fakes {
      */
     static class FakeBluetoothAdapter extends Wrappers.BluetoothAdapterWrapper {
         private final FakeBluetoothLeScanner mFakeScanner;
+        final long mNativeBluetoothTestAndroid;
 
         /**
          * Creates a FakeBluetoothAdapter.
          */
         @CalledByNative("FakeBluetoothAdapter")
-        public static FakeBluetoothAdapter create() {
+        public static FakeBluetoothAdapter create(long nativeBluetoothTestAndroid) {
             Log.v(TAG, "FakeBluetoothAdapter created.");
-            return new FakeBluetoothAdapter();
+            return new FakeBluetoothAdapter(nativeBluetoothTestAndroid);
         }
 
-        private FakeBluetoothAdapter() {
+        private FakeBluetoothAdapter(long nativeBluetoothTestAndroid) {
             super(null, new FakeBluetoothLeScanner());
+            mNativeBluetoothTestAndroid = nativeBluetoothTestAndroid;
             mFakeScanner = (FakeBluetoothLeScanner) mScanner;
         }
 
