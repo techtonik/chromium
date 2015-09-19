@@ -14,6 +14,7 @@ import android.os.ParcelUuid;
 
 import org.chromium.base.Log;
 import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.annotations.JNINamespace;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +22,7 @@ import java.util.List;
 /**
  * Fake implementations of android.bluetooth.* classes for testing.
  */
+@JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 class Fakes {
     private static final String TAG = "cr.Bluetooth";
@@ -59,8 +61,8 @@ class Fakes {
                     uuids.add(ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb"));
 
                     mFakeScanner.mCallback.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice(
-                                                       "01:00:00:90:1E:BE", "FakeBluetoothDevice"),
+                            new FakeScanResult(new FakeBluetoothDevice(this, "01:00:00:90:1E:BE",
+                                                       "FakeBluetoothDevice"),
                                                                 uuids));
                     break;
                 }
@@ -70,24 +72,26 @@ class Fakes {
                     uuids.add(ParcelUuid.fromString("00001803-0000-1000-8000-00805f9b34fb"));
 
                     mFakeScanner.mCallback.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice(
-                                                       "01:00:00:90:1E:BE", "FakeBluetoothDevice"),
+                            new FakeScanResult(new FakeBluetoothDevice(this, "01:00:00:90:1E:BE",
+                                                       "FakeBluetoothDevice"),
                                                                 uuids));
                     break;
                 }
                 case 3: {
                     ArrayList<ParcelUuid> uuids = null;
-                    mFakeScanner.mCallback.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice("01:00:00:90:1E:BE", ""),
-                                                                uuids));
+                    mFakeScanner.mCallback.onScanResult(
+                            ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
+                            new FakeScanResult(
+                                    new FakeBluetoothDevice(this, "01:00:00:90:1E:BE", ""), uuids));
 
                     break;
                 }
                 case 4: {
                     ArrayList<ParcelUuid> uuids = null;
-                    mFakeScanner.mCallback.onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice("02:00:00:8B:74:63", ""),
-                                                                uuids));
+                    mFakeScanner.mCallback.onScanResult(
+                            ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
+                            new FakeScanResult(
+                                    new FakeBluetoothDevice(this, "02:00:00:8B:74:63", ""), uuids));
 
                     break;
                 }
@@ -180,12 +184,14 @@ class Fakes {
      * Fakes android.bluetooth.BluetoothDevice.
      */
     static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
+        final FakeBluetoothAdapter mAdapter;
         private String mAddress;
         private String mName;
         private Wrappers.BluetoothGattCallbackWrapper mGattCallback;
 
-        public FakeBluetoothDevice(String address, String name) {
+        public FakeBluetoothDevice(FakeBluetoothAdapter adapter, String address, String name) {
             super(null);
+            mAdapter = adapter;
             mAddress = address;
             mName = name;
         }
@@ -212,8 +218,9 @@ class Fakes {
                         "BluetoothGattWrapper doesn't support calls to connectGatt() with "
                         + "multiple distinct callbacks.");
             }
+            nativeOnBluetoothDeviceConnectGattCalled(mAdapter.mNativeBluetoothTestAndroid);
             mGattCallback = callback;
-            return new FakeBluetoothGatt();
+            return new FakeBluetoothGatt(this);
         }
 
         @Override
@@ -241,11 +248,26 @@ class Fakes {
      * Fakes android.bluetooth.BluetoothDevice.
      */
     static class FakeBluetoothGatt extends Wrappers.BluetoothGattWrapper {
-        public FakeBluetoothGatt() {
+        final FakeBluetoothDevice mDevice;
+
+        public FakeBluetoothGatt(FakeBluetoothDevice device) {
             super(null);
+            mDevice = device;
         }
 
         @Override
-        public void disconnect() {}
+        public void disconnect() {
+            nativeOnFakeBluetoothGattDisconnect(mDevice.mAdapter.mNativeBluetoothTestAndroid);
+        }
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothTestAndroid C++ methods declared for access from java:
+
+    // Binds to BluetoothAdapterAndroid::OnBluetoothDeviceConnectGattCalled.
+    private static native void nativeOnBluetoothDeviceConnectGattCalled(
+            long nativeBluetoothTestAndroid);
+
+    // Binds to BluetoothAdapterAndroid::OnFakeBluetoothGattDisconnect.
+    private static native void nativeOnFakeBluetoothGattDisconnect(long nativeBluetoothTestAndroid);
 }
