@@ -287,6 +287,8 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   EXPECT_EQ(1, callback_count_);  // Device is assumed still connected.
   EXPECT_EQ(0, error_callback_count_);
   callback_count_ = error_callback_count_ = 0;
+  EXPECT_FALSE(gatt_connections_.front()->IsConnected());
+  EXPECT_TRUE(gatt_connections_.back()->IsConnected());
 
   // Actually disconnect:
   CompleteGattDisconnection(device);
@@ -308,7 +310,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   for (BluetoothGattConnection* connection : gatt_connections_)
     EXPECT_FALSE(connection->IsConnected());
 
-  // CreateGattConnection, but error connecting. Also, Multiple errors only
+  // CreateGattConnection, but error connecting. Also, multiple errors only
   // invoke callbacks once:
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
