@@ -44,7 +44,6 @@
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/metrics/chrome_browser_main_extra_parts_metrics.h"
 #include "chrome/browser/nacl_host/nacl_browser_delegate_impl.h"
-#include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/net/spdyproxy/data_reduction_proxy_chrome_settings.h"
 #include "chrome/browser/net/spdyproxy/data_reduction_proxy_chrome_settings_factory.h"
 #include "chrome/browser/notifications/platform_notification_service_impl.h"
@@ -105,6 +104,7 @@
 #include "components/dom_distiller/core/url_constants.h"
 #include "components/google/core/browser/google_util.h"
 #include "components/metrics/client_info.h"
+#include "components/net_log/chrome_net_log.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/rappor/rappor_utils.h"
 #include "components/signin/core/common/profile_management_switches.h"
@@ -172,7 +172,7 @@
 #include "chrome/browser/android/webapps/single_tab_mode_tab_helper.h"
 #include "chrome/browser/chrome_browser_main_android.h"
 #include "chrome/common/descriptors_android.h"
-#include "components/crash/browser/crash_dump_manager_android.h"
+#include "components/crash/content/browser/crash_dump_manager_android.h"
 #include "components/service_tab_launcher/browser/android/service_tab_launcher.h"
 #include "ui/base/resource/resource_bundle_android.h"
 #elif defined(OS_POSIX)
@@ -181,8 +181,8 @@
 
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
 #include "base/debug/leak_annotations.h"
-#include "components/crash/app/breakpad_linux.h"
-#include "components/crash/browser/crash_handler_host_linux.h"
+#include "components/crash/content/app/breakpad_linux.h"
+#include "components/crash/content/browser/crash_handler_host_linux.h"
 #endif
 
 #if defined(OS_ANDROID)

@@ -26,11 +26,12 @@
 #include "chromecast/browser/service/cast_service_simple.h"
 #include "chromecast/browser/url_request_context_factory.h"
 #include "chromecast/common/global_descriptors.h"
+#include "chromecast/media/audio/cast_audio_manager_factory.h"
 #include "chromecast/media/base/media_message_loop.h"
 #include "chromecast/public/cast_media_shlib.h"
 #include "chromecast/public/media/media_pipeline_backend.h"
-#include "components/crash/app/breakpad_linux.h"
-#include "components/crash/browser/crash_handler_host_linux.h"
+#include "components/crash/content/app/breakpad_linux.h"
+#include "components/crash/content/browser/crash_handler_host_linux.h"
 #include "components/network_hints/browser/network_hints_message_filter.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/certificate_request_result_type.h"
@@ -48,7 +49,7 @@
 #include "ui/gl/gl_switches.h"
 
 #if defined(OS_ANDROID)
-#include "components/crash/browser/crash_dump_manager_android.h"
+#include "components/crash/content/browser/crash_dump_manager_android.h"
 #include "components/external_video_surface/browser/android/external_video_surface_container_impl.h"
 #else
 #include "chromecast/browser/media/cast_browser_cdm_factory.h"
@@ -81,9 +82,13 @@ scoped_ptr<CastService> CastContentBrowserClient::CreateCastService(
 
 scoped_ptr<::media::AudioManagerFactory>
 CastContentBrowserClient::CreateAudioManagerFactory() {
-  // Return nullptr. The factory will not be set, and the statically linked
+#if defined(OS_ANDROID)
+  // Return nullptr. The factory will not be set, and the default
   // implementation of AudioManager will be used.
   return scoped_ptr<::media::AudioManagerFactory>();
+#else
+  return make_scoped_ptr(new media::CastAudioManagerFactory());
+#endif
 }
 
 #if !defined(OS_ANDROID)

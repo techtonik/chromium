@@ -15,6 +15,7 @@
 #include "components/policy/core/common/mock_configuration_policy_provider.h"
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/core/common/policy_service_impl.h"
+#include "components/policy/core/common/policy_types.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/proxy_config/proxy_config_dictionary.h"
 #include "components/proxy_config/proxy_config_pref_names.h"
@@ -98,7 +99,7 @@ class ProxyPolicyTest : public testing::Test {
   void TearDown() override { provider_.Shutdown(); }
 
   scoped_ptr<PrefService> CreatePrefService(bool with_managed_policies) {
-    PrefServiceMockFactory factory;
+    syncable_prefs::PrefServiceMockFactory factory;
     factory.set_command_line_prefs(new CommandLinePrefStore(&command_line_));
     if (with_managed_policies) {
       factory.SetManagedPolicies(policy_service_.get(),
@@ -107,7 +108,7 @@ class ProxyPolicyTest : public testing::Test {
 
     scoped_refptr<user_prefs::PrefRegistrySyncable> registry(
         new user_prefs::PrefRegistrySyncable);
-    scoped_ptr<PrefServiceSyncable> prefs =
+    scoped_ptr<syncable_prefs::PrefServiceSyncable> prefs =
         factory.CreateSyncable(registry.get());
     chrome::RegisterUserProfilePrefs(registry.get());
     return prefs.Pass();
@@ -126,15 +127,17 @@ TEST_F(ProxyPolicyTest, OverridesCommandLineOptions) {
       new base::StringValue(ProxyPrefs::kFixedServersProxyModeName);
   PolicyMap policy;
   policy.Set(key::kProxyMode, POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
-             mode_name, NULL);
+             POLICY_SOURCE_CLOUD, mode_name, nullptr);
   policy.Set(key::kProxyBypassList,
              POLICY_LEVEL_MANDATORY,
              POLICY_SCOPE_USER,
+             POLICY_SOURCE_CLOUD,
              new base::StringValue("abc"),
              NULL);
   policy.Set(key::kProxyServer,
              POLICY_LEVEL_MANDATORY,
              POLICY_SCOPE_USER,
+             POLICY_SOURCE_CLOUD,
              new base::StringValue("ghi"),
              NULL);
   provider_.UpdateChromePolicy(policy);
@@ -167,7 +170,7 @@ TEST_F(ProxyPolicyTest, OverridesUnrelatedCommandLineOptions) {
       new base::StringValue(ProxyPrefs::kAutoDetectProxyModeName);
   PolicyMap policy;
   policy.Set(key::kProxyMode, POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
-             mode_name, NULL);
+             POLICY_SOURCE_CLOUD, mode_name, nullptr);
   provider_.UpdateChromePolicy(policy);
 
   // First verify that command-line options are set correctly when
@@ -195,7 +198,7 @@ TEST_F(ProxyPolicyTest, OverridesCommandLineNoProxy) {
       new base::StringValue(ProxyPrefs::kAutoDetectProxyModeName);
   PolicyMap policy;
   policy.Set(key::kProxyMode, POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
-             mode_name, NULL);
+             POLICY_SOURCE_CLOUD, mode_name, nullptr);
   provider_.UpdateChromePolicy(policy);
 
   // First verify that command-line options are set correctly when
@@ -219,7 +222,7 @@ TEST_F(ProxyPolicyTest, OverridesCommandLineAutoDetect) {
       new base::StringValue(ProxyPrefs::kDirectProxyModeName);
   PolicyMap policy;
   policy.Set(key::kProxyMode, POLICY_LEVEL_MANDATORY, POLICY_SCOPE_USER,
-             mode_name, NULL);
+             POLICY_SOURCE_CLOUD, mode_name, nullptr);
   provider_.UpdateChromePolicy(policy);
 
   // First verify that the auto-detect is set if there is no managed

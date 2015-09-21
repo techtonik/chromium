@@ -40,6 +40,9 @@ class CONTENT_EXPORT BrowserIOSurfaceManager : public IOSurfaceManager {
   // the bootstrap server. |pid| is the process ID of the service.
   static base::mac::ScopedMachSendRight LookupServicePort(pid_t pid);
 
+  // Returns the name of the service registered with the bootstrap server.
+  static std::string GetMachPortName();
+
   // Overridden from IOSurfaceManager:
   bool RegisterIOSurface(IOSurfaceId io_surface_id,
                          int client_id,
@@ -79,12 +82,12 @@ class CONTENT_EXPORT BrowserIOSurfaceManager : public IOSurfaceManager {
   void HandleRequest();
 
   // Message handlers that are invoked from HandleRequest.
-  bool HandleRegisterIOSurfaceRequest(
+  void HandleRegisterIOSurfaceRequest(
       const IOSurfaceManagerHostMsg_RegisterIOSurface& request,
       IOSurfaceManagerMsg_RegisterIOSurfaceReply* reply);
   bool HandleUnregisterIOSurfaceRequest(
       const IOSurfaceManagerHostMsg_UnregisterIOSurface& request);
-  bool HandleAcquireIOSurfaceRequest(
+  void HandleAcquireIOSurfaceRequest(
       const IOSurfaceManagerHostMsg_AcquireIOSurface& request,
       IOSurfaceManagerMsg_AcquireIOSurfaceReply* reply);
 

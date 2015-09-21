@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-
-
 /**
  * 'cr-settings-appearance-page' is the settings page containing appearance
  * settings.
@@ -22,6 +20,29 @@
 Polymer({
   is: 'cr-settings-appearance-page',
 
+  properties: {
+    /**
+     * Preferences state.
+     */
+    prefs: {
+      type: Object,
+      notify: true,
+    },
+
+    /**
+     * Translated strings used in data binding.
+     */
+    i18n_: {
+      type: Object,
+      value: function() {
+        return {
+          homePageNtp: loadTimeData.getString('homePageNtp'),
+          openThisPage: loadTimeData.getString('openThisPage'),
+        };
+      },
+    },
+  },
+
   /** @override */
   attached: function() {
     // Query the initial state.
@@ -31,16 +52,6 @@ Polymer({
     // Set up the change event listener.
     cr.addWebUIListener('reset-theme-enabled-changed',
                         this.setResetThemeEnabled.bind(this));
-  },
-
-  properties: {
-    /**
-     * Preferences state.
-     */
-    prefs: {
-      type: Object,
-      notify: true,
-    },
   },
 
   setResetThemeEnabled: function(enabled) {

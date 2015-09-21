@@ -84,7 +84,7 @@ class HTMLFrame : public blink::WebFrameClient,
           view(view),
           properties(properties),
           delegate(delegate),
-          allow_local_shared_frame(false) {}
+          is_local_create_child(false) {}
     ~CreateParams() {}
 
     HTMLFrameTreeManager* manager;
@@ -97,8 +97,9 @@ class HTMLFrame : public blink::WebFrameClient,
    private:
     friend class HTMLFrame;
 
-    // TODO(sky): nuke.
-    bool allow_local_shared_frame;
+    // True if the creation is the result of createChildFrame(). That is, a
+    // local parent is creating a new child frame.
+    bool is_local_create_child;
   };
 
   explicit HTMLFrame(CreateParams* params);
@@ -179,6 +180,7 @@ class HTMLFrame : public blink::WebFrameClient,
   virtual void didStartLoading(bool to_different_document);
   virtual void didStopLoading();
   virtual void didChangeLoadProgress(double load_progress);
+  virtual void dispatchLoad();
   virtual void didChangeName(blink::WebLocalFrame* frame,
                              const blink::WebString& name);
   virtual void didCommitProvisionalLoad(
@@ -204,11 +206,11 @@ class HTMLFrame : public blink::WebFrameClient,
                                   mojo::Array<uint8_t> new_data);
 
   // The local root is the first ancestor (starting at this) that has its own
-  // connection.
-  HTMLFrame* GetLocalRoot();
+  // delegate.
+  HTMLFrame* GetFirstAncestorWithDelegate();
 
-  // Returns the ApplicationImpl from the local root's delegate.
-  mojo::ApplicationImpl* GetLocalRootApp();
+  // Returns the ApplicationImpl from the first ancestor with a delegate.
+  mojo::ApplicationImpl* GetApp();
 
   // Gets the FrameTreeServer to use for this frame.
   web_view::FrameTreeServer* GetFrameTreeServer();
@@ -270,7 +272,9 @@ class HTMLFrame : public blink::WebFrameClient,
       uint32_t source_frame_id,
       uint32_t target_frame_id,
       web_view::HTMLMessageEventPtr serialized_event) override;
-  void OnWillNavigate(uint32_t target_frame_id) override;
+  void OnWillNavigate() override;
+  void OnFrameLoadingStateChanged(uint32_t frame_id, bool loading) override;
+  void OnDispatchFrameLoadEvent(uint32_t frame_id) override;
 
   // blink::WebRemoteFrameClient:
   virtual void frameDetached(blink::WebRemoteFrameClient::DetachType type);

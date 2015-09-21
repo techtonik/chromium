@@ -35,7 +35,6 @@
 #include "chrome/browser/profiles/profile_window.h"
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/signin/chrome_signin_helper.h"
 #include "chrome/browser/themes/theme_properties.h"
@@ -109,6 +108,7 @@
 #include "components/omnibox/browser/omnibox_popup_model.h"
 #include "components/omnibox/browser/omnibox_popup_view.h"
 #include "components/omnibox/browser/omnibox_view.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/browser/language_state.h"
 #include "content/app/resources/grit/content_resources.h"
@@ -171,7 +171,6 @@
 using base::TimeDelta;
 using base::UserMetricsAction;
 using content::NativeWebKeyboardEvent;
-using content::SSLStatus;
 using content::WebContents;
 using views::ColumnSet;
 using views::GridLayout;
@@ -1386,10 +1385,11 @@ void BrowserView::UserChangedTheme() {
   frame_->FrameTypeChanged();
 }
 
-void BrowserView::ShowWebsiteSettings(Profile* profile,
-                                      content::WebContents* web_contents,
-                                      const GURL& url,
-                                      const content::SSLStatus& ssl) {
+void BrowserView::ShowWebsiteSettings(
+    Profile* profile,
+    content::WebContents* web_contents,
+    const GURL& url,
+    const SecurityStateModel::SecurityInfo& security_info) {
   // Some browser windows have a location icon embedded in the frame. Try to
   // use that if it exists. If it doesn't exist, use the location icon from
   // the location bar.
@@ -1398,7 +1398,7 @@ void BrowserView::ShowWebsiteSettings(Profile* profile,
     popup_anchor = GetLocationBarView()->location_icon_view();
 
   WebsiteSettingsPopupView::ShowPopup(popup_anchor, gfx::Rect(), profile,
-                                      web_contents, url, ssl);
+                                      web_contents, url, security_info);
 }
 
 void BrowserView::ShowAppMenu() {

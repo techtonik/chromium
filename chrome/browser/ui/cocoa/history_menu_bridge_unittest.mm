@@ -12,11 +12,11 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/sessions/chrome_tab_restore_service_client.h"
-#include "chrome/browser/sessions/persistent_tab_restore_service.h"
 #include "chrome/browser/ui/cocoa/cocoa_profile_test.h"
 #include "chrome/browser/ui/cocoa/history_menu_bridge.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/favicon_base/favicon_types.h"
+#include "components/sessions/core/persistent_tab_restore_service.h"
 #include "components/sessions/serialized_navigation_entry_test_helper.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -26,13 +26,13 @@
 
 namespace {
 
-class MockTRS : public PersistentTabRestoreService {
+class MockTRS : public sessions::PersistentTabRestoreService {
  public:
   MockTRS(Profile* profile)
-      : PersistentTabRestoreService(
+      : sessions::PersistentTabRestoreService(
             make_scoped_ptr(new ChromeTabRestoreServiceClient(profile)),
             nullptr) {}
-  MOCK_CONST_METHOD0(entries, const TabRestoreService::Entries&());
+  MOCK_CONST_METHOD0(entries, const sessions::TabRestoreService::Entries&());
 };
 
 class MockBridge : public HistoryMenuBridge {

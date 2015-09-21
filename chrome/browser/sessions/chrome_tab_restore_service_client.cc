@@ -8,6 +8,7 @@
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/common/url_constants.h"
+#include "components/sessions/content/content_live_tab.h"
 #include "components/sessions/content/content_tab_client_data.h"
 #include "content/public/browser/browser_thread.h"
 
@@ -47,7 +48,7 @@ ChromeTabRestoreServiceClient::ChromeTabRestoreServiceClient(Profile* profile)
 
 ChromeTabRestoreServiceClient::~ChromeTabRestoreServiceClient() {}
 
-TabRestoreServiceDelegate*
+sessions::TabRestoreServiceDelegate*
 ChromeTabRestoreServiceClient::CreateTabRestoreServiceDelegate(
     int host_desktop_type,
     const std::string& app_name) {
@@ -62,19 +63,20 @@ ChromeTabRestoreServiceClient::CreateTabRestoreServiceDelegate(
 #endif
 }
 
-TabRestoreServiceDelegate*
-ChromeTabRestoreServiceClient::FindTabRestoreServiceDelegateForWebContents(
-    const content::WebContents* contents) {
+sessions::TabRestoreServiceDelegate*
+ChromeTabRestoreServiceClient::FindTabRestoreServiceDelegateForTab(
+    const sessions::LiveTab* tab) {
 #if defined(OS_ANDROID)
   // Android does not support TabRestoreServiceDelegate, as tab persistence
   // is implemented on the Java side.
   return nullptr;
 #else
-  return BrowserTabRestoreServiceDelegate::FindDelegateForWebContents(contents);
+  return BrowserTabRestoreServiceDelegate::FindDelegateForWebContents(
+      static_cast<const sessions::ContentLiveTab*>(tab)->web_contents());
 #endif
 }
 
-TabRestoreServiceDelegate*
+sessions::TabRestoreServiceDelegate*
 ChromeTabRestoreServiceClient::FindTabRestoreServiceDelegateWithID(
     SessionID::id_type desired_id,
     int host_desktop_type) {
@@ -92,13 +94,14 @@ bool ChromeTabRestoreServiceClient::ShouldTrackURLForRestore(const GURL& url) {
   return ::ShouldTrackURLForRestore(url);
 }
 
-std::string ChromeTabRestoreServiceClient::GetExtensionAppIDForWebContents(
-    content::WebContents* web_contents) {
+std::string ChromeTabRestoreServiceClient::GetExtensionAppIDForTab(
+    sessions::LiveTab* tab) {
   std::string extension_app_id;
 
 #if defined(ENABLE_EXTENSIONS)
   extensions::TabHelper* extensions_tab_helper =
-      extensions::TabHelper::FromWebContents(web_contents);
+      extensions::TabHelper::FromWebContents(
+          static_cast<sessions::ContentLiveTab*>(tab)->web_contents());
   // extensions_tab_helper is NULL in some browser tests.
   if (extensions_tab_helper) {
     const extensions::Extension* extension =
@@ -112,9 +115,9 @@ std::string ChromeTabRestoreServiceClient::GetExtensionAppIDForWebContents(
 }
 
 scoped_ptr<sessions::TabClientData>
-ChromeTabRestoreServiceClient::GetTabClientDataForWebContents(
-    content::WebContents* web_contents) {
-  return make_scoped_ptr(new sessions::ContentTabClientData(web_contents));
+ChromeTabRestoreServiceClient::GetTabClientDataForTab(sessions::LiveTab* tab) {
+  return make_scoped_ptr(new sessions::ContentTabClientData(
+      static_cast<sessions::ContentLiveTab*>(tab)->web_contents()));
 }
 
 base::SequencedWorkerPool* ChromeTabRestoreServiceClient::GetBlockingPool() {

@@ -2526,7 +2526,7 @@ void SpdySession::OnWindowUpdate(SpdyStreamId stream_id,
       DoDrainSession(
           ERR_SPDY_PROTOCOL_ERROR,
           "Received WINDOW_UPDATE with an invalid delta_window_size " +
-              base::UintToString(delta_window_size));
+              base::IntToString(delta_window_size));
       return;
     }
 
@@ -3081,15 +3081,6 @@ void SpdySession::CompleteStreamRequest(
   if (rv != ERR_IO_PENDING) {
     pending_request->OnRequestCompleteFailure(rv);
   }
-}
-
-SSLClientSocket* SpdySession::GetSSLClientSocket() const {
-  if (!is_secure_)
-    return NULL;
-  SSLClientSocket* ssl_socket =
-      reinterpret_cast<SSLClientSocket*>(connection_->socket());
-  DCHECK(ssl_socket);
-  return ssl_socket;
 }
 
 void SpdySession::OnWriteBufferConsumed(

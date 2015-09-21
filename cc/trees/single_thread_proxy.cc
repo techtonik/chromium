@@ -149,6 +149,15 @@ void SingleThreadProxy::RequestNewOutputSurface() {
   layer_tree_host_->RequestNewOutputSurface();
 }
 
+scoped_ptr<OutputSurface> SingleThreadProxy::ReleaseOutputSurface() {
+  // |layer_tree_host_| should already be aware of this.
+  DCHECK(layer_tree_host_->output_surface_lost());
+
+  if (scheduler_on_impl_thread_)
+    scheduler_on_impl_thread_->DidLoseOutputSurface();
+  return layer_tree_host_impl_->ReleaseOutputSurface();
+}
+
 void SingleThreadProxy::SetOutputSurface(
     scoped_ptr<OutputSurface> output_surface) {
   DCHECK(Proxy::IsMainThread());

@@ -188,6 +188,7 @@
 #endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
+#include "content/browser/bootstrap_sandbox_manager_mac.h"
 #include "content/browser/browser_io_surface_manager_mac.h"
 #endif
 
@@ -545,6 +546,11 @@ RenderProcessHostImpl::RenderProcessHostImpl(
   subscribe_uniform_enabled_ =
       base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableSubscribeUniformExtension);
+
+#if defined(OS_MACOSX)
+  if (BootstrapSandboxManager::ShouldEnable())
+    AddObserver(BootstrapSandboxManager::GetInstance());
+#endif
 
   // Note: When we create the RenderProcessHostImpl, it's technically
   //       backgrounded, because it has no visible listeners.  But the process
@@ -2196,6 +2202,10 @@ void RenderProcessHostImpl::ProcessDied(bool already_dead,
   message_port_message_filter_ = NULL;
   RemoveUserData(kSessionStorageHolderKey);
 
+  // RenderProcessGone handlers might navigate or perform other actions that
+  // require a connection. Ensure that there is one before calling them.
+  mojo_application_host_.reset(new MojoApplicationHost);
+
   IDMap<IPC::Listener>::iterator iter(&listeners_);
   while (!iter.IsAtEnd()) {
     iter.GetCurrentValue()->OnMessageReceived(
@@ -2204,8 +2214,6 @@ void RenderProcessHostImpl::ProcessDied(bool already_dead,
                                        exit_code));
     iter.Advance();
   }
-
-  mojo_application_host_.reset(new MojoApplicationHost);
 
   // It's possible that one of the calls out to the observers might have caused
   // this object to be no longer needed.
@@ -2226,28 +2234,6 @@ size_t RenderProcessHost::GetActiveViewCount() {
       num_active_views++;
   }
   return num_active_views;
-}
-
-// Frame subscription API for this class is for accelerated composited path
-// only. These calls are redirected to GpuMessageFilter.
-void RenderProcessHostImpl::BeginFrameSubscription(
-    int route_id,
-    scoped_ptr<RenderWidgetHostViewFrameSubscriber> subscriber) {
-  if (!gpu_message_filter_)
-    return;
-  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE, base::Bind(
-      &GpuMessageFilter::BeginFrameSubscription,
-      gpu_message_filter_,
-      route_id, base::Passed(&subscriber)));
-}
-
-void RenderProcessHostImpl::EndFrameSubscription(int route_id) {
-  if (!gpu_message_filter_)
-    return;
-  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE, base::Bind(
-      &GpuMessageFilter::EndFrameSubscription,
-      gpu_message_filter_,
-      route_id));
 }
 
 #if defined(ENABLE_WEBRTC)

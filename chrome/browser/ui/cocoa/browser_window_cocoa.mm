@@ -73,7 +73,6 @@
 #endif
 
 using content::NativeWebKeyboardEvent;
-using content::SSLStatus;
 using content::WebContents;
 
 namespace {
@@ -170,11 +169,11 @@ void BrowserWindowCocoa::Show() {
   }
 
   {
-    TRACE_EVENT0("ui", "BrowserWindowCocoa::Show Activate");
+    TRACE_EVENT0("ui", "BrowserWindowCocoa::Show makeKeyAndOrderFront");
     // This call takes up a substantial part of startup time, and an even more
     // substantial part of startup time when any CALayers are part of the
     // window's NSView heirarchy.
-    Activate();
+    [window() makeKeyAndOrderFront:controller_];
   }
 
   // When creating windows from nibs it is necessary to |makeKeyAndOrderFront:|
@@ -711,8 +710,9 @@ void BrowserWindowCocoa::ShowWebsiteSettings(
     Profile* profile,
     content::WebContents* web_contents,
     const GURL& url,
-    const content::SSLStatus& ssl) {
-  WebsiteSettingsUIBridge::Show(window(), profile, web_contents, url, ssl);
+    const SecurityStateModel::SecurityInfo& security_info) {
+  WebsiteSettingsUIBridge::Show(window(), profile, web_contents, url,
+                                security_info);
 }
 
 void BrowserWindowCocoa::ShowAppMenu() {

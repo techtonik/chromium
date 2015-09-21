@@ -34,20 +34,46 @@ enum LayoutConstant {
   // the actual border.
   OMNIBOX_DROPDOWN_BORDER_INTERIOR,
 
+  // The font size to use in the location bar and omnibox dropdown, in pixels.
+  OMNIBOX_FONT_PIXEL_SIZE,
+
+  // The amount of overlap between two adjacent tabs.
+  TABSTRIP_TAB_OVERLAP,
+
+  // The vertical overlap of the tabstrip atop the toolbar.
+  TABSTRIP_TOOLBAR_OVERLAP,
+
+  // The height of the shadow region above the top of the tabs.
+  TABSTRIP_TOP_SHADOW_HEIGHT,
+
+  // The amount by which the tab close button should overlap the trailing
+  // padding region after the tab's contents region.
+  TAB_CLOSE_BUTTON_TRAILING_PADDING_OVERLAP,
+
+  // The horizontal space between a tab's favicon and its title.
+  TAB_FAVICON_TITLE_SPACING,
+
+  // The maximum width we'll allow for a tab's title, when the tabstrip is wide
+  // enough for tabs to take as much space as they want.
+  TAB_MAXIMUM_TITLE_WIDTH,
+
+  // Width available for content inside a pinned tab.
+  TAB_PINNED_CONTENT_WIDTH,
+
   // Non-ash uses a rounded content area with no shadow in the assets.
   // Ash doesn't use a rounded content area and its top edge has an extra
   // shadow.
-  TOOLBAR_VIEW_CONTENT_SHADOW_HEIGHT,
-  TOOLBAR_VIEW_CONTENT_SHADOW_HEIGHT_ASH,
+  TOOLBAR_CONTENT_SHADOW_HEIGHT,
+  TOOLBAR_CONTENT_SHADOW_HEIGHT_ASH,
 
   // Additional horizontal padding between the elements in the toolbar.
-  TOOLBAR_VIEW_ELEMENT_PADDING,
+  TOOLBAR_ELEMENT_PADDING,
 
   // Padding between the right-edge of the location bar and browser actions.
-  TOOLBAR_VIEW_LOCATION_BAR_RIGHT_PADDING,
+  TOOLBAR_LOCATION_BAR_RIGHT_PADDING,
 
-  // The horizontal space between most items.
-  TOOLBAR_VIEW_STANDARD_SPACING,
+  // The horizontal space between most items in the toolbar.
+  TOOLBAR_STANDARD_SPACING,
 };
 
 enum LayoutInset {
@@ -59,12 +85,15 @@ enum LayoutInset {
   // row edge.
   OMNIBOX_DROPDOWN_TEXT,
 
-  // The spacing between a ToolbarButton's image and its border.
-  TOOLBAR_BUTTON,
+  // The padding inside the tab bounds that defines the tab contents region.
+  TAB,
 
   // The minimum padding of the toolbar.  The edge graphics have some built-in
   // spacing, shadowing, so this accounts for that as well.
-  TOOLBAR_VIEW,
+  TOOLBAR,
+
+  // The spacing between a ToolbarButton's image and its border.
+  TOOLBAR_BUTTON,
 };
 
 int GetLayoutConstant(LayoutConstant constant);

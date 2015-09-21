@@ -26,10 +26,11 @@
 #include "content/common/sandbox_win.h"
 #include "content/public/common/sandbox_init.h"
 #elif defined(OS_MACOSX)
-#include "content/browser/bootstrap_sandbox_mac.h"
+#include "content/browser/bootstrap_sandbox_manager_mac.h"
 #include "content/browser/browser_io_surface_manager_mac.h"
 #include "content/browser/mach_broker_mac.h"
 #include "sandbox/mac/bootstrap_sandbox.h"
+#include "sandbox/mac/pre_exec_delegate.h"
 #elif defined(OS_ANDROID)
 #include "base/android/jni_android.h"
 #include "content/browser/android/child_process_launcher_android.h"
@@ -242,26 +243,30 @@ void LaunchOnLauncherThread(const NotifyCallback& callback,
     // Make sure the IOSurfaceManager service is running.
     BrowserIOSurfaceManager::GetInstance()->EnsureRunning();
 
-    const int bootstrap_sandbox_policy = delegate->GetSandboxType();
-    if (ShouldEnableBootstrapSandbox() &&
-        bootstrap_sandbox_policy != SANDBOX_TYPE_INVALID) {
-      options.replacement_bootstrap_name =
-          GetBootstrapSandbox()->server_bootstrap_name();
-      GetBootstrapSandbox()->PrepareToForkWithPolicy(
-          bootstrap_sandbox_policy);
+    const SandboxType sandbox_type = delegate->GetSandboxType();
+    scoped_ptr<sandbox::PreExecDelegate> pre_exec_delegate;
+    if (BootstrapSandboxManager::ShouldEnable()) {
+      BootstrapSandboxManager* sandbox_manager =
+          BootstrapSandboxManager::GetInstance();
+      if (sandbox_manager->EnabledForSandbox(sandbox_type)) {
+        pre_exec_delegate =
+            sandbox_manager->sandbox()->NewClient(sandbox_type).Pass();
+      }
     }
+    options.pre_exec_delegate = pre_exec_delegate.get();
 #endif  // defined(OS_MACOSX)
 
     process = base::LaunchProcess(*cmd_line, options);
 
 #if defined(OS_MACOSX)
-    if (ShouldEnableBootstrapSandbox() &&
-        bootstrap_sandbox_policy != SANDBOX_TYPE_INVALID) {
-      GetBootstrapSandbox()->FinishedFork(process.Handle());
-    }
-
-    if (process.IsValid())
+    if (process.IsValid()) {
       broker->AddPlaceholderForPid(process.Pid(), child_process_id);
+    } else {
+      if (pre_exec_delegate) {
+        BootstrapSandboxManager::GetInstance()->sandbox()->RevokeToken(
+            pre_exec_delegate->sandbox_token());
+      }
+    }
 
     // After updating the broker, release the lock and let the child's
     // messasge be processed on the broker's thread.

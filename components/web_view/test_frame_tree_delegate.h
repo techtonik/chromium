@@ -37,6 +37,8 @@ class TestFrameTreeDelegate : public FrameTreeDelegate {
   void WaitForFrameDisconnected(Frame* frame);
 
   // TestFrameTreeDelegate:
+  scoped_ptr<FrameUserData> CreateUserDataForNewFrame(
+      FrameTreeClientPtr frame_tree_client) override;
   bool CanPostMessageEventToFrame(const Frame* source,
                                   const Frame* target,
                                   HTMLMessageEvent* event) override;
@@ -47,6 +49,7 @@ class TestFrameTreeDelegate : public FrameTreeDelegate {
                         mojo::URLRequestPtr request,
                         const CanNavigateFrameCallback& callback) override;
   void DidStartNavigation(Frame* frame) override;
+  void DidCommitProvisionalLoad(Frame* frame) override;
   void DidCreateFrame(Frame* frame) override;
   void DidDestroyFrame(Frame* frame) override;
   void OnViewEmbeddedInFrameDisconnected(Frame* frame) override;

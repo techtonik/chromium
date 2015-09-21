@@ -35,8 +35,8 @@ group("all_components") {
     "//components/compression",
     "//components/content_settings/core/browser",
     "//components/content_settings/core/common",
-    "//components/crash/app",
-    "//components/crash/browser",
+    "//components/crash/content/app",
+    "//components/crash/content/browser",
     "//components/crx_file",
     "//components/data_reduction_proxy/core/browser",
     "//components/data_reduction_proxy/core/common",
@@ -69,6 +69,7 @@ group("all_components") {
     "//components/mime_util",
     "//components/navigation_interception",
     "//components/navigation_metrics",
+    "//components/net_log",
     "//components/network_hints/browser",
     "//components/network_hints/common",
     "//components/network_hints/renderer",
@@ -104,6 +105,7 @@ group("all_components") {
     "//components/security_interstitials/core",
     "//components/sessions",
     "//components/signin/core/browser",
+    "//components/ssl_errors",
     "//components/startup_metric_utils",
     "//components/strings",
     "//components/sync_driver",
@@ -189,8 +191,8 @@ group("all_components") {
       "//components/autofill/content/browser",  # Blocked on content/blink.
       "//components/autofill/content/common",  # Blocked on content.
       "//components/autofill/content/renderer",  # Blocked on content/blink.
-      "//components/crash/app",  # Should work, needs checking.
-      "//components/crash/browser",  # Should work, needs checking.
+      "//components/crash/content/app",  # Should work, needs checking.
+      "//components/crash/content/browser",  # Should work, needs checking.
       "//components/captive_portal",  # Should work, needs checking.
       "//components/cloud_devices/common",  # Should work, needs checking.
       "//components/cdm/browser",  # Blocked on content.
@@ -343,6 +345,7 @@ test("components_unittests") {
     "//components/memory_pressure:unit_tests",
     "//components/metrics:unit_tests",
     "//components/mime_util:unit_tests",
+    "//components/net_log:unit_tests",
     "//components/network_time:unit_tests",
     "//components/offline_pages:unit_tests",
     "//components/omnibox/browser:unit_tests",

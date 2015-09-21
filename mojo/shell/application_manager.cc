@@ -59,8 +59,9 @@ ApplicationManager::ApplicationManager(
 }
 
 ApplicationManager::~ApplicationManager() {
-  URLToContentHandlerMap url_to_content_handler(url_to_content_handler_);
-  for (auto& pair : url_to_content_handler)
+  IdentityToContentHandlerMap identity_to_content_handler(
+      identity_to_content_handler_);
+  for (auto& pair : identity_to_content_handler)
     pair.second->CloseConnection();
   TerminateShellConnections();
   STLDeleteValues(&url_to_loader_);
@@ -71,59 +72,24 @@ void ApplicationManager::TerminateShellConnections() {
 }
 
 void ApplicationManager::ConnectToApplication(
-    ApplicationInstance* originator,
-    URLRequestPtr app_url_request,
-    const std::string& qualifier,
-    InterfaceRequest<ServiceProvider> services,
-    ServiceProviderPtr exposed_services,
-    const CapabilityFilter& filter,
-    const base::Closure& on_application_end,
-    const Shell::ConnectToApplicationCallback& connect_callback) {
-  scoped_ptr<ConnectToApplicationParams> params(new ConnectToApplicationParams);
-  params->SetOriginatorInfo(originator);
-  params->SetURLInfo(app_url_request.Pass());
-  params->set_qualifier(qualifier);
-  params->set_services(services.Pass());
-  params->set_exposed_services(exposed_services.Pass());
-  params->set_filter(filter);
-  params->set_on_application_end(on_application_end);
-  params->set_connect_callback(connect_callback);
-
-  ConnectToApplication(params.Pass());
-}
-
-void ApplicationManager::ConnectToApplication(
     scoped_ptr<ConnectToApplicationParams> params) {
-  GURL original_url = params->app_url();
-  URLRequestPtr original_url_request = params->TakeAppURLRequest();
-
   TRACE_EVENT_INSTANT1("mojo_shell", "ApplicationManager::ConnectToApplication",
                        TRACE_EVENT_SCOPE_THREAD, "original_url",
-                       original_url.spec());
-  DCHECK(original_url.is_valid());
-  DCHECK(original_url_request);
+                       params->app_url().spec());
+  DCHECK(params->app_url().is_valid());
 
-  // We need to look for running instances based on both the unresolved and
-  // resolved urls.
+  // Connect to an existing matching instance, if possible.
   if (ConnectToRunningApplication(&params))
     return;
 
-  GURL resolved_url = package_manager_->ResolveURL(original_url);
-  params->SetURLInfo(resolved_url);
-  if (ConnectToRunningApplication(&params))
-    return;
-
-  // The application is not running, let's compute the parameters.
-  // NOTE: Set URL info using |original_url_request| instead of |original_url|
-  // because it may contain more information (e.g., it is a POST request).
-  params->SetURLInfo(original_url_request.Pass());
-  ApplicationLoader* loader = GetLoaderForURL(resolved_url);
+  ApplicationLoader* loader = GetLoaderForURL(params->app_url());
   if (loader) {
-    ConnectToApplicationWithLoader(&params, resolved_url, loader);
+    GURL url = params->app_url();
+    loader->Load(url, CreateInstance(params.Pass(), nullptr));
     return;
   }
 
-  original_url_request = params->TakeAppURLRequest();
+  URLRequestPtr original_url_request = params->TakeAppURLRequest();
   auto callback =
       base::Bind(&ApplicationManager::HandleFetchCallback,
                  weak_ptr_factory_.GetWeakPtr(), base::Passed(&params));
@@ -141,17 +107,7 @@ bool ApplicationManager::ConnectToRunningApplication(
   return true;
 }
 
-void ApplicationManager::ConnectToApplicationWithLoader(
-    scoped_ptr<ConnectToApplicationParams>* params,
-    const GURL& resolved_url,
-    ApplicationLoader* loader) {
-  if (!(*params)->app_url().SchemeIs("mojo"))
-    (*params)->SetURLInfo(resolved_url);
-
-  loader->Load(resolved_url, RegisterInstance(params->Pass(), nullptr));
-}
-
-InterfaceRequest<Application> ApplicationManager::RegisterInstance(
+InterfaceRequest<Application> ApplicationManager::CreateInstance(
     scoped_ptr<ConnectToApplicationParams> params,
     ApplicationInstance** resulting_instance) {
   Identity app_identity(params->app_url(), params->qualifier());
@@ -174,10 +130,8 @@ InterfaceRequest<Application> ApplicationManager::RegisterInstance(
 
 ApplicationInstance* ApplicationManager::GetApplicationInstance(
     const Identity& identity) const {
-  const auto& instance_it = identity_to_instance_.find(identity);
-  if (instance_it != identity_to_instance_.end())
-    return instance_it->second;
-  return nullptr;
+  const auto& it = identity_to_instance_.find(identity);
+  return it != identity_to_instance_.end() ? it->second : nullptr;
 }
 
 void ApplicationManager::HandleFetchCallback(
@@ -207,14 +161,8 @@ void ApplicationManager::HandleFetchCallback(
   // We already checked if the application was running before we fetched it, but
   // it might have started while the fetch was outstanding. We don't want to
   // have two copies of the app running, so check again.
-  //
-  // Also, it's possible the original URL was redirected to an app that is
-  // already running.
   if (ConnectToRunningApplication(&params))
     return;
-
-  if (params->app_url().scheme() != "mojo")
-    params->SetURLInfo(fetcher->GetURL());
 
   Identity originator_identity = params->originator_identity();
   CapabilityFilter originator_filter = params->originator_filter();
@@ -225,7 +173,7 @@ void ApplicationManager::HandleFetchCallback(
       params->connect_callback();
   params->set_connect_callback(EmptyConnectCallback());
   ApplicationInstance* app = nullptr;
-  InterfaceRequest<Application> request(RegisterInstance(params.Pass(), &app));
+  InterfaceRequest<Application> request(CreateInstance(params.Pass(), &app));
 
 
   GURL content_handler_url;
@@ -299,17 +247,18 @@ void ApplicationManager::LoadWithContentHandler(
     InterfaceRequest<Application> application_request,
     URLResponsePtr url_response) {
   ContentHandlerConnection* connection = nullptr;
-  std::pair<GURL, std::string> key(content_handler_url, qualifier);
+  Identity content_handler_identity(content_handler_url, qualifier);
   // TODO(beng): Figure out the extent to which capability filter should be
   //             factored into handler identity.
-  URLToContentHandlerMap::iterator iter = url_to_content_handler_.find(key);
-  if (iter != url_to_content_handler_.end()) {
+  IdentityToContentHandlerMap::iterator iter =
+      identity_to_content_handler_.find(content_handler_identity);
+  if (iter != identity_to_content_handler_.end()) {
     connection = iter->second;
   } else {
     connection = new ContentHandlerConnection(
         this, originator_identity, originator_filter, content_handler_url,
         qualifier, filter, ++content_handler_id_counter_);
-    url_to_content_handler_[key] = connection;
+    identity_to_content_handler_[content_handler_identity] = connection;
   }
 
   app->set_requesting_content_handler_id(connection->id());
@@ -350,30 +299,16 @@ void ApplicationManager::OnApplicationInstanceError(
 void ApplicationManager::OnContentHandlerConnectionClosed(
     ContentHandlerConnection* content_handler) {
   // Remove the mapping to the content handler.
-  auto it = url_to_content_handler_.find(
-      std::make_pair(content_handler->content_handler_url(),
-                     content_handler->content_handler_qualifier()));
-  DCHECK(it != url_to_content_handler_.end());
-  url_to_content_handler_.erase(it);
+  auto it = identity_to_content_handler_.find(
+      Identity(content_handler->content_handler_url(),
+               content_handler->content_handler_qualifier()));
+  DCHECK(it != identity_to_content_handler_.end());
+  identity_to_content_handler_.erase(it);
 }
 
 void ApplicationManager::CleanupRunner(NativeRunner* runner) {
   native_runners_.erase(
       std::find(native_runners_.begin(), native_runners_.end(), runner));
-}
-
-ScopedMessagePipeHandle ApplicationManager::ConnectToServiceByName(
-    const GURL& application_url,
-    const std::string& interface_name) {
-  ServiceProviderPtr services;
-  scoped_ptr<ConnectToApplicationParams> params(new ConnectToApplicationParams);
-  params->SetURLInfo(application_url);
-  params->set_services(GetProxy(&services));
-  params->set_filter(GetPermissiveCapabilityFilter());
-  ConnectToApplication(params.Pass());
-  MessagePipe pipe;
-  services->ConnectToService(interface_name, pipe.handle1.Pass());
-  return pipe.handle0.Pass();
 }
 
 Shell::ConnectToApplicationCallback EmptyConnectCallback() {

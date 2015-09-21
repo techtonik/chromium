@@ -508,6 +508,24 @@ void CreateTruncatedEntry(std::string raw_headers, MockHttpCache* cache) {
   entry->Close();
 }
 
+// Verifies that there's an entry with this |key| with the truncated flag set to
+// |flag_value|, and with an optional |data_size| (if not zero).
+void VerifyTruncatedFlag(MockHttpCache* cache,
+                         const std::string& key,
+                         bool flag_value,
+                         int data_size) {
+  disk_cache::Entry* entry;
+  ASSERT_TRUE(cache->OpenBackendEntry(key, &entry));
+  disk_cache::ScopedEntryPtr closer(entry);
+
+  HttpResponseInfo response;
+  bool truncated = !flag_value;
+  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
+  EXPECT_EQ(flag_value, truncated);
+  if (data_size)
+    EXPECT_EQ(data_size, entry->GetDataSize(1));
+}
+
 // Helper to represent a network HTTP response.
 struct Response {
   // Set this response into |trans|.
@@ -1914,7 +1932,14 @@ TEST(HttpCache, DeleteCacheWaitingForBackend2) {
   EXPECT_FALSE(cb2.have_result());
 }
 
-TEST(HttpCache, TypicalGET_ConditionalRequest) {
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_TypicalGET_ConditionalRequest \
+  DISABLED_TypicalGET_ConditionalRequest
+#else
+#define MAYBE_TypicalGET_ConditionalRequest TypicalGET_ConditionalRequest
+#endif
+TEST(HttpCache, MAYBE_TypicalGET_ConditionalRequest) {
   MockHttpCache cache;
 
   // write to the cache
@@ -3990,9 +4015,15 @@ TEST(HttpCache, RangeGET_NoContentLength) {
   RemoveMockTransaction(&transaction);
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_OK DISABLED_RangeGET_OK
+#else
+#define MAYBE_RangeGET_OK RangeGET_OK
+#endif
 // Tests that we can cache range requests and fetch random blocks from the
 // cache and the network.
-TEST(HttpCache, RangeGET_OK) {
+TEST(HttpCache, MAYBE_RangeGET_OK) {
   MockHttpCache cache;
   AddMockTransaction(&kRangeGET_TransactionOK);
   std::string headers;
@@ -4050,9 +4081,15 @@ TEST(HttpCache, RangeGET_OK) {
   RemoveMockTransaction(&kRangeGET_TransactionOK);
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_SyncOK DISABLED_RangeGET_SyncOK
+#else
+#define MAYBE_RangeGET_SyncOK RangeGET_SyncOK
+#endif
 // Tests that we can cache range requests and fetch random blocks from the
 // cache and the network, with synchronous responses.
-TEST(HttpCache, RangeGET_SyncOK) {
+TEST(HttpCache, MAYBE_RangeGET_SyncOK) {
   MockHttpCache cache;
 
   MockTransaction transaction(kRangeGET_TransactionOK);
@@ -4187,8 +4224,14 @@ TEST(HttpCache, RangeGET_Revalidate1) {
   RemoveMockTransaction(&transaction);
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_Revalidate2 DISABLED_RangeGET_Revalidate2
+#else
+#define MAYBE_RangeGET_Revalidate2 RangeGET_Revalidate2
+#endif
 // Checks that we revalidate an entry when the headers say so.
-TEST(HttpCache, RangeGET_Revalidate2) {
+TEST(HttpCache, MAYBE_RangeGET_Revalidate2) {
   MockHttpCache cache;
   std::string headers;
 
@@ -4919,8 +4962,14 @@ TEST(HttpCache, GET_Previous206_NotValidation) {
   EXPECT_EQ(2, cache.disk_cache()->create_count());
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_Previous200 DISABLED_RangeGET_Previous200
+#else
+#define MAYBE_RangeGET_Previous200 RangeGET_Previous200
+#endif
 // Tests that we can handle range requests with cached 200 responses.
-TEST(HttpCache, RangeGET_Previous200) {
+TEST(HttpCache, MAYBE_RangeGET_Previous200) {
   MockHttpCache cache;
 
   // Store the whole thing with status 200.
@@ -5061,8 +5110,14 @@ TEST(HttpCache, RangeGET_MoreThanCurrentSize) {
   RemoveMockTransaction(&kRangeGET_TransactionOK);
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_Cancel DISABLED_RangeGET_Cancel
+#else
+#define MAYBE_RangeGET_Cancel RangeGET_Cancel
+#endif
 // Tests that we don't delete a sparse entry when we cancel a request.
-TEST(HttpCache, RangeGET_Cancel) {
+TEST(HttpCache, MAYBE_RangeGET_Cancel) {
   MockHttpCache cache;
   AddMockTransaction(&kRangeGET_TransactionOK);
 
@@ -5097,9 +5152,15 @@ TEST(HttpCache, RangeGET_Cancel) {
   RemoveMockTransaction(&kRangeGET_TransactionOK);
 }
 
+// Fails only on bots. crbug.com/533640
+#if defined(OS_ANDROID)
+#define MAYBE_RangeGET_Cancel2 DISABLED_RangeGET_Cancel2
+#else
+#define MAYBE_RangeGET_Cancel2 RangeGET_Cancel2
+#endif
 // Tests that we don't delete a sparse entry when we start a new request after
 // cancelling the previous one.
-TEST(HttpCache, RangeGET_Cancel2) {
+TEST(HttpCache, MAYBE_RangeGET_Cancel2) {
   MockHttpCache cache;
   AddMockTransaction(&kRangeGET_TransactionOK);
 
@@ -5639,12 +5700,11 @@ TEST(HttpCache, DoomOnDestruction3) {
 TEST(HttpCache, SetTruncatedFlag) {
   MockHttpCache cache;
 
-  MockTransaction transaction(kSimpleGET_Transaction);
+  ScopedMockTransaction transaction(kSimpleGET_Transaction);
   transaction.response_headers =
       "Last-Modified: Wed, 28 Nov 2007 00:40:09 GMT\n"
       "Content-Length: 22\n"
       "Etag: \"foopy\"\n";
-  AddMockTransaction(&transaction);
   MockHttpRequest request(transaction);
 
   scoped_ptr<Context> c(new Context());
@@ -5686,27 +5746,18 @@ TEST(HttpCache, SetTruncatedFlag) {
   EXPECT_FALSE(c->callback.have_result());
 
   // Verify that the entry is marked as incomplete.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kSimpleGET_Transaction.url, &entry));
-  HttpResponseInfo response;
-  bool truncated = false;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_TRUE(truncated);
-  entry->Close();
-
-  RemoveMockTransaction(&transaction);
+  VerifyTruncatedFlag(&cache, kSimpleGET_Transaction.url, true, 0);
 }
 
 // Tests that we don't mark an entry as truncated when we read everything.
 TEST(HttpCache, DontSetTruncatedFlag) {
   MockHttpCache cache;
 
-  MockTransaction transaction(kSimpleGET_Transaction);
+  ScopedMockTransaction transaction(kSimpleGET_Transaction);
   transaction.response_headers =
       "Last-Modified: Wed, 28 Nov 2007 00:40:09 GMT\n"
       "Content-Length: 22\n"
       "Etag: \"foopy\"\n";
-  AddMockTransaction(&transaction);
   MockHttpRequest request(transaction);
 
   scoped_ptr<Context> c(new Context());
@@ -5725,21 +5776,66 @@ TEST(HttpCache, DontSetTruncatedFlag) {
   c->trans.reset();
 
   // Verify that the entry is not marked as truncated.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kSimpleGET_Transaction.url, &entry));
-  HttpResponseInfo response;
-  bool truncated = true;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_FALSE(truncated);
-  entry->Close();
+  VerifyTruncatedFlag(&cache, kSimpleGET_Transaction.url, false, 0);
+}
 
-  RemoveMockTransaction(&transaction);
+// Tests that sparse entries don't set the truncate flag.
+TEST(HttpCache, RangeGET_DontTruncate) {
+  MockHttpCache cache;
+
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
+  transaction.request_headers = "Range: bytes = 0-19\r\n" EXTRA_HEADER;
+
+  scoped_ptr<MockHttpRequest> request(new MockHttpRequest(transaction));
+  scoped_ptr<HttpTransaction> trans;
+
+  int rv = cache.http_cache()->CreateTransaction(DEFAULT_PRIORITY, &trans);
+  EXPECT_EQ(OK, rv);
+
+  TestCompletionCallback cb;
+  rv = trans->Start(request.get(), cb.callback(), BoundNetLog());
+  EXPECT_EQ(0, cb.GetResult(rv));
+
+  scoped_refptr<IOBuffer> buf(new IOBuffer(10));
+  rv = trans->Read(buf.get(), 10, cb.callback());
+  EXPECT_EQ(10, cb.GetResult(rv));
+
+  // Should not trigger any DCHECK.
+  trans.reset();
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, false, 0);
+}
+
+// Tests that sparse entries don't set the truncate flag (when the byte range
+//  starts after 0).
+TEST(HttpCache, RangeGET_DontTruncate2) {
+  MockHttpCache cache;
+
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
+  transaction.request_headers = "Range: bytes = 30-49\r\n" EXTRA_HEADER;
+
+  scoped_ptr<MockHttpRequest> request(new MockHttpRequest(transaction));
+  scoped_ptr<HttpTransaction> trans;
+
+  int rv = cache.http_cache()->CreateTransaction(DEFAULT_PRIORITY, &trans);
+  EXPECT_EQ(OK, rv);
+
+  TestCompletionCallback cb;
+  rv = trans->Start(request.get(), cb.callback(), BoundNetLog());
+  EXPECT_EQ(0, cb.GetResult(rv));
+
+  scoped_refptr<IOBuffer> buf(new IOBuffer(10));
+  rv = trans->Read(buf.get(), 10, cb.callback());
+  EXPECT_EQ(10, cb.GetResult(rv));
+
+  // Should not trigger any DCHECK.
+  trans.reset();
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, false, 0);
 }
 
 // Tests that we can continue with a request that was interrupted.
 TEST(HttpCache, GET_IncompleteResource) {
   MockHttpCache cache;
-  AddMockTransaction(&kRangeGET_TransactionOK);
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
 
   std::string raw_headers("HTTP/1.1 200 OK\n"
                           "Last-Modified: Sat, 18 Apr 2007 01:10:43 GMT\n"
@@ -5750,7 +5846,6 @@ TEST(HttpCache, GET_IncompleteResource) {
 
   // Now make a regular request.
   std::string headers;
-  MockTransaction transaction(kRangeGET_TransactionOK);
   transaction.request_headers = EXTRA_HEADER;
   transaction.data = kFullRangeData;
   RunTransactionTestWithResponse(cache.http_cache(), transaction, &headers);
@@ -5769,16 +5864,7 @@ TEST(HttpCache, GET_IncompleteResource) {
   EXPECT_EQ(1, cache.disk_cache()->create_count());
 
   // Verify that the disk entry was updated.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kRangeGET_TransactionOK.url, &entry));
-  EXPECT_EQ(80, entry->GetDataSize(1));
-  bool truncated = true;
-  HttpResponseInfo response;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_FALSE(truncated);
-  entry->Close();
-
-  RemoveMockTransaction(&kRangeGET_TransactionOK);
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, false, 80);
 }
 
 // Tests the handling of no-store when revalidating a truncated entry.
@@ -6044,7 +6130,7 @@ TEST(HttpCache, TransactionRetryLimit) {
 // Tests that we cache a 200 response to the validation request.
 TEST(HttpCache, GET_IncompleteResource4) {
   MockHttpCache cache;
-  AddMockTransaction(&kRangeGET_TransactionOK);
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
 
   std::string raw_headers("HTTP/1.1 200 OK\n"
                           "Last-Modified: Sat, 18 Apr 2009 01:10:43 GMT\n"
@@ -6055,7 +6141,6 @@ TEST(HttpCache, GET_IncompleteResource4) {
 
   // Now make a regular request.
   std::string headers;
-  MockTransaction transaction(kRangeGET_TransactionOK);
   transaction.request_headers = EXTRA_HEADER;
   transaction.data = "Not a range";
   RangeTransactionServer handler;
@@ -6067,23 +6152,14 @@ TEST(HttpCache, GET_IncompleteResource4) {
   EXPECT_EQ(1, cache.disk_cache()->create_count());
 
   // Verify that the disk entry was updated.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kRangeGET_TransactionOK.url, &entry));
-  EXPECT_EQ(11, entry->GetDataSize(1));
-  bool truncated = true;
-  HttpResponseInfo response;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_FALSE(truncated);
-  entry->Close();
-
-  RemoveMockTransaction(&kRangeGET_TransactionOK);
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, false, 11);
 }
 
 // Tests that when we cancel a request that was interrupted, we mark it again
 // as truncated.
 TEST(HttpCache, GET_CancelIncompleteResource) {
   MockHttpCache cache;
-  AddMockTransaction(&kRangeGET_TransactionOK);
+  ScopedMockTransaction transaction(kRangeGET_TransactionOK);
 
   std::string raw_headers("HTTP/1.1 200 OK\n"
                           "Last-Modified: Sat, 18 Apr 2009 01:10:43 GMT\n"
@@ -6093,7 +6169,6 @@ TEST(HttpCache, GET_CancelIncompleteResource) {
   CreateTruncatedEntry(raw_headers, &cache);
 
   // Now make a regular request.
-  MockTransaction transaction(kRangeGET_TransactionOK);
   transaction.request_headers = EXTRA_HEADER;
 
   MockHttpRequest request(transaction);
@@ -6120,15 +6195,7 @@ TEST(HttpCache, GET_CancelIncompleteResource) {
   EXPECT_EQ(1, cache.disk_cache()->create_count());
 
   // Verify that the disk entry was updated: now we have 30 bytes.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kRangeGET_TransactionOK.url, &entry));
-  EXPECT_EQ(30, entry->GetDataSize(1));
-  bool truncated = false;
-  HttpResponseInfo response;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_TRUE(truncated);
-  entry->Close();
-  RemoveMockTransaction(&kRangeGET_TransactionOK);
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, true, 30);
 }
 
 // Tests that we can handle range requests when we have a truncated entry.
@@ -6875,7 +6942,7 @@ TEST(HttpCache, StopCachingSavesEntry) {
     ASSERT_EQ(OK, cache.CreateTransaction(&trans));
 
     // Force a response that can be resumed.
-    MockTransaction mock_transaction(kSimpleGET_Transaction);
+    ScopedMockTransaction mock_transaction(kSimpleGET_Transaction);
     AddMockTransaction(&mock_transaction);
     mock_transaction.response_headers = "Cache-Control: max-age=10000\n"
                                         "Content-Length: 42\n"
@@ -6895,18 +6962,10 @@ TEST(HttpCache, StopCachingSavesEntry) {
     EXPECT_GT(callback.GetResult(rv), 0);
     rv = trans->Read(buf.get(), 256, callback.callback());
     EXPECT_EQ(callback.GetResult(rv), 0);
-
-    RemoveMockTransaction(&mock_transaction);
   }
 
   // Verify that the entry is marked as incomplete.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kSimpleGET_Transaction.url, &entry));
-  HttpResponseInfo response;
-  bool truncated = false;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_TRUE(truncated);
-  entry->Close();
+  VerifyTruncatedFlag(&cache, kSimpleGET_Transaction.url, true, 0);
 }
 
 // Tests that we handle truncated enries when StopCaching is called.
@@ -6950,15 +7009,7 @@ TEST(HttpCache, StopCachingTruncatedEntry) {
   }
 
   // Verify that the disk entry was updated.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kRangeGET_TransactionOK.url, &entry));
-  EXPECT_EQ(80, entry->GetDataSize(1));
-  bool truncated = true;
-  HttpResponseInfo response;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_FALSE(truncated);
-  entry->Close();
-
+  VerifyTruncatedFlag(&cache, kRangeGET_TransactionOK.url, false, 80);
   RemoveMockTransaction(&kRangeGET_TransactionOK);
 }
 
@@ -6998,13 +7049,7 @@ TEST(HttpCache, TruncatedByContentLength2) {
   RemoveMockTransaction(&transaction);
 
   // Verify that the entry is marked as incomplete.
-  disk_cache::Entry* entry;
-  ASSERT_TRUE(cache.OpenBackendEntry(kSimpleGET_Transaction.url, &entry));
-  HttpResponseInfo response;
-  bool truncated = false;
-  EXPECT_TRUE(MockHttpCache::ReadResponseInfo(entry, &response, &truncated));
-  EXPECT_TRUE(truncated);
-  entry->Close();
+  VerifyTruncatedFlag(&cache, kSimpleGET_Transaction.url, true, 0);
 }
 
 // Make sure that calling SetPriority on a cache transaction passes on

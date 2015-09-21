@@ -1990,11 +1990,17 @@ Even if you have downloaded files from this website before, the website might ha
                desc="In the download view, 'Pause' link text">
         Pause
       </message>
-      <message name="IDS_DOWNLOAD_SEARCH_BUTTON" desc="Title of the button in the download page that triggers a search">
+      <message name="IDS_DOWNLOAD_SEARCH_BUTTON"
+               desc="Title of the button in the download page that triggers a search">
         Search downloads
       </message>
-      <message name="IDS_MD_DOWNLOAD_SEARCH" desc="Placeholder text/label for the search input in the download page">
+      <message name="IDS_MD_DOWNLOAD_SEARCH"
+               desc="Placeholder text/label for the search input in the download page">
         Search
+      </message>
+      <message name="IDS_DOWNLOAD_CLEAR_SEARCH"
+               desc="Tooltip text for the button that clears the search term on the downloads page.">
+        Clear search
       </message>
       <message name="IDS_DOWNLOAD_SEARCHRESULTSFOR" desc="Format string for search results">
         Search results for '<ph name="SEARCH_STRING">$1</ph>'
@@ -2091,6 +2097,10 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_DOWNLOAD_BY_EXTENSION_URL"
                desc="Indicates which extension downloaded this file by name and URL.">
         Downloaded by &lt;a href=&quot;<ph name="URL">$1<ex>adblock.com</ex></ph>&quot;&gt;<ph name="EXTENSION">$2<ex>The Best Chrome Extension Ever</ex></ph>&lt;/a&gt;
+      </message>
+      <message name="IDS_DOWNLOAD_IN_INCOGNITO"
+               desc="Indicates a download was started in Incognito mode.">
+        Downloaded in Incognito
       </message>
 
       <!-- Download Context Menu Items -->
@@ -2657,119 +2667,6 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_BLOCKED_PLUGINS_LOAD_ALL" desc="Button to load all blocked plugins on a page, displayed in bubble when a page tries to display plugins.">
         Run all plugins this time
-      </message>
-
-      <!-- Certificate error strings -->
-      <message name="IDS_CERT_ERROR_COMMON_NAME_INVALID_DETAILS" desc="Details for an unsafe common name in an X509 certificate">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is from <ph name="DOMAIN2">&lt;strong&gt;$2<ex>fakepaypal.com</ex>&lt;/strong&gt;</ph>. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_COMMON_NAME_INVALID_DESCRIPTION" desc="Description for an unsafe common name in an X509 certificate">
-        Server's certificate does not match the URL.
-      </message>
-
-      <message name="IDS_CERT_ERROR_EXPIRED_DETAILS" desc="Details for an expired X509 certificate [ICU Syntax]">
-        {1, plural,
-         =1 {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired yesterday. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_DATE">{2, date, full}<ex>Monday, July 16, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.}
-         other {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired # days ago. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_DATE">{2, date, full}<ex>Monday, July 16, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.}}
-      </message>
-      <message name="IDS_CERT_ERROR_EXPIRED_DESCRIPTION" desc="Description for an expired X509 certificate">
-        Server's certificate has expired.
-      </message>
-
-      <message name="IDS_CERT_ERROR_NOT_YET_VALID_DETAILS" desc="Details for an X509 certificate that is not yet valid [ICU Syntax]">
-        {1, plural,
-         =1 {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is supposedly from tomorrow. This may be caused by a misconfiguration or an attacker intercepting your connection.}
-         other {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is supposedly from # days in the future. This may be caused by a misconfiguration or an attacker intercepting your connection.}}
-      </message>
-      <message name="IDS_CERT_ERROR_NOT_YET_VALID_DESCRIPTION" desc="Description for an X509 certificate that is not yet valid">
-        Server's certificate is not yet valid.
-      </message>
-
-      <message name="IDS_CERT_ERROR_NOT_VALID_AT_THIS_TIME_DETAILS" desc="Details for a chain with a X509 certificate that is not valid at this time.">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is not valid at this time. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_NOT_VALID_AT_THIS_TIME_DESCRIPTION" desc="Description for a chain with a X509 certificate that is not valid at this time.">
-        Server's certificate is not valid at this time.
-      </message>
-
-      <message name="IDS_CERT_ERROR_CHAIN_EXPIRED_DETAILS" desc="Details for an expired root or intermediate cert in chain">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_TIME">$3<ex>July 18, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.
-      </message>
-      <message name="IDS_CERT_ERROR_CHAIN_EXPIRED_DESCRIPTION" desc="Description for an expired intermediate/root certificate in chain">
-        A root or intermediate certificate has expired.
-      </message>
-
-      <message name="IDS_CERT_ERROR_AUTHORITY_INVALID_DESCRIPTION" desc="Description for an X509 certificate with an invalid authority">
-        Server's certificate is not trusted.
-      </message>
-
-      <message name="IDS_CERT_ERROR_CONTAINS_ERRORS_DETAILS" desc="Details of the error page for an X509 certificate that contains errors">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate contains errors. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_CONTAINS_ERRORS_DESCRIPTION" desc="Description of the error page for an X509 certificate that contains errors">
-        Server's certificate contains errors.
-      </message>
-
-      <message name="IDS_CERT_ERROR_UNABLE_TO_CHECK_REVOCATION_DETAILS" desc="Details for being unable to check revocation status of an X509 certificate">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate might be revoked. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_UNABLE_TO_CHECK_REVOCATION_DESCRIPTION" desc="Description for being unable to check revocation status of an X509 certificate">
-        Server's certificate cannot be checked.
-      </message>
-
-      <message name="IDS_CERT_ERROR_NO_REVOCATION_MECHANISM_DETAILS" desc="Details for not finding a revocation mechanism in an X509 certificate">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate might be revoked. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_NO_REVOCATION_MECHANISM_DESCRIPTION" desc="Description for not finding a revocation mechanism in an X509 certificate">
-        No revocation mechanism found.
-      </message>
-
-      <message name="IDS_CERT_ERROR_REVOKED_CERT_DETAILS" desc="Details of the error page for a revoked certificate">
-        You attempted to reach <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>, but the certificate that the server presented has been revoked by its issuer. This means that the security credentials the server presented absolutely should not be trusted. You may be communicating with an attacker.
-      </message>
-      <message name="IDS_CERT_ERROR_REVOKED_CERT_DESCRIPTION" desc="Description of the error page for a revoked certificate">
-        Server's certificate has been revoked.
-      </message>
-
-      <message name="IDS_CERT_ERROR_INVALID_CERT_DETAILS" desc="Details of the error page for an X509 certificate that is invalid">
-        You attempted to reach <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>, but the server presented an invalid certificate.
-      </message>
-      <message name="IDS_CERT_ERROR_INVALID_CERT_DESCRIPTION" desc="Description of the error page for an X509 certificate that is invalid">
-        Server's certificate is invalid.
-      </message>
-
-      <message name="IDS_CERT_ERROR_WEAK_SIGNATURE_ALGORITHM_DETAILS" desc="Details of the error page for a certificate signed using a weak signature algorithm">
-        You attempted to reach <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>, but the server presented a certificate signed using a weak signature algorithm. This means that the security credentials the server presented could have been forged, and the server may not be the server you expected (you may be communicating with an attacker).
-      </message>
-      <message name="IDS_CERT_ERROR_WEAK_SIGNATURE_ALGORITHM_DESCRIPTION" desc="Description of the error page for a certificate signed using a weak signature algorithm">
-        Server's certificate is signed using a weak signature algorithm.
-      </message>
-
-      <message name="IDS_CERT_ERROR_WEAK_KEY_DETAILS" desc="Details of the error page for a certificate containing a weak key">
-        You attempted to reach <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>, but the server presented a certificate containing a weak key. An attacker could have broken the private key, and the server may not be the server you expected (you may be communicating with an attacker).
-      </message>
-      <message name="IDS_CERT_ERROR_WEAK_KEY_DESCRIPTION" desc="Description of the error page for a certificate containing a weak key">
-        The server certificate contains a weak cryptographic key.
-      </message>
-
-      <message name="IDS_CERT_ERROR_NAME_CONSTRAINT_VIOLATION_DETAILS" desc="Details of the error page for a certificate that contains a name outside of its scope">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate might have been issued fraudulently. This may be caused by a misconfiguration or an attacker intercepting your connection.
-      </message>
-      <message name="IDS_CERT_ERROR_NAME_CONSTRAINT_VIOLATION_DESCRIPTION" desc="Description of the error page for a certificate that contains a name outside of its scope">
-        Server's certificate violates name constraints.
-      </message>
-      <message name="IDS_CERT_ERROR_VALIDITY_TOO_LONG_DETAILS" desc="Details of the error page for a certificate whose validity period is too long">
-        You attempted to reach <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>, but the server presented a certificate whose validity period is too long to be trustworthy.
-      </message>
-      <message name="IDS_CERT_ERROR_VALIDITY_TOO_LONG_DESCRIPTION" desc="Description of the error page for a certificate whose validity period is too long">
-        The server certificate has a validity period that is too long.
-      </message>
-
-      <message name="IDS_CERT_ERROR_UNKNOWN_ERROR_DETAILS" desc="Details of the error page for an unknown ssl error">
-        An unknown error has occurred.
-      </message>
-      <message name="IDS_CERT_ERROR_UNKNOWN_ERROR_DESCRIPTION" desc="Description of the error page for an unknown ssl error">
-        Unknown server certificate error.
       </message>
 
       <!-- Administrator-provided certificate notifications -->
@@ -4718,6 +4615,24 @@ Even if you have downloaded files from this website before, the website might ha
         </message>
         <message name="IDS_MD_EXTENSIONS_SEARCH" desc="The text displayed in the search box on the chrome://extensions page.">
           Search
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_EXTENSIONS" desc="The text displayed in the sidebar to go to the extensions section of the page.">
+          Extensions
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_APPS" desc="The text displayed in the sidebar to go to the apps section of the page.">
+          Chrome Apps
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_WEBSITES" desc="The text displayed in the sidebar to go to the websites section of the page.">
+          Websites
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_DEVELOPER_MODE" desc="The text displayed next to the checkbox to toggle developer mode in the extensions page.">
+          Developer mode
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_GET_MORE_EXTENSIONS" desc="The text for the link to get more extensions in the extensions page.">
+          Get more extensions
+        </message>
+        <message name="IDS_MD_EXTENSIONS_SIDEBAR_KEYBOARD_SHORTCUTS" desc="The text for the link to manage keyboard shortcuts for extensions.">
+          Keyboard shortcuts
         </message>
         <if expr="not use_titlecase">
           <message name="IDS_EXTENSIONS_ALWAYS_RUN" desc="The text for the 'always run' item in context menus (sentence case).">
@@ -9434,12 +9349,6 @@ I don't think this site should be blocked!
       <message name="IDS_ERRORPAGES_HEADING_PINNING_FAILURE" desc="Title of the error page for a certificate which doesn't match the built-in pins for that name">
         Incorrect certificate for host.
       </message>
-      <message name="IDS_ERRORPAGES_SUMMARY_PINNING_FAILURE" desc="Details of the error page for a certificate which doesn't match the built-in pins for that name">
-        The server presented a certificate that doesn't match built-in expectations. These expectations are included for certain, high-security websites in order to protect you.
-      </message>
-      <message name="IDS_ERRORPAGES_DETAILS_PINNING_FAILURE" desc="Description of the error page for a certificate which doesn't match the built-in pins for that name">
-        The server's certificate appears to be a forgery.
-      </message>
 
       <message name="IDS_ERRORPAGES_HEADING_BAD_SSL_CLIENT_AUTH_CERT" desc="Heading in the error page for SSL client certificate authentication failure.">
         Certificate-based authentication failed
@@ -10664,9 +10573,6 @@ I don't think this site should be blocked!
         <message name="IDS_RESET_PROFILE_SETTINGS_LOCALE" desc="Locale field in the feedback details of the Reset Profile Settings dialog">
           Locale
         </message>
-        <message name="IDS_RESET_PROFILE_SETTINGS_USER_AGENT" desc="User Agent field in the feedback details of the Reset Profile Settings dialog">
-          User Agent
-        </message>
         <message name="IDS_RESET_PROFILE_SETTINGS_STARTUP_URLS" desc="Startup URLs tag in the feedback details of the Reset Profile Settings dialog">
           Startup URLs
         </message>
@@ -10679,20 +10585,14 @@ I don't think this site should be blocked!
         <message name="IDS_RESET_PROFILE_SETTINGS_HOMEPAGE_IS_NTP" desc="Tag in the feedback details of the Reset Profile Settings dialog">
           Homepage is the New Tab page
         </message>
-        <message name="IDS_RESET_PROFILE_SETTINGS_HOMEPAGE_IS_NTP_TRUE" desc="Value of HOMEPAGE_IS_NTP in the feedback details of the Reset Profile Settings dialog">
+        <message name="IDS_RESET_PROFILE_SETTINGS_YES" desc="'Yes' value for 'Homepage is NTP' and 'Show homebutton' in the feedback details of the Reset Profile Settings dialog">
           Yes
         </message>
-        <message name="IDS_RESET_PROFILE_SETTINGS_HOMEPAGE_IS_NTP_FALSE" desc="Value of HOMEPAGE_IS_NTP in the feedback details of the Reset Profile Settings dialog">
+        <message name="IDS_RESET_PROFILE_SETTINGS_NO" desc="'No' value for 'Homepage is NTP' and 'Show homebutton' in the feedback details of the Reset Profile Settings dialog">
           No
         </message>
         <message name="IDS_RESET_PROFILE_SETTINGS_SHOW_HOME_BUTTON" desc="Tag in the feedback details of the Reset Profile Settings dialog">
           Show Home button
-        </message>
-        <message name="IDS_RESET_PROFILE_SETTINGS_SHOW_HOME_BUTTON_TRUE" desc="Value of SHOW_HOME_BUTTON in the feedback details of the Reset Profile Settings dialog">
-          Yes
-        </message>
-        <message name="IDS_RESET_PROFILE_SETTINGS_SHOW_HOME_BUTTON_FALSE" desc="Value of SHOW_HOME_BUTTON in the feedback details of the Reset Profile Settings dialog">
-          No
         </message>
         <message name="IDS_RESET_PROFILE_SETTINGS_DSE" desc="Default search engine in the feedback details of the Reset Profile Settings dialog">
           Default search engine
@@ -12732,6 +12632,9 @@ Some features may be unavailable.  Please check that the profile exists and you 
         <message name="IDS_NOTIFICATION_WELCOME_TITLE" desc="Notification title for the Welcome Notification">
           Google Now for Chrome!
         </message>
+        <message name="IDS_NOTIFICATION_SETTINGS" desc="Button label to go to the notification settings panel">
+          Notification settings
+        </message>
         <message name="IDS_MESSAGE_CENTER_FOOTER_WITH_PRODUCT_TITLE" desc="The label in the footer of the message center tray, with the product title.">
           <ph name="product_name">$1<ex>Chrome</ex></ph> Notifications
         </message>
@@ -13960,12 +13863,6 @@ After you create a new supervised user, you can manage their settings at any tim
 
       <!-- Aura strings -->
       <if expr="use_ash">
-        <message name="IDS_LAUNCHER_CONTEXT_MENU_NEW_TAB" desc="Title text for the 'open new' context menu item of the launcher for apps configured to open in a tab">
-          New tab
-        </message>
-        <message name="IDS_LAUNCHER_CONTEXT_MENU_NEW_WINDOW" desc="Title text for the 'open new' context menu item of the launcher for apps configured to open windowed">
-          New window
-        </message>
         <message name="IDS_LAUNCHER_CONTEXT_MENU_CLOSE" desc="Title text for the 'close' context menu item of the launcher">
           Close
         </message>
@@ -13974,12 +13871,6 @@ After you create a new supervised user, you can manage their settings at any tim
         </message>
         <message name="IDS_LAUNCHER_CONTEXT_MENU_UNPIN" desc="Title text for the 'unpin' context menu item of the launcher">
           Unpin
-        </message>
-        <message name="IDS_LAUNCHER_NEW_WINDOW" desc="The text label of the New Window menu item">
-          New window
-        </message>
-        <message name="IDS_LAUNCHER_NEW_INCOGNITO_WINDOW" desc="The text label of the New incognito window menu item">
-          New incognito window
         </message>
       </if>
 
@@ -15421,6 +15312,12 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_FLAGS_USE_ANDROID_MIDI_API_DESCRIPTION" desc="Description for the flag to use android midi api.">
         Use Android Midi API for WebMIDI (effective only with Android M+ devices).
+      </message>
+      <message name="IDS_FLAGS_THEME_COLOR_IN_TABBED_MODE_NAME" desc="Name for the flag to enable theme-color in tabbed mode of Chrome.">
+        Enable theme-color in tabbed mode.
+      </message>
+      <message name="IDS_FLAGS_THEME_COLOR_IN_TABBED_MODE_DESCRIPTION" desc="Description for the flag to enable theme-color in tabbed mode of Chrome.">
+        Allows websites to set the color of the omnibox in tabbed mode ("Merge Apps and Tabs" off) via theme-color meta tag.
       </message>
    </if>
 

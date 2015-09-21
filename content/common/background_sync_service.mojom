@@ -17,6 +17,15 @@ enum BackgroundSyncError {
   MAX=NOT_ALLOWED
 };
 
+enum BackgroundSyncState {
+  PENDING,
+  FIRING,
+  UNREGISTERED_WHILE_FIRING,
+  FAILED,
+  SUCCESS,
+  UNREGISTERED
+ };
+
 interface BackgroundSyncService {
   Register(SyncRegistration options, int64 service_worker_registration_id,
            bool requested_from_service_worker)
@@ -35,6 +44,7 @@ interface BackgroundSyncService {
   DuplicateRegistrationHandle(int32 handle_id) 
       => (BackgroundSyncError err, SyncRegistration? registration);  
   ReleaseRegistration(int32 handle_id);
+  NotifyWhenDone(int32 handle_id) => (BackgroundSyncError err, BackgroundSyncState final_status);
 };
 
 interface BackgroundSyncServiceClient {
