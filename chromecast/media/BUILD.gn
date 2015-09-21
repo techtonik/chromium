@@ -6,6 +6,7 @@ import("//testing/test.gni")
 
 group("media") {
   deps = [
+    "//chromecast/media/audio",
     "//chromecast/media/base",
     "//chromecast/media/cdm",
     "//chromecast/media/cma",
@@ -43,6 +44,7 @@ test("cast_media_unittests") {
 
   deps = [
     ":media",
+    "//chromecast/media/audio:test_support",
     "//base",
     "//base:i18n",
     "//base/test:test_support",
@@ -57,7 +59,7 @@ test("cast_media_unittests") {
   ]
 }
 
-# TODO(gunsch): delete this target once Chromecast M44/earlier is obsolete.
+# TODO(slan): delete this target once Chromecast M44/earlier is obsolete.
 # See: b/21639416
 shared_library("libffmpegsumo") {
   output_name = "libffmpegsumo"

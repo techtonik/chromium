@@ -22,8 +22,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/sessions/session_service_factory.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
-#include "chrome/browser/sessions/tab_restore_service_delegate.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/accelerator_utils.h"
@@ -56,6 +54,8 @@
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/google/core/browser/google_util.h"
+#include "components/sessions/core/tab_restore_service.h"
+#include "components/sessions/core/tab_restore_service_delegate.h"
 #include "components/signin/core/browser/signin_header_helper.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/ui/zoom/page_zoom.h"
@@ -117,7 +117,6 @@ using content::NavigationController;
 using content::NavigationEntry;
 using content::OpenURLParams;
 using content::Referrer;
-using content::SSLStatus;
 using content::WebContents;
 
 namespace chrome {
@@ -360,7 +359,8 @@ Browser* OpenEmptyWindow(Profile* profile, HostDesktopType desktop_type) {
 
 void OpenWindowWithRestoredTabs(Profile* profile,
                                 HostDesktopType host_desktop_type) {
-  TabRestoreService* service = TabRestoreServiceFactory::GetForProfile(profile);
+  sessions::TabRestoreService* service =
+      TabRestoreServiceFactory::GetForProfile(profile);
   if (service)
     service->RestoreMostRecentEntry(NULL, host_desktop_type);
 }
@@ -595,11 +595,11 @@ bool CanResetZoom(content::WebContents* contents) {
 
 TabStripModelDelegate::RestoreTabType GetRestoreTabType(
     const Browser* browser) {
-  TabRestoreService* service =
+  sessions::TabRestoreService* service =
       TabRestoreServiceFactory::GetForProfile(browser->profile());
   if (!service || service->entries().empty())
     return TabStripModelDelegate::RESTORE_NONE;
-  if (service->entries().front()->type == TabRestoreService::WINDOW)
+  if (service->entries().front()->type == sessions::TabRestoreService::WINDOW)
     return TabStripModelDelegate::RESTORE_WINDOW;
   return TabStripModelDelegate::RESTORE_TAB;
 }
@@ -860,13 +860,14 @@ void ShowFindBar(Browser* browser) {
   browser->GetFindBarController()->Show();
 }
 
-void ShowWebsiteSettings(Browser* browser,
-                         content::WebContents* web_contents,
-                         const GURL& url,
-                         const SSLStatus& ssl) {
+void ShowWebsiteSettings(
+    Browser* browser,
+    content::WebContents* web_contents,
+    const GURL& url,
+    const SecurityStateModel::SecurityInfo& security_info) {
   browser->window()->ShowWebsiteSettings(
       Profile::FromBrowserContext(web_contents->GetBrowserContext()),
-      web_contents, url, ssl);
+      web_contents, url, security_info);
 }
 
 void Print(Browser* browser) {

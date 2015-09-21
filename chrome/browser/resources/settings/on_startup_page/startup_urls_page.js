@@ -36,18 +36,53 @@ Polymer({
     /** @type {!Array<string>} */
     savedUrlList: {
       type: Array,
-      value: function() { return []; }
     },
+  },
+
+  observers: [
+    'prefsChanged_(prefs.session.startup_urls.value.*)',
+  ],
+
+  attached: function() {
+    var self = this;
+    cr.define('Settings', function() {
+      return {
+        updateStartupPages: function() {
+          return self.updateStartupPages_.apply(self, arguments);
+        },
+      };
+    });
+  },
+
+
+  /** @private */
+  prefsChanged_: function(change) {
+    if (!this.savedUrlList) {
+      var pref = /** @type {chrome.settingsPrivate.PrefObject} */(
+          this.get('prefs.session.startup_urls'));
+      if (pref)
+        this.savedUrlList = pref.value.slice();
+    }
+  },
+
+  /** @private */
+  updateStartupPages_: function(data) {
+    var urlArray = [];
+    for (var i = 0; i < data.length; ++i)
+      urlArray.push(data[i].url);
+    this.set('prefs.session.startup_urls.value', urlArray);
   },
 
   /** @private */
   onUseCurrentPagesTap_: function() {
-    // TODO(dschuyler): I'll be making a chrome.send call here.
+    chrome.send('setStartupPagesToCurrentPages');
   },
 
   /** @private */
   onCancelTap_: function() {
-    this.set('prefs.session.startup_urls.value', this.savedUrlList.slice());
+    if (this.savedUrlList !== undefined) {
+      this.set('prefs.session.startup_urls.value', this.savedUrlList.slice());
+    }
   },
 
   /** @private */

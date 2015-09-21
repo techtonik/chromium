@@ -51,16 +51,20 @@ class FrameTree {
   // that it is sharing the FrameTreeClient/FrameTreeServer of |parent|. There
   // may or may not be a View identified by |frame_id| yet. See Frame for
   // details.
-  Frame* CreateSharedFrame(Frame* parent,
-                           uint32_t frame_id,
-                           uint32_t app_id,
-                           const Frame::ClientPropertyMap& client_properties);
+  Frame* CreateChildFrame(
+      Frame* parent,
+      mojo::InterfaceRequest<FrameTreeServer> server_request,
+      FrameTreeClientPtr client,
+      uint32_t frame_id,
+      uint32_t app_id,
+      const Frame::ClientPropertyMap& client_properties);
 
   // Increments the change id, returning the new value.
   uint32_t AdvanceChangeID();
 
   void LoadingStateChanged();
   void TitleChanged(const mojo::String& title);
+  void DidCommitProvisionalLoad(Frame* source);
   void ClientPropertyChanged(const Frame* source,
                              const mojo::String& name,
                              const mojo::Array<uint8_t>& value);

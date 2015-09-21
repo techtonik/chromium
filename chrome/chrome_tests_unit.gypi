@@ -147,7 +147,6 @@
       'browser/net/dns_probe_runner_unittest.cc',
       'browser/net/dns_probe_service_unittest.cc',
       'browser/net/net_error_tab_helper_unittest.cc',
-      'browser/net/net_log_temp_file_unittest.cc',
       'browser/net/predictor_unittest.cc',
       'browser/net/probe_message_unittest.cc',
       'browser/net/quota_policy_channel_id_store_unittest.cc',
@@ -227,7 +226,6 @@
       'browser/sync/abstract_profile_sync_service_test.cc',
       'browser/sync/abstract_profile_sync_service_test.h',
       'browser/sync/backend_migrator_unittest.cc',
-      'browser/sync/backup_rollback_controller_unittest.cc',
       'browser/sync/glue/autofill_data_type_controller_unittest.cc',
       'browser/sync/glue/bookmark_data_type_controller_unittest.cc',
       'browser/sync/glue/browser_thread_model_worker_unittest.cc',
@@ -619,6 +617,7 @@
       'browser/extensions/api/declarative/rules_registry_service_unittest.cc',
       'browser/extensions/api/declarative/rules_registry_with_cache_unittest.cc',
       'browser/extensions/api/declarative_content/chrome_content_rules_registry_unittest.cc',
+      'browser/extensions/api/declarative_content/content_condition_unittest.cc',
       'browser/extensions/api/declarative_content/content_action_unittest.cc',
       'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.cc',
       'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.h',
@@ -1630,7 +1629,6 @@
     # Sources for Offline pages. For now only for Android.
     'chrome_unit_tests_offline_pages_sources': [
       'browser/android/offline_pages/offline_page_mhtml_archiver_unittest.cc',
-      'browser/android/offline_pages/offline_page_web_contents_observer_unittest.cc',
     ],
   },
   'targets': [

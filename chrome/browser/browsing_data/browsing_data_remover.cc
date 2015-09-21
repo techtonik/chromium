@@ -35,7 +35,6 @@
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/pref_names.h"
@@ -53,6 +52,7 @@
 #include "components/power/origin_power_map.h"
 #include "components/power/origin_power_map_factory.h"
 #include "components/search_engines/template_url_service.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/web_cache/browser/web_cache_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_manager.h"
@@ -363,7 +363,7 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
     if (remove_url.is_empty()) {
       // We also delete the list of recently closed tabs. Since these expire,
       // they can't be more than a day old, so we can simply clear them all.
-      TabRestoreService* tab_service =
+      sessions::TabRestoreService* tab_service =
           TabRestoreServiceFactory::GetForProfile(profile_);
       if (tab_service) {
         tab_service->ClearEntries();

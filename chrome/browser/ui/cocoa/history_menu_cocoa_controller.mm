@@ -7,7 +7,6 @@
 #include "chrome/app/chrome_command_ids.h"  // IDC_HISTORY_MENU
 #import "chrome/browser/app_controller_mac.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -16,6 +15,7 @@
 #include "chrome/browser/ui/host_desktop.h"
 #include "components/history/core/browser/history_service.h"
 #include "components/history/core/browser/history_types.h"
+#include "components/sessions/core/tab_restore_service.h"
 #import "ui/base/cocoa/cocoa_base_utils.h"
 #include "ui/base/window_open_disposition.h"
 
@@ -41,7 +41,7 @@ using content::Referrer;
 - (void)openURLForItem:(const HistoryMenuBridge::HistoryItem*)node {
   // If this item can be restored using TabRestoreService, do so. Otherwise,
   // just load the URL.
-  TabRestoreService* service =
+  sessions::TabRestoreService* service =
       TabRestoreServiceFactory::GetForProfile(bridge_->profile());
   if (node->session_id && service) {
     Browser* browser = chrome::FindTabbedBrowser(bridge_->profile(), false,

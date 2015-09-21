@@ -5,12 +5,13 @@
 #include "components/webcrypto/algorithms/aes.h"
 
 #include "base/logging.h"
-#include "components/webcrypto/algorithms/key.h"
-#include "components/webcrypto/algorithms/util_openssl.h"
+#include "components/webcrypto/algorithms/secret_key_util.h"
 #include "components/webcrypto/crypto_data.h"
 #include "components/webcrypto/jwk.h"
+#include "components/webcrypto/key.h"
 #include "components/webcrypto/status.h"
 #include "components/webcrypto/webcrypto_util.h"
+#include "third_party/WebKit/public/platform/WebCryptoAlgorithmParams.h"
 #include "third_party/WebKit/public/platform/WebCryptoKeyAlgorithm.h"
 
 namespace webcrypto {
@@ -53,10 +54,14 @@ Status AesAlgorithm::GenerateKey(const blink::WebCryptoAlgorithm& algorithm,
   if (status.IsError())
     return status;
 
-  unsigned int keylen_bits;
-  status = GetAesKeyGenLengthInBits(algorithm.aesKeyGenParams(), &keylen_bits);
-  if (status.IsError())
-    return status;
+  unsigned int keylen_bits = algorithm.aesKeyGenParams()->lengthBits();
+
+  // BoringSSL does not support 192-bit AES.
+  if (keylen_bits == 192)
+    return Status::ErrorAes192BitUnsupported();
+
+  if (keylen_bits != 128 && keylen_bits != 256)
+    return Status::ErrorGenerateAesKeyLength();
 
   return GenerateWebCryptoSecretKey(
       blink::WebCryptoKeyAlgorithm::createAes(algorithm.id(), keylen_bits),
@@ -81,9 +86,13 @@ Status AesAlgorithm::ImportKeyRaw(const CryptoData& key_data,
                                   blink::WebCryptoKeyUsageMask usages,
                                   blink::WebCryptoKey* key) const {
   const unsigned int keylen_bytes = key_data.byte_length();
-  Status status = VerifyAesKeyLengthForImport(keylen_bytes);
-  if (status.IsError())
-    return status;
+
+  // BoringSSL does not support 192-bit AES.
+  if (keylen_bytes == 24)
+    return Status::ErrorAes192BitUnsupported();
+
+  if (keylen_bytes != 16 && keylen_bytes != 32)
+    return Status::ErrorImportAesKeyLength();
 
   // No possibility of overflow.
   unsigned int keylen_bits = keylen_bytes * 8;
@@ -101,8 +110,8 @@ Status AesAlgorithm::ImportKeyJwk(const CryptoData& key_data,
                                   blink::WebCryptoKey* key) const {
   std::vector<uint8_t> raw_data;
   JwkReader jwk;
-  Status status = ReadSecretKeyNoExpectedAlg(key_data, extractable, usages,
-                                             &raw_data, &jwk);
+  Status status = ReadSecretKeyNoExpectedAlgJwk(key_data, extractable, usages,
+                                                &raw_data, &jwk);
   if (status.IsError())
     return status;
 
@@ -133,26 +142,18 @@ Status AesAlgorithm::ImportKeyJwk(const CryptoData& key_data,
 
 Status AesAlgorithm::ExportKeyRaw(const blink::WebCryptoKey& key,
                                   std::vector<uint8_t>* buffer) const {
-  *buffer = SymKeyOpenSsl::Cast(key)->raw_key_data();
+  *buffer = GetSymmetricKeyData(key);
   return Status::Success();
 }
 
 Status AesAlgorithm::ExportKeyJwk(const blink::WebCryptoKey& key,
                                   std::vector<uint8_t>* buffer) const {
-  const std::vector<uint8_t>& raw_data =
-      SymKeyOpenSsl::Cast(key)->raw_key_data();
+  const std::vector<uint8_t>& raw_data = GetSymmetricKeyData(key);
 
   WriteSecretKeyJwk(CryptoData(raw_data),
                     MakeJwkAesAlgorithmName(jwk_suffix_, raw_data.size()),
                     key.extractable(), key.usages(), buffer);
 
-  return Status::Success();
-}
-
-Status AesAlgorithm::SerializeKeyForClone(
-    const blink::WebCryptoKey& key,
-    blink::WebVector<uint8_t>* key_data) const {
-  key_data->assign(SymKeyOpenSsl::Cast(key)->serialized_key_data());
   return Status::Success();
 }
 
@@ -171,7 +172,17 @@ Status AesAlgorithm::GetKeyLength(
     const blink::WebCryptoAlgorithm& key_length_algorithm,
     bool* has_length_bits,
     unsigned int* length_bits) const {
-  return GetAesKeyLength(key_length_algorithm, has_length_bits, length_bits);
+  *has_length_bits = true;
+  *length_bits = key_length_algorithm.aesDerivedKeyParams()->lengthBits();
+
+  if (*length_bits == 128 || *length_bits == 256)
+    return Status::Success();
+
+  // BoringSSL does not support 192-bit AES.
+  if (*length_bits == 192)
+    return Status::ErrorAes192BitUnsupported();
+
+  return Status::ErrorGetAesKeyLength();
 }
 
 }  // namespace webcrypto

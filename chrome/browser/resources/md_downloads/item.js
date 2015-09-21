@@ -20,7 +20,6 @@ cr.define('downloads', function() {
 
     properties: {
       hideDate: {
-        reflectToAttribute: true,
         type: Boolean,
         value: true,
       },
@@ -96,10 +95,8 @@ cr.define('downloads', function() {
         value: false,
       },
 
-      // TODO(dbeam): move all properties to |data_|.
       data_: {
         type: Object,
-        value: function() { return {}; },
       },
     },
 
@@ -114,11 +111,7 @@ cr.define('downloads', function() {
 
     /** @param {!downloads.Data} data */
     update: function(data) {
-      for (var key in data) {
-        // TODO(dbeam): does update order matter? Right now it seems to be
-        // alphabetical.
-        this.set('data_.' + key, data[key]);
-      }
+      this.data_ = data;
 
       if (!this.isDangerous_) {
         var icon = 'chrome://fileicon/' + encodeURIComponent(data.file_path);
@@ -150,7 +143,8 @@ cr.define('downloads', function() {
 
     /** @private */
     computeDate_: function() {
-      assert(!this.hideDate);
+      if (this.hideDate)
+        return '';
       return assert(this.data_.since_string || this.data_.date_string);
     },
 
@@ -230,7 +224,7 @@ cr.define('downloads', function() {
 
     /** @private */
     computeShowProgress_: function() {
-      return this.showCancel_ && isFinite(this.data_.percent);
+      return this.showCancel_ && this.data_.percent >= -1;
     },
 
     /** @private */
@@ -252,7 +246,6 @@ cr.define('downloads', function() {
 
     /** @private */
     isIndeterminate_: function() {
-      assert(this.showProgress_);
       return this.data_.percent == -1;
     },
 

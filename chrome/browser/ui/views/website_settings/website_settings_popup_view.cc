@@ -86,7 +86,7 @@ const int kHeaderRowSpacing = 4;
 const int kLocationIconVerticalMargin = 5;
 
 // The max possible width of the popup.
-const int kMaxPopupWidth = 500;
+const int kMaxPopupWidth = 1000;
 
 // The margins between the popup border and the popup content.
 const int kPopupMarginTop = 4;
@@ -277,17 +277,18 @@ WebsiteSettingsPopupView::~WebsiteSettingsPopupView() {
 }
 
 // static
-void WebsiteSettingsPopupView::ShowPopup(views::View* anchor_view,
-                                         const gfx::Rect& anchor_rect,
-                                         Profile* profile,
-                                         content::WebContents* web_contents,
-                                         const GURL& url,
-                                         const content::SSLStatus& ssl) {
+void WebsiteSettingsPopupView::ShowPopup(
+    views::View* anchor_view,
+    const gfx::Rect& anchor_rect,
+    Profile* profile,
+    content::WebContents* web_contents,
+    const GURL& url,
+    const SecurityStateModel::SecurityInfo& security_info) {
   is_popup_showing = true;
   gfx::NativeView parent_window =
       anchor_view ? nullptr : web_contents->GetNativeView();
   if (InternalChromePage(url)) {
-    // Use the concrete type so that SetAnchorRect() can be called as a friend.
+    // Use the concrete type so that |SetAnchorRect| can be called as a friend.
     InternalPageInfoPopupView* popup =
         new InternalPageInfoPopupView(anchor_view, parent_window);
     if (!anchor_view)
@@ -295,7 +296,7 @@ void WebsiteSettingsPopupView::ShowPopup(views::View* anchor_view,
     popup->GetWidget()->Show();
   } else {
     WebsiteSettingsPopupView* popup = new WebsiteSettingsPopupView(
-        anchor_view, parent_window, profile, web_contents, url, ssl);
+        anchor_view, parent_window, profile, web_contents, url, security_info);
     if (!anchor_view)
       popup->SetAnchorRect(anchor_rect);
     popup->GetWidget()->Show();
@@ -313,7 +314,7 @@ WebsiteSettingsPopupView::WebsiteSettingsPopupView(
     Profile* profile,
     content::WebContents* web_contents,
     const GURL& url,
-    const content::SSLStatus& ssl)
+    const SecurityStateModel::SecurityInfo& security_info)
     : content::WebContentsObserver(web_contents),
       BubbleDelegateView(anchor_view, views::BubbleBorder::TOP_LEFT),
       web_contents_(web_contents),
@@ -358,10 +359,10 @@ WebsiteSettingsPopupView::WebsiteSettingsPopupView(
   layout->StartRow(1, content_column);
   layout->AddView(tabbed_pane_);
 
-  // Tabs must be added after the tabbed_pane_ was added to the views hierarchy.
-  // Adding the |tabbed_pane_| to the views hierarchy triggers the
+  // Tabs must be added after the |tabbed_pane_| was added to the views
+  // hierarchy. Adding the |tabbed_pane_| to the views hierarchy triggers the
   // initialization of the native tab UI element. If the native tab UI element
-  // is not initalized, adding a tab will result in a NULL pointer exception.
+  // is not initialized, adding a tab will result in a NULL pointer exception.
   permissions_tab_ = CreatePermissionsTab();
   tabbed_pane_->AddTabAtIndex(
       TAB_ID_PERMISSIONS,
@@ -382,7 +383,7 @@ WebsiteSettingsPopupView::WebsiteSettingsPopupView(
 
   presenter_.reset(new WebsiteSettings(
       this, profile, TabSpecificContentSettings::FromWebContents(web_contents),
-      web_contents, url, ssl, content::CertStore::GetInstance()));
+      web_contents, url, security_info, content::CertStore::GetInstance()));
 }
 
 void WebsiteSettingsPopupView::RenderFrameDeleted(
@@ -448,7 +449,7 @@ gfx::Size WebsiteSettingsPopupView::GetPreferredSize() const {
 
   int height = 0;
   if (header_)
-    height += header_->GetPreferredSize().height();
+    height += header_->GetPreferredSize().height() + kHeaderMarginBottom;
   if (tabbed_pane_)
     height += tabbed_pane_->GetPreferredSize().height();
 
@@ -457,9 +458,10 @@ gfx::Size WebsiteSettingsPopupView::GetPreferredSize() const {
     width = std::max(width, site_data_content_->GetPreferredSize().width());
   if (permissions_content_)
     width = std::max(width, permissions_content_->GetPreferredSize().width());
+  if (header_)
+    width = std::max(width, header_->GetPreferredSize().width());
   width += kPermissionsSectionPaddingLeft;
   width = std::min(width, kMaxPopupWidth);
-
   return gfx::Size(width, height);
 }
 

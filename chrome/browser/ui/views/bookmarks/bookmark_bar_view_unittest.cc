@@ -158,7 +158,7 @@ TEST_F(BookmarkBarViewTest, AppsShortcutVisibility) {
   EXPECT_FALSE(test_helper_->apps_page_shortcut()->visible());
 }
 
-// Various assertions around visibilty of the overflow_button.
+// Various assertions around visibility of the overflow_button.
 TEST_F(BookmarkBarViewTest, OverflowVisibility) {
   profile()->CreateBookmarkModel(true);
   CreateBookmarkBarView();
@@ -333,7 +333,8 @@ TEST_F(BookmarkBarViewTest, ChangeTitle) {
 TEST_F(BookmarkBarViewTest, ManagedShowAppsShortcutInBookmarksBar) {
   CreateBookmarkModelAndBookmarkBarView();
   // By default, the pref is not managed and the apps shortcut is shown.
-  TestingPrefServiceSyncable* prefs = profile()->GetTestingPrefService();
+  syncable_prefs::TestingPrefServiceSyncable* prefs =
+      profile()->GetTestingPrefService();
   EXPECT_FALSE(prefs->IsManagedPreference(
       bookmarks::prefs::kShowAppsShortcutInBookmarkBar));
   EXPECT_TRUE(test_helper_->apps_page_shortcut()->visible());

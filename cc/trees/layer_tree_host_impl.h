@@ -363,7 +363,7 @@ class CC_EXPORT LayerTreeHostImpl
   int id() const { return id_; }
   bool CanDraw() const;
   OutputSurface* output_surface() const { return output_surface_.get(); }
-
+  scoped_ptr<OutputSurface> ReleaseOutputSurface();
   std::string LayerTreeAsJson() const;
 
   void FinishAllRendering();
@@ -674,6 +674,7 @@ class CC_EXPORT LayerTreeHostImpl
 
   void NotifySwapPromiseMonitorsOfSetNeedsRedraw();
   void NotifySwapPromiseMonitorsOfForwardingToMainThread();
+  void NotifyRootLayerScrollOffsetDelegate();
 
   void ScrollAnimationCreate(LayerImpl* layer_impl,
                              const gfx::ScrollOffset& target_offset,

@@ -667,9 +667,10 @@ class GLES2DecoderImpl : public GLES2Decoder,
     return valuebuffer_manager();
   }
 
-  bool ProcessPendingQueries(bool did_finish) override;
+  bool HasPendingQueries() const override;
+  void ProcessPendingQueries(bool did_finish) override;
 
-  bool HasMoreIdleWork() override;
+  bool HasMoreIdleWork() const override;
   void PerformIdleWork() override;
 
   void WaitForReadPixels(base::Closure callback) override;
@@ -2080,7 +2081,6 @@ class GLES2DecoderImpl : public GLES2Decoder,
 
   scoped_ptr<GPUTracer> gpu_tracer_;
   scoped_ptr<GPUStateTracer> gpu_state_tracer_;
-  const unsigned char* cb_command_trace_category_;
   const unsigned char* gpu_decoder_category_;
   int gpu_trace_level_;
   bool gpu_trace_commands_;
@@ -2594,8 +2594,6 @@ GLES2DecoderImpl::GLES2DecoderImpl(ContextGroup* group)
       viewport_max_width_(0),
       viewport_max_height_(0),
       texture_state_(group_->feature_info()->workarounds()),
-      cb_command_trace_category_(TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(
-          TRACE_DISABLED_BY_DEFAULT("cb_command"))),
       gpu_decoder_category_(TRACE_EVENT_API_GET_CATEGORY_GROUP_ENABLED(
           TRACE_DISABLED_BY_DEFAULT("gpu_decoder"))),
       gpu_trace_level_(2),
@@ -3930,8 +3928,7 @@ Logger* GLES2DecoderImpl::GetLogger() {
 void GLES2DecoderImpl::BeginDecoding() {
   gpu_tracer_->BeginDecoding();
   gpu_trace_commands_ = gpu_tracer_->IsTracing() && *gpu_decoder_category_;
-  gpu_debug_commands_ = log_commands() || debug() || gpu_trace_commands_ ||
-                        (*cb_command_trace_category_ != 0);
+  gpu_debug_commands_ = log_commands() || debug() || gpu_trace_commands_;
   query_manager_->ProcessFrameBeginUpdates();
 }
 
@@ -4376,14 +4373,9 @@ error::Error GLES2DecoderImpl::DoCommandsImpl(unsigned int num_commands,
       break;
     }
 
-    if (DebugImpl) {
-      TRACE_EVENT_BEGIN0(TRACE_DISABLED_BY_DEFAULT("cb_command"),
-                         GetCommandName(command));
-
-      if (log_commands()) {
-        LOG(ERROR) << "[" << logger_.GetLogPrefix() << "]"
-                   << "cmd: " << GetCommandName(command);
-      }
+    if (DebugImpl && log_commands()) {
+      LOG(ERROR) << "[" << logger_.GetLogPrefix() << "]"
+                 << "cmd: " << GetCommandName(command);
     }
 
     const unsigned int arg_count = size - 1;
@@ -4425,11 +4417,6 @@ error::Error GLES2DecoderImpl::DoCommandsImpl(unsigned int num_commands,
       }
     } else {
       result = DoCommonCommand(command, arg_count, cmd_data);
-    }
-
-    if (DebugImpl) {
-      TRACE_EVENT_END0(TRACE_DISABLED_BY_DEFAULT("cb_command"),
-                       GetCommandName(command));
     }
 
     if (result == error::kNoError &&
@@ -10454,7 +10441,7 @@ void GLES2DecoderImpl::DoCompressedTexSubImage3D(
     return;
   }
   if (!texture->ValidForTexture(target, level, xoffset, yoffset, zoffset,
-                                width, height, depth, type)) {
+                                width, height, depth)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCompressedTexSubImage3D",
         "bad dimensions");
     return;
@@ -10661,7 +10648,7 @@ void GLES2DecoderImpl::DoCompressedTexSubImage2D(
     return;
   }
   if (!texture->ValidForTexture(target, level, xoffset, yoffset, 0, width,
-                                height, 1, type)) {
+                                height, 1)) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_VALUE, "glCompressedTexSubImage2D", "bad dimensions.");
     return;
@@ -10871,7 +10858,7 @@ void GLES2DecoderImpl::DoCopyTexSubImage2D(
   GLenum format = 0;
   if (!texture->GetLevelType(target, level, &type, &format) ||
       !texture->ValidForTexture(
-          target, level, xoffset, yoffset, 0, width, height, 1, type)) {
+          target, level, xoffset, yoffset, 0, width, height, 1)) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_VALUE, "glCopyTexSubImage2D", "bad dimensions.");
     return;
@@ -11026,14 +11013,14 @@ bool GLES2DecoderImpl::ValidateTexSubImage2D(
       function_name, format, type, internal_format, level)) {
     return false;
   }
-  if (type != current_type) {
+  if (type != current_type && !feature_info_->IsES3Enabled()) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
         function_name, "type does not match type of texture.");
     return false;
   }
   if (!texture->ValidForTexture(
-          target, level, xoffset, yoffset, 0, width, height, 1, type)) {
+          target, level, xoffset, yoffset, 0, width, height, 1)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, function_name, "bad dimensions.");
     return false;
   }
@@ -12259,14 +12246,15 @@ void GLES2DecoderImpl::DeleteQueriesEXTHelper(
   }
 }
 
-bool GLES2DecoderImpl::ProcessPendingQueries(bool did_finish) {
-  if (query_manager_.get() == NULL) {
-    return false;
-  }
-  if (!query_manager_->ProcessPendingQueries(did_finish)) {
+bool GLES2DecoderImpl::HasPendingQueries() const {
+  return query_manager_.get() && query_manager_->HavePendingQueries();
+}
+
+void GLES2DecoderImpl::ProcessPendingQueries(bool did_finish) {
+  if (!query_manager_.get())
+    return;
+  if (!query_manager_->ProcessPendingQueries(did_finish))
     current_decoder_error_ = error::kOutOfBounds;
-  }
-  return query_manager_->HavePendingQueries();
 }
 
 // Note that if there are no pending readpixels right now,
@@ -12295,7 +12283,7 @@ void GLES2DecoderImpl::ProcessPendingReadPixels(bool did_finish) {
   }
 }
 
-bool GLES2DecoderImpl::HasMoreIdleWork() {
+bool GLES2DecoderImpl::HasMoreIdleWork() const {
   return !pending_readpixel_fences_.empty() ||
          gpu_tracer_->HasTracesToProcess();
 }
@@ -13099,7 +13087,7 @@ void GLES2DecoderImpl::DoCopySubTextureCHROMIUM(
   source_texture->GetLevelType(source_texture->target(), 0, &source_type,
                                &source_internal_format);
   if (!source_texture->ValidForTexture(source_texture->target(), 0, x, y, 0,
-                                       width, height, 1, source_type)) {
+                                       width, height, 1)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTextureCHROMIUM",
                        "source texture bad dimensions.");
     return;
@@ -13115,7 +13103,7 @@ void GLES2DecoderImpl::DoCopySubTextureCHROMIUM(
     return;
   }
   if (!dest_texture->ValidForTexture(dest_texture->target(), 0, xoffset,
-                                     yoffset, 0, width, height, 1, dest_type)) {
+                                     yoffset, 0, width, height, 1)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopySubTextureCHROMIUM",
                        "destination texture bad dimensions.");
     return;
@@ -13431,7 +13419,7 @@ void GLES2DecoderImpl::DoCompressedCopySubTextureCHROMIUM(GLenum target,
   source_texture->GetLevelType(source_texture->target(), 0, &source_type,
                                &source_internal_format);
   if (!source_texture->ValidForTexture(source_texture->target(), 0, x, y, 0,
-                                       width, height, 1, source_type)) {
+                                       width, height, 1)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCompressedCopySubTextureCHROMIUM",
                        "source texture bad dimensions.");
     return;
@@ -13448,7 +13436,7 @@ void GLES2DecoderImpl::DoCompressedCopySubTextureCHROMIUM(GLenum target,
     return;
   }
   if (!dest_texture->ValidForTexture(dest_texture->target(), 0, xoffset,
-                                     yoffset, 0, width, height, 1, dest_type)) {
+                                     yoffset, 0, width, height, 1)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCompressedCopySubTextureCHROMIUM",
                        "destination texture bad dimensions.");
     return;

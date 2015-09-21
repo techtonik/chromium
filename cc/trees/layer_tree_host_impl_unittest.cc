@@ -2247,6 +2247,64 @@ TEST_F(LayerTreeHostImplTestScrollbarAnimation, Thinning) {
   RunTest(LayerTreeSettings::THINNING);
 }
 
+class LayerTreeHostImplTestScrollbarOpacity : public LayerTreeHostImplTest {
+ protected:
+  void RunTest(LayerTreeSettings::ScrollbarAnimator animator) {
+    LayerTreeSettings settings;
+    settings.scrollbar_animator = animator;
+    settings.scrollbar_fade_delay_ms = 20;
+    settings.scrollbar_fade_duration_ms = 20;
+    settings.verify_property_trees = true;
+    gfx::Size content_size(100, 100);
+
+    CreateHostImpl(settings, CreateOutputSurface());
+    host_impl_->CreatePendingTree();
+    CreateScrollAndContentsLayers(host_impl_->pending_tree(), content_size);
+    scoped_ptr<SolidColorScrollbarLayerImpl> scrollbar =
+        SolidColorScrollbarLayerImpl::Create(host_impl_->pending_tree(), 400,
+                                             VERTICAL, 10, 0, false, true);
+    LayerImpl* scroll = host_impl_->pending_tree()->InnerViewportScrollLayer();
+    LayerImpl* root = scroll->parent()->parent();
+    scrollbar->SetScrollLayerAndClipLayerByIds(scroll->id(), root->id());
+    root->AddChild(scrollbar.Pass());
+    host_impl_->pending_tree()->PushPageScaleFromMainThread(1.f, 1.f, 1.f);
+    host_impl_->pending_tree()->BuildPropertyTreesForTesting();
+    host_impl_->ActivateSyncTree();
+
+    LayerImpl* scrollbar_layer = host_impl_->active_tree()->LayerById(400);
+
+    EffectNode* active_tree_node =
+        host_impl_->active_tree()->property_trees()->effect_tree.Node(
+            scrollbar_layer->effect_tree_index());
+    EXPECT_FLOAT_EQ(scrollbar_layer->opacity(), active_tree_node->data.opacity);
+
+    host_impl_->ScrollBegin(gfx::Point(), InputHandler::WHEEL);
+    host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(0, 5));
+    host_impl_->ScrollEnd();
+    host_impl_->CreatePendingTree();
+    EffectNode* pending_tree_node =
+        host_impl_->pending_tree()->property_trees()->effect_tree.Node(
+            scrollbar_layer->effect_tree_index());
+    EXPECT_FLOAT_EQ(1.f, active_tree_node->data.opacity);
+    EXPECT_FLOAT_EQ(1.f, scrollbar_layer->opacity());
+    EXPECT_FLOAT_EQ(0.f, pending_tree_node->data.opacity);
+    host_impl_->ActivateSyncTree();
+    active_tree_node =
+        host_impl_->active_tree()->property_trees()->effect_tree.Node(
+            scrollbar_layer->effect_tree_index());
+    EXPECT_FLOAT_EQ(1.f, active_tree_node->data.opacity);
+    EXPECT_FLOAT_EQ(1.f, scrollbar_layer->opacity());
+  }
+};
+
+TEST_F(LayerTreeHostImplTestScrollbarOpacity, LinearFade) {
+  RunTest(LayerTreeSettings::LINEAR_FADE);
+}
+
+TEST_F(LayerTreeHostImplTestScrollbarOpacity, Thinning) {
+  RunTest(LayerTreeSettings::THINNING);
+}
+
 void LayerTreeHostImplTest::SetupMouseMoveAtWithDeviceScale(
     float device_scale_factor) {
   LayerTreeSettings settings;
@@ -4580,19 +4638,28 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   EXPECT_EQ(1.f, scroll_delegate.min_page_scale_factor());
   EXPECT_EQ(1.f, scroll_delegate.max_page_scale_factor());
 
-  // Updating page scale immediately updates the delegate.
+  // Put a page scale on the tree.
   host_impl_->active_tree()->PushPageScaleFromMainThread(2.f, 0.5f, 4.f);
-  EXPECT_EQ(2.f, scroll_delegate.page_scale_factor());
-  EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
-  EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
-  host_impl_->active_tree()->SetPageScaleOnActiveTree(2.f * 1.5f);
-  EXPECT_EQ(3.f, scroll_delegate.page_scale_factor());
-  EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
-  EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
-  host_impl_->active_tree()->SetPageScaleOnActiveTree(2.f);
-  host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 0.5f, 4.f);
   EXPECT_EQ(1.f, scroll_delegate.page_scale_factor());
-  EXPECT_EQ(0.5f, scroll_delegate.min_page_scale_factor());
+  EXPECT_EQ(1.f, scroll_delegate.min_page_scale_factor());
+  EXPECT_EQ(1.f, scroll_delegate.max_page_scale_factor());
+  // Activation will update the delegate.
+  host_impl_->ActivateSyncTree();
+  EXPECT_EQ(2.f, scroll_delegate.page_scale_factor());
+  EXPECT_EQ(.5f, scroll_delegate.min_page_scale_factor());
+  EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
+
+  // Reset the page scale for the rest of the test.
+  host_impl_->active_tree()->PushPageScaleFromMainThread(1.f, 0.5f, 4.f);
+  EXPECT_EQ(2.f, scroll_delegate.page_scale_factor());
+  EXPECT_EQ(.5f, scroll_delegate.min_page_scale_factor());
+  EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
+
+  // Animating page scale can change the root offset, so it should update the
+  // delegate.
+  host_impl_->Animate();
+  EXPECT_EQ(1.f, scroll_delegate.page_scale_factor());
+  EXPECT_EQ(.5f, scroll_delegate.min_page_scale_factor());
   EXPECT_EQ(4.f, scroll_delegate.max_page_scale_factor());
 
   // The pinch gesture doesn't put the delegate into a state where the scroll

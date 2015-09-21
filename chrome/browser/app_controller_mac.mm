@@ -40,7 +40,6 @@
 #include "chrome/browser/sessions/session_restore.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/signin/signin_promo.h"
@@ -84,6 +83,7 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/handoff/handoff_manager.h"
 #include "components/handoff/handoff_utility.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "content/public/browser/browser_thread.h"
@@ -877,7 +877,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
 // Checks with the TabRestoreService to see if there's anything there to
 // restore and returns YES if so.
 - (BOOL)canRestoreTab {
-  TabRestoreService* service =
+  sessions::TabRestoreService* service =
       TabRestoreServiceFactory::GetForProfile([self lastProfile]);
   return service && !service->entries().empty();
 }

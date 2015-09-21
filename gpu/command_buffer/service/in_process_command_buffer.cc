@@ -54,6 +54,8 @@ namespace gpu {
 
 namespace {
 
+base::StaticAtomicSequenceNumber g_next_command_buffer_id;
+
 template <typename T>
 static void RunTaskWithResult(base::Callback<T(void)> task,
                               T* result,
@@ -174,8 +176,9 @@ gpu::gles2::ProgramCache* InProcessCommandBuffer::Service::program_cache() {
 
 InProcessCommandBuffer::InProcessCommandBuffer(
     const scoped_refptr<Service>& service)
-    : context_lost_(false),
-      idle_work_pending_(false),
+    : command_buffer_id_(g_next_command_buffer_id.GetNext()),
+      context_lost_(false),
+      delayed_work_pending_(false),
       image_factory_(nullptr),
       last_put_offset_(-1),
       gpu_memory_buffer_manager_(nullptr),
@@ -494,29 +497,33 @@ void InProcessCommandBuffer::FlushOnGpuThread(int32 put_offset) {
   // If we've processed all pending commands but still have pending queries,
   // pump idle work until the query is passed.
   if (put_offset == state_after_last_flush_.get_offset &&
-      gpu_scheduler_->HasMoreWork()) {
-    ScheduleIdleWorkOnGpuThread();
+      (gpu_scheduler_->HasMoreIdleWork() ||
+       gpu_scheduler_->HasPendingQueries())) {
+    ScheduleDelayedWorkOnGpuThread();
   }
 }
 
-void InProcessCommandBuffer::PerformIdleWork() {
+void InProcessCommandBuffer::PerformDelayedWork() {
   CheckSequencedThread();
-  idle_work_pending_ = false;
+  delayed_work_pending_ = false;
   base::AutoLock lock(command_buffer_lock_);
-  if (MakeCurrent() && gpu_scheduler_->HasMoreWork()) {
+  if (MakeCurrent()) {
     gpu_scheduler_->PerformIdleWork();
-    ScheduleIdleWorkOnGpuThread();
+    gpu_scheduler_->ProcessPendingQueries();
+    if (gpu_scheduler_->HasMoreIdleWork() ||
+        gpu_scheduler_->HasPendingQueries()) {
+      ScheduleDelayedWorkOnGpuThread();
+    }
   }
 }
 
-void InProcessCommandBuffer::ScheduleIdleWorkOnGpuThread() {
+void InProcessCommandBuffer::ScheduleDelayedWorkOnGpuThread() {
   CheckSequencedThread();
-  if (idle_work_pending_)
+  if (delayed_work_pending_)
     return;
-  idle_work_pending_ = true;
-  service_->ScheduleIdleWork(
-      base::Bind(&InProcessCommandBuffer::PerformIdleWork,
-                 gpu_thread_weak_ptr_));
+  delayed_work_pending_ = true;
+  service_->ScheduleDelayedWork(base::Bind(
+      &InProcessCommandBuffer::PerformDelayedWork, gpu_thread_weak_ptr_));
 }
 
 void InProcessCommandBuffer::Flush(int32 put_offset) {
@@ -845,6 +852,14 @@ bool InProcessCommandBuffer::IsGpuChannelLost() {
   return false;
 }
 
+CommandBufferNamespace InProcessCommandBuffer::GetNamespaceID() const {
+  return CommandBufferNamespace::IN_PROCESS;
+}
+
+uint64_t InProcessCommandBuffer::GetCommandBufferID() const {
+  return command_buffer_id_;
+}
+
 uint32 InProcessCommandBuffer::CreateStreamTextureOnGpuThread(
     uint32 client_texture_id) {
 #if defined(OS_ANDROID)
@@ -929,7 +944,7 @@ void GpuInProcessThread::ScheduleTask(const base::Closure& task) {
   task_runner()->PostTask(FROM_HERE, task);
 }
 
-void GpuInProcessThread::ScheduleIdleWork(const base::Closure& callback) {
+void GpuInProcessThread::ScheduleDelayedWork(const base::Closure& callback) {
   // Match delay with GpuCommandBufferStub.
   task_runner()->PostDelayedTask(FROM_HERE, callback,
                                  base::TimeDelta::FromMilliseconds(2));

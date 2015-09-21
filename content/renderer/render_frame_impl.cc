@@ -103,6 +103,7 @@
 #include "content/renderer/render_widget_fullscreen_pepper.h"
 #include "content/renderer/renderer_webapplicationcachehost_impl.h"
 #include "content/renderer/renderer_webcolorchooser_impl.h"
+#include "content/renderer/savable_resources.h"
 #include "content/renderer/screen_orientation/screen_orientation_dispatcher.h"
 #include "content/renderer/shared_worker_repository.h"
 #include "content/renderer/skia_benchmarking_extension.h"
@@ -312,7 +313,13 @@ GURL GetOriginalRequestURL(WebDataSource* ds) {
 NOINLINE void CrashIntentionally() {
   // NOTE(shess): Crash directly rather than using NOTREACHED() so
   // that the signature is easier to triage in crash reports.
-  volatile int* zero = NULL;
+  //
+  // Linker's ICF feature may merge this function with other functions with the
+  // same definition and it may confuse the crash report processing system.
+  static int static_variable_to_make_this_function_unique = 0;
+  base::debug::Alias(&static_variable_to_make_this_function_unique);
+
+  volatile int* zero = nullptr;
   *zero = 0;
 }
 
@@ -351,7 +358,7 @@ NOINLINE void MaybeTriggerAsanError(const GURL& url) {
   std::string crash_type(url.path());
   if (crash_type == kHeapOverflow) {
     base::debug::AsanHeapOverflow();
-  } else if (crash_type == kHeapUnderflow ) {
+  } else if (crash_type == kHeapUnderflow) {
     base::debug::AsanHeapUnderflow();
   } else if (crash_type == kUseAfterFree) {
     base::debug::AsanHeapUseAfterFree();
@@ -396,39 +403,6 @@ void MaybeHandleDebugURL(const GURL& url) {
 // Returns false unless this is a top-level navigation.
 bool IsTopLevelNavigation(WebFrame* frame) {
   return frame->parent() == NULL;
-}
-
-// Returns false unless this is a top-level navigation that crosses origins.
-bool IsNonLocalTopLevelNavigation(const GURL& url,
-                                  WebFrame* frame,
-                                  WebNavigationType type,
-                                  bool is_form_post) {
-  if (!IsTopLevelNavigation(frame))
-    return false;
-
-  // Navigations initiated within Webkit are not sent out to the external host
-  // in the following cases.
-  // 1. The url scheme is not http/https
-  // 2. The origin of the url and the opener is the same in which case the
-  //    opener relationship is maintained.
-  // 3. Reloads/form submits/back forward navigations
-  if (!url.SchemeIs(url::kHttpScheme) && !url.SchemeIs(url::kHttpsScheme))
-    return false;
-
-  if (type != blink::WebNavigationTypeReload &&
-      type != blink::WebNavigationTypeBackForward && !is_form_post) {
-    // The opener relationship between the new window and the parent allows the
-    // new window to script the parent and vice versa. This is not allowed if
-    // the origins of the two domains are different. This can be treated as a
-    // top level navigation and routed back to the host.
-    blink::WebFrame* opener = frame->opener();
-    if (!opener)
-      return true;
-
-    if (url.GetOrigin() != GURL(opener->document().url()).GetOrigin())
-      return true;
-  }
-  return false;
 }
 
 WebURLRequest CreateURLRequestForNavigation(
@@ -1131,6 +1105,8 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnTextTrackSettingsChanged)
     IPC_MESSAGE_HANDLER(FrameMsg_PostMessageEvent, OnPostMessageEvent)
     IPC_MESSAGE_HANDLER(FrameMsg_FailedNavigation, OnFailedNavigation)
+    IPC_MESSAGE_HANDLER(FrameMsg_GetSavableResourceLinks,
+                        OnGetSavableResourceLinks)
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(FrameMsg_SelectPopupMenuItems, OnSelectPopupMenuItems)
 #elif defined(OS_MACOSX)
@@ -1432,6 +1408,7 @@ void RenderFrameImpl::OnAdjustSelectionByCharacterOffset(int start_adjust,
   start += start_adjust;
   length += end_adjust - start_adjust;
 
+  base::AutoReset<bool> handling_select_range(&handling_select_range_, true);
   frame_->selectRange(WebRange::fromDocumentRange(frame_, start, length));
 }
 
@@ -3332,6 +3309,10 @@ void RenderFrameImpl::willSendRequest(
         ServiceWorkerNetworkProvider::FromDocumentState(
             DocumentState::FromDataSource(frame->dataSource()));
     provider_id = provider->provider_id();
+    // Explicitly set the SkipServiceWorker flag here if the renderer process
+    // hasn't received SetControllerServiceWorker message.
+    if (!provider->IsControlledByServiceWorker())
+      request.setSkipServiceWorker(true);
   }
 
   WebFrame* parent = frame->parent();
@@ -3756,7 +3737,7 @@ bool RenderFrameImpl::isControlledByServiceWorker(WebDataSource& data_source) {
   ServiceWorkerNetworkProvider* provider =
       ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(&data_source));
-  return provider->context() && provider->context()->controller();
+  return provider->IsControlledByServiceWorker();
 }
 
 int64_t RenderFrameImpl::serviceWorkerID(WebDataSource& data_source) {
@@ -4286,27 +4267,11 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
       document_state->navigation_state()->IsContentInitiated();
 
   // If the browser is interested, then give it a chance to look at the request.
-  if (is_content_initiated) {
-    bool is_form_post =
-        ((info.navigationType == blink::WebNavigationTypeFormSubmitted) ||
-            (info.navigationType == blink::WebNavigationTypeFormResubmitted)) &&
-        base::EqualsASCII(base::StringPiece16(info.urlRequest.httpMethod()),
-                          "POST");
-    bool browser_handles_request =
-        render_view_->renderer_preferences_
-            .browser_handles_non_local_top_level_requests
-        && IsNonLocalTopLevelNavigation(url, info.frame, info.navigationType,
-                                        is_form_post);
-    if (!browser_handles_request) {
-      browser_handles_request = IsTopLevelNavigation(info.frame) &&
-          render_view_->renderer_preferences_
-              .browser_handles_all_top_level_requests;
-    }
-
-    if (browser_handles_request) {
-      OpenURL(info.frame, url, referrer, info.defaultPolicy);
-      return blink::WebNavigationPolicyIgnore;  // Suppress the load here.
-    }
+  if (is_content_initiated && IsTopLevelNavigation(info.frame) &&
+      render_view_->renderer_preferences_
+          .browser_handles_all_top_level_requests) {
+    OpenURL(info.frame, url, referrer, info.defaultPolicy);
+    return blink::WebNavigationPolicyIgnore;  // Suppress the load here.
   }
 
   // Use the frame's original request's URL rather than the document's URL for
@@ -4423,6 +4388,30 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
   }
 
   return info.defaultPolicy;
+}
+
+void RenderFrameImpl::OnGetSavableResourceLinks() {
+  std::vector<GURL> resources_list;
+  std::vector<GURL> referrer_urls_list;
+  std::vector<blink::WebReferrerPolicy> referrer_policies_list;
+  SavableResourcesResult result(&resources_list, &referrer_urls_list,
+                                &referrer_policies_list);
+
+  if (!GetSavableResourceLinksForFrame(
+          frame_, &result, const_cast<const char**>(GetSavableSchemes()))) {
+    Send(new FrameHostMsg_SavableResourceLinksError(routing_id_));
+    return;
+  }
+
+  std::vector<Referrer> referrers_list;
+  CHECK_EQ(referrer_urls_list.size(), referrer_policies_list.size());
+  for (unsigned i = 0; i < referrer_urls_list.size(); ++i) {
+    referrers_list.push_back(
+        Referrer(referrer_urls_list[i], referrer_policies_list[i]));
+  }
+
+  Send(new FrameHostMsg_SavableResourceLinksResponse(
+      routing_id_, frame_->document().url(), resources_list, referrers_list));
 }
 
 void RenderFrameImpl::OpenURL(WebFrame* frame,

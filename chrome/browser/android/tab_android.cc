@@ -32,7 +32,6 @@
 #include "chrome/browser/search/instant_service_factory.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/sessions/session_tab_helper.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/sync/glue/synced_tab_delegate_android.h"
 #include "chrome/browser/tab_contents/tab_util.h"
@@ -63,6 +62,8 @@
 #include "components/offline_pages/offline_page_feature.h"
 #include "components/offline_pages/offline_page_item.h"
 #include "components/offline_pages/offline_page_model.h"
+#include "components/sessions/content/content_live_tab.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/url_formatter/url_fixer.h"
 #include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/content_view_core.h"
@@ -721,7 +722,7 @@ prerender::PrerenderManager* TabAndroid::GetPrerenderManager() const {
 void TabAndroid::CreateHistoricalTabFromContents(WebContents* web_contents) {
   DCHECK(web_contents);
 
-  TabRestoreService* service =
+  sessions::TabRestoreService* service =
       TabRestoreServiceFactory::GetForProfile(
           Profile::FromBrowserContext(web_contents->GetBrowserContext()));
   if (!service)
@@ -735,8 +736,10 @@ void TabAndroid::CreateHistoricalTabFromContents(WebContents* web_contents) {
     return;
   }
 
+  sessions::ContentLiveTab::CreateForWebContents(web_contents);
   // TODO(jcivelli): is the index important?
-  service->CreateHistoricalTab(web_contents, -1);
+  service->CreateHistoricalTab(
+      sessions::ContentLiveTab::FromWebContents(web_contents), -1);
 }
 
 void TabAndroid::CreateHistoricalTab(JNIEnv* env, jobject obj) {

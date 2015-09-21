@@ -51,6 +51,6 @@ Polymer({
 
   /** @private */
   onClearBrowsingDataTap_: function() {
-    // TODO(dschuyler)
+    this.$.pages.setSubpageChain(['clear-browsing-data']);
   },
 });

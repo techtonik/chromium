@@ -391,6 +391,14 @@ void LayerTreeHost::SetOutputSurface(scoped_ptr<OutputSurface> surface) {
   proxy_->SetOutputSurface(surface.Pass());
 }
 
+scoped_ptr<OutputSurface> LayerTreeHost::ReleaseOutputSurface() {
+  DCHECK(!visible_);
+  DCHECK(!output_surface_lost_);
+
+  DidLoseOutputSurface();
+  return proxy_->ReleaseOutputSurface();
+}
+
 void LayerTreeHost::RequestNewOutputSurface() {
   client_->RequestNewOutputSurface();
 }

@@ -167,9 +167,20 @@ void DocumentResourceWaiter::OnPostMessageEvent(
   NOTREACHED();
 }
 
-void DocumentResourceWaiter::OnWillNavigate(uint32_t target_frame_id) {
+void DocumentResourceWaiter::OnWillNavigate() {
   // It is assumed we receive OnConnect() (which unbinds) before anything else.
   NOTIMPLEMENTED();
+}
+
+void DocumentResourceWaiter::OnFrameLoadingStateChanged(uint32_t frame_id,
+                                                        bool loading) {
+  // It is assumed we receive OnConnect() (which unbinds) before anything else.
+  NOTREACHED();
+}
+
+void DocumentResourceWaiter::OnDispatchFrameLoadEvent(uint32_t frame_id) {
+  // It is assumed we receive OnConnect() (which unbinds) before anything else.
+  NOTREACHED();
 }
 
 void DocumentResourceWaiter::OnViewViewportMetricsChanged(

@@ -11,6 +11,7 @@
 #include "mojo/fetcher/switches.h"
 #include "mojo/fetcher/update_fetcher.h"
 #include "mojo/shell/application_manager.h"
+#include "mojo/shell/connect_util.h"
 #include "mojo/shell/query_util.h"
 #include "mojo/shell/switches.h"
 #include "mojo/util/filename_util.h"
@@ -55,10 +56,6 @@ void PackageManagerImpl::SetApplicationManager(
   application_manager_ = manager;
 }
 
-GURL PackageManagerImpl::ResolveURL(const GURL& url) {
-  return url_resolver_.get() ? url_resolver_->ResolveMojoURL(url) : url;
-}
-
 void PackageManagerImpl::FetchRequest(
     URLRequestPtr request,
     const shell::Fetcher::FetchCallback& loader_callback) {
@@ -74,13 +71,12 @@ void PackageManagerImpl::FetchRequest(
   }
 
   GURL resolved_url = ResolveURL(url);
-
   if (resolved_url.SchemeIsFile()) {
     // LocalFetcher uses the network service to infer MIME types from URLs.
     // Skip this for mojo URLs to avoid recursively loading the network service.
     if (!network_service_ && !url.SchemeIs("mojo")) {
-      application_manager_->ConnectToService(GURL("mojo:network_service"),
-                                            &network_service_);
+      shell::ConnectToService(application_manager_,
+                              GURL("mojo:network_service"), &network_service_);
     }
     // Ownership of this object is transferred to |loader_callback|.
     // TODO(beng): this is eff'n weird.
@@ -99,7 +95,8 @@ void PackageManagerImpl::FetchRequest(
   if (url.SchemeIs("mojo") &&
       base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kUseUpdater)) {
-    application_manager_->ConnectToService(GURL("mojo:updater"), &updater_);
+    shell::ConnectToService(application_manager_, GURL("mojo:updater"),
+                            &updater_);
     // Ownership of this object is transferred to |loader_callback|.
     // TODO(beng): this is eff'n weird.
     new fetcher::UpdateFetcher(url, updater_.get(), loader_callback);
@@ -108,8 +105,8 @@ void PackageManagerImpl::FetchRequest(
 #endif
 
   if (!url_loader_factory_) {
-    application_manager_->ConnectToService(GURL("mojo:network_service"),
-                                           &url_loader_factory_);
+    shell::ConnectToService(application_manager_, GURL("mojo:network_service"),
+                            &url_loader_factory_);
   }
 
   // Ownership of this object is transferred to |loader_callback|.
@@ -119,7 +116,7 @@ void PackageManagerImpl::FetchRequest(
 }
 
 bool PackageManagerImpl::HandleWithContentHandler(shell::Fetcher* fetcher,
-                                                  const GURL& unresolved_url,
+                                                  const GURL& url,
                                                   base::TaskRunner* task_runner,
                                                   URLResponsePtr* new_response,
                                                   GURL* content_handler_url,
@@ -150,11 +147,11 @@ bool PackageManagerImpl::HandleWithContentHandler(shell::Fetcher* fetcher,
   }
 
   // The response URL matches a registered content handler.
-  auto alias_iter = application_package_alias_.find(unresolved_url);
+  auto alias_iter = application_package_alias_.find(url);
   if (alias_iter != application_package_alias_.end()) {
     // We replace the qualifier with the one our package alias requested.
     *new_response = URLResponse::New();
-    (*new_response)->url = unresolved_url.spec();
+    (*new_response)->url = url.spec();
 
     // Why can't we use this in single process mode? Because of
     // base::AtExitManager. If you link in ApplicationRunner into your code, and
@@ -172,6 +169,10 @@ bool PackageManagerImpl::HandleWithContentHandler(shell::Fetcher* fetcher,
   }
 
   return false;
+}
+
+GURL PackageManagerImpl::ResolveURL(const GURL& url) {
+  return url_resolver_.get() ? url_resolver_->ResolveMojoURL(url) : url;
 }
 
 }  // namespace package_manager

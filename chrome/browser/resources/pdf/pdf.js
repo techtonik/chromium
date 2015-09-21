@@ -216,6 +216,7 @@ function PDFViewer(browserApi) {
 
     if (!this.isPrintPreview_) {
       this.materialToolbar_ = $('material-toolbar');
+      this.materialToolbar_.hidden = false;
       this.materialToolbar_.addEventListener('save', this.save_.bind(this));
       this.materialToolbar_.addEventListener('print', this.print_.bind(this));
       this.materialToolbar_.addEventListener('rotate-right',
@@ -246,6 +247,7 @@ function PDFViewer(browserApi) {
   // Setup the keyboard event listener.
   document.addEventListener('keydown', this.handleKeyEvent_.bind(this));
   document.addEventListener('mousemove', this.handleMouseEvent_.bind(this));
+  document.addEventListener('mouseout', this.handleMouseEvent_.bind(this));
 
   // Parse open pdf parameters.
   this.paramsParser_ =
@@ -255,6 +257,10 @@ function PDFViewer(browserApi) {
                                   onNavigateInCurrentTab, onNavigateInNewTab);
   this.viewportScroller_ =
       new ViewportScroller(this.viewport_, this.plugin_, window);
+
+  // Request translated strings.
+  if (!this.isPrintPreview_)
+    chrome.resourcesPrivate.getStrings('pdf', this.handleStrings_.bind(this));
 }
 
 PDFViewer.prototype = {
@@ -397,8 +403,12 @@ PDFViewer.prototype = {
   },
 
   handleMouseEvent_: function(e) {
-    if (this.isMaterial_)
-      this.toolbarManager_.showToolbarsForMouseMove(e);
+    if (this.isMaterial_) {
+      if (e.type == 'mousemove')
+        this.toolbarManager_.showToolbarsForMouseMove(e);
+      else if (e.type == 'mouseout')
+        this.toolbarManager_.hideToolbarsForMouseOut();
+    }
   },
 
   /**
@@ -539,6 +549,22 @@ PDFViewer.prototype = {
 
   /**
    * @private
+   * Load a dictionary of translated strings into the UI. Used as a callback for
+   * chrome.resourcesPrivate.
+   * @param {Object} strings Dictionary of translated strings
+   */
+  handleStrings_: function(strings) {
+    this.passwordScreen_.text = strings.passwordPrompt;
+    if (!this.isMaterial_) {
+      this.progressBar_.text = strings.pageLoading;
+      if (!this.isPrintPreview_)
+        this.progressBar_.style.visibility = 'visible';
+    }
+    this.errorScreen_.text = strings.pageLoadFailed;
+  },
+
+  /**
+   * @private
    * An event handler for handling password-submitted events. These are fired
    * when an event is entered into the password screen.
    * @param {Object} event a password-submitted event.
@@ -617,15 +643,6 @@ PDFViewer.prototype = {
         if (message.data.y !== undefined)
           position.y = message.data.y;
         this.viewport_.position = position;
-        break;
-      case 'setTranslatedStrings':
-        this.passwordScreen_.text = message.data.getPasswordString;
-        if (!this.isMaterial_) {
-          this.progressBar_.text = message.data.loadingString;
-          if (!this.isPrintPreview_)
-            this.progressBar_.style.visibility = 'visible';
-        }
-        this.errorScreen_.text = message.data.loadFailedString;
         break;
       case 'cancelStreamUrl':
         chrome.mimeHandlerPrivate.abortStream();
@@ -707,11 +724,25 @@ PDFViewer.prototype = {
     var verticalScrollbarWidth = hasScrollbars.vertical ? scrollbarWidth : 0;
     var horizontalScrollbarWidth =
         hasScrollbars.horizontal ? scrollbarWidth : 0;
-    var toolbarRight = Math.max(PDFViewer.MIN_TOOLBAR_OFFSET, scrollbarWidth);
-    var toolbarBottom = Math.max(PDFViewer.MIN_TOOLBAR_OFFSET, scrollbarWidth);
-    toolbarRight -= verticalScrollbarWidth;
-    toolbarBottom -= horizontalScrollbarWidth;
-    if (!this.isMaterial_) {
+    if (this.isMaterial_) {
+      // Shift the zoom toolbar to the left by half a scrollbar width. This
+      // gives a compromise: if there is no scrollbar visible then the toolbar
+      // will be half a scrollbar width further left than the spec but if there
+      // is a scrollbar visible it will be half a scrollbar width further right
+      // than the spec.
+      this.zoomToolbar_.style.right = -verticalScrollbarWidth +
+          (scrollbarWidth / 2) + 'px';
+      // Having a horizontal scrollbar is much rarer so we don't offset the
+      // toolbar from the bottom any more than what the spec says. This means
+      // that when there is a scrollbar visible, it will be a full scrollbar
+      // width closer to the bottom of the screen than usual, but this is ok.
+      this.zoomToolbar_.style.bottom = -horizontalScrollbarWidth + 'px';
+    } else {
+      var toolbarRight = Math.max(PDFViewer.MIN_TOOLBAR_OFFSET, scrollbarWidth);
+      var toolbarBottom =
+          Math.max(PDFViewer.MIN_TOOLBAR_OFFSET, scrollbarWidth);
+      toolbarRight -= verticalScrollbarWidth;
+      toolbarBottom -= horizontalScrollbarWidth;
       this.toolbar_.style.right = toolbarRight + 'px';
       this.toolbar_.style.bottom = toolbarBottom + 'px';
       // Hide the toolbar if it doesn't fit in the viewport.

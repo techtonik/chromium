@@ -76,7 +76,9 @@ class DocumentResourceWaiter : public web_view::FrameTreeClient,
   void OnPostMessageEvent(uint32_t source_frame_id,
                           uint32_t target_frame_id,
                           web_view::HTMLMessageEventPtr event) override;
-  void OnWillNavigate(uint32_t target_frame_id) override;
+  void OnWillNavigate() override;
+  void OnFrameLoadingStateChanged(uint32_t frame_id, bool loading) override;
+  void OnDispatchFrameLoadEvent(uint32_t frame_id) override;
 
   // ViewObserver:
   void OnViewViewportMetricsChanged(

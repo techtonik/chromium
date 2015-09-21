@@ -142,7 +142,7 @@
                   '|components/bookmarks'
     },
     'breakpad_app': {
-      'filepath': 'components/crash/app/',
+      'filepath': 'components/crash/content/app/',
     },
     'browser': {
       'filepath': 'chrome/browser/',
@@ -309,9 +309,6 @@
                   'net/base/host_cache|' \
                   'net/dns/'
     },
-    'docs': {
-      'filepath': 'docs',
-    },
     'download': {
       'filepath': 'chrome/browser/download/|'\
                   'content/browser/download/',
@@ -449,6 +446,9 @@
     },
     'libwebp': {
       'filepath': 'third_party/libwebp'
+    },
+    'libvpx': {
+      'filepath': 'third_party/libvpx_new'
     },
     'linux_fonts': {
       'filepath': 'ui/gfx/font_render_params_.*|'\
@@ -992,7 +992,6 @@
                  'devtools-reviews@chromium.org'],
     'disk_cache': ['gavinp+disk@chromium.org'],
     'dns': ['mmenke@chromium.org'],
-    'docs': ['andybons@chromium.org', 'nodir@chromium.org'],
     'download_database': ['benjhayden+dwatch@chromium.org'],
     'download': ['benjhayden+dwatch@chromium.org', 'asanka@chromium.org'],
     'downloads_ext': ['benjhayden+dwatch@chromium.org'],
@@ -1034,6 +1033,8 @@
     'ipc': ['jam@chromium.org', 'darin-cc@chromium.org'],
     'libwebp': ['urvang@chromium.org', 'jzern@chromium.org',
                 'skal@google.com', 'vikasa@google.com'],
+    'libvpx': ['tomfinegan@chromium.org', 'jzern@chromium.org',
+               'fgalligan@chromium.org', 'johannkoenig@chromium.org'],
     'linux_fonts': ['derat+watch@chromium.org'],
     'linux_sandboxing': ['jln+watch@chromium.org'],
     'linux_seccomp_bpf': ['jln+watch@chromium.org'],

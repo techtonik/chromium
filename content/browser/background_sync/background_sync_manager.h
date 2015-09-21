@@ -21,6 +21,7 @@
 #include "content/browser/cache_storage/cache_storage_scheduler.h"
 #include "content/browser/service_worker/service_worker_context_observer.h"
 #include "content/browser/service_worker/service_worker_storage.h"
+#include "content/common/background_sync_service.mojom.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 #include "url/gurl.h"
@@ -53,6 +54,8 @@ class CONTENT_EXPORT BackgroundSyncManager
   using StatusAndRegistrationCallback =
       base::Callback<void(BackgroundSyncStatus,
                           scoped_ptr<BackgroundSyncRegistrationHandle>)>;
+  using StatusAndStateCallback =
+      base::Callback<void(BackgroundSyncStatus, BackgroundSyncState)>;
   using StatusAndRegistrationsCallback = base::Callback<void(
       BackgroundSyncStatus,
       scoped_ptr<ScopedVector<BackgroundSyncRegistrationHandle>>)>;
@@ -128,6 +131,7 @@ class CONTENT_EXPORT BackgroundSyncManager
       const ServiceWorkerVersion::StatusCallback& callback);
 
  private:
+  friend class BackgroundSyncManagerTest;
   friend class BackgroundSyncRegistrationHandle;
 
   class RegistrationKey {
@@ -160,6 +164,8 @@ class CONTENT_EXPORT BackgroundSyncManager
 
   using PermissionStatusCallback = base::Callback<void(bool)>;
   using SWIdToRegistrationsMap = std::map<int64, BackgroundSyncRegistrations>;
+
+  static const size_t kMaxTagLength = 10240;
 
   scoped_ptr<BackgroundSyncRegistrationHandle> CreateRegistrationHandle(
       const scoped_refptr<RefCountedRegistration>& registration);
@@ -241,6 +247,17 @@ class CONTENT_EXPORT BackgroundSyncManager
                           SyncPeriodicity periodicity,
                           const StatusCallback& callback,
                           ServiceWorkerStatusCode status);
+
+  // NotifyWhenDone and its callbacks. See
+  // BackgroundSyncRegistrationHandle::NotifyWhenDone for detailed
+  // documentation.
+  void NotifyWhenDone(BackgroundSyncRegistrationHandle::HandleId handle_id,
+                      const StatusAndStateCallback& callback);
+  void NotifyWhenDoneImpl(
+      scoped_ptr<BackgroundSyncRegistrationHandle> registration_handle,
+      const StatusAndStateCallback& callback);
+  void NotifyWhenDoneDidFinish(const StatusAndStateCallback& callback,
+                               BackgroundSyncState status);
 
   // GetRegistration callbacks
   void GetRegistrationImpl(int64 sw_registration_id,

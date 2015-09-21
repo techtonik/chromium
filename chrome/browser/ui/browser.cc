@@ -75,7 +75,6 @@
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/sessions/session_tab_helper.h"
-#include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/ssl/security_state_model.h"
 #include "chrome/browser/sync/profile_sync_service.h"
@@ -162,6 +161,7 @@
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/history/core/browser/top_sites.h"
 #include "components/search/search.h"
+#include "components/sessions/core/tab_restore_service.h"
 #include "components/sessions/session_types.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "components/translate/core/browser/language_state.h"
@@ -206,7 +206,6 @@
 
 #if defined(OS_WIN)
 #include "base/win/metro.h"
-#include "chrome/browser/ssl/ssl_error_info.h"
 #include "chrome/browser/task_manager/task_manager.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "components/autofill/core/browser/autofill_ie_toolbar_import_win.h"
@@ -508,7 +507,7 @@ Browser::~Browser() {
   if (session_service)
     session_service->WindowClosed(session_id_);
 
-  TabRestoreService* tab_restore_service =
+  sessions::TabRestoreService* tab_restore_service =
       TabRestoreServiceFactory::GetForProfile(profile());
   if (tab_restore_service)
     tab_restore_service->BrowserClosed(tab_restore_service_delegate());
@@ -730,7 +729,7 @@ void Browser::OnWindowClosing() {
   if (session_service)
     session_service->WindowClosing(session_id());
 
-  TabRestoreService* tab_restore_service =
+  sessions::TabRestoreService* tab_restore_service =
       TabRestoreServiceFactory::GetForProfile(profile());
 
 #if defined(USE_AURA)

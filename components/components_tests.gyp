@@ -119,7 +119,7 @@
       'content_settings/core/common/content_settings_pattern_unittest.cc',
     ],
     'crash_unittest_sources': [
-      'crash/app/crash_keys_win_unittest.cc',
+      'crash/content/app/crash_keys_win_unittest.cc',
     ],
     'crx_file_unittest_sources': [
       'crx_file/id_util_unittest.cc',
@@ -236,8 +236,8 @@
       'feedback/feedback_uploader_unittest.cc',
     ],
     'gcm_driver_unittest_sources': [
-      'gcm_driver/gcm_account_tracker_unittest.cc',
       'gcm_driver/gcm_account_mapper_unittest.cc',
+      'gcm_driver/gcm_account_tracker_unittest.cc',
       'gcm_driver/gcm_channel_status_request_unittest.cc',
       'gcm_driver/gcm_client_impl_unittest.cc',
       'gcm_driver/gcm_delayed_task_controller_unittest.cc',
@@ -631,6 +631,7 @@
     ],
     'sync_driver_unittest_sources': [
       'sync_driver/about_sync_util_unittest.cc',
+      'sync_driver/backup_rollback_controller_unittest.cc',
       'sync_driver/data_type_manager_impl_unittest.cc',
       'sync_driver/device_info_data_type_controller_unittest.cc',
       'sync_driver/device_info_sync_service_unittest.cc',
@@ -639,6 +640,9 @@
       'sync_driver/model_association_manager_unittest.cc',
       'sync_driver/non_blocking_data_type_controller_unittest.cc',
       'sync_driver/non_ui_data_type_controller_unittest.cc',
+      'sync_driver/revisit/current_tab_matcher_unittest.cc',
+      'sync_driver/revisit/offset_tab_matcher_unittest.cc',
+      'sync_driver/revisit/sessions_page_revisit_observer_unittest.cc',
       'sync_driver/shared_change_processor_unittest.cc',
       'sync_driver/sync_policy_handler_unittest.cc',
       'sync_driver/sync_prefs_unittest.cc',
@@ -853,6 +857,7 @@
         '<@(wallpaper_unittest_sources)',
         '<@(web_resource_unittest_sources)',
         '<@(webdata_unittest_sources)',
+        'net_log/net_log_temp_file_unittest.cc',
       ],
       'include_dirs': [
         '..',
@@ -932,6 +937,7 @@
         'components.gyp:metrics',
         'components.gyp:metrics_net',
         'components.gyp:metrics_test_support',
+        'components.gyp:net_log',
         'components.gyp:network_time',
         'components.gyp:offline_pages',
         'components.gyp:omnibox_browser',
