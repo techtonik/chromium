@@ -75,9 +75,7 @@ TEST_F(BluetoothTest, LowEnergyDeviceProperties) {
   InitWithFakeAdapter();
   TestBluetoothAdapterObserver observer(adapter_);
 
-  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
-                                  GetErrorCallback());
-  base::RunLoop().RunUntilIdle();
+  StartDiscoverySession();
   DiscoverLowEnergyDevice(1);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
@@ -106,9 +104,7 @@ TEST_F(BluetoothTest, LowEnergyDeviceNoUUIDs) {
   InitWithFakeAdapter();
   TestBluetoothAdapterObserver observer(adapter_);
 
-  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
-                                  GetErrorCallback());
-  base::RunLoop().RunUntilIdle();
+  StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
@@ -132,9 +128,7 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
-  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
-                                  GetErrorCallback());
-  base::RunLoop().RunUntilIdle();
+  StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
@@ -159,9 +153,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
-  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
-                                  GetErrorCallback());
-  base::RunLoop().RunUntilIdle();
+  StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
@@ -223,9 +215,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
-  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
-                                  GetErrorCallback());
-  base::RunLoop().RunUntilIdle();
+  StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();

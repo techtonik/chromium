@@ -30,6 +30,12 @@ BluetoothTestBase::BluetoothTestBase() : weak_factory_(this) {}
 BluetoothTestBase::~BluetoothTestBase() {
 }
 
+void BluetoothTestBase::StartDiscoverySession() {
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+}
+
 void BluetoothTestBase::DeleteDevice(BluetoothDevice* device) {
   adapter_->DeleteDeviceForTesting(device->GetAddress());
 }
