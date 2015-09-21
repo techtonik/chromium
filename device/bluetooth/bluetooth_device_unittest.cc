@@ -77,7 +77,6 @@ TEST_F(BluetoothTest, LowEnergyDeviceProperties) {
 
   StartDiscoverySession();
   DiscoverLowEnergyDevice(1);
-  base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
   ASSERT_TRUE(device);
   EXPECT_EQ(0x1F00u, device->GetBluetoothClass());
@@ -106,7 +105,6 @@ TEST_F(BluetoothTest, LowEnergyDeviceNoUUIDs) {
 
   StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
-  base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
   ASSERT_TRUE(device);
   BluetoothDevice::UUIDList uuids = device->GetUUIDs();
@@ -130,7 +128,6 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   // Get a device.
   StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
-  base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
 
   callback_count_ = error_callback_count_ = 0;
@@ -155,7 +152,6 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   // Get a device.
   StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
-  base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
   std::string device_address = device->GetAddress();
 
@@ -217,7 +213,6 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   // Get a device.
   StartDiscoverySession();
   DiscoverLowEnergyDevice(3);
-  base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
 
   // CreateGattConnection, & multiple connections from platform only invoke
