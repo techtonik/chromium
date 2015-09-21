@@ -7,7 +7,6 @@
 #include "base/macros.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
-#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if defined(OS_ANDROID)
@@ -73,11 +72,9 @@ TEST_F(BluetoothTest, LowEnergyDeviceProperties) {
     return;
   }
   InitWithFakeAdapter();
-  TestBluetoothAdapterObserver observer(adapter_);
 
   StartDiscoverySession();
-  DiscoverLowEnergyDevice(1);
-  BluetoothDevice* device = observer.last_device();
+  BluetoothDevice* device = DiscoverLowEnergyDevice(1);
   ASSERT_TRUE(device);
   EXPECT_EQ(0x1F00u, device->GetBluetoothClass());
   EXPECT_EQ(kTestDeviceAddress1, device->GetAddress());
@@ -101,11 +98,9 @@ TEST_F(BluetoothTest, LowEnergyDeviceNoUUIDs) {
     return;
   }
   InitWithFakeAdapter();
-  TestBluetoothAdapterObserver observer(adapter_);
 
   StartDiscoverySession();
-  DiscoverLowEnergyDevice(3);
-  BluetoothDevice* device = observer.last_device();
+  BluetoothDevice* device = DiscoverLowEnergyDevice(3);
   ASSERT_TRUE(device);
   BluetoothDevice::UUIDList uuids = device->GetUUIDs();
   EXPECT_EQ(0u, uuids.size());
@@ -123,12 +118,10 @@ TEST_F(BluetoothTest, LowEnergyDeviceNoUUIDs) {
 // Basic CreateGattConnection test.
 TEST_F(BluetoothTest, CreateGattConnection) {
   InitWithFakeAdapter();
-  TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
   StartDiscoverySession();
-  DiscoverLowEnergyDevice(3);
-  BluetoothDevice* device = observer.last_device();
+  BluetoothDevice* device = DiscoverLowEnergyDevice(3);
 
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
@@ -147,12 +140,10 @@ TEST_F(BluetoothTest, CreateGattConnection) {
 // functions even when some Disconnect and the BluetoothDevice is destroyed.
 TEST_F(BluetoothTest, BluetoothGattConnection) {
   InitWithFakeAdapter();
-  TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
   StartDiscoverySession();
-  DiscoverLowEnergyDevice(3);
-  BluetoothDevice* device = observer.last_device();
+  BluetoothDevice* device = DiscoverLowEnergyDevice(3);
   std::string device_address = device->GetAddress();
 
   // CreateGattConnection
@@ -209,16 +200,14 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
 // BluetoothGattConnection with several connect / disconnects.
 TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   InitWithFakeAdapter();
-  TestBluetoothAdapterObserver observer(adapter_);
 
   // Get a device.
   StartDiscoverySession();
-  DiscoverLowEnergyDevice(3);
-  BluetoothDevice* device = observer.last_device();
+  BluetoothDevice* device = DiscoverLowEnergyDevice(3);
 
   // CreateGattConnection, & multiple connections from platform only invoke
   // callbacks once:
-  callback_count_ = error_callback_count_ = 0;
+  ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   CompleteGattConnection(device);

@@ -17,6 +17,7 @@
 namespace device {
 
 class BluetoothAdapter;
+class BluetoothDevice;
 
 // A test fixture for Bluetooth that abstracts platform specifics for creating
 // and controlling fake low level objects.
@@ -71,17 +72,19 @@ class BluetoothTestBase : public testing::Test {
   //      kTestDeviceAddress1.
   //   4: kTestDeviceNameEmpty with no advertised UUIDs and address
   //      kTestDeviceAddress2.
-  virtual void DiscoverLowEnergyDevice(int device_ordinal){};
+  virtual BluetoothDevice* DiscoverLowEnergyDevice(int device_ordinal) {
+    return nullptr;
+  }
 
   // Simulates success of implementation details of CreateGattConnection.
-  virtual void CompleteGattConnection(BluetoothDevice* device){};
+  virtual void CompleteGattConnection(BluetoothDevice* device) {}
 
   // Simulates failure of CreateGattConnection with the given error code.
   virtual void FailGattConnection(BluetoothDevice* device,
-                                  BluetoothDevice::ConnectErrorCode){};
+                                  BluetoothDevice::ConnectErrorCode) {}
 
   // Simulates GattConnection disconnecting.
-  virtual void CompleteGattDisconnection(BluetoothDevice* device){};
+  virtual void CompleteGattDisconnection(BluetoothDevice* device) {}
 
   // Remove the device from the adapter and delete it.
   virtual void DeleteDevice(BluetoothDevice* device);
