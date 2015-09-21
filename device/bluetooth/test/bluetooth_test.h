@@ -100,6 +100,9 @@ class BluetoothTestBase : public testing::Test {
   BluetoothAdapter::ErrorCallback GetErrorCallback();
   BluetoothDevice::ConnectErrorCallback GetConnectErrorCallback();
 
+  // Reset all event count members to 0.
+  void ResetEventCounts();
+
   // A Message loop is required by some implementations that will PostTasks and
   // by base::RunLoop().RunUntilIdle() use in this fixuture.
   base::MessageLoop message_loop_;
