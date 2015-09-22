@@ -94,6 +94,7 @@ BluetoothTestBase::GetConnectErrorCallback() {
 }
 
 void BluetoothTestBase::ResetEventCounts() {
+  last_connect_error_code_ = BluetoothDevice::ERROR_UNKNOWN;
   callback_count_ = 0;
   error_callback_count_ = 0;
   gatt_connection_attempt_count_ = 0;

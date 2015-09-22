@@ -284,6 +284,36 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   for (BluetoothGattConnection* connection : gatt_connections_)
     EXPECT_FALSE(connection->IsConnected());
 
+  // CreateGattConnection & DisconnectGatt, then simulate connection.
+  ResetEventCounts();
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  device->DisconnectGatt();
+  EXPECT_EQ(1, gatt_connection_attempt_count_);
+  EXPECT_EQ(1, gatt_disconnection_attempt_count_);
+  CompleteGattConnection(device);
+  EXPECT_EQ(1, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_TRUE(gatt_connections_.back()->IsConnected());
+  ResetEventCounts();
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+
+  // CreateGattConnection & DisconnectGatt, then simulate disconnection.
+  ResetEventCounts();
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  device->DisconnectGatt();
+  EXPECT_EQ(1, gatt_connection_attempt_count_);
+  EXPECT_EQ(1, gatt_disconnection_attempt_count_);
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(1, error_callback_count_);
+  EXPECT_EQ(BluetoothDevice::ERROR_FAILED, last_connect_error_code_);
+  for (BluetoothGattConnection* connection : gatt_connections_)
+    EXPECT_FALSE(connection->IsConnected());
+
   // CreateGattConnection, but error connecting. Also, multiple errors only
   // invoke callbacks once:
   ResetEventCounts();
