@@ -24,16 +24,15 @@ namespace sessions {
 
 // An implementation of LiveTab that is backed by content::WebContents for use
 // on //content-based platforms.
-// Implementation note: This class can't be a WebContentsUserData due to that
-// class being unusable in the component build. crbug.com/532866
 class SESSIONS_EXPORT ContentLiveTab
     : public LiveTab,
       public base::SupportsUserData::Data {
  public:
   ~ContentLiveTab() override;
 
-  static void CreateForWebContents(content::WebContents* web_contents);
-  static ContentLiveTab* FromWebContents(content::WebContents* web_contents);
+  // Returns the ContentLiveTab associated with |web_contents|, creating it if
+  // it has not already been created.
+  static ContentLiveTab* GetForWebContents(content::WebContents* web_contents);
 
   // LiveTab:
   int GetCurrentEntryIndex() override;
@@ -41,6 +40,7 @@ class SESSIONS_EXPORT ContentLiveTab
   sessions::SerializedNavigationEntry GetEntryAtIndex(int index) override;
   sessions::SerializedNavigationEntry GetPendingEntry() override;
   int GetEntryCount() override;
+  scoped_ptr<PlatformSpecificTabData> GetPlatformSpecificTabData() override;
   void LoadIfNecessary() override;
   const std::string& GetUserAgentOverride() const override;
 

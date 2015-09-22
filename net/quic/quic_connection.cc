@@ -1697,6 +1697,8 @@ void QuicConnection::OnRttChange() {
     rtt = QuicTime::Delta::FromMicroseconds(
         sent_packet_manager_.GetRttStats()->initial_rtt_us());
   }
+  if (debug_visitor_)
+    debug_visitor_->OnRttChanged(rtt);
   packet_generator_.OnRttChange(rtt);
 }
 
@@ -2259,10 +2261,6 @@ void QuicConnection::SetMtuDiscoveryTarget(QuicByteCount target) {
 QuicByteCount QuicConnection::LimitMaxPacketSize(
     QuicByteCount suggested_max_packet_size) {
   if (FLAGS_quic_allow_oversized_packets_for_test) {
-    return suggested_max_packet_size;
-  }
-
-  if (!FLAGS_quic_limit_mtu_by_writer) {
     return suggested_max_packet_size;
   }
 

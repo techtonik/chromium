@@ -23,7 +23,7 @@ namespace content {
 
 class WebUSBDeviceImpl : public blink::WebUSBDevice {
  public:
-  WebUSBDeviceImpl(device::usb::DeviceManagerPtr device_manager,
+  WebUSBDeviceImpl(device::usb::DevicePtr device,
                    const blink::WebUSBDeviceInfo& device_info);
   ~WebUSBDeviceImpl() override;
 
@@ -32,6 +32,8 @@ class WebUSBDeviceImpl : public blink::WebUSBDevice {
   const blink::WebUSBDeviceInfo& info() const override;
   void open(blink::WebUSBDeviceOpenCallbacks* callbacks) override;
   void close(blink::WebUSBDeviceCloseCallbacks* callbacks) override;
+  void getConfiguration(
+      blink::WebUSBDeviceGetConfigurationCallbacks* callbacks) override;
   void setConfiguration(
       uint8_t configuration_value,
       blink::WebUSBDeviceSetConfigurationCallbacks* callbacks) override;
@@ -61,10 +63,8 @@ class WebUSBDeviceImpl : public blink::WebUSBDevice {
                 blink::WebUSBDeviceBulkTransferCallbacks* callbacks) override;
   void reset(blink::WebUSBDeviceResetCallbacks* callbacks) override;
 
-  device::usb::DeviceManagerPtr device_manager_;
-
-  blink::WebUSBDeviceInfo device_info_;
   device::usb::DevicePtr device_;
+  blink::WebUSBDeviceInfo device_info_;
 
   base::WeakPtrFactory<WebUSBDeviceImpl> weak_factory_;
 

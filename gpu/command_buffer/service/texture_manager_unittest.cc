@@ -481,7 +481,7 @@ class TextureTestBase : public GpuServiceTest {
   ~TextureTestBase() override { texture_ref_ = NULL; }
 
  protected:
-  void SetUpBase(MemoryTracker* memory_tracker, std::string extensions) {
+  void SetUpBase(MemoryTracker* memory_tracker, const std::string& extensions) {
     GpuServiceTest::SetUp();
     if (!extensions.empty()) {
       TestHelper::SetupFeatureInfoInitExpectations(gl_.get(),
@@ -1825,6 +1825,8 @@ class CountingMemoryTracker : public MemoryTracker {
   uint64_t ClientTracingId() const override { return 0; }
 
   int ClientId() const override { return 0; }
+
+  uint64_t ShareGroupTracingGUID() const override { return 0; }
 
  private:
   ~CountingMemoryTracker() override {}

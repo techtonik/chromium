@@ -130,7 +130,9 @@ GLES2Implementation::GLES2Implementation(
   });
 
   share_group_ =
-      (share_group ? share_group : new ShareGroup(bind_generates_resource));
+      (share_group ? share_group
+                   : new ShareGroup(bind_generates_resource,
+                                    gpu_control_->GetCommandBufferID()));
   DCHECK(share_group_->bind_generates_resource() == bind_generates_resource);
 
   memset(&reserved_ids_, 0, sizeof(reserved_ids_));
@@ -4653,17 +4655,6 @@ void GLES2Implementation::RequestExtensionCHROMIUM(const char* extension) {
   }
 }
 
-void GLES2Implementation::RateLimitOffscreenContextCHROMIUM() {
-  GPU_CLIENT_SINGLE_THREAD_CHECK();
-  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glRateLimitOffscreenCHROMIUM()");
-  // Wait if this would add too many rate limit tokens.
-  if (rate_limit_tokens_.size() == kMaxSwapBuffers) {
-    helper_->WaitForToken(rate_limit_tokens_.front());
-    rate_limit_tokens_.pop();
-  }
-  rate_limit_tokens_.push(helper_->InsertToken());
-}
-
 void GLES2Implementation::GetProgramInfoCHROMIUMHelper(
     GLuint program, std::vector<int8>* result) {
   DCHECK(result);
@@ -5367,6 +5358,10 @@ void GLES2Implementation::RetireSyncPointCHROMIUM(GLuint sync_point) {
   DCHECK(capabilities_.future_sync_points);
   helper_->CommandBufferHelper::Flush();
   gpu_control_->RetireSyncPoint(sync_point);
+}
+
+uint64_t GLES2Implementation::ShareGroupTracingGUID() const {
+  return share_group_->TracingGUID();
 }
 
 namespace {

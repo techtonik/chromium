@@ -1148,9 +1148,6 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
   if (IsPropertyTreeVerificationEnabled())
     command_line->AppendSwitch(cc::switches::kEnablePropertyTreeVerification);
 
-  if (IsDelegatedRendererEnabled())
-    command_line->AppendSwitch(switches::kEnableDelegatedRenderer);
-
   command_line->AppendSwitchASCII(
       switches::kNumRasterThreads,
       base::IntToString(NumberOfRendererRasterThreads()));
@@ -1274,7 +1271,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableLogging,
     switches::kDisableMediaSource,
     switches::kDisableMojoChannel,
-    switches::kDisableNewVideoRenderer,
     switches::kDisableNotifications,
     switches::kDisableOverlayScrollbar,
     switches::kDisablePermissionsAPI,
@@ -1380,7 +1376,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kVModule,
     // Please keep these in alphabetical order. Compositor switches here should
     // also be added to chrome/browser/chromeos/login/chrome_restart_request.cc.
-    cc::switches::kCompositeToMailbox,
     cc::switches::kDisableCompositedAntialiasing,
     cc::switches::kDisableMainFrameBeforeActivation,
     cc::switches::kDisableThreadedAnimation,
@@ -1642,12 +1637,14 @@ void RenderProcessHostImpl::OnChannelError() {
 void RenderProcessHostImpl::OnBadMessageReceived(const IPC::Message& message) {
   // Message de-serialization failed. We consider this a capital crime. Kill the
   // renderer if we have one.
-  LOG(ERROR) << "bad message " << message.type() << " terminating renderer.";
+  auto type = message.type();
+  LOG(ERROR) << "bad message " << type << " terminating renderer.";
   BrowserChildProcessHostImpl::HistogramBadMessageTerminated(
       PROCESS_TYPE_RENDERER);
 
   // Create a memory dump. This will contain enough stack frames to work out
   // what the bad message was.
+  base::debug::Alias(&type);
   base::debug::DumpWithoutCrashing();
 
   bad_message::ReceivedBadMessage(this,

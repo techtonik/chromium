@@ -31,15 +31,15 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': '136d344db3830c87cb3e89eafa50e517d938facd', # from svn revision 202584
+  'webkit_revision': 'a4a20a4d28a518775938688085fc955bd86dc10a', # from svn revision 202641
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': '0d6551cd1e1359423a7f4af503472d280437e9bb',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '3e48aabbf146e8fe6aceb134eb2dcf889baf615e',
+  'skia_revision': 'bf87730c7da80616f6ea17765290dbd2c147a669',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': 'ab9178773c6743e94bbc0d3c42653a1cbea024a7',
+  'v8_revision': '6e4021bb2c08c6948f11a6be4be36f812f9e59a8',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -55,7 +55,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '6f34355e9d091fd4e031e9354fdfa778000b0d4a',
+  'pdfium_revision': 'bca779d0957965eb2ebfad5479e0894844749626',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -195,7 +195,7 @@ deps = {
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '382b031ebab06b25df0708dd44aafad235657d2c',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'df1b109ca587295b6ec2e83e8c6c80de3a09dce8', # commit position 9994
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '300c7492bf1d44614047e24a453a1f13a9c9719d', # commit position 10011
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -219,7 +219,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '47b95c6276e4d174aef09a910e50c1fae26cb50c', # commit position 9994
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'ea85c10a428fd5f038e969e00833dd4b1a96e1f7', # commit position 10010
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -228,7 +228,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/open-source-parsers/jsoncpp.git' + '@' + 'f572e8e42e22cfcf5ab0aea26574f408943edfa4', # from svn 248
 
   'src/third_party/libyuv':
-    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + 'fcacbfb27f4cdc71a4b8f636a16235f6b9af465c', # from version 1483
+    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + '62c49dc811f078e78ed76bfd7c6358c8b7513a14', # from version 1487
 
   'src/third_party/smhasher/src':
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',

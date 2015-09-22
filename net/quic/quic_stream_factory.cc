@@ -19,6 +19,8 @@
 #include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "net/base/net_errors.h"
+#include "net/base/socket_performance_watcher.h"
+#include "net/base/socket_performance_watcher_factory.h"
 #include "net/cert/cert_verifier.h"
 #include "net/dns/host_resolver.h"
 #include "net/dns/single_request_host_resolver.h"
@@ -570,6 +572,7 @@ QuicStreamFactory::QuicStreamFactory(
     CertPolicyEnforcer* cert_policy_enforcer,
     ChannelIDService* channel_id_service,
     TransportSecurityState* transport_security_state,
+    const SocketPerformanceWatcherFactory* socket_performance_watcher_factory,
     QuicCryptoClientStreamFactory* quic_crypto_client_stream_factory,
     QuicRandom* random_generator,
     QuicClock* clock,
@@ -602,6 +605,7 @@ QuicStreamFactory::QuicStreamFactory(
       random_generator_(random_generator),
       clock_(clock),
       max_packet_length_(max_packet_length),
+      socket_performance_watcher_factory_(socket_performance_watcher_factory),
       config_(InitializeQuicConfig(connection_options)),
       supported_versions_(supported_versions),
       enable_port_selection_(enable_port_selection),
@@ -629,6 +633,7 @@ QuicStreamFactory::QuicStreamFactory(
       delay_tcp_race_(delay_tcp_race),
       port_seed_(random_generator_->RandUint64()),
       check_persisted_supports_quic_(true),
+      quic_supported_servers_at_startup_initialzied_(false),
       task_runner_(nullptr),
       weak_factory_(this) {
   DCHECK(transport_security_state_);
@@ -726,23 +731,13 @@ int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
   if (quic_server_info_factory_) {
     bool load_from_disk_cache = !disable_disk_cache_;
     if (http_server_properties_) {
-      const AlternativeServiceMap& alternative_service_map =
-          http_server_properties_->alternative_service_map();
-      AlternativeServiceMap::const_iterator map_it =
-          alternative_service_map.Peek(server_id.host_port_pair());
-      if (map_it != alternative_service_map.end()) {
-        const AlternativeServiceInfoVector& alternative_service_info_vector =
-            map_it->second;
-        AlternativeServiceInfoVector::const_iterator it;
-        for (it = alternative_service_info_vector.begin();
-             it != alternative_service_info_vector.end(); ++it) {
-          if (it->alternative_service.protocol == QUIC)
-            break;
-        }
+      if (!quic_supported_servers_at_startup_initialzied_)
+        InitializeQuicSupportedServersAtStartup();
+      if (!ContainsKey(quic_supported_servers_at_startup_,
+                       server_id.host_port_pair())) {
         // If there is no entry for QUIC, consider that as a new server and
         // don't wait for Cache thread to load the data for that server.
-        if (it == alternative_service_info_vector.end())
-          load_from_disk_cache = false;
+        load_from_disk_cache = false;
       }
     }
     if (load_from_disk_cache && CryptoConfigCacheIsEmpty(server_id)) {
@@ -1283,12 +1278,21 @@ int QuicStreamFactory::CreateSession(const QuicServerId& server_id,
     server_info->Start();
   }
 
+  // Use the factory to create a new socket performance watcher, and pass the
+  // ownership to QuicChromiumClientSession.
+  scoped_ptr<SocketPerformanceWatcher> socket_performance_watcher;
+  if (socket_performance_watcher_factory_) {
+    socket_performance_watcher = socket_performance_watcher_factory_
+                                     ->CreateUDPSocketPerformanceWatcher();
+  }
+
   *session = new QuicChromiumClientSession(
       connection, socket.Pass(), this, quic_crypto_client_stream_factory_,
       transport_security_state_, server_info.Pass(), server_id,
       cert_verify_flags, config, &crypto_config_,
       network_connection_.GetDescription(), dns_resolution_end_time,
-      base::ThreadTaskRunnerHandle::Get().get(), net_log.net_log());
+      base::ThreadTaskRunnerHandle::Get().get(),
+      socket_performance_watcher.Pass(), net_log.net_log());
 
   all_sessions_[*session] = server_id;  // owning pointer
 
@@ -1361,19 +1365,7 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
     return;
 
   if (http_server_properties_) {
-    if (quic_supported_servers_at_startup_.empty()) {
-      for (const std::pair<const HostPortPair, AlternativeServiceInfoVector>&
-               key_value : http_server_properties_->alternative_service_map()) {
-        for (const AlternativeServiceInfo& alternative_service_info :
-             key_value.second) {
-          if (alternative_service_info.alternative_service.protocol == QUIC) {
-            quic_supported_servers_at_startup_.insert(key_value.first);
-            break;
-          }
-        }
-      }
-    }
-
+    DCHECK(quic_supported_servers_at_startup_initialzied_);
     // TODO(rtenneti): Delete the following histogram after collecting stats.
     // If the AlternativeServiceMap contained an entry for this host, check if
     // the disk cache contained an entry for it.
@@ -1395,6 +1387,22 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
   if (!server_id.is_https()) {
     // Don't check the certificates for insecure QUIC.
     cached->SetProofValid();
+  }
+}
+
+void QuicStreamFactory::InitializeQuicSupportedServersAtStartup() {
+  DCHECK(http_server_properties_);
+  DCHECK(!quic_supported_servers_at_startup_initialzied_);
+  quic_supported_servers_at_startup_initialzied_ = true;
+  for (const std::pair<const HostPortPair, AlternativeServiceInfoVector>&
+           key_value : http_server_properties_->alternative_service_map()) {
+    for (const AlternativeServiceInfo& alternative_service_info :
+         key_value.second) {
+      if (alternative_service_info.alternative_service.protocol == QUIC) {
+        quic_supported_servers_at_startup_.insert(key_value.first);
+        break;
+      }
+    }
   }
 }
 

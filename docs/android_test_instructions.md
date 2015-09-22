@@ -123,7 +123,8 @@ builder.
 If you build in an output directory other than "out", you may have to tell
 test\_runner.py where you place it. Say you build your android code in
 out\_android, then do `export CHROMIUM_OUT_DIR=out_android` before running the
-command below.
+command below. You have to do this even if your "out" directory is a symlink
+pointing to "out_android".
 
 ## INSTALL\_FAILED\_CONTAINER\_ERROR or INSTALL\_FAILED\_INSUFFICIENT\_STORAGE
 
@@ -132,13 +133,12 @@ binaries to the AVD emulator, you may need to resize your userdata partition
 with the following commands:
 
 ```shell
-# Resize userdata partition to be 1G resize2fs
-android_emulator_sdk/sdk/system-images/android-19/x86/userdata.img 1G
+# Resize userdata partition to be 1G
+resize2fs android_emulator_sdk/sdk/system-images/android-19/x86/userdata.img 1G
 
 # Set filesystem parameter to continue on errors; Android doesn't like some
 # things e2fsprogs does.
-tune2fs -e continue
-android_emulator_sdk/sdk/system-images/android-19/x86/userdata.img
+tune2fs -e continue android_emulator_sdk/sdk/system-images/android-19/x86/userdata.img
 ```
 
 ## Symbolizing Crashes

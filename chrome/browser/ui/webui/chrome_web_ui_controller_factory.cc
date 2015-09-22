@@ -13,6 +13,7 @@
 #include "base/thread_task_runner_handle.h"
 #include "chrome/browser/about_flags.h"
 #include "chrome/browser/dom_distiller/dom_distiller_service_factory.h"
+#include "chrome/browser/engagement/site_engagement_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/webui/about_ui.h"
@@ -23,6 +24,7 @@
 #include "chrome/browser/ui/webui/device_log_ui.h"
 #include "chrome/browser/ui/webui/domain_reliability_internals_ui.h"
 #include "chrome/browser/ui/webui/downloads_ui.h"
+#include "chrome/browser/ui/webui/engagement/site_engagement_ui.h"
 #include "chrome/browser/ui/webui/flags_ui.h"
 #include "chrome/browser/ui/webui/flash_ui.h"
 #include "chrome/browser/ui/webui/gcm_internals_ui.h"
@@ -110,6 +112,10 @@
 #include "chrome/browser/ui/webui/copresence_ui.h"
 #include "chrome/browser/ui/webui/devtools_ui.h"
 #include "chrome/browser/ui/webui/inspect_ui.h"
+#endif
+
+#if defined(OS_ANDROID)
+#include "chrome/browser/ui/webui/popular_sites_internals_ui.h"
 #endif
 
 #if defined(OS_CHROMEOS)
@@ -498,6 +504,10 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
   if (url.host() == chrome::kChromeUIInspectHost)
     return &NewWebUI<InspectUI>;
 #endif
+#if defined(OS_ANDROID)
+  if (url.host() == chrome::kChromeUIPopularSitesInternalsHost)
+    return &NewWebUI<PopularSitesInternalsUI>;
+#endif
 #if !defined(OS_CHROMEOS) && !defined(OS_ANDROID) && !defined(OS_IOS)
   if (url.host() == chrome::kChromeUIUserManagerHost &&
       switches::IsNewAvatarMenu()) {
@@ -580,6 +590,11 @@ WebUIFactoryFunction GetWebUIFactoryFunction(WebUI* web_ui,
   if (dom_distiller::IsEnableDomDistillerSet() &&
       url.host() == dom_distiller::kChromeUIDomDistillerHost) {
     return &NewWebUI<dom_distiller::DomDistillerUi>;
+  }
+
+  if (SiteEngagementService::IsEnabled() &&
+      url.host() == chrome::kChromeUISiteEngagementHost) {
+    return &NewWebUI<SiteEngagementUI>;
   }
 
   return NULL;
