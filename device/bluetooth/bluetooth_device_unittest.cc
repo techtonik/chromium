@@ -300,9 +300,44 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ConnectDisconnect) {
   // CreateGattConnection, but receive notice that device disconnected before
   // it ever connects:
   callback_count_ = error_callback_count_ = 0;
+  last_connect_error_code_ = BluetoothDevice::ERROR_UNKNOWN;
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(1, gatt_connection_attempt_count_);
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(1, error_callback_count_);
+  EXPECT_EQ(BluetoothDevice::ERROR_FAILED, last_connect_error_code_);
+  for (BluetoothGattConnection* connection : gatt_connections_)
+    EXPECT_FALSE(connection->IsConnected());
+
+  // CreateGattConnection & DisconnectGatt, then simulate connection.
+  callback_count_ = error_callback_count_ = gatt_connection_attempt_count_ =
+      gatt_disconnection_attempt_count_ = 0;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  device->DisconnectGatt();
+  EXPECT_EQ(1, gatt_connection_attempt_count_);
+  EXPECT_EQ(1, gatt_disconnection_attempt_count_);
+  CompleteGattConnection(device);
+  EXPECT_EQ(1, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_TRUE(gatt_connections_.back()->IsConnected());
+  callback_count_ = error_callback_count_ = gatt_connection_attempt_count_ =
+      gatt_disconnection_attempt_count_ = 0;
+  CompleteGattDisconnection(device);
+  EXPECT_EQ(0, callback_count_);
+  EXPECT_EQ(0, error_callback_count_);
+
+  // CreateGattConnection & DisconnectGatt, then simulate disconnection.
+  callback_count_ = error_callback_count_ = gatt_connection_attempt_count_ =
+      gatt_disconnection_attempt_count_ = 0;
+  last_connect_error_code_ = BluetoothDevice::ERROR_UNKNOWN;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  device->DisconnectGatt();
+  EXPECT_EQ(1, gatt_connection_attempt_count_);
+  EXPECT_EQ(1, gatt_disconnection_attempt_count_);
   CompleteGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
