@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "components/sessions/content/content_live_tab.h"
+#include "components/sessions/content/content_platform_specific_tab_data.h"
 
 namespace {
 const char kContentLiveTabWebContentsUserDataKey[] = "content_live_tab";
@@ -11,18 +12,13 @@ const char kContentLiveTabWebContentsUserDataKey[] = "content_live_tab";
 namespace sessions {
 
 // static
-void ContentLiveTab::CreateForWebContents(content::WebContents* contents) {
-  if (FromWebContents(contents))
-    return;
-
-  contents->SetUserData(
-      kContentLiveTabWebContentsUserDataKey,
-      new ContentLiveTab(contents));
-}
-
-// static
-ContentLiveTab* ContentLiveTab::FromWebContents(
+ContentLiveTab* ContentLiveTab::GetForWebContents(
     content::WebContents* contents) {
+  if (!contents->GetUserData(kContentLiveTabWebContentsUserDataKey)) {
+    contents->SetUserData(kContentLiveTabWebContentsUserDataKey,
+                          new ContentLiveTab(contents));
+  }
+
   return static_cast<ContentLiveTab*>(contents->GetUserData(
       kContentLiveTabWebContentsUserDataKey));
 }
@@ -52,6 +48,12 @@ sessions::SerializedNavigationEntry ContentLiveTab::GetPendingEntry() {
 
 int ContentLiveTab::GetEntryCount() {
   return navigation_controller().GetEntryCount();
+}
+
+scoped_ptr<sessions::PlatformSpecificTabData>
+ContentLiveTab::GetPlatformSpecificTabData() {
+  return make_scoped_ptr(
+      new sessions::ContentPlatformSpecificTabData(web_contents()));
 }
 
 void ContentLiveTab::LoadIfNecessary() {

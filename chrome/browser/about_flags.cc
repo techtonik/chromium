@@ -529,6 +529,16 @@ const Experiment::Choice kProgressBarAnimationChoices[] = {
 };
 #endif  // defined(OS_ANDROID)
 
+#if defined(OS_CHROMEOS)
+const Experiment::Choice kCrosRegionsModeChoices[] = {
+  { IDS_FLAGS_CROS_REGIONS_MODE_DEFAULT, "", "" },
+  { IDS_FLAGS_CROS_REGIONS_MODE_OVERRIDE, chromeos::switches::kCrosRegionsMode,
+        chromeos::switches::kCrosRegionsModeOverride },
+  { IDS_FLAGS_CROS_REGIONS_MODE_HIDE, chromeos::switches::kCrosRegionsMode,
+        chromeos::switches::kCrosRegionsModeHide },
+};
+#endif  // defined(OS_CHROMEOS)
+
 // RECORDING USER METRICS FOR FLAGS:
 // -----------------------------------------------------------------------------
 // The first line of the experiment is the internal name. If you'd like to
@@ -1156,14 +1166,6 @@ const Experiment kExperiments[] = {
      kOsDesktop,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableLCDText,
                                switches::kDisableLCDText)},
-#if defined(OS_ANDROID) || defined(OS_MACOSX)
-    {"delegated-renderer",
-     IDS_FLAGS_DELEGATED_RENDERER_NAME,
-     IDS_FLAGS_DELEGATED_RENDERER_DESCRIPTION,
-     kOsAndroid,  // TODO(ccameron) Add mac support soon.
-     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableDelegatedRenderer,
-                               switches::kDisableDelegatedRenderer)},
-#endif
     {"enable-offer-store-unmasked-wallet-cards",
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS,
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS_DESCRIPTION,
@@ -1459,11 +1461,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_READER_MODE_HEURISTICS_DESCRIPTION,
      kOsAndroid,
      MULTI_VALUE_TYPE(kReaderModeHeuristicsChoices)},
-    {"enable-reader-mode-toolbar-icon",
-     IDS_FLAGS_READER_MODE_EXPERIMENT_NAME,
-     IDS_FLAGS_READER_MODE_EXPERIMENT_DESCRIPTION,
-     kOsAndroid,
-     SINGLE_VALUE_TYPE(switches::kEnableReaderModeToolbarIcon)},
     {"enable-dom-distiller-button-animation",
      IDS_FLAGS_READER_MODE_BUTTON_ANIMATION,
      IDS_FLAGS_READER_MODE_BUTTON_ANIMATION_DESCRIPTION,
@@ -1878,11 +1875,6 @@ const Experiment kExperiments[] = {
          autofill::switches::kEnableAccessorySuggestionView,
          autofill::switches::kDisableAccessorySuggestionView)},
 #endif  // defined(OS_ANDROID)
-    {"disable-new-video-renderer",
-     IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_NAME,
-     IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kDisableNewVideoRenderer)},
     // Temporary flag to ease the transition to standard-compliant scrollTop
     // behavior.  Will be removed shortly after http://crbug.com/157855 ships.
     {"scroll-top-left-interop",
@@ -2066,6 +2058,13 @@ const Experiment kExperiments[] = {
       kOsDesktop,
       SINGLE_VALUE_TYPE(switches::kEnableWebUsbOnAnyOrigin)},
 #endif
+#if defined(OS_CHROMEOS)
+    {"cros-regions-mode",
+     IDS_FLAGS_CROS_REGIONS_MODE_NAME,
+     IDS_FLAGS_CROS_REGIONS_MODE_DESCRIPTION,
+     kOsCrOS,
+     MULTI_VALUE_TYPE(kCrosRegionsModeChoices)},
+#endif  // OS_CHROMEOS
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

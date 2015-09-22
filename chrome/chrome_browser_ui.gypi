@@ -420,6 +420,8 @@
       'browser/ui/webui/device_log_ui.h',
       'browser/ui/webui/domain_reliability_internals_ui.cc',
       'browser/ui/webui/domain_reliability_internals_ui.h',
+      'browser/ui/webui/engagement/site_engagement_ui.cc',
+      'browser/ui/webui/engagement/site_engagement_ui.h',
       'browser/ui/webui/fallback_icon_source.cc',
       'browser/ui/webui/fallback_icon_source.h',
       'browser/ui/webui/favicon_source.cc',
@@ -515,6 +517,10 @@
       'browser/ui/android/snackbars/auto_signin_snackbar_controller.cc',
       'browser/ui/android/snackbars/auto_signin_snackbar_controller.h',
       'browser/ui/screen_capture_notification_ui_stub.cc',
+      'browser/ui/webui/popular_sites_internals_message_handler.cc',
+      'browser/ui/webui/popular_sites_internals_message_handler.h',
+      'browser/ui/webui/popular_sites_internals_ui.cc',
+      'browser/ui/webui/popular_sites_internals_ui.h',
     ],
     # Cross-platform ash sources.
     'chrome_browser_ui_ash_sources': [
@@ -2783,6 +2789,7 @@
             '<@(chrome_browser_ui_non_ios_sources)',
             '<@(chrome_browser_ui_toolbar_model_sources)',
             '<(SHARED_INTERMEDIATE_DIR)/chrome/browser/ui/webui/omnibox/omnibox.mojom.cc',
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/browser/ui/webui/engagement/site_engagement.mojom.cc',
           ],
           'dependencies': [
             'chrome_web_ui_mojo_bindings.gyp:web_ui_mojo_bindings',
@@ -2792,6 +2799,7 @@
             '../components/components.gyp:app_modal',
             '../components/components.gyp:autofill_content_risk_proto',
             '../components/components.gyp:net_log',
+            '../components/components.gyp:page_load_metrics_browser',
             '../components/components.gyp:translate_content_common',
             '../content/app/resources/content_resources.gyp:content_resources',
             '../media/media.gyp:media',

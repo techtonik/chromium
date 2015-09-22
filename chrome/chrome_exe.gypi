@@ -352,41 +352,6 @@
                 '<(version_full)'
               ],
             },
-            {
-              # This postbuid step is responsible for creating the following
-              # helpers:
-              #
-              # Currently no helpers are produced (crbug.com/520680), but
-              # more will be added soon (crbug.com/497190).
-              #
-              # Normally, applications shipping as part of offical builds with
-              # Google Chrome branding have dsymutil (dwarf-with-dsym,
-              # mac_real_dsym) and dump_syms (mac_breakpad) run on them to
-              # produce a .dSYM bundle and a Breakpad .sym file. This is
-              # unnecessary for the "More Helpers" because they're identical
-              # to the original helper except for the bits in their Mach-O
-              # headers that change to enable or disable special features.
-              # Each .dSYM is identified by UUID stored in a Mach-O file's
-              # LC_UUID load command. Because the "More Helpers" share a UUID
-              # with the original helper, there's no need to run dsymutil
-              # again. All helpers can share the same .dSYM. Special handling
-              # is performed in chrome/tools/build/mac/dump_product_syms to
-              # prepare their Breakpad symbol files.
-              'postbuild_name': 'Make More Helpers',
-              'action': [
-                '../build/mac/make_more_helpers.sh',
-                'Versions/<(version_full)',
-                '<(mac_product_name)',
-              ],
-            },
-            {
-              # Make sure there isn't any Objective-C in the browser app's
-              # executable.
-              'postbuild_name': 'Verify No Objective-C',
-              'action': [
-                '../build/mac/verify_no_objc.sh',
-              ],
-            },
           ],  # postbuilds
         }, {  # OS != "mac"
           'conditions': [
@@ -450,7 +415,7 @@
             '../breakpad/breakpad.gyp:breakpad_sender',
             '../chrome_elf/chrome_elf.gyp:chrome_elf',
             '../components/components.gyp:crash_component',
-            '../components/components.gyp:crash_keys',
+            '../components/components.gyp:crash_core_common',
             '../sandbox/sandbox.gyp:sandbox',
             '../ui/gfx/gfx.gyp:gfx',
             '../win8/metro_driver/metro_driver.gyp:metro_driver',
@@ -586,7 +551,7 @@
                 '../breakpad/breakpad.gyp:breakpad_handler_win64',
                 '../breakpad/breakpad.gyp:breakpad_sender_win64',
                 '../components/components.gyp:breakpad_win64',
-                '../components/components.gyp:crash_keys_win64',
+                '../components/components.gyp:crash_core_common_win64',
                 '../chrome/common_constants.gyp:common_constants_win64',
                 '../components/nacl.gyp:nacl_win64',
                 '../crypto/crypto.gyp:crypto_nacl_win64',

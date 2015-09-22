@@ -98,6 +98,7 @@ const int kPopupMarginRight = 0;
 const int kPermissionsSectionContentMinWidth = 300;
 const int kPermissionsSectionPaddingBottom = 6;
 const int kPermissionsSectionPaddingLeft = 18;
+const int kPermissionsSectionPaddingRight = 18;
 const int kPermissionsSectionPaddingTop = 16;
 
 // Space between the headline and the content of a section on the permissions
@@ -126,6 +127,8 @@ class PopupHeaderView : public views::View {
   // Sets the |status_text| for the identity check of this site and the
   // |text_color|.
   void SetIdentityStatus(const base::string16& status_text, SkColor text_color);
+
+  int GetPreferredNameWidth() const;
 
  private:
   // The label that displays the name of the site's identity.
@@ -218,6 +221,10 @@ PopupHeaderView::PopupHeaderView(views::ButtonListener* close_button_listener)
 }
 
 PopupHeaderView::~PopupHeaderView() {
+}
+
+int PopupHeaderView::GetPreferredNameWidth() const {
+  return name_->GetPreferredSize().width();
 }
 
 void PopupHeaderView::SetIdentityName(const base::string16& name) {
@@ -459,8 +466,8 @@ gfx::Size WebsiteSettingsPopupView::GetPreferredSize() const {
   if (permissions_content_)
     width = std::max(width, permissions_content_->GetPreferredSize().width());
   if (header_)
-    width = std::max(width, header_->GetPreferredSize().width());
-  width += kPermissionsSectionPaddingLeft;
+    width = std::max(width, header_->GetPreferredNameWidth());
+  width += kPermissionsSectionPaddingLeft + kPermissionsSectionPaddingRight;
   width = std::min(width, kMaxPopupWidth);
   return gfx::Size(width, height);
 }
@@ -771,7 +778,6 @@ void WebsiteSettingsPopupView::ResetConnectionSection(
                         0,
                         0);
   column_set->AddPaddingColumn(0, kConnectionSectionPaddingRight);
-
 
   layout->AddPaddingRow(0, kConnectionSectionPaddingTop);
   layout->StartRow(1, 0);

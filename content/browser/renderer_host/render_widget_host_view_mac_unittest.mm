@@ -201,11 +201,9 @@ class RenderWidgetHostViewMacTest : public RenderViewHostImplTestHarness {
 
   void SetUp() override {
     RenderViewHostImplTestHarness::SetUp();
-    if (IsDelegatedRendererEnabled()) {
-      ImageTransportFactory::InitializeForUnitTests(
-          scoped_ptr<ImageTransportFactory>(
-              new NoTransportImageTransportFactory));
-    }
+    ImageTransportFactory::InitializeForUnitTests(
+        scoped_ptr<ImageTransportFactory>(
+            new NoTransportImageTransportFactory));
 
     // TestRenderViewHost's destruction assumes that its view is a
     // TestRenderWidgetHostView, so store its view and reset it back to the
@@ -224,8 +222,7 @@ class RenderWidgetHostViewMacTest : public RenderViewHostImplTestHarness {
     // See comment in SetUp().
     test_rvh()->SetView(static_cast<RenderWidgetHostViewBase*>(old_rwhv_));
 
-    if (IsDelegatedRendererEnabled())
-      ImageTransportFactory::Terminate();
+    ImageTransportFactory::Terminate();
     RenderViewHostImplTestHarness::TearDown();
   }
 
@@ -408,15 +405,15 @@ TEST_F(RenderWidgetHostViewMacTest, GetFirstRectForCharacterRangeCaretCase) {
         gfx::Range(0, 1).ToNSRange(),
         &rect,
         &actual_range));
-  EXPECT_FALSE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
+  EXPECT_TRUE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
         gfx::Range(1, 1).ToNSRange(),
         &rect,
         &actual_range));
-  EXPECT_FALSE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
+  EXPECT_TRUE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
         gfx::Range(1, 2).ToNSRange(),
         &rect,
         &actual_range));
-  EXPECT_FALSE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
+  EXPECT_TRUE(rwhv_mac_->GetCachedFirstRectForCharacterRange(
         gfx::Range(2, 2).ToNSRange(),
         &rect,
         &actual_range));

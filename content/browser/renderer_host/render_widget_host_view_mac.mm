@@ -20,6 +20,7 @@
 #include "base/mac/sdk_forward_declarations.h"
 #include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/sys_string_conversions.h"
@@ -180,6 +181,8 @@ static BOOL SupportsBackingPropertiesChangedNotification() {
 - (void)updateScreenProperties;
 - (void)setResponderDelegate:
         (NSObject<RenderWidgetHostViewMacDelegate>*)delegate;
+- (void)showLookUpDictionaryOverlayInternal:(NSAttributedString*) string
+                              baselinePoint:(NSPoint) baselinePoint;
 @end
 
 // A window subclass that allows the fullscreen window to become main and gain
@@ -592,10 +595,8 @@ RenderWidgetHostViewMac::RenderWidgetHostViewMac(RenderWidgetHost* widget,
   [cocoa_view_ setLayer:background_layer_];
   [cocoa_view_ setWantsLayer:YES];
 
-  if (IsDelegatedRendererEnabled()) {
-    root_layer_.reset(new ui::Layer(ui::LAYER_SOLID_COLOR));
-    delegated_frame_host_.reset(new DelegatedFrameHost(this));
-  }
+  root_layer_.reset(new ui::Layer(ui::LAYER_SOLID_COLOR));
+  delegated_frame_host_.reset(new DelegatedFrameHost(this));
 
   gfx::Screen::GetScreenFor(cocoa_view_)->AddObserver(this);
 
@@ -1042,9 +1043,8 @@ bool RenderWidgetHostViewMac::HasFocus() const {
 }
 
 bool RenderWidgetHostViewMac::IsSurfaceAvailableForCopy() const {
-  if (delegated_frame_host_)
-    return delegated_frame_host_->CanCopyToBitmap();
-  return false;
+  DCHECK(delegated_frame_host_);
+  return delegated_frame_host_->CanCopyToBitmap();
 }
 
 bool RenderWidgetHostViewMac::IsShowing() {
@@ -1265,6 +1265,7 @@ void RenderWidgetHostViewMac::SelectionBoundsChanged(
     const ViewHostMsg_SelectionBounds_Params& params) {
   if (params.anchor_rect == params.focus_rect)
     caret_rect_ = params.anchor_rect;
+  first_selection_rect_ = params.anchor_rect;
 }
 
 void RenderWidgetHostViewMac::SetShowingContextMenu(bool showing) {
@@ -1303,41 +1304,34 @@ void RenderWidgetHostViewMac::CopyFromCompositingSurface(
     const gfx::Size& dst_size,
     ReadbackRequestCallback& callback,
     const SkColorType preferred_color_type) {
-  if (delegated_frame_host_) {
-    delegated_frame_host_->CopyFromCompositingSurface(
-        src_subrect, dst_size, callback, preferred_color_type);
-  }
+  DCHECK(delegated_frame_host_);
+  delegated_frame_host_->CopyFromCompositingSurface(
+      src_subrect, dst_size, callback, preferred_color_type);
 }
 
 void RenderWidgetHostViewMac::CopyFromCompositingSurfaceToVideoFrame(
       const gfx::Rect& src_subrect,
       const scoped_refptr<media::VideoFrame>& target,
       const base::Callback<void(bool)>& callback) {
-  if (delegated_frame_host_) {
-    delegated_frame_host_->CopyFromCompositingSurfaceToVideoFrame(
-        src_subrect, target, callback);
-  }
+  DCHECK(delegated_frame_host_);
+  delegated_frame_host_->CopyFromCompositingSurfaceToVideoFrame(
+      src_subrect, target, callback);
 }
 
 bool RenderWidgetHostViewMac::CanCopyToVideoFrame() const {
-  if (delegated_frame_host_)
-    return delegated_frame_host_->CanCopyToVideoFrame();
-  return false;
-}
-
-bool RenderWidgetHostViewMac::CanSubscribeFrame() const {
-  return !!delegated_frame_host_;
+  DCHECK(delegated_frame_host_);
+  return delegated_frame_host_->CanCopyToVideoFrame();
 }
 
 void RenderWidgetHostViewMac::BeginFrameSubscription(
     scoped_ptr<RenderWidgetHostViewFrameSubscriber> subscriber) {
-  if (delegated_frame_host_)
-    delegated_frame_host_->BeginFrameSubscription(subscriber.Pass());
+  DCHECK(delegated_frame_host_);
+  delegated_frame_host_->BeginFrameSubscription(subscriber.Pass());
 }
 
 void RenderWidgetHostViewMac::EndFrameSubscription() {
-  if (delegated_frame_host_)
-    delegated_frame_host_->EndFrameSubscription();
+  DCHECK(delegated_frame_host_);
+  delegated_frame_host_->EndFrameSubscription();
 }
 
 void RenderWidgetHostViewMac::ForwardMouseEvent(const WebMouseEvent& event) {
@@ -1482,16 +1476,26 @@ bool RenderWidgetHostViewMac::GetCachedFirstRectForCharacterRange(
   TRACE_EVENT0("browser",
                "RenderWidgetHostViewMac::GetFirstRectForCharacterRange");
 
+  const gfx::Range requested_range(range);
   // If requested range is same as caret location, we can just return it.
-  if (selection_range_.is_empty() && gfx::Range(range) == selection_range_) {
+  if (selection_range_.is_empty() && requested_range == selection_range_) {
     if (actual_range)
       *actual_range = range;
     *rect = NSRectFromCGRect(caret_rect_.ToCGRect());
     return true;
   }
 
+  if (composition_range_.is_empty()) {
+    if (!selection_range_.Contains(requested_range))
+      return false;
+    if (actual_range)
+      *actual_range = selection_range_.ToNSRange();
+    *rect = NSRectFromCGRect(first_selection_rect_.ToCGRect());
+    return true;
+  }
+
   const gfx::Range request_range_in_composition =
-      ConvertCharacterRangeToCompositionRange(gfx::Range(range));
+      ConvertCharacterRangeToCompositionRange(requested_range);
   if (request_range_in_composition == gfx::Range::InvalidRange())
     return false;
 
@@ -1563,8 +1567,7 @@ void RenderWidgetHostViewMac::OnSwapCompositorFrame(
 }
 
 void RenderWidgetHostViewMac::ClearCompositorFrame() {
-  if (delegated_frame_host_)
-    delegated_frame_host_->ClearDelegatedFrame();
+  delegated_frame_host_->ClearDelegatedFrame();
 }
 
 void RenderWidgetHostViewMac::GetScreenInfo(blink::WebScreenInfo* results) {
@@ -1636,10 +1639,8 @@ void RenderWidgetHostViewMac::WheelEventAck(
 }
 
 uint32_t RenderWidgetHostViewMac::GetSurfaceIdNamespace() {
-  if (delegated_frame_host_)
-    return delegated_frame_host_->GetSurfaceIdNamespace();
-
-  return 0;
+  DCHECK(delegated_frame_host_);
+  return delegated_frame_host_->GetSurfaceIdNamespace();
 }
 
 uint32_t RenderWidgetHostViewMac::SurfaceIdNamespaceAtPoint(
@@ -2430,22 +2431,56 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   }
 }
 
-// This is invoked only on 10.8 or newer when the user taps a word using
-// three fingers.
-- (void)quickLookWithEvent:(NSEvent*)event {
-  NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
+- (void)showLookUpDictionaryOverlayInternal:(NSAttributedString*) string
+                              baselinePoint:(NSPoint) baselinePoint {
+  if ([string length] == 0) {
+    // The PDF plugin does not support getting the attributed string at point.
+    // Until it does, use NSPerformService(), which opens Dictionary.app.
+    // TODO(shuchen): Support GetStringAtPoint() & GetStringFromRange() for PDF.
+    // See crbug.com/152438.
+    NSString* text = base::SysUTF8ToNSString(
+        renderWidgetHostView_->selected_text());
+    if ([text length] == 0)
+      return;
+    NSPasteboard* pasteboard = [NSPasteboard pasteboardWithUniqueName];
+    NSArray* types = [NSArray arrayWithObject:NSStringPboardType];
+    [pasteboard declareTypes:types owner:nil];
+    if ([pasteboard setString:text forType:NSStringPboardType])
+      NSPerformService(@"Look Up in Dictionary", pasteboard);
+    return;
+  }
+  dispatch_async(dispatch_get_main_queue(), ^{
+      [self showDefinitionForAttributedString:string
+                                      atPoint:baselinePoint];
+  });
+}
+
+- (void)showLookUpDictionaryOverlayFromRange:(NSRange)range {
+  TextInputClientMac::GetInstance()->GetStringFromRange(
+      renderWidgetHostView_->render_widget_host_, range,
+      ^(NSAttributedString* string, NSPoint baselinePoint) {
+        [self showLookUpDictionaryOverlayInternal:string
+                                    baselinePoint:baselinePoint];
+      }
+  );
+}
+
+- (void)showLookUpDictionaryOverlayAtPoint:(NSPoint)point {
   TextInputClientMac::GetInstance()->GetStringAtPoint(
       renderWidgetHostView_->render_widget_host_,
       gfx::Point(point.x, NSHeight([self frame]) - point.y),
       ^(NSAttributedString* string, NSPoint baselinePoint) {
-          if (string && [string length] > 0) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [self showDefinitionForAttributedString:string
-                                                atPoint:baselinePoint];
-            });
-          }
+        [self showLookUpDictionaryOverlayInternal:string
+                                    baselinePoint:baselinePoint];
       }
   );
+}
+
+// This is invoked only on 10.8 or newer when the user taps a word using
+// three fingers.
+- (void)quickLookWithEvent:(NSEvent*)event {
+  NSPoint point = [self convertPoint:[event locationInWindow] fromView:nil];
+  [self showLookUpDictionaryOverlayAtPoint:point];
 }
 
 // This method handles 2 different types of hardware events.
@@ -2977,10 +3012,40 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
   // TODO(thakis): Pipe |actualRange| through TextInputClientMac machinery.
   if (actualRange)
     *actualRange = range;
-  NSAttributedString* str =
-      TextInputClientMac::GetInstance()->GetAttributedSubstringFromRange(
-          renderWidgetHostView_->render_widget_host_, range);
-  return str;
+
+  const gfx::Range requested_range(range);
+  if (requested_range.is_reversed())
+    return nil;
+
+  gfx::Range expected_range;
+  const base::string16* expected_text;
+
+  if (!renderWidgetHostView_->composition_range().is_empty()) {
+    expected_text = &markedText_;
+    expected_range = renderWidgetHostView_->composition_range();
+  } else {
+    expected_text = &renderWidgetHostView_->selection_text();
+    size_t offset = renderWidgetHostView_->selection_text_offset();
+    expected_range = gfx::Range(offset, offset + expected_text->size());
+  }
+
+  if (!expected_range.Contains(requested_range))
+    return nil;
+
+  // Gets the raw bytes to avoid unnecessary string copies for generating
+  // NSString.
+  const base::char16* bytes =
+      &(*expected_text)[requested_range.start() - expected_range.start()];
+  // Avoid integer overflow.
+  base::CheckedNumeric<size_t> requested_len = requested_range.length();
+  requested_len *= sizeof(base::char16);
+  NSUInteger bytes_len = base::strict_cast<NSUInteger, size_t>(
+      requested_len.ValueOrDefault(0));
+  base::scoped_nsobject<NSString> ns_string(
+      [[NSString alloc] initWithBytes:bytes
+                               length:bytes_len
+                             encoding:NSUTF16LittleEndianStringEncoding]);
+  return [[[NSAttributedString alloc] initWithString:ns_string] autorelease];
 }
 
 - (NSInteger)conversationIdentifier {

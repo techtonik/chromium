@@ -120,6 +120,7 @@
     ],
     'crash_unittest_sources': [
       'crash/content/app/crash_keys_win_unittest.cc',
+      'crash/core/common/objc_zombie_unittest.mm',
     ],
     'crx_file_unittest_sources': [
       'crx_file/id_util_unittest.cc',
@@ -396,6 +397,11 @@
       'packed_ct_ev_whitelist/bit_stream_reader_unittest.cc',
       'packed_ct_ev_whitelist/packed_ct_ev_whitelist_unittest.cc',
     ],
+    'page_load_metrics_unittest_sources': [
+      'page_load_metrics/browser/metrics_web_contents_observer_unittest.cc',
+      'page_load_metrics/renderer/metrics_render_frame_observer_unittest.cc',
+      'page_load_metrics/renderer/page_timing_metrics_sender_unittest.cc',
+    ],
     'password_manager_unittest_sources': [
       'password_manager/content/browser/credential_manager_dispatcher_unittest.cc',
       'password_manager/core/browser/affiliated_match_helper_unittest.cc',
@@ -505,7 +511,7 @@
       'proximity_auth/bluetooth_connection_finder_unittest.cc',
       'proximity_auth/bluetooth_connection_unittest.cc',
       'proximity_auth/bluetooth_throttler_impl_unittest.cc',
-      'proximity_auth/client_impl_unittest.cc',
+      'proximity_auth/messenger_impl_unittest.cc',
       'proximity_auth/connection_unittest.cc',
       'proximity_auth/cryptauth/base64url_unittest.cc',
       'proximity_auth/cryptauth/cryptauth_access_token_fetcher_impl_unittest.cc',
@@ -523,6 +529,7 @@
       'proximity_auth/logging/logging_unittest.cc',
       'proximity_auth/proximity_auth_system_unittest.cc',
       'proximity_auth/proximity_monitor_impl_unittest.cc',
+      'proximity_auth/remote_device_life_cycle_impl_unittest.cc',
       'proximity_auth/remote_status_update_unittest.cc',
       'proximity_auth/throttled_bluetooth_connection_finder_unittest.cc',
       'proximity_auth/unlock_manager_unittest.cc',
@@ -904,6 +911,7 @@
         'components.gyp:content_settings_core_browser',
         'components.gyp:content_settings_core_common',
         'components.gyp:content_settings_core_test_support',
+        'components.gyp:crash_core_common',
         'components.gyp:crx_file',
         'components.gyp:data_reduction_proxy_core_browser',
         'components.gyp:data_reduction_proxy_core_common',
@@ -989,6 +997,11 @@
         'url_formatter/url_formatter.gyp:url_formatter',
       ],
       'conditions': [
+        ['OS!="mac" and OS!="ios"', {
+          'sources!': [
+            'crash/core/common/objc_zombie_unittest.mm',
+          ],
+        }],
         ['enable_rlz_support==1', {
           'sources': [
             '<@(rlz_unittest_sources)',
@@ -1041,6 +1054,7 @@
             '<@(guest_view_unittest_sources)',
             '<@(navigation_interception_unittest_sources)',
             '<@(network_hints_unittest_sources)',
+            '<@(page_load_metrics_unittest_sources)',
             '<@(power_unittest_sources)',
             '<@(safe_json_unittest_sources)',
             '<@(scheduler_unittest_sources)',
@@ -1074,6 +1088,8 @@
             'components.gyp:network_hints_renderer',
             'components.gyp:metrics_gpu',
             'components.gyp:metrics_profiler',
+            'components.gyp:page_load_metrics_browser',
+            'components.gyp:page_load_metrics_renderer',
             'components.gyp:password_manager_content_browser',
             'components.gyp:password_manager_content_common',
             'components.gyp:power',
@@ -1231,8 +1247,7 @@
             'components.gyp:web_modal',
             'components.gyp:web_modal_test_support',
           ],
-        }],
-        ['OS != "android"', {
+        }, {
           'sources': [
             '<@(invalidation_unittest_sources)',
           ],
@@ -1467,6 +1482,45 @@
           },
           'includes': [ '../build/apk_browsertest.gypi' ],
         },
+        {
+          'target_name': 'components_unittests_apk',
+          'isolate_file': 'components_unittests.isolate',
+          'type': 'none',
+          'dependencies': [
+            'components_unittests',
+            'components.gyp:invalidation_java',
+            'components.gyp:signin_core_browser_java',
+          ],
+          'variables': {
+            'test_suite_name': 'components_unittests',
+          },
+          'includes': [ '../build/apk_test.gypi' ],
+        },
+        {
+          'target_name': 'components_junit_tests',
+          'type': 'none',
+          'dependencies': [
+            'components.gyp:invalidation_java',
+            '../base/base.gyp:base_java',
+            '../base/base.gyp:base_java_test_support',
+            '../testing/android/junit/junit_test.gyp:junit_test_support',
+          ],
+          'conditions': [
+            ['configuration_policy == 1', {
+              'dependencies': [
+                'components.gyp:policy_java',
+              ],
+            }],
+          ],
+          'variables': {
+            'main_class': 'org.chromium.testing.local.JunitTestMain',
+            'src_paths': [
+              'invalidation/impl/android/junit/',
+              'policy/android/junit/'
+            ],
+          },
+          'includes': [ '../build/host_jar.gypi' ],
+         },
       ],
     }],
     ['OS != "ios"', {
@@ -1664,49 +1718,6 @@
             }],
           ],
         },
-      ],
-    }],
-    ['OS == "android"', {
-      'targets': [
-        {
-          'target_name': 'components_unittests_apk',
-          'isolate_file': 'components_unittests.isolate',
-          'type': 'none',
-          'dependencies': [
-            'components_unittests',
-            'components.gyp:invalidation_java',
-            'components.gyp:signin_core_browser_java',
-          ],
-          'variables': {
-            'test_suite_name': 'components_unittests',
-          },
-          'includes': [ '../build/apk_test.gypi' ],
-        },
-        {
-          'target_name': 'components_junit_tests',
-          'type': 'none',
-          'dependencies': [
-            'components.gyp:invalidation_java',
-            '../base/base.gyp:base_java',
-            '../base/base.gyp:base_java_test_support',
-            '../testing/android/junit/junit_test.gyp:junit_test_support',
-          ],
-          'conditions': [
-            ['configuration_policy == 1', {
-              'dependencies': [
-                'components.gyp:policy_java',
-              ],
-            }],
-          ],
-          'variables': {
-            'main_class': 'org.chromium.testing.local.JunitTestMain',
-            'src_paths': [
-              'invalidation/impl/android/junit/',
-              'policy/android/junit/'
-            ],
-          },
-          'includes': [ '../build/host_jar.gypi' ],
-         },
       ],
     }],
   ],

@@ -6,14 +6,7 @@
 
 namespace sessions {
 
-TabClientData::~TabClientData() {}
-
 TabRestoreServiceClient::~TabRestoreServiceClient() {}
-
-scoped_ptr<TabClientData> TabRestoreServiceClient::GetTabClientDataForTab(
-    LiveTab* tab) {
-  return nullptr;
-}
 
 void TabRestoreServiceClient::OnTabRestored(const GURL& url) {}
 

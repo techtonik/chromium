@@ -947,7 +947,6 @@
       'test/data/webui/async_gen.js',
       'test/data/webui/certificate_viewer_dialog_test.js',
       'test/data/webui/chrome_send_browsertest.js',
-      'test/data/webui/cr_elements/cr_elements_browsertest.js',
       'test/data/webui/history_browsertest.js',
       'test/data/webui/mock4js_browsertest.js',
       'test/data/webui/net_internals/bandwidth_view.js',
@@ -1409,6 +1408,7 @@
       'browser/sync/test/integration/migration_test.cc',
       'browser/sync/test/integration/multiple_client_bookmarks_sync_test.cc',
       'browser/sync/test/integration/multiple_client_dictionary_sync_test.cc',
+      'browser/sync/test/integration/multiple_client_password_manager_setting_migrator_service_sync_test.cc',
       'browser/sync/test/integration/multiple_client_passwords_sync_test.cc',
       'browser/sync/test/integration/multiple_client_preferences_sync_test.cc',
       'browser/sync/test/integration/multiple_client_sessions_sync_test.cc',
@@ -1421,6 +1421,7 @@
       'browser/sync/test/integration/single_client_directory_sync_test.cc',
       'browser/sync/test/integration/single_client_e2e_test.cc',
       'browser/sync/test/integration/single_client_extensions_sync_test.cc',
+      'browser/sync/test/integration/single_client_password_manager_setting_migrator_service_sync_test.cc',
       'browser/sync/test/integration/single_client_passwords_sync_test.cc',
       'browser/sync/test/integration/single_client_preferences_sync_test.cc',
       'browser/sync/test/integration/single_client_search_engines_sync_test.cc',
@@ -1441,6 +1442,7 @@
       'browser/sync/test/integration/two_client_e2e_test.cc',
       'browser/sync/test/integration/two_client_extension_settings_and_app_settings_sync_test.cc',
       'browser/sync/test/integration/two_client_extensions_sync_test.cc',
+      'browser/sync/test/integration/two_client_password_manager_setting_migrator_service_sync_test.cc',
       'browser/sync/test/integration/two_client_passwords_sync_test.cc',
       'browser/sync/test/integration/two_client_preferences_sync_test.cc',
       'browser/sync/test/integration/two_client_search_engines_sync_test.cc',
@@ -1480,6 +1482,8 @@
       'browser/sync/test/integration/p2p_invalidation_forwarder.h',
       'browser/sync/test/integration/p2p_sync_refresher.cc',
       'browser/sync/test/integration/p2p_sync_refresher.h',
+      'browser/sync/test/integration/password_manager_setting_migrator_helper.cc',
+      'browser/sync/test/integration/password_manager_setting_migrator_helper.h',
       'browser/sync/test/integration/passwords_helper.cc',
       'browser/sync/test/integration/passwords_helper.h',
       'browser/sync/test/integration/preferences_helper.cc',
@@ -2525,11 +2529,6 @@
             'browser/media/router/media_router.gyp:media_router_test_support',
             'test/media_router/media_router_tests.gypi:media_router_integration_test_files'
           ],
-          'conditions': [
-            ['toolkit_views==0', {
-              'sources!': [ 'browser/ui/views/media_router/media_router_ui_browsertest.cc' ],
-            }],
-          ],
         }],
         ['enable_mdns==1', {
           'sources' : [
@@ -3305,7 +3304,7 @@
                 },
               ],
             }],
-            ['OS=="win" or OS=="linux"', {
+            ['OS=="win" or OS=="linux" or OS=="mac"', {
               'targets': [
                 {
                   'target_name': 'angle_end2end_tests_run',
