@@ -285,7 +285,8 @@ TEST_F(BluetoothTest, BluetoothGattConnection_AlreadyConnected) {
 
 #if defined(OS_ANDROID)
 // Creates BluetoothGattConnection after one exists that has disconnected.
-TEST_F(BluetoothTest, BluetoothGattConnection_NewConnectionLeavesPreviousDisconnected) {
+TEST_F(BluetoothTest,
+       BluetoothGattConnection_NewConnectionLeavesPreviousDisconnected) {
   InitWithFakeAdapter();
   TestBluetoothAdapterObserver observer(adapter_);
 
