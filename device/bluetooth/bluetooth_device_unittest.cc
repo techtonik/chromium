@@ -119,7 +119,7 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   StartDiscoverySession();
   BluetoothDevice* device = DiscoverLowEnergyDevice(3);
 
-  callback_count_ = error_callback_count_ = 0;
+  ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   CompleteGattConnection(device);
@@ -141,7 +141,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   std::string device_address = device->GetAddress();
 
   // CreateGattConnection
-  callback_count_ = error_callback_count_ = 0;
+  ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(1, gatt_connection_attempt_count_);
@@ -233,8 +233,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_AlreadyConnected) {
   EXPECT_TRUE(gatt_connections_[0]->IsConnected());
 
   // Then CreateGattConnection:
-  callback_count_ = error_callback_count_ = gatt_connection_attempt_count_ =
-      gatt_disconnection_attempt_count_ = 0;
+  ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(0, gatt_connection_attempt_count_);
