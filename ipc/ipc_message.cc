@@ -134,6 +134,27 @@ Message::NextMessageInfo::NextMessageInfo()
     : message_found(false), pickle_end(nullptr), message_end(nullptr) {}
 Message::NextMessageInfo::~NextMessageInfo() {}
 
+Message::SerializedAttachmentIds
+Message::SerializedIdsOfBrokerableAttachments() {
+  DCHECK(HasBrokerableAttachments());
+  std::vector<const BrokerableAttachment*> attachments =
+      attachment_set_->PeekBrokerableAttachments();
+  CHECK_LE(attachments.size(), std::numeric_limits<size_t>::max() /
+                                   BrokerableAttachment::kNonceSize);
+  size_t size = attachments.size() * BrokerableAttachment::kNonceSize;
+  char* buffer = static_cast<char*>(malloc(size));
+  for (size_t i = 0; i < attachments.size(); ++i) {
+    const BrokerableAttachment* attachment = attachments[i];
+    char* start_range = buffer + i * BrokerableAttachment::kNonceSize;
+    BrokerableAttachment::AttachmentId id = attachment->GetIdentifier();
+    id.SerializeToBuffer(start_range, BrokerableAttachment::kNonceSize);
+  }
+  SerializedAttachmentIds ids;
+  ids.buffer = buffer;
+  ids.size = size;
+  return ids;
+}
+
 // static
 void Message::FindNext(const char* range_start,
                        const char* range_end,
@@ -149,7 +170,7 @@ void Message::FindNext(const char* range_start,
   // The data is not copied.
   size_t pickle_len = static_cast<size_t>(pickle_end - range_start);
   Message message(range_start, static_cast<int>(pickle_len));
-  size_t num_attachments = message.header()->num_brokered_attachments;
+  int num_attachments = message.header()->num_brokered_attachments;
 
   // Check for possible overflows.
   size_t max_size_t = std::numeric_limits<size_t>::max();
@@ -165,7 +186,7 @@ void Message::FindNext(const char* range_start,
   if (buffer_length < attachment_length + pickle_len)
     return;
 
-  for (size_t i = 0; i < num_attachments; ++i) {
+  for (int i = 0; i < num_attachments; ++i) {
     const char* attachment_start =
         pickle_end + i * BrokerableAttachment::kNonceSize;
     BrokerableAttachment::AttachmentId id(attachment_start,

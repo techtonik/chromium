@@ -2771,6 +2771,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Blink.DecodedImageType" enum="DecodedImageType">
+  <owner>urvang@chromium.org</owner>
   <summary>Image codec inferred during decode.</summary>
 </histogram>
 
@@ -8993,6 +8994,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="EnhancedBookmarks.ViewMode" enum="EnhancedBookmarkViewMode">
   <owner>ianwen@chromium.org</owner>
+  <obsolete>
+    Removed 9/2015 after list view became the only view mode.
+  </obsolete>
   <summary>
     Record which Enhanced Bookmark UI mode users are in. This will be recorded
     everytime the user opens the bookmark manager UI.
@@ -13616,6 +13620,11 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="GCM.SuspendTime" units="milliseconds">
+  <owner>zea@chromium.org</owner>
+  <summary>Time elapsed from machine suspend until resume.</summary>
+</histogram>
+
 <histogram name="GCM.UnregistrationCompleteTime" units="milliseconds">
   <owner>jianli@chromium.org</owner>
   <summary>
@@ -16171,6 +16180,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     enum="InvalidationNetworkChannel">
   <owner>pavely@chromium.org</owner>
   <summary>Network channel used for invalidations.</summary>
+</histogram>
+
+<histogram name="IPC.AttachmentBrokerPrivileged.BrokerAttachmentError"
+    enum="IPCAttachmentBrokerPrivilegedBrokerAttachmentError">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    Errors that the privileged attachment broker encounters while trying to
+    broker attachments.
+  </summary>
 </histogram>
 
 <histogram name="Keyboard.KeystrokeDeltas" units="milliseconds">
@@ -55103,6 +55121,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </enum>
 
 <enum name="EnhancedBookmarkViewMode" type="int">
+  <obsolete>
+    Deprecated 9/2015.
+  </obsolete>
   <int value="0" label="Default view mode"/>
   <int value="1" label="List view mode"/>
   <int value="2" label="Grid view mode"/>
@@ -62020,6 +62041,19 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="0" label="MainFrameAllowed"/>
   <int value="1" label="SubframeAllowed"/>
   <int value="2" label="SubframeBlocked"/>
+</enum>
+
+<enum name="IPCAttachmentBrokerPrivilegedBrokerAttachmentError" type="int">
+  <int value="0" label="DESTINATION_FOUND">
+    The brokerable attachment had a valid destination. This is the success case.
+  </int>
+  <int value="1" label="DESTINATION_NOT_FOUND">
+    The brokerable attachment had a destination, but the broker did not have a
+    channel of communication with that process.
+  </int>
+  <int value="2" label="NO_DESTINATION">
+    The brokerable attachment did not have a destination process.
+  </int>
 </enum>
 
 <enum name="IPv6ConnectivityStatus" type="int">

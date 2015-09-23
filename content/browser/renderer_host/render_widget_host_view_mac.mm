@@ -42,6 +42,7 @@
 #include "content/browser/renderer_host/render_widget_helper.h"
 #include "content/browser/renderer_host/render_widget_host_delegate.h"
 #include "content/browser/renderer_host/render_widget_host_input_event_router.h"
+#import "content/browser/renderer_host/input/synthetic_gesture_target_mac.h"
 #import "content/browser/renderer_host/render_widget_host_view_mac_dictionary_helper.h"
 #import "content/browser/renderer_host/render_widget_host_view_mac_editcommand_helper.h"
 #include "content/browser/renderer_host/render_widget_resize_helper_mac.h"
@@ -1638,6 +1639,14 @@ void RenderWidgetHostViewMac::WheelEventAck(
     [cocoa_view_ processedWheelEvent:event consumed:consumed];
 }
 
+scoped_ptr<SyntheticGestureTarget>
+RenderWidgetHostViewMac::CreateSyntheticGestureTarget() {
+  RenderWidgetHostImpl* host =
+      RenderWidgetHostImpl::From(GetRenderWidgetHost());
+  return scoped_ptr<SyntheticGestureTarget>(
+      new SyntheticGestureTargetMac(host, cocoa_view_));
+}
+
 uint32_t RenderWidgetHostViewMac::GetSurfaceIdNamespace() {
   DCHECK(delegated_frame_host_);
   return delegated_frame_host_->GetSurfaceIdNamespace();
@@ -2988,6 +2997,13 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
 
 - (NSRect)firstRectForCharacterRange:(NSRange)theRange
                          actualRange:(NSRangePointer)actualRange {
+  // During tab closure, events can arrive after RenderWidgetHostViewMac::
+  // Destroy() is called, which will have set |render_widget_host_| to null.
+  if (!renderWidgetHostView_->render_widget_host_) {
+    [self cancelComposition];
+    return NSZeroRect;
+  }
+
   NSRect rect = [self firstViewRectForCharacterRange:theRange
                                          actualRange:actualRange];
 
