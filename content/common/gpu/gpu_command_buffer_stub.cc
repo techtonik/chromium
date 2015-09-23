@@ -185,7 +185,6 @@ GpuCommandBufferStub::GpuCommandBufferStub(
     const gpu::gles2::DisallowedFeatures& disallowed_features,
     const std::vector<int32>& attribs,
     gfx::GpuPreference gpu_preference,
-    bool use_virtualized_gl_context,
     int32 stream_id,
     int32 route_id,
     int32 surface_id,
@@ -200,7 +199,7 @@ GpuCommandBufferStub::GpuCommandBufferStub(
       disallowed_features_(disallowed_features),
       requested_attribs_(attribs),
       gpu_preference_(gpu_preference),
-      use_virtualized_gl_context_(use_virtualized_gl_context),
+      use_virtualized_gl_context_(false),
       command_buffer_id_(GetCommandBufferID(channel->client_id(), route_id)),
       stream_id_(stream_id),
       route_id_(route_id),
@@ -233,8 +232,16 @@ GpuCommandBufferStub::GpuCommandBufferStub(
         attrib_parser.bind_generates_resource);
   }
 
+// Virtualize PreferIntegratedGpu contexts by default on OS X to prevent
+// performance regressions when enabling FCM.
+// http://crbug.com/180463
+#if defined(OS_MACOSX)
+  if (gpu_preference_ == gfx::PreferIntegratedGpu)
+    use_virtualized_gl_context_ = true;
+#endif
+
   use_virtualized_gl_context_ |=
-      context_group_->feature_info()->workarounds().use_virtualized_gl_contexts;
+      context_group_->feature_info()->UseVirtualizedGLContexts();
 
   bool is_offscreen = surface_id_ == 0;
   if (is_offscreen && initial_size_.IsEmpty()) {
@@ -485,6 +492,8 @@ void GpuCommandBufferStub::Destroy() {
   // destroy it before those.
   scheduler_.reset();
 
+  sync_point_client_.reset();
+
   bool have_context = false;
   if (decoder_ && decoder_->GetGLContext()) {
     // Try to make the context current regardless of whether it was lost, so we
@@ -528,10 +537,22 @@ void GpuCommandBufferStub::OnInitialize(
   bool result = command_buffer_->Initialize();
   DCHECK(result);
 
+  GpuChannelManager* manager = channel_->gpu_channel_manager();
+  DCHECK(manager);
+
+  gpu::SyncPointManager* sync_point_manager = manager->sync_point_manager();
+  DCHECK(sync_point_manager);
+
   decoder_.reset(::gpu::gles2::GLES2Decoder::Create(context_group_.get()));
   scheduler_.reset(new gpu::GpuScheduler(command_buffer_.get(),
                                          decoder_.get(),
                                          decoder_.get()));
+  sync_point_client_ =
+      sync_point_manager->CreateSyncPointClient(
+          channel_->GetSyncPointClientState(),
+          gpu::CommandBufferNamespace::GPU_IO,
+          command_buffer_id_);
+
   if (preemption_flag_.get())
     scheduler_->SetPreemptByFlag(preemption_flag_);
 
@@ -551,7 +572,6 @@ void GpuCommandBufferStub::OnInitialize(
         this,
         handle_);
   } else {
-    GpuChannelManager* manager = channel_->gpu_channel_manager();
     surface_ = manager->GetDefaultOffscreenSurface();
   }
 
@@ -682,8 +702,7 @@ void GpuCommandBufferStub::OnInitialize(
   Send(reply_message);
 
   if (handle_.is_null() && !active_url_.is_empty()) {
-    GpuChannelManager* gpu_channel_manager = channel_->gpu_channel_manager();
-    gpu_channel_manager->Send(new GpuHostMsg_DidCreateOffscreenContext(
+    manager->Send(new GpuHostMsg_DidCreateOffscreenContext(
         active_url_));
   }
 

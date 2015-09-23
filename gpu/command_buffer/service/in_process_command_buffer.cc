@@ -344,11 +344,15 @@ bool InProcessCommandBuffer::InitializeOnGpuThread(
     return false;
   }
 
+  sync_point_client_state_ = SyncPointClientState::Create();
+  sync_point_client_ = service_->sync_point_manager()->CreateSyncPointClient(
+      sync_point_client_state_,
+      GetNamespaceID(), GetCommandBufferID());
+
   if (service_->UseVirtualizedGLContexts() ||
       decoder_->GetContextGroup()
           ->feature_info()
-          ->workarounds()
-          .use_virtualized_gl_contexts) {
+          ->UseVirtualizedGLContexts()) {
     context_ = gl_share_group_->GetSharedContext();
     if (!context_.get()) {
       context_ = gfx::GLContext::CreateGLContext(
@@ -439,6 +443,8 @@ bool InProcessCommandBuffer::DestroyOnGpuThread() {
   }
   context_ = NULL;
   surface_ = NULL;
+  sync_point_client_ = NULL;
+  sync_point_client_state_ = NULL;
   gl_share_group_ = NULL;
 #if defined(OS_ANDROID)
   stream_texture_manager_.reset();
@@ -481,10 +487,13 @@ int32 InProcessCommandBuffer::GetLastToken() {
   return last_state_.token;
 }
 
-void InProcessCommandBuffer::FlushOnGpuThread(int32 put_offset) {
+void InProcessCommandBuffer::FlushOnGpuThread(int32 put_offset,
+                                              uint32_t order_num) {
   CheckSequencedThread();
   ScopedEvent handle_flush(&flush_event_);
   base::AutoLock lock(command_buffer_lock_);
+
+  sync_point_client_state_->BeginProcessingOrderNumber(order_num);
   command_buffer_->Flush(put_offset);
   {
     // Update state before signaling the flush event.
@@ -493,6 +502,13 @@ void InProcessCommandBuffer::FlushOnGpuThread(int32 put_offset) {
   }
   DCHECK((!error::IsError(state_after_last_flush_.error) && !context_lost_) ||
          (error::IsError(state_after_last_flush_.error) && context_lost_));
+
+  // Currently the in process command buffer does not support being descheduled,
+  // if it does we would need to back off on calling the finish processing
+  // order number function until the message is rescheduled and finished
+  // processing. This DCHECK is to enforce this.
+  DCHECK(context_lost_ || put_offset == state_after_last_flush_.get_offset);
+  sync_point_client_state_->FinishProcessingOrderNumber(order_num);
 
   // If we've processed all pending commands but still have pending queries,
   // pump idle work until the query is passed.
@@ -534,10 +550,14 @@ void InProcessCommandBuffer::Flush(int32 put_offset) {
   if (last_put_offset_ == put_offset)
     return;
 
+  SyncPointManager* sync_manager = service_->sync_point_manager();
+  const uint32_t order_num =
+      sync_point_client_state_->GenerateUnprocessedOrderNumber(sync_manager);
   last_put_offset_ = put_offset;
   base::Closure task = base::Bind(&InProcessCommandBuffer::FlushOnGpuThread,
                                   gpu_thread_weak_ptr_,
-                                  put_offset);
+                                  put_offset,
+                                  order_num);
   QueueTask(task);
 }
 

@@ -574,6 +574,29 @@ const char kConfigs_Help[] =
     "    }\n"
     "  }\n";
 
+const char kConsole[] = "console";
+const char kConsole_HelpShort[] =
+    "console [boolean]: Run this action in the console pool.";
+const char kConsole_Help[] =
+    "console: Run this action in the console pool.\n"
+    "\n"
+    "  Boolean. Defaults to false.\n"
+    "\n"
+    "  Actions marked \"console = true\" will be run in the built-in ninja\n"
+    "  \"console\" pool. They will have access to real stdin and stdout, and\n"
+    "  output will not be buffered by ninja. This can be useful for\n"
+    "  long-running actions with progress logs, or actions that require user \n"
+    "  input.\n"
+    "\n"
+    "  Only one console pool target can run at any one time in Ninja. Refer\n"
+    "  to the Ninja documentation on the console pool for more info.\n"
+    "\n"
+    "Example\n"
+    "\n"
+    "  action(\"long_action_with_progress_logs\") {\n"
+    "    console = true\n"
+    "  }\n";
+
 const char kData[] = "data";
 const char kData_HelpShort[] =
     "data: [file list] Runtime data file dependencies.";
@@ -683,10 +706,7 @@ const char kDeps_Help[] =
     "  A list of target labels.\n"
     "\n"
     "  Specifies private dependencies of a target. Shared and dynamic\n"
-    "  libraries will be linked into the current target. Other target types\n"
-    "  that can't be linked (like actions and groups) listed in \"deps\" will\n"
-    "  be treated as \"data_deps\". Likewise, if the current target isn't\n"
-    "  linkable, then all deps will be treated as \"data_deps\".\n"
+    "  libraries will be linked into the current target.\n"
     "\n"
     "  These dependencies are private in that it does not grant dependent\n"
     "  targets the ability to include headers from the dependency, and direct\n"
@@ -1249,6 +1269,7 @@ const VariableInfoMap& GetTargetVariables() {
     INSERT_VARIABLE(CheckIncludes)
     INSERT_VARIABLE(CompleteStaticLib)
     INSERT_VARIABLE(Configs)
+    INSERT_VARIABLE(Console)
     INSERT_VARIABLE(Data)
     INSERT_VARIABLE(DataDeps)
     INSERT_VARIABLE(Defines)

@@ -34,6 +34,7 @@
 
 namespace gpu {
 struct Mailbox;
+class SyncPointClient;
 class ValueStateMap;
 namespace gles2 {
 class MailboxManager;
@@ -79,7 +80,6 @@ class GpuCommandBufferStub
       const gpu::gles2::DisallowedFeatures& disallowed_features,
       const std::vector<int32>& attribs,
       gfx::GpuPreference gpu_preference,
-      bool use_virtualized_gl_context,
       int32 stream_id,
       int32 route_id,
       int32 surface_id,
@@ -271,6 +271,7 @@ class GpuCommandBufferStub
   scoped_ptr<gpu::CommandBufferService> command_buffer_;
   scoped_ptr<gpu::gles2::GLES2Decoder> decoder_;
   scoped_ptr<gpu::GpuScheduler> scheduler_;
+  scoped_ptr<gpu::SyncPointClient> sync_point_client_;
   scoped_refptr<gfx::GLSurface> surface_;
 
   scoped_ptr<GpuMemoryManagerClientState> memory_manager_client_state_;

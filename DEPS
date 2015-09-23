@@ -31,15 +31,14 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': 'a4a20a4d28a518775938688085fc955bd86dc10a', # from svn revision 202641
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': '0d6551cd1e1359423a7f4af503472d280437e9bb',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': 'bf87730c7da80616f6ea17765290dbd2c147a669',
+  'skia_revision': '10cae83e4bb726610b93276e17815c5d52d73395',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '6e4021bb2c08c6948f11a6be4be36f812f9e59a8',
+  'v8_revision': '38c6221febba5b87d833ce563b06077629d208f4',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -125,9 +124,6 @@ deps = {
   'src/third_party/crashpad/crashpad':
    Var('chromium_git') + '/crashpad/crashpad.git' + '@' + '595803e1be18aa789ba561aa06db73cfc3c2e7a2',
 
-  'src/third_party/WebKit':
-   Var('chromium_git') + '/chromium/blink.git' + '@' +  Var('webkit_revision'),
-
   'src/third_party/icu':
    Var('chromium_git') + '/chromium/deps/icu.git' + '@' + '6b3ce817f8e828c3b7a577d2395f0882eb56ef18',
 
@@ -189,13 +185,13 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libvpx.git' + '@' +  Var('libvpx_revision'),
 
   'src/third_party/libvpx_new/source/libvpx':
-   Var('chromium_git') + '/webm/libvpx.git' + '@' +  'c5f11912ae328a912ef087fdcd074ff07e96d8f9',
+   Var('chromium_git') + '/webm/libvpx.git' + '@' +  '90a109f0eef8bfaaa4869cf7b2873dac5076b582',
 
   'src/third_party/ffmpeg':
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '382b031ebab06b25df0708dd44aafad235657d2c',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '300c7492bf1d44614047e24a453a1f13a9c9719d', # commit position 10011
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '228d997b9a60b755dbc985b78b3053dc461b4be7', # commit position 10022
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -219,7 +215,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'ea85c10a428fd5f038e969e00833dd4b1a96e1f7', # commit position 10010
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'a6e4fcd3f63f91d0f15cebb1e391c9d83d42d4d6', # commit position 10022
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -282,7 +278,7 @@ deps = {
 
   'src/third_party/catapult':
     Var('chromium_git') + '/external/github.com/catapult-project/catapult.git' + '@' +
-    'dc1a60501d508cc469c8dc94305724b153e556e2',
+    '17c9875ee1fe7e078c28450160e7fc08b26fe024',
 }
 
 
