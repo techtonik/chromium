@@ -36,6 +36,12 @@ void BluetoothTestBase::StartDiscoverySession() {
   base::RunLoop().RunUntilIdle();
 }
 
+BluetoothDevice* BluetoothTestBase::DiscoverLowEnergyDevice(
+    int device_ordinal) {
+  NOTIMPLEMENTED();
+  return nullptr;
+}
+
 void BluetoothTestBase::DeleteDevice(BluetoothDevice* device) {
   adapter_->DeleteDeviceForTesting(device->GetAddress());
 }
