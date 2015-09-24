@@ -99,7 +99,8 @@ void BluetoothTestMac::InitWithFakeAdapter() {
   }
 }
 
-void BluetoothTestMac::DiscoverLowEnergyDevice(int device_ordinal) {
+BluetoothDevice* BluetoothTestMac::DiscoverLowEnergyDevice(int device_ordinal) {
+  TestBluetoothAdapterObserver observer(adapter_);
   CBCentralManager* central_manager = adapter_mac_->low_energy_central_manager_;
   BluetoothLowEnergyCentralManagerDelegate* central_manager_delegate =
       adapter_mac_->low_energy_central_manager_delegate_;
@@ -172,6 +173,7 @@ void BluetoothTestMac::DiscoverLowEnergyDevice(int device_ordinal) {
       break;
     }
   }
+  return observer.last_device();
 }
 
 // Utility function for generating new (CBUUID, address) pairs where CBUUID
