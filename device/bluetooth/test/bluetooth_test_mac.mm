@@ -7,6 +7,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "device/bluetooth/bluetooth_adapter_mac.h"
 #include "device/bluetooth/test/mock_bluetooth_central_manager_mac.h"
+#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "third_party/ocmock/OCMock/OCMock.h"
 
 #if defined(OS_IOS)
