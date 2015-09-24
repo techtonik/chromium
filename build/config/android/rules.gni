@@ -1403,7 +1403,6 @@ template("android_apk") {
   if (_dist_jar_path != "") {
     create_dist_target = "${_template_name}__create_dist_jar"
     _final_deps += [ ":$create_dist_target" ]
-    _incremental_final_deps += [ ":$create_dist_target" ]
 
     # TODO(cjhopman): This is only ever needed to calculate the list of tests to
     # run. See build/android/pylib/instrumentation/test_jar.py. We should be
@@ -1540,8 +1539,10 @@ template("android_apk") {
              ":$process_resources_target",
              ":$final_dex_target_name",
            ]
+    incremental_deps = _android_manifest_deps + [ ":$process_resources_target" ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
+      incremental_deps += invoker.deps
     }
 
     if (defined(invoker.asset_location)) {
@@ -1596,6 +1597,7 @@ template("android_apk") {
         ":${_template_name}__prepare_native",
         ":${_manifest_rule}",
       ]
+      incremental_deps = deps
     }
   }
 

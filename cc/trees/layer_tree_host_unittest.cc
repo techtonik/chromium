@@ -38,7 +38,6 @@
 #include "cc/test/fake_painted_scrollbar_layer.h"
 #include "cc/test/fake_picture_layer.h"
 #include "cc/test/fake_picture_layer_impl.h"
-#include "cc/test/fake_picture_pile.h"
 #include "cc/test/fake_proxy.h"
 #include "cc/test/fake_scoped_ui_resource.h"
 #include "cc/test/fake_video_frame_provider.h"
@@ -465,7 +464,7 @@ class LayerTreeHostFreeWorkerContextResourcesTest : public LayerTreeHostTest {
     explicit MockSetWorkerContextShouldAggressivelyFreeResourcesOutputSurface(
         bool delegated_rendering)
         : FakeOutputSurface(TestContextProvider::Create(),
-                            TestContextProvider::Create(),
+                            TestContextProvider::CreateWorker(),
                             delegated_rendering) {}
     MOCK_METHOD1(SetWorkerContextShouldAggressivelyFreeResources,
                  void(bool is_visible));
@@ -1150,17 +1149,17 @@ class LayerTreeHostTestDamageWithScale : public LayerTreeHostTest {
   void SetupTree() override {
     client_.set_fill_with_nonsolid_color(true);
 
-    scoped_ptr<FakePicturePile> pile(
-        new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                            LayerTreeSettings().default_tile_grid_size));
+    scoped_ptr<FakeDisplayListRecordingSource> recording(
+        new FakeDisplayListRecordingSource(
+            LayerTreeSettings().default_tile_grid_size));
     root_layer_ = FakePictureLayer::CreateWithRecordingSource(
-        layer_settings(), &client_, pile.Pass());
+        layer_settings(), &client_, recording.Pass());
     root_layer_->SetBounds(gfx::Size(50, 50));
 
-    pile.reset(new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                                   LayerTreeSettings().default_tile_grid_size));
+    recording.reset(new FakeDisplayListRecordingSource(
+        LayerTreeSettings().default_tile_grid_size));
     child_layer_ = FakePictureLayer::CreateWithRecordingSource(
-        layer_settings(), &client_, pile.Pass());
+        layer_settings(), &client_, recording.Pass());
     child_layer_->SetBounds(gfx::Size(25, 25));
     child_layer_->SetIsDrawable(true);
     child_layer_->SetContentsOpaque(true);
@@ -4622,7 +4621,6 @@ class LayerTreeHostTestWillBeginImplFrameHasDidFinishImplFrame
       : will_begin_impl_frame_count_(0), did_finish_impl_frame_count_(0) {}
 
   void BeginTest() override {
-    // Kick off the test with a commit.
     PostSetNeedsCommitToMainThread();
   }
 
@@ -4667,6 +4665,70 @@ class LayerTreeHostTestWillBeginImplFrameHasDidFinishImplFrame
 
 SINGLE_AND_MULTI_THREAD_TEST_F(
     LayerTreeHostTestWillBeginImplFrameHasDidFinishImplFrame);
+
+::testing::AssertionResult AssertFrameTimeContained(
+    const char* haystack_expr,
+    const char* needle_expr,
+    const std::vector<BeginFrameArgs> haystack,
+    const BeginFrameArgs needle) {
+  auto failure = ::testing::AssertionFailure()
+                 << needle.frame_time << " (" << needle_expr
+                 << ") not found in " << haystack_expr;
+
+  if (haystack.size() == 0) {
+    failure << " which is empty.";
+  } else {
+    failure << " which contains:\n";
+    for (size_t i = 0; i < haystack.size(); i++) {
+      if (haystack[i].frame_time == needle.frame_time)
+        return ::testing::AssertionSuccess();
+      failure << "  [" << i << "]: " << haystack[i].frame_time << "\n";
+    }
+  }
+
+  return failure;
+}
+
+class LayerTreeHostTestBeginMainFrameTimeIsAlsoImplTime
+    : public LayerTreeHostTest {
+ public:
+  LayerTreeHostTestBeginMainFrameTimeIsAlsoImplTime()
+      : impl_frame_args_(), will_begin_impl_frame_count_(0) {}
+
+  void BeginTest() override {
+    // Kick off the test with a commit.
+    PostSetNeedsCommitToMainThread();
+  }
+
+  void WillBeginImplFrameOnThread(LayerTreeHostImpl* impl,
+                                  const BeginFrameArgs& args) override {
+    impl_frame_args_.push_back(args);
+
+    will_begin_impl_frame_count_++;
+    if (will_begin_impl_frame_count_ < 10)
+      PostSetNeedsCommitToMainThread();
+  }
+
+  void BeginMainFrame(const BeginFrameArgs& args) override {
+    ASSERT_GT(impl_frame_args_.size(), 0U)
+        << "BeginMainFrame called before BeginImplFrame called!";
+    EXPECT_PRED_FORMAT2(AssertFrameTimeContained, impl_frame_args_, args);
+  }
+
+  void SendBeginMainFrameNotExpectedSoon() override { EndTest(); }
+
+  void AfterTest() override {
+    EXPECT_GT(impl_frame_args_.size(), 0U);
+    EXPECT_GE(will_begin_impl_frame_count_, 10);
+  }
+
+ private:
+  std::vector<BeginFrameArgs> impl_frame_args_;
+  int will_begin_impl_frame_count_;
+};
+
+SINGLE_AND_MULTI_THREAD_TEST_F(
+    LayerTreeHostTestBeginMainFrameTimeIsAlsoImplTime);
 
 class LayerTreeHostTestSendBeginFramesToChildren : public LayerTreeHostTest {
  public:
@@ -4933,13 +4995,13 @@ class LayerTreeHostTestCrispUpAfterPinchEnds : public LayerTreeHostTest {
     pinch->SetIsContainerForFixedPositionLayers(true);
     root->AddChild(pinch);
 
-    scoped_ptr<FakePicturePile> pile(
-        new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                            LayerTreeSettings().default_tile_grid_size));
-    pile->SetPlaybackAllowedEvent(&playback_allowed_event_);
+    scoped_ptr<FakeDisplayListRecordingSource> recording(
+        new FakeDisplayListRecordingSource(
+            LayerTreeSettings().default_tile_grid_size));
+    recording->SetPlaybackAllowedEvent(&playback_allowed_event_);
     scoped_refptr<FakePictureLayer> layer =
         FakePictureLayer::CreateWithRecordingSource(layer_settings(), &client_,
-                                                    pile.Pass());
+                                                    recording.Pass());
     layer->SetBounds(gfx::Size(500, 500));
     layer->SetContentsOpaque(true);
     // Avoid LCD text on the layer so we don't cause extra commits when we
@@ -5137,12 +5199,12 @@ class RasterizeWithGpuRasterizationCreatesResources : public LayerTreeHostTest {
     scoped_refptr<Layer> root = Layer::Create(layer_settings());
     root->SetBounds(gfx::Size(500, 500));
 
-    scoped_ptr<FakePicturePile> pile(
-        new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                            LayerTreeSettings().default_tile_grid_size));
+    scoped_ptr<FakeDisplayListRecordingSource> recording(
+        new FakeDisplayListRecordingSource(
+            LayerTreeSettings().default_tile_grid_size));
     scoped_refptr<FakePictureLayer> layer =
         FakePictureLayer::CreateWithRecordingSource(layer_settings(), &client_,
-                                                    pile.Pass());
+                                                    recording.Pass());
     layer->SetBounds(gfx::Size(500, 500));
     layer->SetContentsOpaque(true);
     root->AddChild(layer);
@@ -5179,12 +5241,12 @@ class GpuRasterizationRasterizesBorderTiles : public LayerTreeHostTest {
   void SetupTree() override {
     client_.set_fill_with_nonsolid_color(true);
 
-    scoped_ptr<FakePicturePile> pile(
-        new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                            LayerTreeSettings().default_tile_grid_size));
+    scoped_ptr<FakeDisplayListRecordingSource> recording(
+        new FakeDisplayListRecordingSource(
+            LayerTreeSettings().default_tile_grid_size));
     scoped_refptr<FakePictureLayer> root =
         FakePictureLayer::CreateWithRecordingSource(layer_settings(), &client_,
-                                                    pile.Pass());
+                                                    recording.Pass());
     root->SetBounds(gfx::Size(10000, 10000));
     root->SetContentsOpaque(true);
 
@@ -5232,13 +5294,13 @@ class LayerTreeHostTestContinuousDrawWhenCreatingVisibleTiles
     pinch->SetIsContainerForFixedPositionLayers(true);
     root->AddChild(pinch);
 
-    scoped_ptr<FakePicturePile> pile(
-        new FakePicturePile(LayerTreeSettings().minimum_contents_scale,
-                            LayerTreeSettings().default_tile_grid_size));
-    pile->SetPlaybackAllowedEvent(&playback_allowed_event_);
+    scoped_ptr<FakeDisplayListRecordingSource> recording(
+        new FakeDisplayListRecordingSource(
+            LayerTreeSettings().default_tile_grid_size));
+    recording->SetPlaybackAllowedEvent(&playback_allowed_event_);
     scoped_refptr<FakePictureLayer> layer =
         FakePictureLayer::CreateWithRecordingSource(layer_settings(), &client_,
-                                                    pile.Pass());
+                                                    recording.Pass());
     layer->SetBounds(gfx::Size(500, 500));
     layer->SetContentsOpaque(true);
     // Avoid LCD text on the layer so we don't cause extra commits when we
@@ -6257,6 +6319,22 @@ class LayerTreeHostScrollingAndScalingUpdatesLayers : public LayerTreeHostTest {
 };
 
 MULTI_THREAD_TEST_F(LayerTreeHostScrollingAndScalingUpdatesLayers);
+
+class LayerTreeHostTestDestroyWhileInitializingOutputSurface
+    : public LayerTreeHostTest {
+ protected:
+  void BeginTest() override {
+    // By ending the test immediately we start initialization of an output
+    // surface but destroy the LTH before it completes. This test verifies
+    // that this works correctly and the output surface is destroyed on
+    // the correct thread.
+    EndTest();
+  }
+
+  void AfterTest() override {}
+};
+
+MULTI_THREAD_TEST_F(LayerTreeHostTestDestroyWhileInitializingOutputSurface);
 
 }  // namespace
 }  // namespace cc

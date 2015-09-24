@@ -292,9 +292,6 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // IsSurfaceAvailableForCopy() and HasAcceleratedSurface().
   virtual bool CanCopyToVideoFrame() const = 0;
 
-  // DEPRECATED. Called when an accelerated compositing surface is initialized.
-  virtual void AcceleratedSurfaceInitialized(int route_id) {}
-
   // Return true if the view has an accelerated surface that contains the last
   // presented frame for the view. If |desired_size| is non-empty, true is
   // returned only if the accelerated surface size matches.
@@ -428,7 +425,7 @@ protected:
 
   uint32 renderer_frame_number_;
 
-  base::OneShotTimer<RenderWidgetHostViewBase> flush_input_timer_;
+  base::OneShotTimer flush_input_timer_;
 
   base::WeakPtrFactory<RenderWidgetHostViewBase> weak_factory_;
 

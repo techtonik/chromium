@@ -46,6 +46,7 @@ import org.chromium.chrome.browser.AccessibilityUtil;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeApplication;
 import org.chromium.chrome.browser.ChromeSwitches;
+import org.chromium.chrome.browser.ChromeVersionInfo;
 import org.chromium.chrome.browser.ChromeWebContentsDelegateAndroid;
 import org.chromium.chrome.browser.FrozenNativePage;
 import org.chromium.chrome.browser.IntentHandler.TabOpenType;
@@ -90,7 +91,7 @@ import org.chromium.chrome.browser.tabmodel.TabCreatorManager.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
-import org.chromium.chrome.browser.tabmodel.TabModelBase;
+import org.chromium.chrome.browser.tabmodel.TabModelImpl;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.util.FeatureUtilities;
@@ -2847,7 +2848,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         } else {
             mFullscreenManager.setPositionsForTab(topControlsOffsetY, contentOffsetY);
         }
-        TabModelBase.setActualTabSwitchLatencyMetricRequired();
+        TabModelImpl.setActualTabSwitchLatencyMetricRequired();
     }
 
     /**
@@ -3237,7 +3238,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
     private static boolean isThemeColorEnabledInTabbedMode() {
         CommandLine commandLine = CommandLine.getInstance();
-        return commandLine.hasSwitch(ChromeSwitches.ENABLE_THEME_COLOR_IN_TABBED_MODE);
+        return ChromeVersionInfo.isLocalBuild()
+                || commandLine.hasSwitch(ChromeSwitches.ENABLE_THEME_COLOR_IN_TABBED_MODE);
     }
 
     /**

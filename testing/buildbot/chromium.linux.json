@@ -183,6 +183,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
@@ -432,6 +438,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "mojo_common_unittests"
       },
       {
@@ -472,6 +484,9 @@
       },
       {
         "test": "mojo_system_unittests"
+      },
+      {
+        "test": "mojo_view_manager_lib_unittests"
       },
       {
         "swarming": {
@@ -618,6 +633,7 @@
       "jingle_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "net_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -806,6 +822,9 @@
         "test": "gpu_unittests"
       },
       {
+        "test": "html_viewer_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true
         },
@@ -830,6 +849,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
@@ -843,6 +868,9 @@
           "can_use_on_swarming_builders": true
         },
         "test": "mojo_common_unittests"
+      },
+      {
+        "test": "mojo_public_application_unittests"
       },
       {
         "swarming": {
@@ -869,7 +897,19 @@
         "test": "mojo_public_utility_unittests"
       },
       {
+        "test": "mojo_runner_unittests"
+      },
+      {
+        "test": "mojo_shell_unittests"
+      },
+      {
+        "test": "mojo_surfaces_lib_unittests"
+      },
+      {
         "test": "mojo_system_unittests"
+      },
+      {
+        "test": "mojo_view_manager_lib_unittests"
       },
       {
         "swarming": {
@@ -897,6 +937,9 @@
           "can_use_on_swarming_builders": true
         },
         "test": "remoting_unittests"
+      },
+      {
+        "test": "resource_provider_unittests"
       },
       {
         "swarming": {
@@ -953,6 +996,9 @@
         "test": "url_unittests"
       },
       {
+        "test": "view_manager_unittests"
+      },
+      {
         "test": "views_unittests"
       },
       {
@@ -990,6 +1036,10 @@
       {
         "name": "nacl_integration",
         "script": "nacl_integration.py"
+      },
+      {
+        "name": "mojo_apptests",
+        "script": "mojo_apptests.py"
       }
     ]
   },
@@ -1173,6 +1223,12 @@
           "can_use_on_swarming_builders": true
         },
         "test": "jingle_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "media_blink_unittests"
       },
       {
         "swarming": {
@@ -1511,6 +1567,12 @@
           "can_use_on_swarming_builders": true
         },
         "test": "jingle_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "media_blink_unittests"
       },
       {
         "swarming": {

@@ -125,8 +125,11 @@ void InitDevToolsServiceIfNeeded(shell::ApplicationManager* manager,
   ServiceProviderPtr devtools_service_provider;
   scoped_ptr<shell::ConnectToApplicationParams> params(
       new shell::ConnectToApplicationParams);
-  params->set_source(shell::Identity(GURL("mojo:shell")));
-  params->SetTargetURL(GURL("mojo:devtools_service"));
+  params->set_source(shell::Identity(GURL("mojo:shell"), std::string(),
+                                     shell::GetPermissiveCapabilityFilter()));
+  params->SetTarget(shell::Identity(GURL("mojo:devtools_service"),
+                                    std::string(),
+                                    shell::GetPermissiveCapabilityFilter()));
   params->set_services(GetProxy(&devtools_service_provider));
   manager->ConnectToApplication(params.Pass());
 
@@ -188,19 +191,18 @@ bool Context::Init() {
       embedder::ProcessType::NONE, task_runners_->shell_runner(), this,
       task_runners_->io_runner(), embedder::ScopedPlatformHandle());
 
-  package_manager_ = new package_manager::PackageManagerImpl(shell_file_root_);
+  package_manager_ = new package_manager::PackageManagerImpl(
+      shell_file_root_, task_runners_->blocking_pool());
   InitContentHandlers(package_manager_, command_line);
-
-  application_manager_.reset(
-      new shell::ApplicationManager(make_scoped_ptr(package_manager_)));
 
   scoped_ptr<shell::NativeRunnerFactory> runner_factory;
   if (command_line.HasSwitch(switches::kEnableMultiprocess))
     runner_factory.reset(new OutOfProcessNativeRunnerFactory(this));
   else
     runner_factory.reset(new InProcessNativeRunnerFactory(this));
-  application_manager_->set_blocking_pool(task_runners_->blocking_pool());
-  application_manager_->set_native_runner_factory(runner_factory.Pass());
+  application_manager_.reset(new shell::ApplicationManager(
+      make_scoped_ptr(package_manager_), runner_factory.Pass(),
+      task_runners_->blocking_pool()));
 
   ServiceProviderPtr service_provider_ptr;
   ServiceProviderPtr tracing_service_provider_ptr;
@@ -208,7 +210,10 @@ bool Context::Init() {
 
   scoped_ptr<shell::ConnectToApplicationParams> params(
       new shell::ConnectToApplicationParams);
-  params->SetTargetURL(GURL("mojo:tracing"));
+  params->set_source(shell::Identity(GURL("mojo:shell"), std::string(),
+                                     shell::GetPermissiveCapabilityFilter()));
+  params->SetTarget(shell::Identity(GURL("mojo:tracing"), std::string(),
+                                    shell::GetPermissiveCapabilityFilter()));
   params->set_services(GetProxy(&service_provider_ptr));
   params->set_exposed_services(tracing_service_provider_ptr.Pass());
   application_manager_->ConnectToApplication(params.Pass());

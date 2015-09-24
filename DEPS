@@ -32,17 +32,17 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
   'chromium_git': 'https://chromium.googlesource.com',
-  'libvpx_revision': '0d6551cd1e1359423a7f4af503472d280437e9bb',
+  'libvpx_revision': '70db2235b7e389f4d1b178320ebce76280c127af',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '10cae83e4bb726610b93276e17815c5d52d73395',
+  'skia_revision': '3f9deab9fc0e0aba77dfa0fe09e7ef01921ce689',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '38c6221febba5b87d833ce563b06077629d208f4',
+  'v8_revision': 'c63779d2ec7f2f20c03d69f1959bd22cf6d6c375',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
-  'swarming_revision': 'f71d1a3fbe207d91bb2f0bd96c8821ff90bb7c28',
+  'swarming_revision': '6e5d2b21f0ac98396cd736097a985346feed1328',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
@@ -101,7 +101,7 @@ allowed_hosts = [
 
 deps = {
   'src/breakpad/src':
-   Var('chromium_git') + '/breakpad/breakpad/src.git' + '@' + '027db3c04fbea96f3efa8e1f722ffff11b19a085',
+   Var('chromium_git') + '/breakpad/breakpad/src.git' + '@' + '9e9c3563a356ce441eed044257a54aa8b4114693',
 
   'src/buildtools':
    Var('chromium_git') + '/chromium/buildtools.git' + '@' +  Var('buildtools_revision'),
@@ -188,7 +188,7 @@ deps = {
    Var('chromium_git') + '/webm/libvpx.git' + '@' +  '90a109f0eef8bfaaa4869cf7b2873dac5076b582',
 
   'src/third_party/ffmpeg':
-   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '382b031ebab06b25df0708dd44aafad235657d2c',
+   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '9055a855511af7170daa498409227cacaca51c0c',
 
   'src/third_party/libjingle/source/talk':
     Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '228d997b9a60b755dbc985b78b3053dc461b4be7', # commit position 10022
@@ -274,7 +274,7 @@ deps = {
     Var('chromium_git') + '/external/py_trace_event.git' + '@' + 'dd463ea9e2c430de2b9e53dea57a77b4c3ac9b30',
 
   'src/third_party/dom_distiller_js/dist':
-    Var('chromium_git') + '/external/github.com/chromium/dom-distiller-dist.git' + '@' + '81e5b59da2a7a0a518b90b5ded58670322c98128',
+    Var('chromium_git') + '/external/github.com/chromium/dom-distiller-dist.git' + '@' + '445b024cb55f367636e6da4a61796a2afecd6d3f',
 
   'src/third_party/catapult':
     Var('chromium_git') + '/external/github.com/catapult-project/catapult.git' + '@' +

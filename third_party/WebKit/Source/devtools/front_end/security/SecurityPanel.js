@@ -10,8 +10,6 @@
 WebInspector.SecurityPanel = function()
 {
     WebInspector.PanelWithSidebar.call(this, "security");
-    this.registerRequiredCSS("security/mainView.css");
-    this.registerRequiredCSS("security/lockIcon.css");
 
     var sidebarTree = new TreeOutlineInShadow();
     sidebarTree.element.classList.add("sidebar-tree");
@@ -60,6 +58,22 @@ WebInspector.SecurityPanel.Origin;
 WebInspector.SecurityPanel.OriginState;
 
 WebInspector.SecurityPanel.prototype = {
+
+    /**
+     * @param {!SecurityAgent.SecurityState} securityState
+     */
+    setRanInsecureContentStyle: function(securityState)
+    {
+        this._ranInsecureContentStyle = securityState;
+    },
+
+    /**
+     * @param {!SecurityAgent.SecurityState} securityState
+     */
+    setDisplayedInsecureContentStyle: function(securityState)
+    {
+        this._displayedInsecureContentStyle = securityState;
+    },
 
     /**
      * @param {!SecurityAgent.SecurityState} newSecurityState
@@ -140,16 +154,20 @@ WebInspector.SecurityPanel.prototype = {
         }
         if (request.resourceType() == WebInspector.resourceTypes.Document)
             this._lastResponseReceivedForLoaderId.set(request.loaderId, request);
-        this._processResponse(request);
     },
 
     /**
      * @param {!WebInspector.NetworkRequest} request
      */
-    _processResponse: function(request)
+    _processRequest: function(request)
     {
         var origin = WebInspector.ParsedURL.splitURLIntoPathComponents(request.url)[0];
         var securityState = /** @type {!SecurityAgent.SecurityState} */ (request.securityState());
+
+        if (request.mixedContentType === NetworkAgent.RequestMixedContentType.Blockable && this._ranInsecureContentStyle)
+            securityState = this._ranInsecureContentStyle;
+        else if (request.mixedContentType === NetworkAgent.RequestMixedContentType.OptionallyBlockable && this._displayedInsecureContentStyle)
+            securityState = this._displayedInsecureContentStyle;
 
         if (this._origins.has(origin)) {
             var originState = this._origins.get(origin);
@@ -188,6 +206,7 @@ WebInspector.SecurityPanel.prototype = {
     {
         var request = /** @type {!WebInspector.NetworkRequest} */ (event.data);
         this._updateFilterRequestCounts(request);
+        this._processRequest(request);
     },
 
     /**
@@ -195,16 +214,16 @@ WebInspector.SecurityPanel.prototype = {
      */
     _updateFilterRequestCounts: function(request)
     {
-        if (!request.mixedContentType || request.mixedContentType === "none")
+        if (request.mixedContentType === NetworkAgent.RequestMixedContentType.None)
             return;
 
         /** @type {!WebInspector.NetworkLogView.MixedContentFilterValues} */
         var filterKey = WebInspector.NetworkLogView.MixedContentFilterValues.All;
         if (request.wasBlocked())
             filterKey = WebInspector.NetworkLogView.MixedContentFilterValues.Blocked;
-        else if (request.mixedContentType === "blockable")
+        else if (request.mixedContentType === NetworkAgent.RequestMixedContentType.Blockable)
             filterKey = WebInspector.NetworkLogView.MixedContentFilterValues.BlockOverridden;
-        else if (request.mixedContentType === "optionally-blockable")
+        else if (request.mixedContentType === NetworkAgent.RequestMixedContentType.OptionallyBlockable)
             filterKey = WebInspector.NetworkLogView.MixedContentFilterValues.Displayed;
 
         if (!this._filterRequestCounts.has(filterKey))
@@ -278,7 +297,7 @@ WebInspector.SecurityPanel.prototype = {
         var request = this._lastResponseReceivedForLoaderId.get(frame.loaderId);
         this._clearOrigins();
         if (request)
-            this._processResponse(request);
+            this._processRequest(request);
     },
 
     __proto__: WebInspector.PanelWithSidebar.prototype
@@ -406,25 +425,31 @@ WebInspector.SecurityPanelFactory.prototype = {
  */
 WebInspector.SecurityMainView = function(panel)
 {
-    WebInspector.VBox.call(this);
+    WebInspector.VBox.call(this, true);
+    this.registerRequiredCSS("security/mainView.css");
+    this.registerRequiredCSS("security/lockIcon.css");
     this.setMinimumSize(100, 100);
 
-    this.element.classList.add("security-main-view");
+    this.contentElement.classList.add("security-main-view");
 
     this._panel = panel;
 
-    // Create security state section.
-    var summarySection = this.element.createChild("div", "security-section");
-    summarySection.classList.add("security-summary");
+    this._summarySection = this.contentElement.createChild("div", "security-summary");
+    this._securityExplanations = this.contentElement.createChild("div", "security-explanation-list");
 
-    this._summarylockIcon = summarySection.createChild("div", "lock-icon");
+    // Fill the security summary section.
+    this._summarySection.createChild("div", "security-summary-section-title").textContent = WebInspector.UIString("Security Overview");
 
-    var text = summarySection.createChild("div", "security-section-text");
-    text.createChild("div", "security-summary-section-title").textContent = WebInspector.UIString("Security Overview");
-    this._summaryExplanation = text.createChild("div", "security-explanation");
+    var lockSpectrum = this._summarySection.createChild("div", "lock-spectrum");
+    lockSpectrum.createChild("div", "lock-icon lock-icon-secure").title = WebInspector.UIString("Secure");
+    lockSpectrum.createChild("div", "security-summary-lock-spacer");
+    lockSpectrum.createChild("div", "lock-icon lock-icon-neutral").title = WebInspector.UIString("Not Secure");
+    lockSpectrum.createChild("div", "security-summary-lock-spacer");
+    lockSpectrum.createChild("div", "lock-icon lock-icon-insecure").title = WebInspector.UIString("Insecure (Broken)");
 
-    this._securityExplanations = this.element.createChild("div", "security-explanation-list");
+    this._summarySection.createChild("div", "triangle-pointer-container").createChild("div", "triangle-pointer-wrapper").createChild("div", "triangle-pointer");
 
+    this._summaryText = this._summarySection.createChild("div", "security-summary-text");
 }
 
 WebInspector.SecurityMainView.prototype = {
@@ -436,8 +461,9 @@ WebInspector.SecurityMainView.prototype = {
     {
         var explanationSection = this._securityExplanations.createChild("div", "security-section");
         explanationSection.classList.add("security-explanation");
+        explanationSection.classList.add("security-state-" + explanation.securityState);
 
-        explanationSection.createChild("div", "lock-icon").classList.add("lock-icon-" + explanation.securityState);
+        explanationSection.createChild("div", "security-property").classList.add("security-property-" + explanation.securityState);
         var text = explanationSection.createChild("div", "security-section-text");
         text.createChild("div", "security-section-title").textContent = explanation.summary;
         text.createChild("div", "security-explanation").textContent = explanation.description;
@@ -470,24 +496,25 @@ WebInspector.SecurityMainView.prototype = {
     {
         // Remove old state.
         // It's safe to call this even when this._securityState is undefined.
-        this._summarylockIcon.classList.remove("lock-icon-" + this._securityState);
-        this._summaryExplanation.classList.remove("security-state-" + this._securityState);
+        this._summarySection.classList.remove("security-summary-" + this._securityState);
 
         // Add new state.
         this._securityState = newSecurityState;
-        this._summarylockIcon.classList.add("lock-icon-" + this._securityState);
-        this._summaryExplanation.classList.add("security-state-" + this._securityState);
+        this._summarySection.classList.add("security-summary-" + this._securityState);
         var summaryExplanationStrings = {
             "unknown":  WebInspector.UIString("This security of this page is unknown."),
             "insecure": WebInspector.UIString("This page is insecure (broken HTTPS)."),
             "neutral":  WebInspector.UIString("This page is not secure."),
             "secure":   WebInspector.UIString("This page is secure (valid HTTPS).")
         }
-        this._summaryExplanation.textContent = summaryExplanationStrings[this._securityState];
+        this._summaryText.textContent = summaryExplanationStrings[this._securityState];
 
         this._explanations = explanations,
         this._mixedContentStatus = mixedContentStatus;
         this._schemeIsCryptographic = schemeIsCryptographic;
+
+        this._panel.setRanInsecureContentStyle(mixedContentStatus.ranInsecureContentStyle);
+        this._panel.setDisplayedInsecureContentStyle(mixedContentStatus.displayedInsecureContentStyle);
 
         this.refreshExplanations();
     },
@@ -642,7 +669,7 @@ WebInspector.SecurityOriginView = function(panel, origin, originState)
 
         var noteSection = this.element.createChild("div", "origin-view-section");
         noteSection.createChild("div", "origin-view-section-title").textContent = WebInspector.UIString("Development Note");
-        // TODO(lgarron): Fix the issue and then remove this section. See comment in SecurityPanel. _processResponse().
+        // TODO(lgarron): Fix the issue and then remove this section. See comment in SecurityPanel._processRequest().
         noteSection.createChild("div").textContent = WebInspector.UIString("At the moment, this view only shows security details from the first connection made to %s", origin);
     } else {
         var notSecureSection = this.element.createChild("div", "origin-view-section");

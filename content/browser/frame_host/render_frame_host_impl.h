@@ -68,6 +68,7 @@ class RenderViewHostImpl;
 class RenderWidgetHostDelegate;
 class RenderWidgetHostImpl;
 class RenderWidgetHostView;
+class RenderWidgetHostViewBase;
 class ResourceRequestBody;
 class StreamHandle;
 class TimeoutMonitor;
@@ -186,8 +187,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   gfx::AcceleratedWidget AccessibilityGetAcceleratedWidget() override;
   gfx::NativeViewAccessible AccessibilityGetNativeViewAccessible() override;
 
-  // Creates a RenderFrame in the renderer process.  Only called for
-  // cross-process subframe navigations in --site-per-process.
+  // Creates a RenderFrame in the renderer process.
   bool CreateRenderFrame(int proxy_routing_id,
                          int opener_routing_id,
                          int parent_routing_id,
@@ -605,6 +605,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // AXNodeData structure.
   void AXContentNodeDataToAXNodeData(const AXContentNodeData& src,
                                      ui::AXNodeData* dst);
+
+  // Returns the RenderWidgetHostView used for accessibility. For subframes,
+  // this function will return the platform view on the main frame; for main
+  // frames, it will return the current frame's view.
+  RenderWidgetHostViewBase* GetViewForAccessibility();
 
   // For now, RenderFrameHosts indirectly keep RenderViewHosts alive via a
   // refcount that calls Shutdown when it reaches zero.  This allows each

@@ -45,6 +45,7 @@
       "jingle_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "net_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -92,6 +93,7 @@
       "jingle_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "net_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -143,6 +145,7 @@
       "jingle_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "net_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -258,6 +261,9 @@
         "test": "jingle_unittests"
       },
       {
+        "test": "media_blink_unittests"
+      },
+      {
         "test": "media_unittests"
       },
       {
@@ -289,6 +295,9 @@
       },
       {
         "test": "mojo_system_unittests"
+      },
+      {
+        "test": "mojo_view_manager_lib_unittests"
       },
       {
         "test": "nacl_loader_unittests"

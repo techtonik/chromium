@@ -30,12 +30,21 @@ bool OutputSurfaceMojo::BindToClient(cc::OutputSurfaceClient* client) {
   return cc::OutputSurface::BindToClient(client);
 }
 
+void OutputSurfaceMojo::DetachFromClient() {
+  surface_.reset();
+  cc::OutputSurface::DetachFromClient();
+}
+
 void OutputSurfaceMojo::SwapBuffers(cc::CompositorFrame* frame) {
   // TODO(fsamuel, rjkroege): We should probably throttle compositor frames.
-  surface_->SubmitCompositorFrame(mojo::CompositorFrame::From(*frame));
-
   client_->DidSwapBuffers();
-  client_->DidSwapBuffersComplete();
+  // OutputSurfaceMojo owns ViewSurface, and so if OutputSurfaceMojo is
+  // destroyed then SubmitCompositorFrame's callback will never get called.
+  // Thus, base::Unretained is safe here.
+  surface_->SubmitCompositorFrame(
+      mojo::CompositorFrame::From(*frame),
+      base::Bind(&OutputSurfaceMojo::SwapBuffersComplete,
+                 base::Unretained(this)));
 }
 
 void OutputSurfaceMojo::OnResourcesReturned(
@@ -44,6 +53,10 @@ void OutputSurfaceMojo::OnResourcesReturned(
   cc::CompositorFrameAck cfa;
   cfa.resources = resources.To<cc::ReturnedResourceArray>();
   ReclaimResources(&cfa);
+}
+
+void OutputSurfaceMojo::SwapBuffersComplete() {
+  client_->DidSwapBuffersComplete();
 }
 
 }  // namespace mojo

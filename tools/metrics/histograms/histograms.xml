@@ -4075,6 +4075,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Chromoting.Input.EventLatency" units="microseconds">
+  <owner>anandc@chromium.org</owner>
+  <owner>sergeyu@chromium.org</owner>
+  <summary>
+    Input event delivery latency from the browser to the plugin.
+  </summary>
+</histogram>
+
 <histogram name="Chromoting.Video.Bandwidth" units="Bytes/second">
   <owner>anandc@chromium.org</owner>
   <owner>sergeyu@chromium.org</owner>
@@ -4704,9 +4712,28 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>The default location setting at profile open.</summary>
 </histogram>
 
+<histogram name="ContentSettings.DefaultMediaStreamCameraSetting"
+    enum="ContentSetting">
+  <owner>msramek@chromium.org</owner>
+  <summary>The default camera setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultMediaStreamMicSetting"
+    enum="ContentSetting">
+  <owner>msramek@chromium.org</owner>
+  <summary>The default microphone setting at profile open.</summary>
+</histogram>
+
 <histogram name="ContentSettings.DefaultMediaStreamSetting"
     enum="ContentSetting">
+  <obsolete>
+    This setting was deprecated in r322364 and replaced with separate settings
+    for camera and microphone. See
+    ContentSettings.DefaultMediaStreamCameraSetting and
+    ContentSettings.DefaultMediaStreamMicSetting.
+  </obsolete>
   <owner>toyoshim@chromium.org</owner>
+  <owner>msramek@chromium.org</owner>
   <summary>The default MediaStream setting at profile open.</summary>
 </histogram>
 
@@ -37595,6 +37622,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="SafeBrowsing.Pref.Extended" enum="BooleanEnabled">
+  <owner>nparker@chromium.org</owner>
+  <summary>
+    Whether the Safe Browsing extended reporting service is currently enabled.
+    Recorded for all non-Incognito profiles on profile startup.
+  </summary>
+</histogram>
+
+<histogram name="SafeBrowsing.Pref.General" enum="BooleanEnabled">
+  <owner>nparker@chromium.org</owner>
+  <summary>
+    Whether the Safe Browsing service is currently enabled. Recorded for all
+    non-Incognito profiles on profile startup.
+  </summary>
+</histogram>
+
 <histogram name="SB.BloomFilter" units="milliseconds">
   <obsolete>
     Has not been generated for years (7/8/14).
@@ -43149,6 +43192,32 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Startup.BrowserMainRunnerImplInitializeLongTime"
+    units="milliseconds">
+  <owner>robliao@chromium.org</owner>
+  <summary>
+    The amount of time that elapsed during BrowserMainRunnerImpl::Initialize.
+  </summary>
+</histogram>
+
+<histogram name="Startup.BrowserMainRunnerImplInitializeStep1Time"
+    units="milliseconds">
+  <owner>robliao@chromium.org</owner>
+  <summary>
+    The amount of time that elapsed during the first section of
+    BrowserMainRunnerImpl::Initialize.
+  </summary>
+</histogram>
+
+<histogram name="Startup.BrowserMainRunnerImplInitializeStep2Time"
+    units="milliseconds">
+  <owner>robliao@chromium.org</owner>
+  <summary>
+    The amount of time that elapsed during the second section of
+    BrowserMainRunnerImpl::Initialize.
+  </summary>
+</histogram>
+
 <histogram name="Startup.BrowserMessageLoopStartHardFaultCount" units="faults">
   <owner>chrisha@chromium.org</owner>
   <summary>
@@ -43692,6 +43761,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>rkaplow@chromium.org</owner>
   <summary>
     The amount of time that elapsed during StartupBrowserCreator::Start().
+  </summary>
+</histogram>
+
+<histogram name="Startup.Temperature" enum="StartupTemperature">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    Indicates whether or not the given startup was warm, cold or unable to be
+    determined. This is based off observing the number of hard faults that occur
+    during startup prior to Startup.BrowserMessageLoopStartTime.
   </summary>
 </histogram>
 
@@ -57695,6 +57773,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1086" label="EASYUNLOCKPRIVATE_SETUPCONNECTIONSTATUS"/>
   <int value="1087" label="EASYUNLOCKPRIVATE_SETUPCONNECTIONDISCONNECT"/>
   <int value="1088" label="EASYUNLOCKPRIVATE_SETUPCONNECTIONSEND"/>
+  <int value="1089" label="DATAREDUCTIONPROXY_GETDATAUSAGE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -71478,6 +71557,12 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="Displayed clock interstitial. (DISPLAYED_CLOCK_INTERSTITIAL)"/>
 </enum>
 
+<enum name="StartupTemperature" type="int">
+  <int value="0" label="Cold startup (mostly hard faults)"/>
+  <int value="1" label="Warm startup (nearly no hard faults)"/>
+  <int value="2" label="Uncertain startup (in between cold and warm)"/>
+</enum>
+
 <enum name="StartupURLsMigration" type="int">
   <int value="0" label="Performed migration"/>
   <int value="1" label="No migration value"/>
@@ -78285,6 +78370,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Net.SSL_Connection_Latency_2"/>
   <affected-histogram name="Net.SSL_Connection_Latency_Google"/>
   <affected-histogram name="Net.SSL_Connection_Latency_Google2"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="StartupTemperature" separator=".">
+  <suffix name="ColdStartup" label="Startup was cold (mostly hard faults)."/>
+  <suffix name="WarmStartup" label="Startup was warm (almost no hard faults)."/>
+  <affected-histogram name="Startup.BrowserMessageLoopStartTime"/>
+  <affected-histogram name="Startup.BrowserMessageLoopStartTimeFromMainEntry"/>
+  <affected-histogram
+      name="Startup.BrowserMessageLoopStartTimeFromMainEntry.FirstRun"/>
+  <affected-histogram name="Startup.BrowserOpenTabs"/>
+  <affected-histogram name="Startup.BrowserWindowDisplay"/>
+  <affected-histogram name="Startup.FirstWebContents.MainFrameLoad"/>
+  <affected-histogram name="Startup.FirstWebContents.NonEmptyPaint"/>
+  <affected-histogram name="Startup.LoadTime.ExeMainToDllMain"/>
+  <affected-histogram name="Startup.LoadTime.ProcessCreateToDllMain"/>
+  <affected-histogram name="Startup.LoadTime.ProcessCreateToExeMain"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="StartupTimeBombAlarm" separator=".">

@@ -736,6 +736,7 @@ if (!is_android) {
       "//components/autofill/content/renderer:test_support",
       "//components/captive_portal:test_support",
       "//components/dom_distiller/content:content_browser",
+      "//components/dom_distiller/content:content_renderer",
       "//components/dom_distiller/core:test_support",
       "//components/guest_view/browser:test_support",
       "//components/resources",
@@ -819,6 +820,10 @@ if (!is_android) {
       ]
       deps += [ "//components/nacl/renderer/plugin:nacl_trusted_plugin" ]
 
+      data += [
+        #        "$root_out_dir/nacl_helper",
+      ]
+
       if (enable_nacl_untrusted) {
         sources += [
           "nacl/nacl_browsertest.cc",
@@ -832,7 +837,7 @@ if (!is_android) {
         data_deps += [
           # "test/data/nacl:shared_test_files",  # TODO(GYP) bug 512902
           "//ppapi/native_client:irt",
-          "//ppapi:ppapi_nacl_tests",
+          "//ppapi:ppapi_nacl_tests_all",
 
           # "../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests",  # TODO(GYP) bug 512901
           # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive",  # TODO(GYP) bug 512900

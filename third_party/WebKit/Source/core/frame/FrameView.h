@@ -52,6 +52,7 @@
 namespace blink {
 
 class AXObjectCache;
+class ComputedStyle;
 class DocumentLifecycle;
 class Cursor;
 class Element;
@@ -271,7 +272,7 @@ public:
     bool isProgrammaticallyScrollable() override;
 
     enum ScrollbarModesCalculationStrategy { RulesFromWebContentOnly, AnyRule };
-    void calculateScrollbarModesForLayout(ScrollbarMode& hMode, ScrollbarMode& vMode, ScrollbarModesCalculationStrategy = AnyRule);
+    void calculateScrollbarModes(ScrollbarMode& hMode, ScrollbarMode& vMode, ScrollbarModesCalculationStrategy = AnyRule);
 
     IntPoint lastKnownMousePosition() const override;
     bool shouldSetCursor() const;
@@ -436,9 +437,6 @@ public:
     IntPoint minimumScrollPosition() const override; // The minimum position we can be scrolled to.
     int scrollX() const { return scrollPosition().x(); }
     int scrollY() const { return scrollPosition().y(); }
-
-    void cacheCurrentScrollPosition() { m_cachedScrollPosition = scrollPositionDouble(); }
-    DoublePoint cachedScrollPosition() const { return m_cachedScrollPosition; }
 
     // Scroll the actual contents of the view (either blitting or invalidating as needed).
     void scrollContents(const IntSize& scrollDelta);
@@ -630,7 +628,7 @@ private:
 
     bool contentsInCompositedLayer() const;
 
-    void applyOverflowToViewport(LayoutObject*, ScrollbarMode& hMode, ScrollbarMode& vMode);
+    void calculateScrollbarModesFromOverflowStyle(const ComputedStyle*, ScrollbarMode& hMode, ScrollbarMode& vMode);
 
     void updateCounters();
     void forceLayoutParentViewIfNeeded();
@@ -817,7 +815,6 @@ private:
 
     DoubleSize m_pendingScrollDelta;
     DoublePoint m_scrollPosition;
-    DoublePoint m_cachedScrollPosition;
     IntSize m_contentsSize;
 
     int m_scrollbarsAvoidingResizer;

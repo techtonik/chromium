@@ -45,12 +45,6 @@ WebInspector.StylesSidebarPane = function()
     filterContainerElement.appendChild(this._filterInput);
 
     var toolbar = new WebInspector.ExtensibleToolbar("styles-sidebarpane-toolbar", hbox);
-    if (Runtime.experiments.isEnabled("layoutEditor") && !Runtime.queryParam("remoteFrontend")) {
-        this._layoutEditorButton = new WebInspector.ToolbarButton(WebInspector.UIString("Toggle Layout Editor"), "layout-editor-toolbar-item");
-        toolbar.appendToolbarItem(this._layoutEditorButton);
-        this._layoutEditorButton.addEventListener("click", this._toggleLayoutEditor, this);
-        toolbar.appendSeparator();
-    }
 
     toolbar.element.classList.add("styles-pane-toolbar", "toolbar-gray-toggled");
     this._currentToolbarPane = null;
@@ -143,21 +137,6 @@ WebInspector.StylesSidebarPane.ignoreErrorsForProperty = function(property) {
 }
 
 WebInspector.StylesSidebarPane.prototype = {
-    _toggleLayoutEditor: function()
-    {
-        this._showLayoutEditor = !this._showLayoutEditor;
-        this._layoutEditorButton.setToggled(this._showLayoutEditor);
-        var targets = WebInspector.targetManager.targets();
-
-        if (this._showLayoutEditor)
-            WebInspector.inspectElementModeController.disable();
-        else
-            WebInspector.inspectElementModeController.enable();
-
-        var mode = this._showLayoutEditor ? DOMAgent.InspectMode.ShowLayoutEditor : DOMAgent.InspectMode.None;
-        for (var domModel of WebInspector.DOMModel.instances())
-            domModel.setInspectMode(mode);
-    },
 
     onUndoOrRedoHappened: function()
     {
@@ -1607,23 +1586,28 @@ WebInspector.StylePropertiesSection.prototype = {
             this._moveEditorFromSelector(moveDirection);
             return;
         }
+        var rule = this.rule();
+        var oldSelectorRange = rule.selectorRange();
+        if (!rule || !oldSelectorRange)
+            return;
 
         /**
-         * @param {?WebInspector.CSSRule} newRule
+         * @param {!WebInspector.CSSRule} rule
+         * @param {!WebInspector.TextRange} oldSelectorRange
+         * @param {boolean} success
          * @this {WebInspector.StylePropertiesSection}
          */
-        function finishCallback(newRule)
+        function finishCallback(rule, oldSelectorRange, success)
         {
-            if (newRule) {
-                var doesAffectSelectedNode = newRule.matchingSelectors.length > 0;
+            if (success) {
+                var doesAffectSelectedNode = rule.matchingSelectors.length > 0;
                 this.element.classList.toggle("no-affect", !doesAffectSelectedNode);
 
-                var oldSelectorRange = /** @type {!WebInspector.TextRange} */(this.rule().selectorRange());
-                var newSelectorRange = /** @type {!WebInspector.TextRange} */(newRule.selectorRange());
-                this.styleRule.updateRule(newRule);
-
+                this.styleRule.resetCachedData();
+                var newSelectorRange = /** @type {!WebInspector.TextRange} */(rule.selectorRange());
+                rule.style.sourceStyleSheetEdited(/** @type {string} */(rule.styleSheetId), oldSelectorRange, newSelectorRange);
+                this._parentPane._styleSheetRuleEdited(rule, oldSelectorRange, newSelectorRange);
                 this._parentPane._refreshUpdate(this);
-                this._parentPane._styleSheetRuleEdited(newRule, oldSelectorRange, newSelectorRange);
             }
 
             delete this._parentPane._userOperation;
@@ -1634,7 +1618,7 @@ WebInspector.StylePropertiesSection.prototype = {
         // This gets deleted in finishOperationAndMoveEditor(), which is called both on success and failure.
         this._parentPane._userOperation = true;
         var selectedNode = this._parentPane.node();
-        this._parentPane._cssModel.setRuleSelector(this.rule(), selectedNode ? selectedNode.id : 0, newContent, finishCallback.bind(this));
+        this._parentPane._cssModel.setRuleSelector(rule, selectedNode ? selectedNode.id : 0, newContent, finishCallback.bind(this, rule, oldSelectorRange));
     },
 
     _editingSelectorCommittedForTest: function() { },

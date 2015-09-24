@@ -32,7 +32,9 @@ InspectorTest.timelinePropertyFormatters = {
     nodeId: "formatAsTypeName",
     rootNode: "formatAsTypeName",
     networkTime: "formatAsTypeName",
-    thread: "formatAsTypeName"
+    thread: "formatAsTypeName",
+    allottedMilliseconds: "formatAsTypeName",
+    timedOut: "formatAsTypeName"
 };
 
 InspectorTest.InvalidationFormatters = {
@@ -145,7 +147,7 @@ InspectorTest.performActionsAndPrint = function(actions, typeName, includeTimeSt
 {
     function callback()
     {
-        InspectorTest.printTimelineRecords(typeName);
+        InspectorTest.printTimelineRecordsWithDetails(typeName);
         if (includeTimeStamps) {
             InspectorTest.addResult("Timestamp records: ");
             InspectorTest.printTimestampRecords(typeName);
@@ -158,6 +160,28 @@ InspectorTest.performActionsAndPrint = function(actions, typeName, includeTimeSt
 InspectorTest.printTimelineRecords = function(typeName, formatter)
 {
     InspectorTest.timelineModel().forAllRecords(InspectorTest._printTimlineRecord.bind(InspectorTest, typeName, formatter));
+};
+
+InspectorTest.detailsTextForTraceEvent = function(traceEvent)
+{
+    return WebInspector.TimelineUIUtils.buildDetailsTextForTraceEvent(traceEvent,
+        WebInspector.targetManager.mainTarget(),
+        new WebInspector.Linkifier());
+}
+
+InspectorTest.printTimelineRecordsWithDetails = function(typeName)
+{
+    function detailsFormatter(recordType, record)
+    {
+        if (recordType && recordType !== record.type())
+            return;
+        var event = record.traceEvent();
+        InspectorTest.addResult("Text details for " + record.type() + ": " + InspectorTest.detailsTextForTraceEvent(event));
+        if (event.warning)
+            InspectorTest.addResult(record.type() + " has a warning");
+    }
+
+    InspectorTest.timelineModel().forAllRecords(InspectorTest._printTimlineRecord.bind(InspectorTest, typeName, detailsFormatter.bind(null, typeName)));
 };
 
 InspectorTest.printTimelinePresentationRecords = function(typeName, formatter)
@@ -183,7 +207,6 @@ InspectorTest._printTimlineRecord = function(typeName, formatter, record)
     if (formatter)
         formatter(record);
 };
-
 
 InspectorTest.innerPrintTimelinePresentationRecords = function(records, typeName, formatter)
 {

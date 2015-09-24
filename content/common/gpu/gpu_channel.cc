@@ -238,7 +238,7 @@ GpuChannelMessageFilter::~GpuChannelMessageFilter() {}
 void GpuChannelMessageFilter::OnFilterAdded(IPC::Sender* sender) {
   DCHECK(!sender_);
   sender_ = sender;
-  timer_ = make_scoped_ptr(new base::OneShotTimer<GpuChannelMessageFilter>);
+  timer_ = make_scoped_ptr(new base::OneShotTimer);
   for (scoped_refptr<IPC::MessageFilter>& filter : channel_filters_) {
     filter->OnFilterAdded(sender_);
   }
@@ -909,6 +909,17 @@ void GpuChannel::HandleOutOfOrderMessage(const IPC::Message& msg) {
       NOTREACHED();
   }
 }
+
+#if defined(OS_ANDROID)
+const GpuCommandBufferStub* GpuChannel::GetOneStub() const {
+  for (const auto& kv : stubs_) {
+    const GpuCommandBufferStub* stub = kv.second;
+    if (stub->decoder() && !stub->decoder()->WasContextLost())
+      return stub;
+  }
+  return nullptr;
+}
+#endif
 
 void GpuChannel::OnCreateOffscreenCommandBuffer(
     const gfx::Size& size,

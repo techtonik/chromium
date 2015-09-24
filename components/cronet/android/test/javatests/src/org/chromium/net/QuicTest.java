@@ -70,9 +70,10 @@ public class QuicTest extends CronetTestBase {
         assertEquals("quic/1+spdy/3", listener.mNegotiatedProtocol);
     }
 
+    // TODO(sclittle): Re-enable test after fixing http://crbug.com/535462
     @LargeTest
     @Feature({"Cronet"})
-    public void testQuicLoadUrl() throws Exception {
+    public void disable_testQuicLoadUrl() throws Exception {
         String quicURL = QuicTestServer.getServerURL() + "/simple.txt";
         TestUrlRequestListener listener = new TestUrlRequestListener();
 

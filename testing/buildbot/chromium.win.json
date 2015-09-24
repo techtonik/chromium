@@ -169,6 +169,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
@@ -518,6 +524,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
@@ -734,6 +746,7 @@
       "keyboard_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "message_center_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -943,6 +956,12 @@
       },
       {
         "test": "keyboard_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "media_blink_unittests"
       },
       {
         "swarming": {
@@ -1285,6 +1304,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "media_blink_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
@@ -1485,6 +1510,7 @@
       "keyboard_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "message_center_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -1508,7 +1534,49 @@
         "test": "events_unittests"
       },
       {
+        "test": "html_viewer_unittests"
+      },
+      {
+        "test": "ipc_mojo_unittests"
+      },
+      {
+        "test": "mojo_common_unittests"
+      },
+      {
+        "test": "mojo_public_application_unittests"
+      },
+      {
+        "test": "mojo_public_environment_unittests"
+      },
+      {
+        "test": "mojo_public_system_unittests"
+      },
+      {
+        "test": "mojo_public_utility_unittests"
+      },
+      {
+        "test": "mojo_runner_unittests"
+      },
+      {
+        "test": "mojo_shell_unittests"
+      },
+      {
+        "test": "mojo_surfaces_lib_unittests"
+      },
+      {
+        "test": "mojo_system_unittests"
+      },
+      {
+        "test": "mojo_view_manager_lib_unittests"
+      },
+      {
+        "test": "resource_provider_unittests"
+      },
+      {
         "test": "ui_touch_selection_unittests"
+      },
+      {
+        "test": "view_manager_unittests"
       }
     ]
   },
@@ -1548,6 +1616,7 @@
       "keyboard_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "message_center_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -1601,6 +1670,7 @@
       "keyboard_unittests",
       "mandoline:all",
       "media_unittests",
+      "media_blink_unittests",
       "message_center_unittests",
       "ppapi_unittests",
       "printing_unittests",
@@ -1792,6 +1862,12 @@
           "can_use_on_swarming_builders": true
         },
         "test": "jingle_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "media_blink_unittests"
       },
       {
         "swarming": {

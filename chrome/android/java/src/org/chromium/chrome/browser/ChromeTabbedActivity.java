@@ -51,7 +51,7 @@ import org.chromium.chrome.browser.document.DocumentUma;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkUtils;
 import org.chromium.chrome.browser.firstrun.FirstRunActivity;
 import org.chromium.chrome.browser.firstrun.FirstRunFlowSequencer;
-import org.chromium.chrome.browser.firstrun.FirstRunSigninProcessor;
+import org.chromium.chrome.browser.firstrun.FirstRunSignInProcessor;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
 import org.chromium.chrome.browser.metrics.LaunchMetrics;
 import org.chromium.chrome.browser.metrics.UmaUtils;
@@ -237,7 +237,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements OverviewMode
     private void refreshSignIn() {
         if (mIsOnFirstRun) return;
         Log.i(TAG, "in refreshSignIn before starting the sign-in processor");
-        FirstRunSigninProcessor.start(this);
+        FirstRunSignInProcessor.start(this);
     }
 
     @Override

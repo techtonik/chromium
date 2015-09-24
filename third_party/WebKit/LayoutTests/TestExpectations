@@ -176,6 +176,8 @@ crbug.com/463358 [ Mac Linux Debug ] css3/masking/clip-path-polygon.html [ Image
 
 crbug.com/267206 [ Mac ] virtual/rootlayerscrolls/fast/scrolling/scrollbar-tickmarks-hittest.html [ Timeout ]
 
+crbug.com/535141 fast/text/international/combining-marks-position.html [ NeedsRebaseline ]
+
 # Times out on the windows trybot.
 crbug.com/481269 [ Win ] fast/dom/gc-treescope.html [ Pass Timeout ]
 
@@ -241,6 +243,8 @@ crbug.com/518967 [ Win7 ] http/tests/htmlimports/csp-import-block-but-nonce-nest
 crbug.com/448461 http/tests/loading/simple-subframe.html [ Failure Pass Timeout ]
 crbug.com/339597 http/tests/navigation/back-to-redirect-with-frame.php [ Pass Timeout ]
 crbug.com/473718 http/tests/navigation/beacon-cross-origin-redirect.html [ Failure Pass ]
+
+crbug.com/535102 fast/text/midword-break-before-surrogate-pair.html [ NeedsRebaseline ]
 
 crbug.com/410974 fast/scroll-behavior/scroll-customization/scrollstate-basic.html [ Pass Failure ]
 crbug.com/410974 fast/scroll-behavior/scroll-customization/scrollstate-consume-deltas.html [ Pass Failure ]
@@ -358,6 +362,8 @@ crbug.com/524859 fast/text/complex-text-opacity.html [ NeedsManualRebaseline ]
 # crbug.com/521730 [ Win10 ] fast/text/complex-text-opacity.html [ Failure Timeout Failure Failure ]
 crbug.com/524859 transforms/2d/hindi-rotated.html [ NeedsManualRebaseline ]
 
+crbug.com/535408 fast/js/function-bind.html [ NeedsManualRebaseline ]
+
 crbug.com/498539 http/tests/inspector/elements/styles/selector-line.html [ Pass Timeout ]
 crbug.com/498539 http/tests/inspector/network/network-datareceived.html [ Pass Timeout ]
 crbug.com/498539 [ Win ] inspector/tracing/decode-resize.html [ Failure Timeout ]
@@ -365,10 +371,9 @@ crbug.com/498539 [ Win ] inspector/tracing/timeline-event-dispatch.html [ Failur
 crbug.com/498539 inspector/console/console-log-syntax-error.html [ Pass Timeout ]
 crbug.com/498539 inspector/tracing/timeline-bound-function.html [ Pass Failure ]
 crbug.com/498539 inspector/tracing/timeline-injected-script-eval.html [ Pass Failure ]
-crbug.com/498539 inspector/tracing/timeline-receive-response-event.html [ Pass Failure ]
 crbug.com/498539 inspector/tracing/timeline-time.html [ Pass Failure Timeout ]
 crbug.com/498539 inspector/tracing/timeline-timer.html [ Pass Failure ]
-crbug.com/498539 crbug.com/534422 inspector/elements/styles-3/styles-change-node-while-editing.html [ Crash Failure Pass ]
+crbug.com/498539 inspector/elements/styles-3/styles-change-node-while-editing.html [ Failure Pass ]
 crbug.com/498539 [ Mac ] inspector-protocol/debugger/domdebugger-setInnerHTML.html [ Failure Pass Timeout ]
 crbug.com/498539 http/tests/inspector/console-fetch-logging.html [ Failure Pass Timeout ]
 crbug.com/498539 [ Precise MountainLion Trusty Linux32 XP SnowLeopard ] inspector/extensions/extensions-panel.html [ Failure Pass ]
@@ -1235,7 +1240,7 @@ crbug.com/524646 [ Yosemite ] fast/forms/select-selected.html [ NeedsRebaseline 
 crbug.com/524646 [ Yosemite ] fast/forms/select-size.html [ NeedsRebaseline ]
 crbug.com/524646 [ Yosemite ] fast/forms/select-style.html [ NeedsRebaseline ]
 crbug.com/524646 [ Yosemite ] fast/forms/select-writing-direction-natural.html [ NeedsRebaseline ]
-crbug.com/524646 [ Yosemite ] fast/forms/select/listbox-appearance-basic.html [ NeedsRebaseline ]
+crbug.com/534265 fast/forms/select/listbox-appearance-basic.html [ NeedsRebaseline ]
 crbug.com/524646 [ Yosemite ] fast/forms/select/listbox-appearance-separator.html [ NeedsRebaseline ]
 crbug.com/524646 [ Yosemite ] fast/forms/select/listbox-with-display-none-option.html [ NeedsRebaseline ]
 crbug.com/524646 [ Yosemite ] fast/forms/select/menulist-appearance-basic.html [ NeedsRebaseline ]
@@ -1520,6 +1525,8 @@ crbug.com/509025 [ Yosemite ] virtual/prefer_compositing_to_lcd_text/compositing
 
 crbug.com/528431 paint/invalidation/spv2/fixed-img-src-change-after-scroll.html [ Skip ]
 crbug.com/528431 paint/invalidation/spv2/background-image-paint-invalidation.html [ Skip ]
+
+crbug.com/443596 media/sources-fallback-codecs.html [ Pass Failure ]
 
 crbug.com/464736 http/tests/xmlhttprequest/ontimeout-event-override-after-failure.html [ Pass Failure ]
 
@@ -2131,22 +2138,6 @@ crbug.com/524826 [ Win10 ] compositing/squashing/squashing-reflection-disallowed
 
 crbug.com/526752 [ Win10 ] fast/css/fontfaceset-check-platform-fonts.html [ Failure Pass ]
 
-crbug.com/534422 [ Debug ] inspector/elements/edit/edit-style-attribute.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/edit/set-outer-html-2.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/node-reselect-on-append-child.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/styles-1/add-new-rule-invalid-selector.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/styles-2/perform-undo-perform-of-mergable-action.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/styles-3/styles-add-invalid-property.html [ Crash Pass ]
-crbug.com/534422 [ Mac Linux Debug ] inspector/elements/styles-3/styles-computed-trace.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/styles-3/styles-disable-then-delete.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/elements/styles-3/styles-disable-then-enable-overriden-ua.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/profiler/agents-disabled-check.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/runtime/runtime-callFunctionOn.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/sources/debugger-breakpoints/breakpoint-manager-listeners-count.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/sources/debugger-breakpoints/dom-breakpoints.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] inspector/sources/debugger-frameworks/frameworks-dom-xhr-event-breakpoints.html [ Crash Pass ]
-crbug.com/534422 [ Debug ] http/tests/inspector/change-iframe-src.html [ Crash Pass ]
-
 crbug.com/534423 [ Debug ] fast/frames/sandboxed-iframe-navigation-parent.html [ Crash Pass ]
 crbug.com/534423 [ Debug ] imported/web-platform-tests/html/syntax/parsing/html5lib_tests10.html [ Crash Pass ]
 
@@ -2181,3 +2172,7 @@ crbug.com/527743 [ Win10 ] paint/masks/table-cell-masks.html [ Pass Timeout ]
 
 crbug.com/531286 virtual/gpu/fast/canvas/yuv-video-on-accelerated-canvas.html [ ImageOnlyFailure ]
 crbug.com/534423 [ Debug ] imported/web-platform-tests/html/syntax/parsing/html5lib_tests2.html [ Pass Crash ]
+
+crbug.com/535478 [ Debug ] virtual/threaded/inspector/tracing/console-timeline.html [ Pass Timeout ]
+crbug.com/535478 [ Linux Mac ] virtual/threaded/inspector/tracing/decode-resize.html [ Pass Timeout ]
+crbug.com/535478 [ Win ] virtual/threaded/inspector/tracing/decode-resize.html [ Pass Timeout Failure ]

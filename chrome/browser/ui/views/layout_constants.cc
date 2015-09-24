@@ -16,7 +16,7 @@ int GetLayoutConstant(LayoutConstant constant) {
   const int kLocationBarVerticalPadding[] = {2, 2, 2};
   const int kOmniboxDropdownBorderInterior[] = {6, 0, 0};
   const int kOmniboxFontPixelSize[] = {16, 14, 14};
-  const int kTabCloseButtonTrailingPaddingOverlap[] = {3, 3, 3};
+  const int kTabCloseButtonTrailingPaddingOverlap[] = {2, 2, 2};
   const int kTabFaviconTitleSpacing[] = {4, 4, 4};
   const int kTabMaximumTitleWidth[] = {175, 175, 175};
   const int kTabPinnedContentWidth[] = {25, 25, 25};
@@ -81,6 +81,9 @@ int GetLayoutConstant(LayoutConstant constant) {
 }
 
 gfx::Insets GetLayoutInsets(LayoutInset inset) {
+  const int kAvatarLeftPadding[] = {2, 4, 4};
+  const int kAvatarRightPadding[] = {2, 2, 2};
+  const int kAvatarBottomPadding[] = {2, 4, 4};
   const int kOmniboxDropdownIconPadding[] = {2, 4, 8};
   const int kOmniboxDropdownTextPadding[] = {3, 4, 8};
   const int kTabBottomPadding[] = {2, 2, 2};
@@ -95,6 +98,10 @@ gfx::Insets GetLayoutInsets(LayoutInset inset) {
 
   const int mode = ui::MaterialDesignController::GetMode();
   switch (inset) {
+    case AVATAR_ICON: {
+      return gfx::Insets(0, kAvatarLeftPadding[mode],
+                         kAvatarBottomPadding[mode], kAvatarRightPadding[mode]);
+    }
     case OMNIBOX_DROPDOWN_ICON: {
       const int padding = kOmniboxDropdownIconPadding[mode];
       return gfx::Insets(padding, 0, padding, 0);

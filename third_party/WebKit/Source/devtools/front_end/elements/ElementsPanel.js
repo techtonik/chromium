@@ -50,16 +50,15 @@ WebInspector.ElementsPanel = function()
 
     this._contentElement = createElement("div");
     var crumbsContainer = createElement("div");
-    this._showLayoutEditor = false;
     if (Runtime.experiments.isEnabled("materialDesign"))
         this._initializeActionsToolbar();
     stackElement.appendChild(this._contentElement);
     stackElement.appendChild(crumbsContainer);
 
-    this._elementsPanelTreeOutilneSplit = new WebInspector.SplitWidget(false, true, "treeOutlineAnimationTimelineWidget", 300, 300);
-    this._elementsPanelTreeOutilneSplit.hideSidebar();
-    this._elementsPanelTreeOutilneSplit.setMainWidget(this._searchableView);
-    this._splitWidget.setMainWidget(this._elementsPanelTreeOutilneSplit);
+    this._treeOutlineSplit = new WebInspector.SplitWidget(false, true, "treeOutlineAnimationTimelineWidget", 300, 300);
+    this._treeOutlineSplit.hideSidebar();
+    this._treeOutlineSplit.setMainWidget(this._searchableView);
+    this._splitWidget.setMainWidget(this._treeOutlineSplit);
 
     this._contentElement.id = "elements-content";
     // FIXME: crbug.com/425984
@@ -934,14 +933,15 @@ WebInspector.ElementsPanel.prototype = {
      */
     revealAndSelectNode: function(node)
     {
-        if (WebInspector.inspectElementModeController && WebInspector.inspectElementModeController.started())
-            WebInspector.inspectElementModeController.stop();
+        if (WebInspector.inspectElementModeController && WebInspector.inspectElementModeController.isInInspectElementMode())
+            WebInspector.inspectElementModeController.stopInspection();
 
         this._omitDefaultSelection = true;
 
-        WebInspector.inspectorView.setCurrentPanel(this, this._showLayoutEditor);
+        var showLayoutEditor = !!WebInspector.inspectElementModeController && WebInspector.inspectElementModeController.isInLayoutEditorMode();
+        WebInspector.inspectorView.setCurrentPanel(this, showLayoutEditor);
         node = WebInspector.moduleSetting("showUAShadowDOM").get() ? node : this._leaveUserAgentShadowDOM(node);
-        if (!this._showLayoutEditor)
+        if (!showLayoutEditor)
             node.highlightForTwoSeconds();
 
         this.selectDOMNode(node, true);
@@ -1138,10 +1138,10 @@ WebInspector.ElementsPanel.prototype = {
     setWidgetBelowDOM: function(widget)
     {
         if (widget) {
-            this._elementsPanelTreeOutilneSplit.setSidebarWidget(widget);
-            this._elementsPanelTreeOutilneSplit.showBoth(true);
+            this._treeOutlineSplit.setSidebarWidget(widget);
+            this._treeOutlineSplit.showBoth(true);
         } else {
-            this._elementsPanelTreeOutilneSplit.hideSidebar(true);
+            this._treeOutlineSplit.hideSidebar(true);
         }
     },
 

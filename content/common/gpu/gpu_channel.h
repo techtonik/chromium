@@ -183,6 +183,10 @@ class CONTENT_EXPORT GpuChannel
   // are completed.
   void HandleOutOfOrderMessage(const IPC::Message& msg);
 
+#if defined(OS_ANDROID)
+  const GpuCommandBufferStub* GetOneStub() const;
+#endif
+
  protected:
   // The message filter on the io thread.
   scoped_refptr<GpuChannelMessageFilter> filter_;
@@ -375,7 +379,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
   std::vector<scoped_refptr<IPC::MessageFilter>> channel_filters_;
 
   // This timer is created and destroyed on the IO thread.
-  scoped_ptr<base::OneShotTimer<GpuChannelMessageFilter>> timer_;
+  scoped_ptr<base::OneShotTimer> timer_;
 
   bool a_stub_is_descheduled_;
 

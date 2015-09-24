@@ -149,6 +149,23 @@
   color: #5a5a5a;
 }
 
+#controlled-by {
+  -webkit-margin-start: 8px;
+}
+
+#controlled-by,
+#controlled-by a {
+  color: #5a5a5a;
+}
+
+.is-active #controlled-by {
+  color: #333;
+}
+
+.is-active #controlled-by a {
+  color: rgb(51, 103, 214);
+}
+
 #remove-wrapper {
   align-self: flex-start;
   margin: 0;
@@ -157,6 +174,9 @@
 #remove {
   --iron-icon-height: 16px;
   --iron-icon-width: 16px;
+  --layout-inline: {
+    /* HACK(dbeam): we probably shouldn't be overriding Polymer like this. */
+  };
   color: #969696;
   height: 16px;
   padding: 8px;

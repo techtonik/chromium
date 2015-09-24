@@ -401,6 +401,7 @@ class CONTENT_EXPORT RenderViewImpl
   virtual double zoomFactorToZoomLevel(double factor) const;
   virtual blink::WebPageVisibilityState visibilityState() const;
   virtual void draggableRegionsChanged();
+  virtual void pageImportanceSignalsChanged();
 
 #if defined(OS_ANDROID)
   virtual void scheduleContentIntent(const blink::WebURL& intent);
@@ -827,7 +828,7 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Timer used to delay the updating of nav state (see
   // StartNavStateSyncTimerIfNecessary).
-  base::OneShotTimer<RenderViewImpl> nav_state_sync_timer_;
+  base::OneShotTimer nav_state_sync_timer_;
 
   // Page IDs ------------------------------------------------------------------
   // See documentation in RenderView.
@@ -900,7 +901,7 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Used to delay determining the preferred size (to avoid intermediate
   // states for the sizes).
-  base::OneShotTimer<RenderViewImpl> check_preferred_size_timer_;
+  base::OneShotTimer check_preferred_size_timer_;
 
   // Bookkeeping to suppress redundant scroll and focus requests for an already
   // scrolled and focused editable node.

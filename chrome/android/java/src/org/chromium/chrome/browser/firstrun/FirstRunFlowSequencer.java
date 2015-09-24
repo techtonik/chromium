@@ -175,7 +175,7 @@ public abstract class FirstRunFlowSequencer  {
         onFlowIsKnown(mActivity, freProperties);
         if (mHasChildAccount || forceEduSignIn) {
             // Child and Edu forced signins are processed independently.
-            FirstRunSigninProcessor.setFirstRunFlowSignInComplete(context, true);
+            FirstRunSignInProcessor.setFirstRunFlowSignInComplete(context, true);
         }
     }
 
@@ -192,7 +192,7 @@ public abstract class FirstRunFlowSequencer  {
         }
 
         // Mark the FRE flow as complete and set the sign-in flow preferences if necessary.
-        FirstRunSigninProcessor.finalizeFirstRunFlowState(activity, data);
+        FirstRunSignInProcessor.finalizeFirstRunFlowState(activity, data);
     }
 
     /**

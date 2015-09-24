@@ -39,6 +39,7 @@
 #include "content/child/fileapi/file_system_dispatcher.h"
 #include "content/child/fileapi/webfilesystem_impl.h"
 #include "content/child/geofencing/geofencing_message_filter.h"
+#include "content/child/memory/child_memory_message_filter.h"
 #include "content/child/mojo/mojo_application.h"
 #include "content/child/notifications/notification_dispatcher.h"
 #include "content/child/power_monitor_broadcast_source.h"
@@ -434,10 +435,11 @@ void ChildThreadImpl::Init(const Options& options) {
   channel_->AddFilter(geofencing_message_filter_->GetFilter());
 
   if (!IsInBrowserProcess()) {
-    // In single process mode, browser-side tracing will cover the whole
-    // process including renderers.
+    // In single process mode, browser-side tracing and memory will cover the
+    // whole process including renderers.
     channel_->AddFilter(new tracing::ChildTraceMessageFilter(
         ChildProcess::current()->io_task_runner()));
+    channel_->AddFilter(new ChildMemoryMessageFilter());
   }
 
   // In single process mode we may already have a power monitor
@@ -590,7 +592,7 @@ scoped_ptr<base::SharedMemory> ChildThreadImpl::AllocateSharedMemory(
   shared_buf.reset(new base::SharedMemory);
   if (!shared_buf->CreateAnonymous(buf_size)) {
     NOTREACHED();
-    return NULL;
+    return nullptr;
   }
 #else
   // On POSIX, we need to ask the browser to create the shared memory for us,
@@ -602,11 +604,11 @@ scoped_ptr<base::SharedMemory> ChildThreadImpl::AllocateSharedMemory(
       shared_buf.reset(new base::SharedMemory(shared_mem_handle, false));
     } else {
       NOTREACHED() << "Browser failed to allocate shared memory";
-      return NULL;
+      return nullptr;
     }
   } else {
-    NOTREACHED() << "Browser allocation request message failed";
-    return NULL;
+    // Send is allowed to fail during shutdown. Return null in this case.
+    return nullptr;
   }
 #endif
   return shared_buf;
