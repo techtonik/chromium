@@ -187,7 +187,8 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
   // sessions when other sessions are active.
   base::Timer discovery_session_timer_;
 
-  // At least one WeakPtr must always exist to enforce all factoried WeakPtr objects are bound to UI thread.
+  // At least one WeakPtr must always exist to enforce all factoried WeakPtr
+  // objects are bound to UI thread.
   base::WeakPtr<BluetoothDispatcherHost> weak_ptr_on_ui_thread_;
 
   // Must be last member, see base/memory/weak_ptr.h documentation
