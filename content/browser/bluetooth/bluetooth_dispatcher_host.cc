@@ -171,6 +171,13 @@ BluetoothDispatcherHost::BluetoothDispatcherHost(int render_process_id)
           /*is_repeating=*/false),
       weak_ptr_factory_(this) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  // Bind weak pointers to the UI thread.
+  LOG(INFO) << __FUNCTION__ << "PlatformThread::CurrentRef().id_ "
+            << base::PlatformThread::CurrentRef().id_;
+  weak_ptr_ = weak_ptr_factory_.GetWeakPtr();
+  weak_ptr_.get();
+
   if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
     BluetoothAdapterFactory::GetAdapter(
         base::Bind(&BluetoothDispatcherHost::set_adapter,
@@ -187,6 +194,12 @@ void BluetoothDispatcherHost::OverrideThreadForMessage(
     content::BrowserThread::ID* thread) {
   // See class comment: UI Thread Note.
   *thread = BrowserThread::UI;
+
+  // Bind weak pointers to the UI thread.
+  LOG(INFO) << __FUNCTION__ << "PlatformThread::CurrentRef().id_ "
+            << base::PlatformThread::CurrentRef().id_;
+  //weak_ptr_factory_.GetWeakPtr().get();
+  //weak_ptr_.get();
 }
 
 bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
@@ -464,6 +477,7 @@ void BluetoothDispatcherHost::OnConnectGATT(
         thread_id, request_id, WebBluetoothError::DeviceNoLongerInRange));
     return;
   }
+  VLOG(1) << __FUNCTION__ << "";
   device->CreateGattConnection(
       base::Bind(&BluetoothDispatcherHost::OnGATTConnectionCreated,
                  weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
@@ -478,6 +492,7 @@ void BluetoothDispatcherHost::OnGetPrimaryService(
     int request_id,
     const std::string& device_instance_id,
     const std::string& service_uuid) {
+  VLOG(1) << __FUNCTION__ << "in";
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   RecordWebBluetoothFunctionCall(UMAWebBluetoothFunction::GET_PRIMARY_SERVICE);
   RecordGetPrimaryServiceService(BluetoothUUID(service_uuid));
@@ -494,6 +509,7 @@ void BluetoothDispatcherHost::OnGetPrimaryService(
                  weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
                  device_instance_id, service_uuid),
       base::TimeDelta::FromSeconds(current_delay_time_));
+  VLOG(1) << __FUNCTION__ << "out";
 }
 
 void BluetoothDispatcherHost::OnGetCharacteristic(
@@ -828,12 +844,17 @@ void BluetoothDispatcherHost::OnGATTConnectionCreated(
     const std::string& device_instance_id,
     base::TimeTicks start_time,
     scoped_ptr<device::BluetoothGattConnection> connection) {
+  VLOG(1) << __FUNCTION__ << "in";
   // TODO(ortuno): Save the BluetoothGattConnection so we can disconnect
   // from it.
+  // device::BluetoothGattConnection* what = connection.release();
+  // what->IsConnected();
+
   RecordConnectGATTTimeSuccess(base::TimeTicks::Now() - start_time);
   RecordConnectGATTOutcome(UMAConnectGATTOutcome::SUCCESS);
   Send(new BluetoothMsg_ConnectGATTSuccess(thread_id, request_id,
                                            device_instance_id));
+  VLOG(1) << __FUNCTION__ << "out";
 }
 
 void BluetoothDispatcherHost::OnCreateGATTConnectionError(

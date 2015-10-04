@@ -187,6 +187,8 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
   // sessions when other sessions are active.
   base::Timer discovery_session_timer_;
 
+  base::WeakPtr<BluetoothDispatcherHost> weak_ptr_;
+
   // Must be last member, see base/memory/weak_ptr.h documentation
   base::WeakPtrFactory<BluetoothDispatcherHost> weak_ptr_factory_;
 
