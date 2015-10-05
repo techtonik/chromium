@@ -7,8 +7,8 @@
 
 #include "base/basictypes.h"
 #include "base/id_map.h"
-#include "base/memory/weak_ptr.h"
 #include "base/memory/scoped_vector.h"
+#include "base/memory/weak_ptr.h"
 #include "content/public/browser/bluetooth_chooser.h"
 #include "content/public/browser/browser_message_filter.h"
 #include "device/bluetooth/bluetooth_adapter.h"
