@@ -174,7 +174,7 @@ BluetoothDispatcherHost::BluetoothDispatcherHost(int render_process_id)
 
   // Bind all future weak pointers to the UI thread.
   weak_ptr_on_ui_thread_ = weak_ptr_factory_.GetWeakPtr();
-  weak_ptr_on_ui_thread_.get();
+  weak_ptr_on_ui_thread_.get();  // Associates with UI thread.
 
   if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
     BluetoothAdapterFactory::GetAdapter(
@@ -292,9 +292,9 @@ void BluetoothDispatcherHost::StartDeviceDiscovery(
     adapter_->StartDiscoverySessionWithFilter(
         session->ComputeScanFilter(),
         base::Bind(&BluetoothDispatcherHost::OnDiscoverySessionStarted,
-                   weak_ptr_factory_.GetWeakPtr(), chooser_id),
+                   weak_ptr_on_ui_thread_, chooser_id),
         base::Bind(&BluetoothDispatcherHost::OnDiscoverySessionStartedError,
-                   weak_ptr_factory_.GetWeakPtr(), chooser_id));
+                   weak_ptr_on_ui_thread_, chooser_id));
   }
 }
 
@@ -412,7 +412,7 @@ void BluetoothDispatcherHost::OnRequestDevice(
 
   BluetoothChooser::EventHandler chooser_event_handler =
       base::Bind(&BluetoothDispatcherHost::OnBluetoothChooserEvent,
-                 weak_ptr_factory_.GetWeakPtr(), chooser_id);
+                 weak_ptr_on_ui_thread_, chooser_id);
   if (WebContents* web_contents =
           WebContents::FromRenderFrameHost(render_frame_host)) {
     if (WebContentsDelegate* delegate = web_contents->GetDelegate()) {
@@ -471,10 +471,10 @@ void BluetoothDispatcherHost::OnConnectGATT(
   }
   device->CreateGattConnection(
       base::Bind(&BluetoothDispatcherHost::OnGATTConnectionCreated,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 weak_ptr_on_ui_thread_, thread_id, request_id,
                  device_instance_id, start_time),
       base::Bind(&BluetoothDispatcherHost::OnCreateGATTConnectionError,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 weak_ptr_on_ui_thread_, thread_id, request_id,
                  device_instance_id, start_time));
 }
 
@@ -496,7 +496,7 @@ void BluetoothDispatcherHost::OnGetPrimaryService(
   BrowserThread::PostDelayedTask(
       BrowserThread::UI, FROM_HERE,
       base::Bind(&BluetoothDispatcherHost::OnServicesDiscovered,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 weak_ptr_on_ui_thread_, thread_id, request_id,
                  device_instance_id, service_uuid),
       base::TimeDelta::FromSeconds(current_delay_time_));
 }
@@ -624,9 +624,9 @@ void BluetoothDispatcherHost::OnReadValue(
 
   characteristic->ReadRemoteCharacteristic(
       base::Bind(&BluetoothDispatcherHost::OnCharacteristicValueRead,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id),
+                 weak_ptr_on_ui_thread_, thread_id, request_id),
       base::Bind(&BluetoothDispatcherHost::OnCharacteristicReadValueError,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id));
+                 weak_ptr_on_ui_thread_, thread_id, request_id));
 }
 
 void BluetoothDispatcherHost::OnWriteValue(
@@ -694,9 +694,9 @@ void BluetoothDispatcherHost::OnWriteValue(
   }
   characteristic->WriteRemoteCharacteristic(
       value, base::Bind(&BluetoothDispatcherHost::OnWriteValueSuccess,
-                        weak_ptr_factory_.GetWeakPtr(), thread_id, request_id),
+                        weak_ptr_on_ui_thread_, thread_id, request_id),
       base::Bind(&BluetoothDispatcherHost::OnWriteValueFailed,
-                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id));
+                 weak_ptr_on_ui_thread_, thread_id, request_id));
 }
 
 void BluetoothDispatcherHost::OnDiscoverySessionStarted(
@@ -756,7 +756,7 @@ void BluetoothDispatcherHost::OnBluetoothChooserEvent(
       if (!base::ThreadTaskRunnerHandle::Get()->PostTask(
               FROM_HERE,
               base::Bind(&BluetoothDispatcherHost::FinishClosingChooser,
-                         weak_ptr_factory_.GetWeakPtr(), chooser_id, event,
+                         weak_ptr_on_ui_thread_, chooser_id, event,
                          device_id))) {
         LOG(WARNING) << "No TaskRunner; not closing requestDevice dialog.";
       }
