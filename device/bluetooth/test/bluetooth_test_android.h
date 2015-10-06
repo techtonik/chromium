@@ -29,7 +29,7 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   BluetoothDevice* DiscoverLowEnergyDevice(int device_ordinal) override;
   void SimulateGattConnection(BluetoothDevice* device) override;
   void SimulateGattConnectionError(BluetoothDevice* device,
-                          BluetoothDevice::ConnectErrorCode) override;
+                                   BluetoothDevice::ConnectErrorCode) override;
   void SimulateGattDisconnection(BluetoothDevice* device) override;
 
   // Records that Java FakeBluetoothDevice connectGatt was called.

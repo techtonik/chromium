@@ -79,7 +79,7 @@ class BluetoothTestBase : public testing::Test {
 
   // Simulates failure of CreateGattConnection with the given error code.
   virtual void SimulateGattConnectionError(BluetoothDevice* device,
-                                  BluetoothDevice::ConnectErrorCode) {}
+                                           BluetoothDevice::ConnectErrorCode) {}
 
   // Simulates GattConnection disconnecting.
   virtual void SimulateGattDisconnection(BluetoothDevice* device) {}
