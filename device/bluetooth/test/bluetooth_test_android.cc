@@ -119,4 +119,9 @@ void BluetoothTestAndroid::OnFakeBluetoothGattDisconnect(JNIEnv* env,
   gatt_disconnection_attempts_++;
 }
 
+void BluetoothTestAndroid::OnFakeBluetoothGattDiscoveryAttempts(JNIEnv* env,
+                                                         jobject caller) {
+  gatt_discovery_attempts_++;
+}
+
 }  // namespace device
