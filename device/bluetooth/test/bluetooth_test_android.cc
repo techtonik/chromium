@@ -107,15 +107,16 @@ void BluetoothTestAndroid::CompleteGattDisconnection(BluetoothDevice* device) {
 }
 
 // Records that Java FakeBluetoothDevice connectGatt was called.
-void BluetoothTestAndroid::OnBluetoothDeviceConnectGattCalled(JNIEnv* env,
-                                                              jobject caller) {
-  gatt_connection_attempt_count_++;
+void BluetoothTestAndroid::OnFakeBluetoothDeviceConnectGattCalled(
+    JNIEnv* env,
+    jobject caller) {
+  gatt_connection_attempts_++;
 }
 
 // Records that Java FakeBluetoothGatt disconnect was called.
 void BluetoothTestAndroid::OnFakeBluetoothGattDisconnect(JNIEnv* env,
                                                          jobject caller) {
-  gatt_disconnection_attempt_count_++;
+  gatt_disconnection_attempts_++;
 }
 
 }  // namespace device
