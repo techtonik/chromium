@@ -84,6 +84,13 @@ class BluetoothTestBase : public testing::Test {
   // Simulates GattConnection disconnecting.
   virtual void CompleteGattDisconnection(BluetoothDevice* device) {}
 
+  // Simulates success of discovering services .
+  virtual void SimulateGattServicesDiscovered(BluetoothDevice* device) {}
+
+  // Simulates failure to discover services with the given error code.
+  virtual void SimulateGattServicesDiscoveryError(BluetoothDevice* device,
+                                  BluetoothDevice::ConnectErrorCode) {}
+
   // Remove the device from the adapter and delete it.
   virtual void DeleteDevice(BluetoothDevice* device);
 

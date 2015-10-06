@@ -207,6 +207,15 @@ class Fakes {
                             : android.bluetooth.BluetoothProfile.STATE_DISCONNECTED);
         }
 
+        // Create a call to onServicesDiscovered on the |chrome_device| using parameter
+        // |status|.
+        @CalledByNative("FakeBluetoothDevice")
+        private static void servicesDiscovered(
+                ChromeBluetoothDevice chromeDevice, int status) {
+            FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
+            fakeDevice.mGattCallback.onServicesDiscovered(status);
+        }
+
         // -----------------------------------------------------------------------------------------
         // Wrappers.BluetoothDeviceWrapper overrides:
 
@@ -275,4 +284,8 @@ class Fakes {
 
     // Binds to BluetoothAdapterAndroid::OnFakeBluetoothGattDisconnect.
     private static native void nativeOnFakeBluetoothGattDisconnect(long nativeBluetoothTestAndroid);
+
+    // Binds to BluetoothAdapterAndroid::OnFakeBluetoothGattDiscoverServices.
+    private static native void nativeOnFakeBluetoothGattDiscoverServices(
+            long nativeBluetoothTestAndroid);
 }

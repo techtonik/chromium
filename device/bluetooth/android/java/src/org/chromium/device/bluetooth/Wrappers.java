@@ -301,5 +301,6 @@ class Wrappers {
      */
     abstract static class BluetoothGattCallbackWrapper {
         public abstract void onConnectionStateChange(int status, int newState);
+        public abstract void onServicesDiscovered(int status)
     }
 }
