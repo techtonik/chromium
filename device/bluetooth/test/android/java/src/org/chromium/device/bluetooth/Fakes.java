@@ -259,6 +259,11 @@ class Fakes {
         public void disconnect() {
             nativeOnFakeBluetoothGattDisconnect(mDevice.mAdapter.mNativeBluetoothTestAndroid);
         }
+
+        @Override
+        public void discoverServices() {
+            nativeOnFakeBluetoothGattDiscoverServices(mDevice.mAdapter.mNativeBluetoothTestAndroid);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

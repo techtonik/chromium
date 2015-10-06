@@ -264,6 +264,10 @@ class Wrappers {
         public void disconnect() {
             mGatt.disconnect();
         }
+
+        public void discoverServices() {
+            mGatt.discoverServices();
+        }
     }
 
     /**

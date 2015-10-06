@@ -139,7 +139,10 @@ final class ChromeBluetoothDevice {
                     (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED)
                             ? "Connected"
                             : "Disconnected");
-            ThreadUtils.runOnUiThread(new Runnable() {
+            if (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
+                mBluetoothGatt.discoverServices();
+            }
+            ThreadUtils.runOnUiThread(new Runnable(){
                 @Override
                 public void run() {
                     if (mNativeBluetoothDeviceAndroid != 0) {

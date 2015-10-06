@@ -117,6 +117,7 @@ class BluetoothTestBase : public testing::Test {
   int error_callback_count_ = 0;
   int gatt_connection_attempt_count_ = 0;
   int gatt_disconnection_attempt_count_ = 0;
+  int gatt_discovery_attempt_count_ = 0;
   base::WeakPtrFactory<BluetoothTestBase> weak_factory_;
 };
 

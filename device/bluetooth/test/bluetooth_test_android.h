@@ -38,6 +38,9 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   // Records that Java FakeBluetoothGatt disconnect was called.
   void OnFakeBluetoothGattDisconnect(JNIEnv* env, jobject caller);
 
+  // Records that Java FakeBluetoothGatt discoverServices was called.
+  void OnFakeBluetoothGattDiscoverServices(JNIEnv* env, jobject caller);
+
   base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };
 
