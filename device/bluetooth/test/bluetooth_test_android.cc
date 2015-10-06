@@ -57,7 +57,7 @@ BluetoothDevice* BluetoothTestAndroid::DiscoverLowEnergyDevice(
   return observer.last_device();
 }
 
-void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
+void BluetoothTestAndroid::SimulateGattConnection(BluetoothDevice* device) {
   BluetoothDeviceAndroid* device_android =
       static_cast<BluetoothDeviceAndroid*>(device);
 
@@ -67,7 +67,7 @@ void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
       true);  // connected
 }
 
-void BluetoothTestAndroid::FailGattConnection(
+void BluetoothTestAndroid::SimulateGattConnectionError(
     BluetoothDevice* device,
     BluetoothDevice::ConnectErrorCode error) {
   int android_error_value = 0;
@@ -96,7 +96,7 @@ void BluetoothTestAndroid::FailGattConnection(
       false);  // connected
 }
 
-void BluetoothTestAndroid::CompleteGattDisconnection(BluetoothDevice* device) {
+void BluetoothTestAndroid::SimulateGattDisconnection(BluetoothDevice* device) {
   BluetoothDeviceAndroid* device_android =
       static_cast<BluetoothDeviceAndroid*>(device);
 
