@@ -33,7 +33,7 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void CompleteGattDisconnection(BluetoothDevice* device) override;
 
   // Records that Java FakeBluetoothDevice connectGatt was called.
-  void OnBluetoothDeviceConnectGattCalled(JNIEnv* env, jobject caller);
+  void OnFakeBluetoothDeviceConnectGattCalled(JNIEnv* env, jobject caller);
 
   // Records that Java FakeBluetoothGatt disconnect was called.
   void OnFakeBluetoothGattDisconnect(JNIEnv* env, jobject caller);
