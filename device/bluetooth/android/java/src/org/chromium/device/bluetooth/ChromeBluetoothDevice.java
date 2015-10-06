@@ -161,7 +161,9 @@ final class ChromeBluetoothDevice {
                 @Override
                 public void run() {
                     if (mNativeBluetoothDeviceAndroid != 0) {
-                        for (Wrappers.BluetoothGattServiceWrapper service : mBluetoothGatt.getServices()) {
+                        for (Wrappers.BluetoothGattServiceWrapper service :
+                                mBluetoothGatt.getServices()) {
+                            Log.i(TAG, "Service");
                         }
                     }
                 }
