@@ -122,7 +122,7 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
   EXPECT_EQ(1, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   ASSERT_EQ(1u, gatt_connections_.size());
@@ -145,7 +145,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection) {
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(1, gatt_connection_attempts_);
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
   EXPECT_EQ(1, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   ASSERT_EQ(1u, gatt_connections_.size());
@@ -205,8 +205,8 @@ TEST_F(BluetoothTest,
   ResetEventCounts();
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
+  SimulateGattConnection(device);
   EXPECT_EQ(1, gatt_connection_attempts_);
   EXPECT_EQ(1, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
@@ -214,7 +214,7 @@ TEST_F(BluetoothTest,
 
   // Become disconnected:
   ResetEventCounts();
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_FALSE(gatt_connections_[0]->IsConnected());
@@ -231,7 +231,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_AlreadyConnected) {
   // Be already connected:
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
   EXPECT_TRUE(gatt_connections_[0]->IsConnected());
 
   // Then CreateGattConnection:
@@ -256,16 +256,16 @@ TEST_F(BluetoothTest,
   // Create connection:
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
 
   // Disconnect connection:
   gatt_connections_[0]->Disconnect();
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
 
   // Create 2nd connection:
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
 
   EXPECT_FALSE(gatt_connections_[0]->IsConnected())
       << "The disconnected connection shouldn't become connected when another "
@@ -286,7 +286,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_DisconnectWhenObjectsDestroyed) {
                                GetConnectErrorCallback());
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
 
   // Delete all CreateGattConnection objects, observe disconnection:
   ResetEventCounts();
@@ -307,7 +307,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_DisconnectInProgress) {
                                GetConnectErrorCallback());
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
 
   // Disconnect all CreateGattConnection objects & create a new connection.
   // But, don't yet simulate the device disconnecting:
@@ -327,7 +327,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_DisconnectInProgress) {
 
   // Actually disconnect:
   ResetEventCounts();
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   for (BluetoothGattConnection* connection : gatt_connections_)
@@ -347,7 +347,7 @@ TEST_F(BluetoothTest, BluetoothGattConnection_SimulateDisconnect) {
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(1, gatt_connection_attempts_);
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
   EXPECT_EQ(BluetoothDevice::ERROR_FAILED, last_connect_error_code_);
@@ -369,12 +369,12 @@ TEST_F(BluetoothTest, BluetoothGattConnection_DisconnectGatt_SimulateConnect) {
   device->DisconnectGatt();
   EXPECT_EQ(1, gatt_connection_attempts_);
   EXPECT_EQ(1, gatt_disconnection_attempts_);
-  CompleteGattConnection(device);
+  SimulateGattConnection(device);
   EXPECT_EQ(1, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_TRUE(gatt_connections_.back()->IsConnected());
   ResetEventCounts();
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(0, error_callback_count_);
 }
@@ -394,7 +394,7 @@ TEST_F(BluetoothTest,
   device->DisconnectGatt();
   EXPECT_EQ(1, gatt_connection_attempts_);
   EXPECT_EQ(1, gatt_disconnection_attempts_);
-  CompleteGattDisconnection(device);
+  SimulateGattDisconnection(device);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
   EXPECT_EQ(BluetoothDevice::ERROR_FAILED, last_connect_error_code_);
@@ -415,8 +415,8 @@ TEST_F(BluetoothTest, BluetoothGattConnection_ErrorAfterConnection) {
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   EXPECT_EQ(1, gatt_connection_attempts_);
-  FailGattConnection(device, BluetoothDevice::ERROR_AUTH_FAILED);
-  FailGattConnection(device, BluetoothDevice::ERROR_FAILED);
+  SimulateGattConnectionError(device, BluetoothDevice::ERROR_AUTH_FAILED);
+  SimulateGattConnectionError(device, BluetoothDevice::ERROR_FAILED);
   EXPECT_EQ(0, callback_count_);
   EXPECT_EQ(1, error_callback_count_);
   EXPECT_EQ(BluetoothDevice::ERROR_AUTH_FAILED, last_connect_error_code_);
