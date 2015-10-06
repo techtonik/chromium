@@ -31,6 +31,8 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void SimulateGattConnectionError(BluetoothDevice* device,
                                    BluetoothDevice::ConnectErrorCode) override;
   void SimulateGattDisconnection(BluetoothDevice* device) override;
+  void SimulateGattServicesDiscovered(BluetoothDevice* device) override;
+  void SimulateGattServicesDiscoveryError(BluetoothDevice* device) override;
 
   // Records that Java FakeBluetoothDevice connectGatt was called.
   void OnFakeBluetoothDeviceConnectGattCalled(JNIEnv* env, jobject caller);

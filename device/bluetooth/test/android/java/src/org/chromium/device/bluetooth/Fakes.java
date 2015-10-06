@@ -210,8 +210,7 @@ class Fakes {
         // Create a call to onServicesDiscovered on the |chrome_device| using parameter
         // |status|.
         @CalledByNative("FakeBluetoothDevice")
-        private static void servicesDiscovered(
-                ChromeBluetoothDevice chromeDevice, int status) {
+        private static void servicesDiscovered(ChromeBluetoothDevice chromeDevice, int status) {
             FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
             fakeDevice.mGattCallback.onServicesDiscovered(status);
         }

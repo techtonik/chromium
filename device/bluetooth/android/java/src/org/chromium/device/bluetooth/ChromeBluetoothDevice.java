@@ -152,6 +152,21 @@ final class ChromeBluetoothDevice {
                 }
             });
         }
+
+        @Override
+        public void onServicesDiscovered(final int status) {
+            Log.i(TAG, "onServicesDiscovered status:%d==%s", status,
+                    status == android.bluetooth.BluetoothGatt.GATT_SUCCESS ? "OK" : "Error");
+            ThreadUtils.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (mNativeBluetoothDeviceAndroid != 0) {
+                        for (Wrappers.BluetoothGattServiceWrapper service : mBluetoothGatt.getServices()) {
+                        }
+                    }
+                }
+            });
+        }
     }
 
     // ---------------------------------------------------------------------------------------------

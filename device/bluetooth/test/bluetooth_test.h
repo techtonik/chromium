@@ -87,9 +87,8 @@ class BluetoothTestBase : public testing::Test {
   // Simulates success of discovering services .
   virtual void SimulateGattServicesDiscovered(BluetoothDevice* device) {}
 
-  // Simulates failure to discover services with the given error code.
-  virtual void SimulateGattServicesDiscoveryError(BluetoothDevice* device,
-                                  BluetoothDevice::ConnectErrorCode) {}
+  // Simulates failure to discover services.
+  virtual void SimulateGattServicesDiscoveryError(BluetoothDevice* device) {}
 
   // Remove the device from the adapter and delete it.
   virtual void DeleteDevice(BluetoothDevice* device);
