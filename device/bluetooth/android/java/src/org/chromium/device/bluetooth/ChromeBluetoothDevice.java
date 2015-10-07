@@ -164,6 +164,8 @@ final class ChromeBluetoothDevice {
                         for (Wrappers.BluetoothGattServiceWrapper service :
                                 mBluetoothGatt.getServices()) {
                             Log.i(TAG, "Service");
+                            nativeCreateGattRemoteService(mNativeBluetoothDeviceAndroid,
+                                    service.getInstanceId(), service);
                         }
                     }
                 }
@@ -177,4 +179,11 @@ final class ChromeBluetoothDevice {
     // Binds to BluetoothDeviceAndroid::OnConnectionStateChange.
     private native void nativeOnConnectionStateChange(
             long nativeBluetoothDeviceAndroid, int status, boolean connected);
+
+    // Binds to BluetoothDeviceAndroid::CreateGattRemoteService.
+    // 'Object' type must be used for |bluetoothGattServiceWrapper| because inner class
+    // Wrappers.BluetoothGattServiceWrapper reference is not handled by jni_generator.py JavaToJni.
+    // http://crbug.com/505554
+    private native void nativeCreateGattRemoteService(
+            long nativeBluetoothDeviceAndroid, int instanceId, Object bluetoothGattServiceWrapper);
 }

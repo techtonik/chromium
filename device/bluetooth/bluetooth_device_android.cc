@@ -221,6 +221,25 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
   }
 }
 
+void BluetoothDeviceAndroid::CreateGattRemoteService(
+    JNIEnv* env,
+    jobject caller,
+    int32_t instanceId,
+    jobject bluetooth_gatt_service_wrapper  // Java Type:
+                                            // BluetoothGattServiceWrapper
+    ) {
+  VLOG(1) << __FUNCTION__; // scheib remove ,<<<<<<<<<<<<<<<<<<
+  // BluetoothRemoteGattServiceChromeOS* service =
+  //    new BluetoothRemoteGattServiceChromeOS(adapter(), this, object_path);
+  //
+  // gatt_services_[service->GetIdentifier()] = service;
+  // DCHECK(service->object_path() == object_path);
+  // DCHECK(service->GetUUID().IsValid());
+  //
+  // DCHECK(adapter_);
+  // adapter()->NotifyGattServiceAdded(service);
+}
+
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
     : BluetoothDevice(adapter) {}
 

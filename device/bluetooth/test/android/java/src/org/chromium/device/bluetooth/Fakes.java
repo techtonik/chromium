@@ -274,6 +274,23 @@ class Fakes {
         }
     }
 
+    /**
+     * Fakes android.bluetooth.BluetoothGattService.
+     */
+    static class FakeBluetoothGattService extends Wrappers.BluetoothGattServiceWrapper {
+        final int mInstanceId;
+
+        public FakeBluetoothGattService(int instanceId) {
+            super(null);
+            mInstanceId = instanceId;
+        }
+
+        @Override
+        public int getInstanceId() {
+            return instanceId;
+        }
+    }
+
     // ---------------------------------------------------------------------------------------------
     // BluetoothTestAndroid C++ methods declared for access from java:
 

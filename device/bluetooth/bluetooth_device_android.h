@@ -90,6 +90,15 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
                                int32_t status,
                                bool connected);
 
+  // Creates or updates device with advertised UUID information when a device is
+  // discovered during a scan.
+  void CreateGattRemoteService(
+      JNIEnv* env,
+      jobject caller,
+      int32_t instanceId,
+      jobject bluetooth_gatt_service_wrapper);  // Java Type:
+                                                // BluetoothGattServiceWrapper
+
  protected:
   BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter);
 

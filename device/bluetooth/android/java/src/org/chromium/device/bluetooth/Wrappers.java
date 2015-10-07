@@ -329,5 +329,9 @@ class Wrappers {
         public BluetoothGattServiceWrapper(BluetoothGattService service) {
             mService = service;
         }
+
+        public int getInstanceId() {
+            return mService.getInstanceId();
+        }
     }
 }
