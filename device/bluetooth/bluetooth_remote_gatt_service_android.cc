@@ -4,92 +4,42 @@
 
 #include "device/bluetooth/bluetooth_remote_gatt_service_android.h"
 
-#include "base/logging.h"
 #include "base/strings/stringprintf.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "device/bluetooth/bluetooth_device_android.h"
-#include "device/bluetooth/bluetooth_remote_gatt_characteristic_android.h"
-#include "device/bluetooth/bluetooth_remote_gatt_descriptor_android.h"
-#include "device/bluetooth/dbus/bluetooth_gatt_service_client.h"
-#include "device/bluetooth/dbus/bluez_dbus_manager.h"
+#include "jni/ChromeBluetoothRemoteGattService_jni.h"
 
-namespace android {
+namespace device {
 
-namespace {
-
-// TODO(jamuraa) move these to cros_system_api later
-const char kErrorFailed[] = "org.bluez.Error.Failed";
-const char kErrorInProgress[] = "org.bluez.Error.InProgress";
-const char kErrorInvalidValueLength[] = "org.bluez.Error.InvalidValueLength";
-const char kErrorNotAuthorized[] = "org.bluez.Error.NotAuthorized";
-const char kErrorNotPaired[] = "org.bluez.Error.NotPaired";
-const char kErrorNotSupported[] = "org.bluez.Error.NotSupported";
-const char kErrorNotPermitted[] = "org.bluez.Error.NotPermitted";
-
-}  // namespace
-
-BluetoothRemoteGattServiceAndroid::BluetoothRemoteGattServiceAndroid(
+// static
+BluetoothRemoteGattServiceAndroid* BluetoothRemoteGattServiceAndroid::Create(
     BluetoothAdapterAndroid* adapter,
     BluetoothDeviceAndroid* device,
-    const dbus::ObjectPath& object_path)
-    : object_path_(object_path),
-      adapter_(adapter),
-      device_(device),
-      discovery_complete_(false),
-      weak_ptr_factory_(this) {
-  VLOG(1) << "Creating remote GATT service with identifier: "
-          << object_path.value() << ", UUID: " << GetUUID().canonical_value();
-  DCHECK(adapter_);
+    jobject bluetooth_remote_gatt_service_wrapper,
+    std::string instanceId) {
+  BluetoothRemoteGattServiceAndroid* service =
+      new BluetoothRemoteGattServiceAndroid(adapter, device, instanceId);
 
-  bluez::BluezDBusManager::Get()->GetBluetoothGattServiceClient()->AddObserver(
-      this);
-  bluez::BluezDBusManager::Get()
-      ->GetBluetoothGattCharacteristicClient()
-      ->AddObserver(this);
+  service->j_device_.Reset(Java_ChromeBluetoothRemoteGattService_create(
+      AttachCurrentThread(), reinterpret_cast<intptr_t>(service),
+      bluetooth_remote_gatt_service_wrapper));
 
-  // Add all known GATT characteristics.
-  const std::vector<dbus::ObjectPath>& gatt_chars =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattCharacteristicClient()
-          ->GetCharacteristics();
-  for (std::vector<dbus::ObjectPath>::const_iterator iter = gatt_chars.begin();
-       iter != gatt_chars.end(); ++iter)
-    GattCharacteristicAdded(*iter);
+  return service;
 }
 
-BluetoothRemoteGattServiceAndroid::~BluetoothRemoteGattServiceAndroid() {
-  bluez::BluezDBusManager::Get()
-      ->GetBluetoothGattServiceClient()
-      ->RemoveObserver(this);
-  bluez::BluezDBusManager::Get()
-      ->GetBluetoothGattCharacteristicClient()
-      ->RemoveObserver(this);
-
-  // Clean up all the characteristics. Copy the characteristics list here and
-  // clear the original so that when we send GattCharacteristicRemoved(),
-  // GetCharacteristics() returns no characteristics.
-  CharacteristicMap characteristics = characteristics_;
-  characteristics_.clear();
-  for (CharacteristicMap::iterator iter = characteristics.begin();
-       iter != characteristics.end(); ++iter) {
-    DCHECK(adapter_);
-    adapter_->NotifyGattCharacteristicRemoved(iter->second);
-
-    delete iter->second;
-  }
+// static
+bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
+  return RegisterNativesImpl(
+      env);  // Generated in ChromeBluetoothRemoteGattService_jni.h
 }
 
 std::string BluetoothRemoteGattServiceAndroid::GetIdentifier() const {
-  return object_path_.value();
+  return instanceIdAsString_;
 }
 
 device::BluetoothUUID BluetoothRemoteGattServiceAndroid::GetUUID() const {
-  bluez::BluetoothGattServiceClient::Properties* properties =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattServiceClient()
-          ->GetProperties(object_path_);
-  DCHECK(properties);
-  return device::BluetoothUUID(properties->uuid.value());
+  NOTIMPLEMENTED();
+  return device::BluetoothUUID();
 }
 
 bool BluetoothRemoteGattServiceAndroid::IsLocal() const {
@@ -97,12 +47,8 @@ bool BluetoothRemoteGattServiceAndroid::IsLocal() const {
 }
 
 bool BluetoothRemoteGattServiceAndroid::IsPrimary() const {
-  bluez::BluetoothGattServiceClient::Properties* properties =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattServiceClient()
-          ->GetProperties(object_path_);
-  DCHECK(properties);
-  return properties->primary.value();
+  NOTIMPLEMENTED();
+  return true;
 }
 
 device::BluetoothDevice* BluetoothRemoteGattServiceAndroid::GetDevice() const {
@@ -111,229 +57,56 @@ device::BluetoothDevice* BluetoothRemoteGattServiceAndroid::GetDevice() const {
 
 std::vector<device::BluetoothGattCharacteristic*>
 BluetoothRemoteGattServiceAndroid::GetCharacteristics() const {
+  NOTIMPLEMENTED();
   std::vector<device::BluetoothGattCharacteristic*> characteristics;
-  for (CharacteristicMap::const_iterator iter = characteristics_.begin();
-       iter != characteristics_.end(); ++iter) {
-    characteristics.push_back(iter->second);
-  }
   return characteristics;
 }
 
 std::vector<device::BluetoothGattService*>
 BluetoothRemoteGattServiceAndroid::GetIncludedServices() const {
-  // TODO(armansito): Return the actual included services here.
+  NOTIMPLEMENTED();
   return std::vector<device::BluetoothGattService*>();
 }
 
 device::BluetoothGattCharacteristic*
 BluetoothRemoteGattServiceAndroid::GetCharacteristic(
     const std::string& identifier) const {
-  CharacteristicMap::const_iterator iter =
-      characteristics_.find(dbus::ObjectPath(identifier));
-  if (iter == characteristics_.end())
-    return NULL;
-  return iter->second;
+  NOTIMPLEMENTED();
+  return nullptr;
 }
 
 bool BluetoothRemoteGattServiceAndroid::AddCharacteristic(
     device::BluetoothGattCharacteristic* characteristic) {
-  VLOG(1) << "Characteristics cannot be added to a remote GATT service.";
   return false;
 }
 
 bool BluetoothRemoteGattServiceAndroid::AddIncludedService(
     device::BluetoothGattService* service) {
-  VLOG(1) << "Included services cannot be added to a remote GATT service.";
   return false;
 }
 
 void BluetoothRemoteGattServiceAndroid::Register(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  VLOG(1) << "A remote GATT service cannot be registered.";
   error_callback.Run();
 }
 
 void BluetoothRemoteGattServiceAndroid::Unregister(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  VLOG(1) << "A remote GATT service cannot be unregistered.";
   error_callback.Run();
 }
 
-// static
-device::BluetoothGattService::GattErrorCode
-BluetoothRemoteGattServiceAndroid::DBusErrorToServiceError(
-    std::string error_name) {
-  device::BluetoothGattService::GattErrorCode code = GATT_ERROR_UNKNOWN;
-  if (error_name == kErrorFailed) {
-    code = GATT_ERROR_FAILED;
-  } else if (error_name == kErrorInProgress) {
-    code = GATT_ERROR_IN_PROGRESS;
-  } else if (error_name == kErrorInvalidValueLength) {
-    code = GATT_ERROR_INVALID_LENGTH;
-  } else if (error_name == kErrorNotPermitted) {
-    code = GATT_ERROR_NOT_PERMITTED;
-  } else if (error_name == kErrorNotAuthorized) {
-    code = GATT_ERROR_NOT_AUTHORIZED;
-  } else if (error_name == kErrorNotPaired) {
-    code = GATT_ERROR_NOT_PAIRED;
-  } else if (error_name == kErrorNotSupported) {
-    code = GATT_ERROR_NOT_SUPPORTED;
-  }
-  return code;
+BluetoothRemoteGattServiceAndroid::BluetoothRemoteGattServiceAndroid(
+    BluetoothAdapterAndroid* adapter,
+    BluetoothDeviceAndroid* device,
+    std::string instanceId)
+    : adapter_(adapter),
+      device_(device),
+      instanceIdAsString_(instanceId) {
 }
 
-BluetoothAdapterAndroid*
-BluetoothRemoteGattServiceAndroid::GetAdapter() const {
-  return adapter_;
+BluetoothRemoteGattServiceAndroid::~BluetoothRemoteGattServiceAndroid() {
 }
 
-void BluetoothRemoteGattServiceAndroid::NotifyServiceChanged() {
-  // Don't send service changed unless we know that all characteristics have
-  // already been discovered. This is to prevent spammy events before sending
-  // out the first Gatt
-  if (!discovery_complete_)
-    return;
-
-  DCHECK(adapter_);
-  adapter_->NotifyGattServiceChanged(this);
-}
-
-void BluetoothRemoteGattServiceAndroid::NotifyDescriptorAddedOrRemoved(
-    BluetoothRemoteGattCharacteristicAndroid* characteristic,
-    BluetoothRemoteGattDescriptorAndroid* descriptor,
-    bool added) {
-  DCHECK(characteristic->GetService() == this);
-  DCHECK(descriptor->GetCharacteristic() == characteristic);
-  DCHECK(adapter_);
-
-  if (added) {
-    adapter_->NotifyGattDescriptorAdded(descriptor);
-    return;
-  }
-
-  adapter_->NotifyGattDescriptorRemoved(descriptor);
-}
-
-void BluetoothRemoteGattServiceAndroid::NotifyDescriptorValueChanged(
-    BluetoothRemoteGattCharacteristicAndroid* characteristic,
-    BluetoothRemoteGattDescriptorAndroid* descriptor,
-    const std::vector<uint8>& value) {
-  DCHECK(characteristic->GetService() == this);
-  DCHECK(descriptor->GetCharacteristic() == characteristic);
-  DCHECK(adapter_);
-  adapter_->NotifyGattDescriptorValueChanged(descriptor, value);
-}
-
-void BluetoothRemoteGattServiceAndroid::GattServicePropertyChanged(
-    const dbus::ObjectPath& object_path,
-    const std::string& property_name){
-  if (object_path != object_path_)
-    return;
-
-  VLOG(1) << "Service property changed: \"" << property_name << "\", "
-          << object_path.value();
-  bluez::BluetoothGattServiceClient::Properties* properties =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattServiceClient()
-          ->GetProperties(object_path);
-  DCHECK(properties);
-
-  if (property_name != properties->characteristics.name()) {
-    NotifyServiceChanged();
-    return;
-  }
-
-  if (discovery_complete_)
-    return;
-
-  VLOG(1) << "All characteristics were discovered for service: "
-          << object_path.value();
-  discovery_complete_ = true;
-  DCHECK(adapter_);
-  adapter_->NotifyGattDiscoveryComplete(this);
-}
-
-void BluetoothRemoteGattServiceAndroid::GattCharacteristicAdded(
-    const dbus::ObjectPath& object_path) {
-  if (characteristics_.find(object_path) != characteristics_.end()) {
-    VLOG(1) << "Remote GATT characteristic already exists: "
-            << object_path.value();
-    return;
-  }
-
-  bluez::BluetoothGattCharacteristicClient::Properties* properties =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattCharacteristicClient()
-          ->GetProperties(object_path);
-  DCHECK(properties);
-  if (properties->service.value() != object_path_) {
-    VLOG(2) << "Remote GATT characteristic does not belong to this service.";
-    return;
-  }
-
-  VLOG(1) << "Adding new remote GATT characteristic for GATT service: "
-          << GetIdentifier() << ", UUID: " << GetUUID().canonical_value();
-
-  BluetoothRemoteGattCharacteristicAndroid* characteristic =
-      new BluetoothRemoteGattCharacteristicAndroid(this, object_path);
-  characteristics_[object_path] = characteristic;
-  DCHECK(characteristic->GetIdentifier() == object_path.value());
-  DCHECK(characteristic->GetUUID().IsValid());
-
-  DCHECK(adapter_);
-  adapter_->NotifyGattCharacteristicAdded(characteristic);
-}
-
-void BluetoothRemoteGattServiceAndroid::GattCharacteristicRemoved(
-    const dbus::ObjectPath& object_path) {
-  CharacteristicMap::iterator iter = characteristics_.find(object_path);
-  if (iter == characteristics_.end()) {
-    VLOG(2) << "Unknown GATT characteristic removed: " << object_path.value();
-    return;
-  }
-
-  VLOG(1) << "Removing remote GATT characteristic from service: "
-          << GetIdentifier() << ", UUID: " << GetUUID().canonical_value();
-
-  BluetoothRemoteGattCharacteristicAndroid* characteristic = iter->second;
-  DCHECK(characteristic->object_path() == object_path);
-  characteristics_.erase(iter);
-
-  DCHECK(adapter_);
-  adapter_->NotifyGattCharacteristicRemoved(characteristic);
-
-  delete characteristic;
-}
-
-void BluetoothRemoteGattServiceAndroid::GattCharacteristicPropertyChanged(
-    const dbus::ObjectPath& object_path,
-    const std::string& property_name) {
-  CharacteristicMap::iterator iter = characteristics_.find(object_path);
-  if (iter == characteristics_.end()) {
-    VLOG(3) << "Properties of unknown characteristic changed";
-    return;
-  }
-
-  // We may receive a property changed event in certain cases, e.g. when the
-  // characteristic "Flags" property has been updated with values from the
-  // "Characteristic Extended Properties" descriptor. In this case, kick off
-  // a service changed observer event to let observers refresh the
-  // characteristics.
-  bluez::BluetoothGattCharacteristicClient::Properties* properties =
-      bluez::BluezDBusManager::Get()
-          ->GetBluetoothGattCharacteristicClient()
-          ->GetProperties(object_path);
-
-  DCHECK(properties);
-  DCHECK(adapter_);
-
-  if (property_name == properties->flags.name())
-    NotifyServiceChanged();
-  else if (property_name == properties->value.name())
-    adapter_->NotifyGattCharacteristicValueChanged(iter->second,
-                                                   properties->value.value());
-}
-
-}  // namespace android
+}  // namespace device

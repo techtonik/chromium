@@ -228,11 +228,17 @@ void BluetoothDeviceAndroid::CreateGattRemoteService(
     jobject bluetooth_gatt_service_wrapper  // Java Type:
                                             // BluetoothGattServiceWrapper
     ) {
-  VLOG(1) << __FUNCTION__; // scheib remove ,<<<<<<<<<<<<<<<<<<
-  // BluetoothRemoteGattServiceChromeOS* service =
-  //    new BluetoothRemoteGattServiceChromeOS(adapter(), this, object_path);
-  //
-  // gatt_services_[service->GetIdentifier()] = service;
+  VLOG(1) << __FUNCTION__;  // scheib remove ,<<<<<<<<<<<<<<<<<<
+
+  std::string instanceIdString = StringPrintf(instanceId);
+  GattServiceMap::iterator it = gatt_services_.find(instanceIdString);
+  if (it != gatt_services_.end())
+    return; // Already know about this service.
+
+  gatt_services_.insert( ...
+
+  BluetoothRemoteGattServiceAndroid* service = BluetoothRemoteGattServiceAndroid::Create(adapter_, this, bluetooth_gatt_service_wrapper, instanceId);
+  gatt_services_[service->GetIdentifier()] = service;
   // DCHECK(service->object_path() == object_path);
   // DCHECK(service->GetUUID().IsValid());
   //

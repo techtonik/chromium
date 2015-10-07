@@ -30,9 +30,27 @@ class BluetoothRemoteGattDescriptorAndroid;
 
 // The BluetoothRemoteGattServiceAndroid class implements BluetootGattService
 // for remote GATT services on Android.
-class BluetoothRemoteGattServiceAndroid
-    : public device::BluetoothGattService {
+class BluetoothRemoteGattServiceAndroid : public device::BluetoothGattService {
  public:
+  // Create a BluetoothRemoteGattServiceAndroid instance and associated Java
+  // ChromeBluetoothRemoteGattService using the provided
+  // |bluetooth_remote_gatt_service_wrapper|.
+  //
+  // The ChromeBluetoothRemoteGattService instance will hold a Java reference
+  // to |bluetooth_remote_gatt_service_wrapper|.
+  //
+  // TODO(scheib): Return a scoped_ptr<>, but then device will need to handle
+  // this correctly. http://crbug.com/506416
+  static BluetoothDeviceAndroid* Create(
+      BluetoothAdapterAndroid* adapter,
+      BluetoothDeviceAndroid* device,
+      jobject bluetooth_remote_gatt_service_wrapper,  // Java Type:
+      // BluetoothRemoteGattServiceWrapper
+      int32_t instanceId);
+
+  // Register C++ methods exposed to Java using JNI.
+  static bool RegisterJNI(JNIEnv* env);
+
   // device::BluetoothGattService overrides.
   std::string GetIdentifier() const override;
   device::BluetoothUUID GetUUID() const override;
@@ -53,54 +71,13 @@ class BluetoothRemoteGattServiceAndroid
   void Unregister(const base::Closure& callback,
                   const ErrorCallback& error_callback) override;
 
-  // Notifies its observers that the GATT service has changed. This is mainly
-  // used by BluetoothRemoteGattCharacteristicAndroid instances to notify
-  // service observers when characteristic descriptors get added and removed.
-  void NotifyServiceChanged();
-
-  // Notifies its observers that a descriptor |descriptor| belonging to
-  // characteristic |characteristic| has been added or removed. This is used
-  // by BluetoothRemoteGattCharacteristicAndroid instances to notify service
-  // observers when characteristic descriptors get added and removed. If |added|
-  // is true, an "Added" event will be sent. Otherwise, a "Removed" event will
-  // be sent.
-  void NotifyDescriptorAddedOrRemoved(
-      BluetoothRemoteGattCharacteristicAndroid* characteristic,
-      BluetoothRemoteGattDescriptorAndroid* descriptor,
-      bool added);
-
-  // Notifies its observers that the value of a descriptor has changed. Called
-  // by BluetoothRemoteGattCharacteristicAndroid instances to notify service
-  // observers.
-  void NotifyDescriptorValueChanged(
-      BluetoothRemoteGattCharacteristicAndroid* characteristic,
-      BluetoothRemoteGattDescriptorAndroid* descriptor,
-      const std::vector<uint8>& value);
-
  private:
   friend class BluetoothDeviceAndroid;
 
-  typedef std::map<dbus::ObjectPath, BluetoothRemoteGattCharacteristicAndroid*>
-      CharacteristicMap;
-
   BluetoothRemoteGattServiceAndroid(BluetoothAdapterAndroid* adapter,
-                                     BluetoothDeviceAndroid* device,
-                                     const dbus::ObjectPath& object_path);
+                                    BluetoothDeviceAndroid* device,
+                                    int32_t instanceId);
   ~BluetoothRemoteGattServiceAndroid() override;
-
-  // bluez::BluetoothGattServiceClient::Observer override.
-  void GattServicePropertyChanged(const dbus::ObjectPath& object_path,
-                                  const std::string& property_name) override;
-
-  // bluez::BluetoothGattCharacteristicClient::Observer override.
-  void GattCharacteristicAdded(const dbus::ObjectPath& object_path) override;
-  void GattCharacteristicRemoved(const dbus::ObjectPath& object_path) override;
-  void GattCharacteristicPropertyChanged(
-      const dbus::ObjectPath& object_path,
-      const std::string& property_name) override;
-
-  // Object path of the GATT service.
-  dbus::ObjectPath object_path_;
 
   // The adapter associated with this service. It's ok to store a raw pointer
   // here since |adapter_| indirectly owns this instance.
@@ -110,19 +87,8 @@ class BluetoothRemoteGattServiceAndroid
   // here since |device_| owns this instance.
   BluetoothDeviceAndroid* device_;
 
-  // Mapping from GATT characteristic object paths to characteristic objects.
-  // owned by this service. Since the Chrome OS implementation uses object
-  // paths as unique identifiers, we also use this mapping to return
-  // characteristics by identifier.
-  CharacteristicMap characteristics_;
-
-  // Indicates whether or not the characteristics of this service are known to
-  // have been discovered.
-  bool discovery_complete_;
-
-  // Note: This should remain the last member so it'll be destroyed and
-  // invalidate its weak pointers before any other members are destroyed.
-  base::WeakPtrFactory<BluetoothRemoteGattServiceAndroid> weak_ptr_factory_;
+  // Instance ID, cached from Android object.
+  std::string instanceIdAsString_;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothRemoteGattServiceAndroid);
 };
@@ -130,4 +96,3 @@ class BluetoothRemoteGattServiceAndroid
 }  // namespace android
 
 #endif  // DEVICE_BLUETOOTH_BLUETOOTH_REMOTE_GATT_SERVICE_ANDROID_H_
-
