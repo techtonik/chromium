@@ -19,6 +19,7 @@
 #include "build/build_config.h"
 #include "cc/blink/context_provider_web_context.h"
 #include "components/scheduler/child/web_scheduler_impl.h"
+#include "components/scheduler/child/web_task_runner_impl.h"
 #include "components/scheduler/renderer/renderer_scheduler.h"
 #include "components/scheduler/renderer/webthread_impl_for_renderer_scheduler.h"
 #include "components/url_formatter/url_formatter.h"
@@ -32,6 +33,7 @@
 #include "content/child/simple_webmimeregistry_impl.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/child/web_database_observer_impl.h"
+#include "content/child/web_url_loader_impl.h"
 #include "content/child/webblobregistry_impl.h"
 #include "content/child/webfileutilities_impl.h"
 #include "content/child/webmessageportchannel_impl.h"
@@ -237,7 +239,9 @@ RendererBlinkPlatformImpl::RendererBlinkPlatformImpl(
       sudden_termination_disables_(0),
       plugin_refresh_allowed_(true),
       default_task_runner_(renderer_scheduler->DefaultTaskRunner()),
-      web_scrollbar_behavior_(new WebScrollbarBehaviorImpl) {
+      loading_task_runner_(renderer_scheduler->LoadingTaskRunner()),
+      web_scrollbar_behavior_(new WebScrollbarBehaviorImpl),
+      vibration_manager_(6) {
 #if !defined(OS_ANDROID) && !defined(OS_WIN)
   if (g_sandbox_enabled && sandboxEnabled()) {
     sandbox_support_.reset(new RendererBlinkPlatformImpl::SandboxSupport);
@@ -272,6 +276,19 @@ void RendererBlinkPlatformImpl::Shutdown() {
 }
 
 //------------------------------------------------------------------------------
+
+blink::WebURLLoader* RendererBlinkPlatformImpl::createURLLoader() {
+  ChildThreadImpl* child_thread = ChildThreadImpl::current();
+  // There may be no child thread in RenderViewTests.  These tests can still use
+  // data URLs to bypass the ResourceDispatcher.
+  scoped_ptr<scheduler::WebTaskRunnerImpl> task_runner(
+      new scheduler::WebTaskRunnerImpl(
+        loading_task_runner_->BelongsToCurrentThread()
+            ? loading_task_runner_ : base::ThreadTaskRunnerHandle::Get()));
+  return new content::WebURLLoaderImpl(
+      child_thread ? child_thread->resource_dispatcher() : NULL,
+      task_runner.Pass());
+}
 
 blink::WebThread* RendererBlinkPlatformImpl::currentThread() {
   if (main_thread_->isCurrentThread())
@@ -643,14 +660,6 @@ bool RendererBlinkPlatformImpl::databaseSetFileSize(
 }
 
 bool RendererBlinkPlatformImpl::canAccelerate2dCanvas() {
-#if defined(OS_ANDROID)
-  SynchronousCompositorFactory* factory =
-      SynchronousCompositorFactory::GetInstance();
-  if (factory && factory->OverrideWithFactory()) {
-    return factory->GetGPUInfo().SupportsAccelerated2dCanvas();
-  }
-#endif
-
   RenderThreadImpl* thread = RenderThreadImpl::current();
   GpuChannelHost* host = thread->EstablishGpuChannelSync(
       CAUSE_FOR_GPU_LAUNCH_CANVAS_2D);
@@ -975,19 +984,6 @@ RendererBlinkPlatformImpl::createOffscreenGraphicsContext3D(
     blink::WebGLInfo* gl_info) {
   if (!RenderThreadImpl::current())
     return NULL;
-
-#if defined(OS_ANDROID)
-  SynchronousCompositorFactory* factory =
-      SynchronousCompositorFactory::GetInstance();
-  if (factory && factory->OverrideWithFactory()) {
-    scoped_ptr<gpu_blink::WebGraphicsContext3DInProcessCommandBufferImpl>
-        in_process_context(
-            factory->CreateOffscreenGraphicsContext3D(attributes));
-    if (!in_process_context || !in_process_context->InitializeOnCurrentThread())
-      return NULL;
-    return in_process_context.release();
-  }
-#endif
 
   scoped_refptr<GpuChannelHost> gpu_channel_host(
       RenderThreadImpl::current()->EstablishGpuChannelSync(

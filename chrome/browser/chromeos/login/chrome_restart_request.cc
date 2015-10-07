@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ash/ash_switches.h"
+#include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/memory/weak_ptr.h"
 #include "base/message_loop/message_loop.h"
@@ -93,7 +94,6 @@ void DeriveCommandLine(const GURL& start_url,
     ::switches::kDisableSurfaces,
     ::switches::kDisableThreadedScrolling,
     ::switches::kDisableTouchDragDrop,
-    ::switches::kDisableTouchEditing,
     ::switches::kDisableZeroCopy,
     ::switches::kEnableBlinkFeatures,
     ::switches::kEnableCompositorAnimationTimelines,
@@ -114,7 +114,6 @@ void DeriveCommandLine(const GURL& start_url,
     ::switches::kEnableRGBA4444Textures,
     ::switches::kEnableSlimmingPaintV2,
     ::switches::kEnableTouchDragDrop,
-    ::switches::kEnableTouchEditing,
     ::switches::kEnableViewport,
     ::switches::kEnableZeroCopy,
 #if defined(USE_OZONE)

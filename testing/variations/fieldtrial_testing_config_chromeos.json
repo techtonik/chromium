@@ -9,6 +9,11 @@
             "group_name": "Enabled"
         }
     ],
+    "AutofillProfileOrderByFrecency": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "CaptivePortalInterstitial": [
         {
             "group_name": "Enabled"
@@ -25,6 +30,11 @@
         }
     ],
     "ExtensionActionRedesign": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "MaterialDesignDownloads": [
         {
             "group_name": "Enabled"
         }
@@ -100,6 +110,11 @@
             "params": {
                 "fetch_period_min": "30"
             }
+        }
+    ],
+    "WebRTC-PeerConnectionDTLS1.2": [
+        {
+            "group_name": "Enabled"
         }
     ]
 }

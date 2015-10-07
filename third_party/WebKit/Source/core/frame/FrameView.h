@@ -82,7 +82,6 @@ class CORE_EXPORT FrameView final : public Widget, public ScrollableArea {
     friend class DisplayItemListPaintTestForSlimmingPaintV2;
     friend class Internals;
     friend class LayoutPart; // for invalidateTreeIfNeeded
-    friend class LayoutView; // for contentRectangleForPaintInvalidation
 
 public:
     static PassRefPtrWillBeRawPtr<FrameView> create(LocalFrame*);
@@ -361,7 +360,8 @@ public:
     LayoutRect scrollIntoView(
         const LayoutRect& rectInContent,
         const ScrollAlignment& alignX,
-        const ScrollAlignment& alignY) override;
+        const ScrollAlignment& alignY,
+        ScrollType = ProgrammaticScroll) override;
 
     // The window that hosts the FrameView. The FrameView will communicate scrolls and repaints to the
     // host window in the window's coordinate space.
@@ -405,11 +405,6 @@ public:
     void setScrollingModesLock(bool lock = true) { m_horizontalScrollbarLock = m_verticalScrollbarLock = lock; }
 
     bool canHaveScrollbars() const { return horizontalScrollbarMode() != ScrollbarAlwaysOff || verticalScrollbarMode() != ScrollbarAlwaysOff; }
-
-    // By default, paint events are clipped to the visible area.  If set to
-    // false, paint events are no longer clipped.
-    bool clipsPaintInvalidations() const { return m_clipsRepaints; }
-    void setClipsRepaints(bool);
 
     // The visible content rect has a location that is the scrolled offset of
     // the document. The width and height are the layout viewport width and
@@ -640,7 +635,6 @@ private:
 
     DocumentLifecycle& lifecycle() const;
 
-    void contentRectangleForPaintInvalidation(const IntRect&);
     void contentsResized() override;
     void scrollbarExistenceDidChange();
 
@@ -822,8 +816,6 @@ private:
     bool m_scrollbarsSuppressed;
 
     bool m_inUpdateScrollbars;
-
-    bool m_clipsRepaints;
 
     OwnPtr<LayoutAnalyzer> m_analyzer;
 

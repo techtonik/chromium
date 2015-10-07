@@ -248,8 +248,10 @@ DirectoryItem.prototype.onExpand_ = function(e) {
  */
 DirectoryItem.prototype.handleClick = function(e) {
   cr.ui.TreeItem.prototype.handleClick.call(this, e);
-  if (!e.target.classList.contains('expand-icon') && this.entry)
+  cr.dispatchSimpleEvent(this, 'click-tree-item', true);
+  if (!e.target.classList.contains('expand-icon') && this.entry) {
     this.directoryModel_.activateDirectoryEntry(this.entry);
+  }
 };
 
 /**
@@ -771,6 +773,7 @@ ShortcutItem.prototype.searchAndSelectByEntry = function(entry) {
  */
 ShortcutItem.prototype.handleClick = function(e) {
   cr.ui.TreeItem.prototype.handleClick.call(this, e);
+  cr.dispatchSimpleEvent(this, 'click-tree-item', true);
   this.activate();
   // Resets file selection when a volume is clicked.
   this.parentTree_.directoryModel.clearSelection();

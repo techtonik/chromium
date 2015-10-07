@@ -64,6 +64,7 @@
 #include "platform/network/ResourceTimingInfo.h"
 #include "platform/weborigin/SchemeRegistry.h"
 #include "platform/weborigin/SecurityPolicy.h"
+#include "public/platform/WebFrameScheduler.h"
 
 #include <algorithm>
 
@@ -352,7 +353,8 @@ bool FrameFetchContext::canRequest(Resource::Type type, const ResourceRequest& r
 {
     ResourceRequestBlockedReason reason = canRequestInternal(type, resourceRequest, url, options, forPreload, originRestriction);
     if (reason != ResourceRequestBlockedReasonNone) {
-        InspectorInstrumentation::didBlockRequest(frame(), resourceRequest, ensureLoaderForNotifications(), options.initiatorInfo, reason);
+        if (!forPreload)
+            InspectorInstrumentation::didBlockRequest(frame(), resourceRequest, ensureLoaderForNotifications(), options.initiatorInfo, reason);
         return false;
     }
     return true;
@@ -730,6 +732,11 @@ ResourceLoadPriority FrameFetchContext::modifyPriorityForExperiments(ResourceLoa
     // Clamp priority
     modifiedPriority = std::min(static_cast<int>(ResourceLoadPriorityHighest), std::max(static_cast<int>(ResourceLoadPriorityLowest), modifiedPriority));
     return static_cast<ResourceLoadPriority>(modifiedPriority);
+}
+
+WebTaskRunner* FrameFetchContext::loadingTaskRunner() const
+{
+    return frame()->frameScheduler()->loadingTaskRunner();
 }
 
 DEFINE_TRACE(FrameFetchContext)

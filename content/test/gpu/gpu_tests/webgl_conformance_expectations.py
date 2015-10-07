@@ -109,8 +109,15 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail('deqp/data/gles2/shaders/swizzles.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
 
-    # Skip all WebGL CTS on OpenGL+Intel
-    self.Skip('*', ['win', 'opengl', 'intel'], bug=1007) # angle bug ID
+    # Win / OpenGL / Intel failures
+    self.Fail('conformance/extensions/webgl-draw-buffers.html',
+        ['win', 'intel', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/glsl/functions/glsl-function-normalize.html',
+        ['win', 'intel', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/glsl/misc/shader-struct-scope.html',
+        ['win', 'intel', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/uniforms/uniform-default-values.html',
+        ['win', 'intel', 'opengl'], bug=1007) # angle bug ID
 
     # Mac failures
     self.Fail('conformance/glsl/misc/shaders-with-invariance.html',

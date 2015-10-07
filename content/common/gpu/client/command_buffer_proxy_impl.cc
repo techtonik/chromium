@@ -46,6 +46,9 @@ CommandBufferProxyImpl::CommandBufferProxyImpl(GpuChannelHost* channel,
       flush_count_(0),
       last_put_offset_(-1),
       last_barrier_put_offset_(-1),
+      next_fence_sync_release_(1),
+      flushed_fence_sync_release_(0),
+      verified_fence_sync_release_(0),
       next_signal_id_(0) {
   DCHECK(channel);
 }
@@ -68,8 +71,6 @@ bool CommandBufferProxyImpl::OnMessageReceived(const IPC::Message& message) {
   IPC_BEGIN_MESSAGE_MAP(CommandBufferProxyImpl, message)
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_Destroyed, OnDestroyed);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_ConsoleMsg, OnConsoleMessage);
-    IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_SetMemoryAllocation,
-                        OnSetMemoryAllocation);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_SignalSyncPointAck,
                         OnSignalSyncPointAck);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_SwapBuffersCompleted,
@@ -128,17 +129,6 @@ void CommandBufferProxyImpl::OnConsoleMessage(
   }
 }
 
-void CommandBufferProxyImpl::SetMemoryAllocationChangedCallback(
-    const MemoryAllocationChangedCallback& callback) {
-  CheckLock();
-  if (last_state_.error != gpu::error::kNoError)
-    return;
-
-  memory_allocation_changed_callback_ = callback;
-  Send(new GpuCommandBufferMsg_SetClientHasMemoryAllocationChangedCallback(
-      route_id_, !memory_allocation_changed_callback_.is_null()));
-}
-
 void CommandBufferProxyImpl::AddDeletionObserver(DeletionObserver* observer) {
   CheckLock();
   deletion_observers_.AddObserver(observer);
@@ -148,12 +138,6 @@ void CommandBufferProxyImpl::RemoveDeletionObserver(
     DeletionObserver* observer) {
   CheckLock();
   deletion_observers_.RemoveObserver(observer);
-}
-
-void CommandBufferProxyImpl::OnSetMemoryAllocation(
-    const gpu::MemoryAllocation& allocation) {
-  if (!memory_allocation_changed_callback_.is_null())
-    memory_allocation_changed_callback_.Run(allocation);
 }
 
 void CommandBufferProxyImpl::OnSignalSyncPointAck(uint32 id) {
@@ -231,8 +215,18 @@ void CommandBufferProxyImpl::Flush(int32 put_offset) {
   last_barrier_put_offset_ = put_offset;
 
   if (channel_) {
-    channel_->OrderingBarrier(route_id_, stream_id_, put_offset, ++flush_count_,
-                              latency_info_, put_offset_changed, true);
+    const uint32_t flush_id = channel_->OrderingBarrier(
+        route_id_, stream_id_, put_offset, ++flush_count_, latency_info_,
+        put_offset_changed, true);
+    if (put_offset_changed) {
+      DCHECK(flush_id);
+      const uint64_t fence_sync_release = next_fence_sync_release_ - 1;
+      if (fence_sync_release > flushed_fence_sync_release_) {
+        flushed_fence_sync_release_ = fence_sync_release;
+        flushed_release_flush_id_.push(
+            std::make_pair(fence_sync_release, flush_id));
+      }
+    }
   }
 
   if (put_offset_changed)
@@ -250,8 +244,18 @@ void CommandBufferProxyImpl::OrderingBarrier(int32 put_offset) {
   last_barrier_put_offset_ = put_offset;
 
   if (channel_) {
-    channel_->OrderingBarrier(route_id_, stream_id_, put_offset, ++flush_count_,
-                              latency_info_, put_offset_changed, false);
+    const uint32_t flush_id = channel_->OrderingBarrier(
+        route_id_, stream_id_, put_offset, ++flush_count_, latency_info_,
+        put_offset_changed, false);
+    if (put_offset_changed) {
+      DCHECK(flush_id);
+      const uint64_t fence_sync_release = next_fence_sync_release_ - 1;
+      if (fence_sync_release > flushed_fence_sync_release_) {
+        flushed_fence_sync_release_ = fence_sync_release;
+        flushed_release_flush_id_.push(
+            std::make_pair(fence_sync_release, flush_id));
+      }
+    }
   }
 
   if (put_offset_changed)
@@ -492,6 +496,38 @@ uint64_t CommandBufferProxyImpl::GetCommandBufferID() const {
   return command_buffer_id_;
 }
 
+uint64_t CommandBufferProxyImpl::GenerateFenceSyncRelease() {
+  return next_fence_sync_release_++;
+}
+
+bool CommandBufferProxyImpl::IsFenceSyncRelease(uint64_t release) {
+  return release != 0 && release < next_fence_sync_release_;
+}
+
+bool CommandBufferProxyImpl::IsFenceSyncFlushed(uint64_t release) {
+  CheckLock();
+  if (last_state_.error != gpu::error::kNoError)
+    return false;
+
+  if (release <= verified_fence_sync_release_)
+    return true;
+
+  // Check if we have actually flushed the fence sync release.
+  if (release <= flushed_fence_sync_release_) {
+    DCHECK(!flushed_release_flush_id_.empty());
+    // Check if it has already been validated by another context.
+    UpdateVerifiedReleases(channel_->GetHighestValidatedFlushID(stream_id_));
+    if (release <= verified_fence_sync_release_)
+      return true;
+
+    // Has not been validated, validate it now.
+    UpdateVerifiedReleases(channel_->ValidateFlushIDReachedServer(stream_id_));
+    return release <= verified_fence_sync_release_;
+  }
+
+  return false;
+}
+
 uint32 CommandBufferProxyImpl::InsertSyncPoint() {
   CheckLock();
   if (last_state_.error != gpu::error::kNoError)
@@ -636,6 +672,17 @@ void CommandBufferProxyImpl::SetOnConsoleMessageCallback(
 void CommandBufferProxyImpl::TryUpdateState() {
   if (last_state_.error == gpu::error::kNoError)
     shared_state()->Read(&last_state_);
+}
+
+void CommandBufferProxyImpl::UpdateVerifiedReleases(uint32_t verified_flush) {
+  while (!flushed_release_flush_id_.empty()) {
+    const std::pair<uint64_t, uint32_t>& front_item =
+        flushed_release_flush_id_.front();
+    if (front_item.second > verified_flush)
+      break;
+    verified_fence_sync_release_ = front_item.first;
+    flushed_release_flush_id_.pop();
+  }
 }
 
 gpu::CommandBufferSharedState* CommandBufferProxyImpl::shared_state() const {

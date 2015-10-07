@@ -85,6 +85,14 @@ void PageDebuggerAgent::enable(ErrorString* errorString)
         return;
     }
     InspectorDebuggerAgent::enable(errorString);
+    m_instrumentingAgents->setPageDebuggerAgent(this);
+}
+
+void PageDebuggerAgent::disable(ErrorString* errorString)
+{
+    m_instrumentingAgents->setPageDebuggerAgent(nullptr);
+    m_compiledScriptURLs.clear();
+    InspectorDebuggerAgent::disable(errorString);
 }
 
 void PageDebuggerAgent::restore()
@@ -93,19 +101,6 @@ void PageDebuggerAgent::restore()
         InspectorDebuggerAgent::restore();
 }
 
-void PageDebuggerAgent::debuggerAgentEnabled()
-{
-    ASSERT(canExecuteScripts());
-    m_instrumentingAgents->setPageDebuggerAgent(this);
-    InspectorDebuggerAgent::debuggerAgentEnabled();
-}
-
-void PageDebuggerAgent::debuggerAgentDisabled()
-{
-    m_instrumentingAgents->setPageDebuggerAgent(nullptr);
-    m_compiledScriptURLs.clear();
-    InspectorDebuggerAgent::debuggerAgentDisabled();
-}
 
 void PageDebuggerAgent::muteConsole()
 {
@@ -168,7 +163,7 @@ void PageDebuggerAgent::runScript(ErrorString* errorString, const ScriptId& scri
 
     String sourceURL = m_compiledScriptURLs.take(scriptId);
     LocalFrame* frame = toDocument(executionContext)->frame();
-    TRACE_EVENT1("devtools.timeline", "EvaluateScript", "data", InspectorEvaluateScriptEvent::data(frame, sourceURL, TextPosition::minimumPosition().m_line.oneBasedInt()));
+    TRACE_EVENT1("devtools.timeline", "EvaluateScript", "data", InspectorEvaluateScriptEvent::data(frame, sourceURL, TextPosition::minimumPosition()));
 
     RefPtrWillBeRawPtr<LocalFrame> protect(frame);
     InspectorDebuggerAgent::runScript(errorString, scriptId, executionContextId, objectGroup, doNotPauseOnExceptionsAndMuteConsole, result, exceptionDetails);

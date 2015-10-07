@@ -135,9 +135,17 @@ void BackgroundTracingManagerImpl::TriggerPreemptiveFinalization() {
 
 void BackgroundTracingManagerImpl::OnHistogramTrigger(
     const std::string& histogram_name) {
+  if (!content::BrowserThread::CurrentlyOn(content::BrowserThread::UI)) {
+    content::BrowserThread::PostTask(
+        content::BrowserThread::UI, FROM_HERE,
+        base::Bind(&BackgroundTracingManagerImpl::OnHistogramTrigger,
+                   base::Unretained(this), histogram_name));
+    return;
+  }
+
   for (auto& rule : config_->rules()) {
-    static_cast<BackgroundTracingRule*>(rule)
-        ->OnHistogramTrigger(histogram_name);
+    if (rule->ShouldTriggerNamedEvent(histogram_name))
+      TriggerPreemptiveFinalization();
   }
 }
 
@@ -396,6 +404,7 @@ BackgroundTracingManagerImpl::GenerateMetadataDict() const {
   metadata_dict->Set("config", config_dict.Pass());
   metadata_dict->SetString("network-type", network_type);
   metadata_dict->SetString("product-version", product_version);
+  metadata_dict->SetString("user-agent", GetContentClient()->GetUserAgent());
 
   // OS
   metadata_dict->SetString("os-name", base::SysInfo::OperatingSystemName());
@@ -439,6 +448,9 @@ BackgroundTracingManagerImpl::GenerateMetadataDict() const {
   metadata_dict->SetString("gpu-gl-vendor", gpu_info.gl_vendor);
   metadata_dict->SetString("gpu-gl-renderer", gpu_info.gl_renderer);
 #endif
+
+  if (delegate_)
+    delegate_->GenerateMetadataDict(metadata_dict.get());
 
   return metadata_dict.Pass();
 }
@@ -499,7 +511,9 @@ BackgroundTracingManagerImpl::GetCategoryFilterStringForCategoryPreset(
     case BackgroundTracingConfigImpl::CategoryPreset::BENCHMARK_IPC:
       return "benchmark,toplevel,ipc";
     case BackgroundTracingConfigImpl::CategoryPreset::BENCHMARK_STARTUP:
-      return "benchmark,toplevel,startup,disabled-by-default-file";
+      return "benchmark,toplevel,startup,disabled-by-default-file,"
+             "disabled-by-default-toplevel.flow,"
+             "disabled-by-default-ipc.flow";
   }
   NOTREACHED();
   return "";

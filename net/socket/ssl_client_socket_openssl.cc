@@ -55,6 +55,10 @@
 #include "net/ssl/ssl_platform_key.h"
 #endif
 
+#if defined(USE_NSS_CERTS) || defined(OS_IOS)
+#include "net/cert_net/nss_ocsp.h"
+#endif
+
 namespace net {
 
 namespace {
@@ -790,6 +794,14 @@ int SSLClientSocketOpenSSL::SetSendBufferSize(int32 size) {
 int SSLClientSocketOpenSSL::Init() {
   DCHECK(!ssl_);
   DCHECK(!transport_bio_);
+
+#if defined(USE_NSS_CERTS) || defined(OS_IOS)
+  if (ssl_config_.cert_io_enabled) {
+    // TODO(davidben): Move this out of SSLClientSocket. See
+    // https://crbug.com/539520.
+    EnsureNSSHttpIOInit();
+  }
+#endif
 
   SSLContext* context = SSLContext::GetInstance();
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
@@ -1924,10 +1936,10 @@ int SSLClientSocketOpenSSL::SelectNextProtoCallback(unsigned char** out,
       break;
   }
 
-  // If we didn't find a protocol, we select the first one from our list.
+  // If we didn't find a protocol, we select the last one from our list.
   if (npn_status_ == kNextProtoNoOverlap) {
     // NextProtoToString returns a pointer to a static string.
-    const char* proto = NextProtoToString(ssl_config_.next_protos[0]);
+    const char* proto = NextProtoToString(ssl_config_.next_protos.back());
     *out = reinterpret_cast<unsigned char*>(const_cast<char*>(proto));
     *outlen = strlen(proto);
   }

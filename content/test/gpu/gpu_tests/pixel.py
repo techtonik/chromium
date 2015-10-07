@@ -51,7 +51,10 @@ def _DidTestSucceed(tab):
 
 class PixelValidator(cloud_storage_test_base.ValidatorBase):
   def CustomizeBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--enable-gpu-benchmarking')
+    # --test-type=gpu is used only to suppress the "Google API Keys are missing"
+    # infobar, which causes flakiness in tests.
+    options.AppendExtraBrowserArgs(['--enable-gpu-benchmarking',
+                                    '--test-type=gpu'])
 
   def ValidateAndMeasurePage(self, page, tab, results):
     if not _DidTestSucceed(tab):
@@ -153,7 +156,8 @@ class PixelValidator(cloud_storage_test_base.ValidatorBase):
     if ref_png is not None:
       return ref_png
 
-    print 'Reference image not found. Writing tab contents as reference.'
+    print ('Reference image not found. Writing tab contents as reference to: ' +
+           image_path)
 
     self._WriteImage(image_path, screenshot)
     return screenshot
@@ -179,7 +183,8 @@ class Pixel(cloud_storage_test_base.TestBase):
         default=default_reference_image_dir)
 
   def CreateStorySet(self, options):
-    story_set = page_sets.PixelTestsStorySet(self.GetExpectations())
+    story_set = page_sets.PixelTestsStorySet(self.GetExpectations(),
+                                             try_es3=True)
     for page in story_set:
       page.script_to_evaluate_on_commit = test_harness_script
     return story_set

@@ -209,6 +209,7 @@ void GaiaScreenHandler::LoadGaiaWithVersion(
   params.SetBoolean("isShowUsers", context.show_users);
   params.SetBoolean("useOffline", context.use_offline);
   params.SetString("gaiaId", context.gaia_id);
+  params.SetBoolean("readOnlyEmail", true);
   params.SetString("email", context.email);
   params.SetBoolean("isEnrollingConsumerManagement",
                     is_enrolling_consumer_management);
@@ -402,16 +403,15 @@ void GaiaScreenHandler::RegisterMessages() {
 void GaiaScreenHandler::OnPortalDetectionCompleted(
     const NetworkState* network,
     const NetworkPortalDetector::CaptivePortalState& state) {
-  VLOG(1) << "OnPortalDetectionCompleted " << state.status;
+  VLOG(1) << "OnPortalDetectionCompleted "
+          << NetworkPortalDetector::CaptivePortalStatusString(state.status);
 
-  NetworkPortalDetector::CaptivePortalStatus status = state.status;
+  const NetworkPortalDetector::CaptivePortalStatus status = state.status;
   if (status == captive_portal_status_)
     return;
 
-  // Only consider online/portal status.
-  if (status == NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_ONLINE ||
-      status == NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_PORTAL) {
-    captive_portal_status_ = status;
+  captive_portal_status_ = status;
+  if (signin_screen_handler_->ShouldLoadGaia()) {
     LoadAuthExtension(true /* force */, true /* silent_load */,
                       false /* offline */);
   }
@@ -480,6 +480,29 @@ void GaiaScreenHandler::HandleWebviewLoadAborted(
   UpdateState(error_reason);
 }
 
+std::string GaiaScreenHandler::GetCanonicalEmail(
+    const std::string& authenticated_email,
+    const std::string& gaia_id) const {
+  const std::string sanitized_email = gaia::SanitizeEmail(authenticated_email);
+
+  const std::string canonicalized_email =
+      gaia::CanonicalizeEmail(sanitized_email);
+  user_manager::UserManager* user_manager = user_manager::UserManager::Get();
+  if (user_manager && !user_manager->IsKnownUser(canonicalized_email)) {
+    std::string old_canonical_email;
+    if (user_manager->GetKnownUserCanonicalEmail(gaia_id,
+                                                 &old_canonical_email)) {
+      if (old_canonical_email != canonicalized_email) {
+        LOG(WARNING) << "Existing user '" << old_canonical_email
+                     << "' authenticated by alias '" << sanitized_email << "'.";
+        return old_canonical_email;
+      }
+    }
+  }
+  // For compatibility reasons, sanitized email is used.
+  return sanitized_email;
+}
+
 void GaiaScreenHandler::HandleCompleteAuthentication(
     const std::string& gaia_id,
     const std::string& email,
@@ -494,7 +517,9 @@ void GaiaScreenHandler::HandleCompleteAuthentication(
   DCHECK(!gaia_id.empty());
   const std::string sanitized_email = gaia::SanitizeEmail(email);
   Delegate()->SetDisplayEmail(sanitized_email);
-  UserContext user_context(sanitized_email);
+
+  const std::string canonical_email = GetCanonicalEmail(email, gaia_id);
+  UserContext user_context(canonical_email);
   user_context.SetGaiaID(gaia_id);
   user_context.SetKey(Key(password));
   user_context.SetAuthCode(auth_code);
@@ -615,7 +640,8 @@ void GaiaScreenHandler::DoCompleteLogin(const std::string& gaia_id,
   DCHECK(!gaia_id.empty());
   const std::string sanitized_email = gaia::SanitizeEmail(typed_email);
   Delegate()->SetDisplayEmail(sanitized_email);
-  UserContext user_context(sanitized_email);
+  const std::string canonical_email = GetCanonicalEmail(typed_email, gaia_id);
+  UserContext user_context(canonical_email);
   user_context.SetGaiaID(gaia_id);
   user_context.SetKey(Key(password));
   user_context.SetAuthFlow(using_saml
@@ -814,15 +840,15 @@ void GaiaScreenHandler::ShowGaiaScreenIfReady() {
 }
 
 void GaiaScreenHandler::MaybePreloadAuthExtension() {
-  VLOG(1) << "MaybePreloadAuthExtension() call.";
+  VLOG(1) << "MaybePreloadAuthExtension";
 
   if (!network_portal_detector_) {
     NetworkPortalDetectorImpl* detector = new NetworkPortalDetectorImpl(
         g_browser_process->system_request_context(), false);
     detector->set_portal_test_url(GURL(kRestrictiveProxyURL));
     network_portal_detector_.reset(detector);
+    network_portal_detector_->AddObserver(this);
     network_portal_detector_->Enable(true);
-    network_portal_detector_->AddAndFireObserver(this);
   }
 
   // If cookies clearing was initiated or |dns_clear_task_running_| then auth
@@ -851,6 +877,9 @@ void GaiaScreenHandler::ShowWhitelistCheckFailedError() {
 void GaiaScreenHandler::LoadAuthExtension(bool force,
                                           bool silent_load,
                                           bool offline) {
+  VLOG(1) << "LoadAuthExtension, force: " << force
+          << ", silent_load: " << silent_load
+          << ", offline: " << offline;
   GaiaContext context;
   context.force_reload = force;
   context.is_local = offline;
@@ -889,7 +918,9 @@ SigninScreenHandlerDelegate* GaiaScreenHandler::Delegate() {
 
 bool GaiaScreenHandler::IsRestrictiveProxy() const {
   return captive_portal_status_ ==
-         NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_PORTAL;
+             NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_PORTAL ||
+         captive_portal_status_ ==
+             NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_OFFLINE;
 }
 
 }  // namespace chromeos

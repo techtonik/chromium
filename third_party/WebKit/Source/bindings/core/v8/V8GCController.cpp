@@ -121,9 +121,19 @@ public:
         // Practically speaking, as far as I crawled real web applications,
         // the number of wrappers handled by each minor GC cycle is at most 3000.
         // So this limit is mainly for pathological micro benchmarks.
+        //
+        // In Oilpan, we don't limit the number of wrappers to collect as many
+        // wrappers in minor GC cycles as possible. This may increase the pause
+        // time of a minor GC, but if we give up collecting wrappers in a minor
+        // GC, it will instead end up with increasing the cost of subsequent
+        // Oilpan's GCs. Thus it will be better to collect as many wrappers as
+        // possible for minimizing the value of max(a pause time of a minor GC,
+        // a pause time of Oilpan's GC).
+#if !ENABLE(OILPAN)
         const unsigned wrappersHandledByEachMinorGC = 10000;
         if (m_nodesInNewSpace.size() >= wrappersHandledByEachMinorGC)
             return;
+#endif
 
         v8::Local<v8::Object> wrapper = v8::Local<v8::Object>::New(m_isolate, v8::Persistent<v8::Object>::Cast(*value));
         ASSERT(V8DOMWrapper::hasInternalFieldsSet(wrapper));
@@ -366,15 +376,8 @@ void gcPrologueForMajorGC(v8::Isolate* isolate, bool constructRetainedObjectInfo
 
 void V8GCController::gcPrologue(v8::GCType type, v8::GCCallbackFlags flags)
 {
-    // Finish Oilpan's complete sweeping before running a V8 GC.
-    // This will let the GC collect more V8 objects.
-    //
-    // TODO(haraken): It's a bit too late for a major GC to schedule
-    // completeSweep() here, because gcPrologue for a major GC is called
-    // not at the point where the major GC started but at the point where
-    // the major GC requests object grouping.
     if (ThreadState::current())
-        ThreadState::current()->completeSweep();
+        ThreadState::current()->willStartV8GC();
 
     if (isMainThread()) {
         ScriptForbiddenScope::enter();
@@ -499,6 +502,10 @@ void V8GCController::collectAllGarbageForTesting(v8::Isolate* isolate)
 
 void V8GCController::reportDOMMemoryUsageToV8(v8::Isolate* isolate)
 {
+    // TODO(haraken): Oilpan should report the amount of memory used
+    // by DOM nodes as well. Currently Partitions::currentDOMMemoryUsage()
+    // just returns 0.
+#if !ENABLE(OILPAN)
     if (!isMainThread())
         return;
 
@@ -509,6 +516,7 @@ void V8GCController::reportDOMMemoryUsageToV8(v8::Isolate* isolate)
     isolate->AdjustAmountOfExternalAllocatedMemory(diff);
 
     lastUsageReportedToV8 = currentUsage;
+#endif
 }
 
 class DOMWrapperTracer : public v8::PersistentHandleVisitor {

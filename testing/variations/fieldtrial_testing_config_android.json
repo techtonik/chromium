@@ -14,6 +14,11 @@
             "group_name": "Enabled"
         }
     ],
+    "AutofillProfileOrderByFrecency": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "ChromotingQUIC": [
         {
             "group_name": "Enabled"
@@ -275,6 +280,11 @@
             "params": {
                 "fetch_period_min": "30"
             }
+        }
+    ],
+    "WebRTC-PeerConnectionDTLS1.2": [
+        {
+            "group_name": "Enabled"
         }
     ]
 }

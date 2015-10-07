@@ -1188,10 +1188,10 @@ Element* Document::elementFromPoint(int x, int y) const
     return TreeScope::elementFromPoint(x, y);
 }
 
-Vector<Element*> Document::elementsFromPoint(int x, int y) const
+WillBeHeapVector<RawPtrWillBeMember<Element>> Document::elementsFromPoint(int x, int y) const
 {
     if (!layoutView())
-        return Vector<Element*>();
+        return WillBeHeapVector<RawPtrWillBeMember<Element>>();
     return TreeScope::elementsFromPoint(x, y);
 }
 
@@ -1721,8 +1721,10 @@ void Document::updateLayoutTree(StyleRecalcChange change)
     if (!view() || !isActive())
         return;
 
-    if (change != Force && !needsLayoutTreeUpdate())
+    if (change != Force && !needsLayoutTreeUpdate()) {
+        ASSERT(lifecycle().state() != DocumentLifecycle::VisualUpdatePending);
         return;
+    }
 
     if (inStyleRecalc())
         return;
@@ -1927,6 +1929,12 @@ void Document::layoutUpdated()
         if (!m_documentTiming.firstLayout())
             m_documentTiming.markFirstLayout();
     }
+}
+
+void Document::markFirstTextPaint()
+{
+    if (m_documentTiming.firstTextPaint() == 0)
+        m_documentTiming.markFirstTextPaint();
 }
 
 void Document::setNeedsFocusedElementCheck()
@@ -5683,6 +5691,13 @@ bool Document::isSecureContext(String& errorMessage, const SecureContextCheck pr
         }
     }
     return true;
+}
+
+WebTaskRunner* Document::loadingTaskRunner() const
+{
+    if (frame())
+        return frame()->frameScheduler()->loadingTaskRunner();
+    return Platform::current()->currentThread()->scheduler()->loadingTaskRunner();
 }
 
 DEFINE_TRACE(Document)

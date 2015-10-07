@@ -61,6 +61,7 @@
 #include "chrome/browser/history/top_sites_factory.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
+#include "chrome/browser/memory/tab_discard_state.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/pepper_broker_infobar_delegate.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
@@ -131,7 +132,6 @@
 #include "chrome/browser/ui/tab_dialogs.h"
 #include "chrome/browser/ui/tab_helpers.h"
 #include "chrome/browser/ui/tab_modal_confirm_dialog.h"
-#include "chrome/browser/ui/tabs/tab_discard_state.h"
 #include "chrome/browser/ui/tabs/tab_menu_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_utils.h"
@@ -209,7 +209,6 @@
 #include "chrome/browser/task_manager/task_manager.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "components/autofill/core/browser/autofill_ie_toolbar_import_win.h"
-#include "components/browser_watcher/exit_funnel_win.h"
 #include "ui/base/touch/touch_device.h"
 #include "ui/base/win/shell.h"
 #endif  // OS_WIN
@@ -714,13 +713,8 @@ void Browser::OnWindowClosing() {
   bool should_quit_if_last_browser =
       browser_shutdown::IsTryingToQuit() || !chrome::WillKeepAlive();
 
-  if (should_quit_if_last_browser && chrome::ShouldStartShutdown(this)) {
-#if defined(OS_WIN)
-    browser_watcher::ExitFunnel::RecordSingleEvent(
-          chrome::kBrowserExitCodesRegistryPath, L"LastWindowClose");
-#endif
+  if (should_quit_if_last_browser && chrome::ShouldStartShutdown(this))
     browser_shutdown::OnShutdownStarting(browser_shutdown::WINDOW_CLOSE);
-  }
 
   // Don't use GetForProfileIfExisting here, we want to force creation of the
   // session service so that user can restore what was open.
@@ -1054,7 +1048,7 @@ void Browser::ActiveTabChanged(WebContents* old_contents,
   exclusive_access_manager_->OnTabDetachedFromView(old_contents);
 
   // Discarded tabs always get reloaded.
-  if (TabDiscardState::IsDiscarded(new_contents))
+  if (memory::TabDiscardState::IsDiscarded(new_contents))
     chrome::Reload(this, CURRENT_TAB);
 
   // If we have any update pending, do it now.
@@ -1341,18 +1335,18 @@ content::SecurityStyle Browser::GetSecurityStyle(
   }
 
   if (security_info.sha1_deprecation_status ==
-      SecurityStateModel::DEPRECATED_SHA1_BROKEN) {
+      SecurityStateModel::DEPRECATED_SHA1_MAJOR) {
     security_style_explanations->broken_explanations.push_back(
         content::SecurityStyleExplanation(
-            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1),
-            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1_DESCRIPTION),
+            l10n_util::GetStringUTF8(IDS_MAJOR_SHA1),
+            l10n_util::GetStringUTF8(IDS_MAJOR_SHA1_DESCRIPTION),
             security_info.cert_id));
   } else if (security_info.sha1_deprecation_status ==
-             SecurityStateModel::DEPRECATED_SHA1_WARNING) {
+             SecurityStateModel::DEPRECATED_SHA1_MINOR) {
     security_style_explanations->warning_explanations.push_back(
         content::SecurityStyleExplanation(
-            l10n_util::GetStringUTF8(IDS_WARNING_SHA1),
-            l10n_util::GetStringUTF8(IDS_WARNING_SHA1_DESCRIPTION),
+            l10n_util::GetStringUTF8(IDS_MINOR_SHA1),
+            l10n_util::GetStringUTF8(IDS_MINOR_SHA1_DESCRIPTION),
             security_info.cert_id));
   }
 
