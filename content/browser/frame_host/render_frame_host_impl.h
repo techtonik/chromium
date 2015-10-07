@@ -172,9 +172,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
                                   const gfx::Point& point) override;
   void AccessibilitySetScrollOffset(int acc_obj_id,
                                     const gfx::Point& offset) override;
-  void AccessibilitySetTextSelection(int acc_obj_id,
-                                     int start_offset,
-                                     int end_offset) override;
+  void AccessibilitySetSelection(int anchor_object_id,
+                                 int anchor_offset,
+                                 int focus_object_id,
+                                 int focus_offset) override;
   void AccessibilitySetValue(int acc_obj_id, const base::string16& value)
       override;
   bool AccessibilityViewHasFocus() const override;
@@ -612,6 +613,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // this function will return the platform view on the main frame; for main
   // frames, it will return the current frame's view.
   RenderWidgetHostViewBase* GetViewForAccessibility();
+
+  // Sends a navigate message to the RenderFrame and notifies DevTools about
+  // navigation happening. Should be used instead of sending the message
+  // directly.
+  void SendNavigateMessage(
+      const content::CommonNavigationParams& common_params,
+      const content::StartNavigationParams& start_params,
+      const content::RequestNavigationParams& request_params);
 
   // For now, RenderFrameHosts indirectly keep RenderViewHosts alive via a
   // refcount that calls Shutdown when it reaches zero.  This allows each

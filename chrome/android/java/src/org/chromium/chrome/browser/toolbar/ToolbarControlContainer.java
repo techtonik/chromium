@@ -141,8 +141,12 @@ public class ToolbarControlContainer extends FrameLayout implements ControlConta
 
             mToolbarContainer = toolbarContainer;
             mToolbar = toolbar;
+            int containerHeightResId = R.dimen.control_container_height;
+            if (mToolbar instanceof CustomTabToolbar) {
+                containerHeightResId = R.dimen.custom_tabs_control_container_height;
+            }
             mToolbarActualHeightPx = toolbarContainer.getResources().getDimensionPixelSize(
-                    R.dimen.control_container_height);
+                    containerHeightResId);
         }
 
         /**
@@ -182,7 +186,8 @@ public class ToolbarControlContainer extends FrameLayout implements ControlConta
 
         @Override
         protected void computeContentPadding(Rect outContentPadding) {
-            outContentPadding.set(0, 0, mToolbarContainer.getWidth(), mToolbarActualHeightPx);
+            outContentPadding.set(0, ((View) mToolbar).getTop(), mToolbarContainer.getWidth(),
+                    mToolbarActualHeightPx);
         }
 
         @Override

@@ -36,17 +36,8 @@ class ServiceWorkerContextWrapper;
 // registrations across all registered service workers for a profile.
 // Registrations are stored along with their associated Service Worker
 // registration in ServiceWorkerStorage. If the ServiceWorker is unregistered,
-// the sync registrations are removed. This class expects to be run on the IO
+// the sync registrations are removed. This class must be run on the IO
 // thread. The asynchronous methods are executed sequentially.
-
-// TODO(jkarlin): Check permissions when registering, scheduling, and firing
-// background sync. In the meantime, --enable-service-worker-sync is required to
-// fire a sync event.
-// TODO(jkarlin): Unregister syncs when permission is revoked.
-// TODO(jkarlin): Create a background sync scheduler to actually run the
-// registered events.
-// TODO(jkarlin): Keep the browser alive if "Let Google Chrome Run in the
-// Background" is true and a sync is registered.
 class CONTENT_EXPORT BackgroundSyncManager
     : NON_EXPORTED_BASE(public ServiceWorkerContextObserver) {
  public:
@@ -185,10 +176,12 @@ class CONTENT_EXPORT BackgroundSyncManager
       BackgroundSyncRegistrationHandle::HandleId handle_id);
 
   // Disable the manager. Already queued operations will abort once they start
-  // to run (in their impl methods). Future operations will not queue. Any
-  // registrations are cleared from memory and the backend (if it's still
-  // functioning). The manager will reenable itself once it receives the
-  // OnStorageWiped message or on browser restart.
+  // to run (in their impl methods). Future operations will not queue. The one
+  // exception is already firing events -- their responses will be processed in
+  // order to notify their final state.
+  // The list of active registrations is cleared and the backend is also cleared
+  // (if it's still functioning). The manager will reenable itself once it
+  // receives the OnStorageWiped message or on browser restart.
   void DisableAndClearManager(const base::Closure& callback);
   void DisableAndClearDidGetRegistrations(
       const base::Closure& callback,

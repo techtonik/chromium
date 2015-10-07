@@ -39,11 +39,12 @@ class MEDIA_EXPORT MediaSourcePlayer : public MediaPlayerAndroid,
  public:
   // Constructs a player with the given ID and demuxer. |manager| must outlive
   // the lifetime of this object.
-  MediaSourcePlayer(int player_id,
-                    MediaPlayerManager* manager,
-                    const RequestMediaResourcesCB& request_media_resources_cb,
-                    scoped_ptr<DemuxerAndroid> demuxer,
-                    const GURL& frame_url);
+  MediaSourcePlayer(
+      int player_id,
+      MediaPlayerManager* manager,
+      const OnDecoderResourcesReleasedCB& on_decoder_resources_released_cb,
+      scoped_ptr<DemuxerAndroid> demuxer,
+      const GURL& frame_url);
   ~MediaSourcePlayer() override;
 
   // MediaPlayerAndroid implementation.
@@ -84,10 +85,11 @@ class MEDIA_EXPORT MediaSourcePlayer : public MediaPlayerAndroid,
   void PlaybackCompleted(bool is_audio);
 
   // Called when the decoder finishes its task.
-  void MediaDecoderCallback(
-        bool is_audio, MediaCodecStatus status,
-        base::TimeDelta current_presentation_timestamp,
-        base::TimeDelta max_presentation_timestamp);
+  void MediaDecoderCallback(bool is_audio,
+                            MediaCodecStatus status,
+                            bool is_late_frame,
+                            base::TimeDelta current_presentation_timestamp,
+                            base::TimeDelta max_presentation_timestamp);
 
   bool IsPrerollFinished(bool is_audio) const;
 

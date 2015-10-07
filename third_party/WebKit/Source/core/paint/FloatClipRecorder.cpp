@@ -17,8 +17,6 @@ FloatClipRecorder::FloatClipRecorder(GraphicsContext& context, const DisplayItem
     , m_clipType(DisplayItem::paintPhaseToFloatClipType(paintPhase))
 {
     ASSERT(m_context.displayItemList());
-    if (m_context.displayItemList()->displayItemConstructionIsDisabled())
-        return;
     m_context.displayItemList()->createAndAppend<FloatClipDisplayItem>(m_client, m_clipType, clipRect);
 }
 
@@ -26,12 +24,7 @@ FloatClipRecorder::~FloatClipRecorder()
 {
     DisplayItem::Type endType = DisplayItem::floatClipTypeToEndFloatClipType(m_clipType);
     ASSERT(m_context.displayItemList());
-    if (!m_context.displayItemList()->displayItemConstructionIsDisabled()) {
-        if (m_context.displayItemList()->lastDisplayItemIsNoopBegin())
-            m_context.displayItemList()->removeLastDisplayItem();
-        else
-            m_context.displayItemList()->createAndAppend<EndFloatClipDisplayItem>(m_client, endType);
-    }
+    m_context.displayItemList()->endItem<EndFloatClipDisplayItem>(m_client, endType);
 }
 
 } // namespace blink

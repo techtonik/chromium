@@ -155,16 +155,51 @@ typedef TreeNode<TransformNodeData> TransformNode;
 struct CC_EXPORT ClipNodeData {
   ClipNodeData();
 
+  // The clip rect that this node contributes, expressed in the space of its
+  // transform node.
   gfx::RectF clip;
+
+  // Clip nodes are uses for two reasons. First, they are used for determining
+  // which parts of each layer are visible. Second, they are used for
+  // determining whether a clip needs to be applied when drawing a layer, and if
+  // so, the rect that needs to be used. These can be different since not all
+  // clips need to be applied directly to each layer. For example, a layer is
+  // implicitly clipped by the bounds of its target render surface and by clips
+  // applied to this surface. |combined_clip_in_target_space| is used for
+  // computing visible rects, and |clip_in_target_space| is used for computing
+  // clips applied at draw time. Both rects are expressed in the space of the
+  // target transform node, and may include clips contributed by ancestors.
   gfx::RectF combined_clip_in_target_space;
   gfx::RectF clip_in_target_space;
+
+  // The id of the transform node that defines the clip node's local space.
   int transform_id;
+
+  // The id of the transform node that defines the clip node's target space.
   int target_id;
-  bool use_only_parent_clip : 1;
+
+  // Whether this node contributes a new clip (that is, whether |clip| needs to
+  // be applied), rather than only inheriting ancestor clips.
+  bool applies_local_clip : 1;
+
+  // When true, |clip_in_target_space| does not include clips from ancestor
+  // nodes.
   bool layer_clipping_uses_only_local_clip : 1;
+
+  // When true, |combined_clip_in_target_space| does not include clips from
+  // ancestor nodes.
   bool layer_visibility_uses_only_local_clip : 1;
+
+  // True if render surfaces with this clip tree node need to be drawn with a
+  // clip applied.
   bool render_surface_is_clipped : 1;
+
+  // True if layers with this clip tree node need to be drawn with a clip
+  // applied.
   bool layers_are_clipped : 1;
+
+  // Nodes that correspond to unclipped surfaces disregard ancestor clips.
+  bool resets_clip : 1;
 };
 
 typedef TreeNode<ClipNodeData> ClipNode;
@@ -283,6 +318,13 @@ class CC_EXPORT TransformTree final : public PropertyTree<TransformNode> {
     return source_to_parent_updates_allowed_;
   }
 
+  // We store the page scale factor on the transform tree so that it can be
+  // easily be retrieved and updated in UpdatePageScaleInPropertyTrees.
+  void set_page_scale_factor(float page_scale_factor) {
+    page_scale_factor_ = page_scale_factor;
+  }
+  float page_scale_factor() const { return page_scale_factor_; }
+
   void SetInnerViewportBoundsDelta(gfx::Vector2dF bounds_delta);
   gfx::Vector2dF inner_viewport_bounds_delta() const {
     return inner_viewport_bounds_delta_;
@@ -335,6 +377,7 @@ class CC_EXPORT TransformTree final : public PropertyTree<TransformNode> {
   bool NeedsSourceToParentUpdate(TransformNode* node);
 
   bool source_to_parent_updates_allowed_;
+  float page_scale_factor_;
   gfx::Vector2dF inner_viewport_bounds_delta_;
   gfx::Vector2dF outer_viewport_bounds_delta_;
   std::vector<int> nodes_affected_by_inner_viewport_bounds_delta_;

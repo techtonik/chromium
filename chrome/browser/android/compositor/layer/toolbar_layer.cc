@@ -34,9 +34,15 @@ void ToolbarLayer::PushResource(
 
   // This layer effectively draws over the space it takes for shadows.  Set the
   // bounds to the non-shadow size so that other things can properly line up.
-  layer_->SetBounds(resource->padding.size());
+  // Padding height does not include the height of the tabstrip, so we add
+  // it explicitly by adding y offset.
+  gfx::Size size = gfx::Size(
+      resource->padding.width(),
+      resource->padding.height() + resource->padding.y());
+  layer_->SetBounds(size);
 
   toolbar_background_layer_->SetBounds(resource->padding.size());
+  toolbar_background_layer_->SetPosition(resource->padding.origin());
   toolbar_background_layer_->SetBackgroundColor(toolbar_background_color);
 
   bitmap_layer_->SetUIResourceId(resource->ui_resource->id());

@@ -118,6 +118,7 @@
       'test/fake_plugin_service.h',
       'test/fake_renderer_scheduler.cc',
       'test/fake_renderer_scheduler.h',
+      'test/gpu_memory_buffer_factory_test_template.h',
       'test/mock_google_streaming_server.cc',
       'test/mock_google_streaming_server.h',
       'test/mock_keyboard.cc',
@@ -224,6 +225,7 @@
       'browser/indexed_db/mock_browsertest_indexed_db_class_factory.cc',
       'browser/indexed_db/mock_browsertest_indexed_db_class_factory.h',
       'browser/loader/resource_dispatcher_host_browsertest.cc',
+      'browser/loader/cross_site_resource_handler_browsertest.cc',
       'browser/loader/async_resource_handler_browsertest.cc',
       'browser/manifest/manifest_browsertest.cc',
       'browser/media/android/media_session_browsertest.cc',
@@ -253,6 +255,7 @@
       'browser/tracing/background_tracing_manager_browsertest.cc',
       'browser/tracing/memory_tracing_browsertest.cc',
       'browser/tracing/tracing_controller_browsertest.cc',
+      'browser/vibration_manager_integration_browsertest.cc',
       'browser/web_contents/opened_by_dom_browsertest.cc',
       'browser/web_contents/web_contents_impl_browsertest.cc',
       'browser/web_contents/web_contents_view_aura_browsertest.cc',
@@ -632,12 +635,11 @@
       'common/dwrite_font_platform_win_unittest.cc',
       'common/fileapi/file_system_util_unittest.cc',
       'common/font_warmup_win_unittest.cc',
-      'common/gpu/client/gpu_memory_buffer_impl_unittest.cc',
+      'common/gpu/client/gpu_memory_buffer_impl_shared_memory_unittest.cc',
       'common/gpu/gpu_channel_test_common.cc',
       'common/gpu/gpu_channel_test_common.h',
       'common/gpu/gpu_channel_unittest.cc',
       'common/gpu/gpu_channel_manager_unittest.cc',
-      'common/gpu/gpu_memory_buffer_factory_unittest.cc',
       'common/gpu/gpu_memory_manager_unittest.cc',
       'common/host_discardable_shared_memory_manager_unittest.cc',
       'common/host_shared_bitmap_manager_unittest.cc',
@@ -786,7 +788,17 @@
       'browser/android/overscroll_refresh_unittest.cc',
       'browser/android/url_request_content_job_unittest.cc',
       'browser/renderer_host/input/motion_event_android_unittest.cc',
+      'common/gpu/client/gpu_memory_buffer_impl_surface_texture_unittest.cc',
+      'common/gpu/gpu_memory_buffer_factory_surface_texture_unittest.cc',
       'renderer/java/gin_java_bridge_value_converter_unittest.cc',
+    ],
+    'content_unittests_mac_sources': [
+      'common/gpu/client/gpu_memory_buffer_impl_io_surface_unittest.cc',
+      'common/gpu/gpu_memory_buffer_factory_io_surface_unittest.cc',
+    ],
+    'content_unittests_ozone_sources': [
+      'common/gpu/client/gpu_memory_buffer_impl_ozone_native_pixmap_unittest.cc',
+      'common/gpu/gpu_memory_buffer_factory_ozone_native_pixmap_unittest.cc',
     ],
   },
   'targets': [
@@ -1215,12 +1227,14 @@
           ],
         }],
         ['use_ozone==1', {
+          'sources': [ '<@(content_unittests_ozone_sources)' ],
           'dependencies': [
             '../ui/ozone/ozone.gyp:ozone',
             '../ui/ozone/ozone.gyp:ozone_base',
           ],
         }],
         ['OS == "mac"', {
+          'sources': [ '<@(content_unittests_mac_sources)' ],
           'dependencies': [
             '../third_party/boringssl/boringssl.gyp:boringssl',
           ],
@@ -1269,19 +1283,6 @@
           'type': 'none',
           'dependencies': [
             '../tools/telemetry/telemetry.gyp:bitmaptools#host',
-          ],
-        },
-        {
-          'target_name': 'telemetry_gpu_unittests_run',
-          'type': 'none',
-          'dependencies': [
-            'telemetry_base',
-          ],
-          'includes': [
-            '../build/isolate.gypi',
-          ],
-          'sources': [
-            'telemetry_gpu_unittests.isolate',
           ],
         },
       ],
@@ -1431,6 +1432,7 @@
             '../base/base.gyp:test_support_base',
             '../device/battery/battery.gyp:device_battery',
             '../device/battery/battery.gyp:device_battery_mojo_bindings',
+            '../device/vibration/vibration.gyp:device_vibration_mojo_bindings',
             '../gin/gin.gyp:gin',
             '../gpu/gpu.gyp:gpu',
             '../ipc/ipc.gyp:test_support_ipc',

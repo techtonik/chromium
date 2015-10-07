@@ -344,7 +344,7 @@ class RenderFrameSetupImpl : public RenderFrameSetup {
  public:
   explicit RenderFrameSetupImpl(
       mojo::InterfaceRequest<RenderFrameSetup> request)
-      : routing_id_highmark_(-1), binding_(this, request.Pass()) {}
+      : routing_id_highmark_(-1), binding_(this, request.Pass(), 24) {}
 
   void ExchangeServiceProviders(
       int32_t frame_routing_id,
@@ -361,12 +361,17 @@ class RenderFrameSetupImpl : public RenderFrameSetup {
     // created due to a race between the message and a ViewMsg_New IPC that
     // triggers creation of the RenderFrame we want.
     if (!frame) {
+      mojo::ServiceProviderPtr exposed_services_with_id(22);
+      exposed_services_with_id.Bind(exposed_services.PassInterface());
       RenderThreadImpl::current()->RegisterPendingRenderFrameConnect(
-          frame_routing_id, services.Pass(), exposed_services.Pass());
+          frame_routing_id, services.Pass(), exposed_services_with_id.Pass());
       return;
     }
 
-    frame->BindServiceRegistry(services.Pass(), exposed_services.Pass());
+    mojo::ServiceProviderPtr exposed_services_with_id(23);
+    exposed_services_with_id.Bind(exposed_services.PassInterface());
+    frame->BindServiceRegistry(services.Pass(),
+                               exposed_services_with_id.Pass());
   }
 
  private:
@@ -390,7 +395,7 @@ blink::WebGraphicsContext3D::Attributes GetOffscreenAttribs() {
 
 void SetupEmbeddedWorkerOnWorkerThread(
     mojo::InterfaceRequest<mojo::ServiceProvider> services,
-    mojo::ServiceProviderPtr exposed_services) {
+    mojo::InterfacePtrInfo<mojo::ServiceProvider> exposed_services) {
   ServiceWorkerContextClient* client =
       ServiceWorkerContextClient::ThreadSpecificInstance();
   // It is possible for client to be null if for some reason the worker died
@@ -398,14 +403,15 @@ void SetupEmbeddedWorkerOnWorkerThread(
   // nothing and let mojo close the connection.
   if (!client)
     return;
-  client->BindServiceRegistry(services.Pass(), exposed_services.Pass());
+  client->BindServiceRegistry(services.Pass(),
+                              mojo::MakeProxy(exposed_services.Pass()));
 }
 
 class EmbeddedWorkerSetupImpl : public EmbeddedWorkerSetup {
  public:
   explicit EmbeddedWorkerSetupImpl(
       mojo::InterfaceRequest<EmbeddedWorkerSetup> request)
-      : binding_(this, request.Pass()) {}
+      : binding_(this, request.Pass(), 33) {}
 
   void ExchangeServiceProviders(
       int32_t thread_id,
@@ -414,7 +420,7 @@ class EmbeddedWorkerSetupImpl : public EmbeddedWorkerSetup {
     WorkerTaskRunner::Instance()->GetTaskRunnerFor(thread_id)->PostTask(
         FROM_HERE,
         base::Bind(&SetupEmbeddedWorkerOnWorkerThread, base::Passed(&services),
-                   base::Passed(&exposed_services)));
+                   base::Passed(exposed_services.PassInterface())));
   }
 
  private:
@@ -1041,9 +1047,10 @@ void RenderThreadImpl::SetResourceDispatchTaskQueue(
     const scoped_refptr<base::SingleThreadTaskRunner>& resource_task_queue) {
   // Add a filter that forces resource messages to be dispatched via a
   // particular task runner.
-  resource_scheduling_filter_ =
-      new ResourceSchedulingFilter(resource_task_queue, resource_dispatcher());
-  channel()->AddFilter(resource_scheduling_filter_.get());
+  scoped_refptr<ResourceSchedulingFilter> filter(
+      new ResourceSchedulingFilter(resource_task_queue, resource_dispatcher()));
+  channel()->AddFilter(filter.get());
+  resource_dispatcher()->SetResourceSchedulingFilter(filter);
 
   // The ChildResourceMessageFilter and the ResourceDispatcher need to use the
   // same queue to ensure tasks are executed in the expected order.
@@ -1408,19 +1415,8 @@ RenderThreadImpl::SharedMainThreadContextProvider() {
   DCHECK(IsMainThread());
   if (!shared_main_thread_contexts_.get() ||
       shared_main_thread_contexts_->DestroyedOnMainThread()) {
-    shared_main_thread_contexts_ = NULL;
-#if defined(OS_ANDROID)
-    SynchronousCompositorFactory* factory =
-        SynchronousCompositorFactory::GetInstance();
-    if (factory && factory->OverrideWithFactory()) {
-      shared_main_thread_contexts_ = factory->CreateOffscreenContextProvider(
-          GetOffscreenAttribs(), "Offscreen-MainThread");
-    }
-#endif
-    if (!shared_main_thread_contexts_.get()) {
-      shared_main_thread_contexts_ = ContextProviderCommandBuffer::Create(
-          CreateOffscreenContext3d(), RENDERER_MAINTHREAD_CONTEXT);
-    }
+    shared_main_thread_contexts_ = ContextProviderCommandBuffer::Create(
+        CreateOffscreenContext3d(), RENDERER_MAINTHREAD_CONTEXT);
     if (shared_main_thread_contexts_.get() &&
         !shared_main_thread_contexts_->BindToCurrentThread())
       shared_main_thread_contexts_ = NULL;
@@ -1559,29 +1555,15 @@ RenderThreadImpl::GetIOThreadTaskRunner() {
 
 scoped_ptr<base::SharedMemory> RenderThreadImpl::AllocateSharedMemory(
     size_t size) {
-  return scoped_ptr<base::SharedMemory>(
-      HostAllocateSharedMemoryBuffer(size));
+  return HostAllocateSharedMemoryBuffer(size);
 }
 
 CreateCommandBufferResult RenderThreadImpl::CreateViewCommandBuffer(
       int32 surface_id,
       const GPUCreateCommandBufferConfig& init_params,
       int32 route_id) {
-  TRACE_EVENT1("gpu",
-               "RenderThreadImpl::CreateViewCommandBuffer",
-               "surface_id",
-               surface_id);
-
-  CreateCommandBufferResult result = CREATE_COMMAND_BUFFER_FAILED;
-  IPC::Message* message = new GpuHostMsg_CreateViewCommandBuffer(
-      init_params,
-      route_id,
-      &result);
-
-  // Allow calling this from the compositor thread.
-  thread_safe_sender()->Send(message);
-
-  return result;
+  NOTREACHED();
+  return CREATE_COMMAND_BUFFER_FAILED;
 }
 
 void RenderThreadImpl::DoNotNotifyWebKitOfModalLoop() {

@@ -443,6 +443,9 @@ const char kEnableMaterialDesignDownloads[] = "enable-md-downloads";
 // Enables the Material Design version of chrome://extensions.
 const char kEnableMaterialDesignExtensions[] = "enable-md-extensions";
 
+// Enables the Material Design policy page at chrome://md-policy.
+const char kEnableMaterialDesignPolicyPage[]  = "enable-md-policy-page";
+
 // Enables Media Router.
 const char kEnableMediaRouter[]             = "enable-media-router";
 
@@ -677,6 +680,9 @@ const char kInstallSupervisedUserWhitelists[] =
 // Marks a renderer as an Instant process.
 const char kInstantProcess[]                = "instant-process";
 
+// The URL for the interests API.
+const char kInterestsURL[]                  = "interests-url";
+
 // Invalidation service should use GCM network channel even if experiment is not
 // enabled.
 const char kInvalidationUseGCMChannel[]     = "invalidation-use-gcm-channel";
@@ -711,7 +717,7 @@ const char kLoadComponentExtension[]        = "load-component-extension";
 // Loads an extension from the specified directory.
 const char kLoadExtension[]                 = "load-extension";
 
-#if !defined(OFFICIAL_BUILD)
+#if !defined(GOOGLE_CHROME_BUILD)
 // Enables a live-reload for local NTP resources. This only works when Chrome
 // is running from a Chrome source directory.
 const char kLocalNtpReload[]                = "local-ntp-reload";
@@ -1343,6 +1349,11 @@ bool AboutInSettingsEnabled() {
 bool MdExtensionsEnabled() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableMaterialDesignExtensions);
+}
+
+bool MdPolicyPageEnabled() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      ::switches::kEnableMaterialDesignPolicyPage);
 }
 
 bool MediaRouterEnabled() {

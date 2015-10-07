@@ -54,6 +54,7 @@
 #include "core/css/CSSPathValue.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSPropertyMetadata.h"
+#include "core/css/CSSURIValue.h"
 #include "core/css/CSSValuePair.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRule.h"
@@ -191,7 +192,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyCursor(StyleResolverState& stat
                 CSSCursorImageValue* image = toCSSCursorImageValue(item);
                 if (image->updateIfSVGCursorIsUsed(state.element())) // Elements with SVG cursors are not allowed to share style.
                     state.style()->setUnique();
-                state.style()->addCursor(state.styleImage(CSSPropertyCursor, image), image->hotSpotSpecified(), image->hotSpot());
+                state.style()->addCursor(state.styleImage(CSSPropertyCursor, *image), image->hotSpotSpecified(), image->hotSpot());
             } else {
                 state.style()->setCursor(*toCSSPrimitiveValue(item));
             }
@@ -255,7 +256,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyGridTemplateAreas(StyleResolver
 
 void StyleBuilderFunctions::applyValueCSSPropertyListStyleImage(StyleResolverState& state, CSSValue* value)
 {
-    state.style()->setListStyleImage(state.styleImage(CSSPropertyListStyleImage, value));
+    state.style()->setListStyleImage(state.styleImage(CSSPropertyListStyleImage, *value));
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyOutlineStyle(StyleResolverState& state)
@@ -560,7 +561,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyZoom(StyleResolverState& state,
 void StyleBuilderFunctions::applyValueCSSPropertyWebkitBorderImage(StyleResolverState& state, CSSValue* value)
 {
     NinePieceImage image;
-    CSSToStyleMap::mapNinePieceImage(state, CSSPropertyWebkitBorderImage, value, image);
+    CSSToStyleMap::mapNinePieceImage(state, CSSPropertyWebkitBorderImage, *value, image);
     state.style()->setBorderImage(image);
 }
 
@@ -569,16 +570,14 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitClipPath(StyleResolverSta
     if (value->isBasicShapeValue()) {
         state.style()->setClipPath(ShapeClipPathOperation::create(basicShapeForValue(state, *value)));
     }
-    if (value->isPrimitiveValue()) {
-        CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-        if (primitiveValue->getValueID() == CSSValueNone) {
-            state.style()->setClipPath(nullptr);
-        } else if (primitiveValue->isURI()) {
-            String cssURLValue = primitiveValue->getStringValue();
-            KURL url = state.document().completeURL(cssURLValue);
-            // FIXME: It doesn't work with forward or external SVG references (see https://bugs.webkit.org/show_bug.cgi?id=90405)
-            state.style()->setClipPath(ReferenceClipPathOperation::create(cssURLValue, AtomicString(url.fragmentIdentifier())));
-        }
+    if (value->isPrimitiveValue() && toCSSPrimitiveValue(value)->getValueID() == CSSValueNone) {
+        state.style()->setClipPath(nullptr);
+    }
+    if (value->isURIValue()) {
+        String cssURLValue = toCSSURIValue(value)->value();
+        KURL url = state.document().completeURL(cssURLValue);
+        // FIXME: It doesn't work with forward or external SVG references (see https://bugs.webkit.org/show_bug.cgi?id=90405)
+        state.style()->setClipPath(ReferenceClipPathOperation::create(cssURLValue, AtomicString(url.fragmentIdentifier())));
     }
 }
 
@@ -628,14 +627,14 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitTextEmphasisStyle(StyleRe
         return;
     }
 
-    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-
-    if (primitiveValue->isString()) {
+    if (value->isStringValue()) {
         state.style()->setTextEmphasisFill(TextEmphasisFillFilled);
         state.style()->setTextEmphasisMark(TextEmphasisMarkCustom);
-        state.style()->setTextEmphasisCustomMark(AtomicString(primitiveValue->getStringValue()));
+        state.style()->setTextEmphasisCustomMark(AtomicString(toCSSStringValue(value)->value()));
         return;
     }
+
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
 
     state.style()->setTextEmphasisCustomMark(nullAtom);
 
@@ -706,15 +705,15 @@ void StyleBuilderFunctions::applyValueCSSPropertyContent(StyleResolverState& sta
     bool didSet = false;
     for (auto& item : toCSSValueList(*value)) {
         if (item->isImageGeneratorValue()) {
-            state.style()->setContent(StyleGeneratedImage::create(toCSSImageGeneratorValue(item.get())), didSet);
+            state.style()->setContent(StyleGeneratedImage::create(toCSSImageGeneratorValue(*item)), didSet);
             didSet = true;
         } else if (item->isImageSetValue()) {
-            state.style()->setContent(state.elementStyleResources().setOrPendingFromValue(CSSPropertyContent, toCSSImageSetValue(item.get())), didSet);
+            state.style()->setContent(state.elementStyleResources().setOrPendingFromValue(CSSPropertyContent, toCSSImageSetValue(*item)), didSet);
             didSet = true;
         }
 
         if (item->isImageValue()) {
-            state.style()->setContent(state.elementStyleResources().cachedOrPendingFromValue(state.document(), CSSPropertyContent, toCSSImageValue(item.get())), didSet);
+            state.style()->setContent(state.elementStyleResources().cachedOrPendingFromValue(state.document(), CSSPropertyContent, toCSSImageValue(*item)), didSet);
             didSet = true;
             continue;
         }
@@ -738,22 +737,20 @@ void StyleBuilderFunctions::applyValueCSSPropertyContent(StyleResolverState& sta
                 state.style()->setUnique();
             else
                 state.parentStyle()->setUnique();
-            QualifiedName attr(nullAtom, AtomicString(toCSSPrimitiveValue(functionValue->item(0))->getStringValue()), nullAtom);
+            QualifiedName attr(nullAtom, AtomicString(toCSSCustomIdentValue(functionValue->item(0))->value()), nullAtom);
             const AtomicString& value = state.element()->getAttribute(attr);
             state.style()->setContent(value.isNull() ? emptyString() : value.string(), didSet);
             didSet = true;
         }
 
-        if (!item->isPrimitiveValue())
+        if (!item->isPrimitiveValue() && !item->isStringValue())
             continue;
 
-        CSSPrimitiveValue* contentValue = toCSSPrimitiveValue(item.get());
-
-        if (contentValue->isString()) {
-            state.style()->setContent(contentValue->getStringValue().impl(), didSet);
+        if (item->isStringValue()) {
+            state.style()->setContent(toCSSStringValue(*item).value().impl(), didSet);
             didSet = true;
         } else {
-            switch (contentValue->getValueID()) {
+            switch (toCSSPrimitiveValue(*item).getValueID()) {
             case CSSValueOpenQuote:
                 state.style()->setContent(OPEN_QUOTE, didSet);
                 didSet = true;
@@ -782,12 +779,11 @@ void StyleBuilderFunctions::applyValueCSSPropertyContent(StyleResolverState& sta
 
 void StyleBuilderFunctions::applyValueCSSPropertyWebkitLocale(StyleResolverState& state, CSSValue* value)
 {
-    const CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-    if (primitiveValue->getValueID() == CSSValueAuto) {
+    if (value->isPrimitiveValue()) {
+        ASSERT(toCSSPrimitiveValue(value)->getValueID() == CSSValueAuto);
         state.style()->setLocale(nullAtom);
     } else {
-        ASSERT(primitiveValue->isString());
-        state.style()->setLocale(AtomicString(primitiveValue->getStringValue()));
+        state.style()->setLocale(AtomicString(toCSSStringValue(value)->value()));
     }
     state.fontBuilder().setScript(state.style()->locale());
 }
@@ -810,6 +806,11 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitAppRegion(StyleResolverSt
 void StyleBuilderFunctions::applyValueCSSPropertyWebkitWritingMode(StyleResolverState& state, CSSValue* value)
 {
     state.setWritingMode(*toCSSPrimitiveValue(value));
+}
+
+void StyleBuilderFunctions::applyValueCSSPropertyTextOrientation(StyleResolverState& state, CSSValue* value)
+{
+    state.setTextOrientation(*toCSSPrimitiveValue(value));
 }
 
 void StyleBuilderFunctions::applyValueCSSPropertyWebkitTextOrientation(StyleResolverState& state, CSSValue* value)

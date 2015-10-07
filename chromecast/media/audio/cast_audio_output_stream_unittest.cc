@@ -4,7 +4,7 @@
 
 #include "base/bind.h"
 #include "base/synchronization/waitable_event.h"
-#include "chromecast/base/metrics/cast_metrics_test_helper.cc"
+#include "chromecast/base/metrics/cast_metrics_test_helper.h"
 #include "chromecast/media/audio/cast_audio_manager.h"
 #include "chromecast/media/audio/cast_audio_output_stream.h"
 #include "chromecast/media/base/media_message_loop.h"
@@ -182,7 +182,8 @@ class FakeAudioManager : public CastAudioManager {
   ~FakeAudioManager() override {}
 
   // CastAudioManager overrides.
-  scoped_ptr<MediaPipelineBackend> CreateMediaPipelineBackend() override {
+  scoped_ptr<MediaPipelineBackend> CreateMediaPipelineBackend(
+      const MediaPipelineDeviceParams& params) override {
     DCHECK(media::MediaMessageLoop::GetTaskRunner()->BelongsToCurrentThread());
     DCHECK(!media_pipeline_backend_);
 

@@ -5015,6 +5015,14 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
       </if>
 
+      <!-- Material Design version of chrome://policy -->
+      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_POLICY_PAGE_NAME" desc="Name for the flag to enable the material design policy page.">
+          Enable Material Design policy page
+      </message>
+      <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_POLICY_PAGE_DESCRIPTION" desc="Description for the flag to enable the material design policy page.">
+          If enabled, the chrome://md-policy URL loads the Material Design policy page.
+      </message>
+
       <!-- Material Design version of chrome://downloads -->
       <message name="IDS_FLAGS_ENABLE_MATERIAL_DESIGN_DOWNLOADS_NAME" desc="Name for the flag to enable the material design downloads page.">
           Enable Material Design downloads
@@ -5474,12 +5482,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ENABLE_TOUCH_DRAG_DROP_DESCRIPTION" desc="Description of the flag to enable touch initiated drag drop.">
         Touch drag and drop can be initiated through long press on a draggable element.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_TOUCH_EDITING_NAME" desc="Name of the flag that enables touch based text editing.">
-        Enable touch based text editing
-      </message>
-      <message name="IDS_FLAGS_ENABLE_TOUCH_EDITING_DESCRIPTION" desc="Description of the flag to enable touch based text editing.">
-        Touch editing can be initiated by tapping on a textfield or a selected text.
       </message>
       <message name="IDS_FLAGS_TOUCH_SELECTION_STRATEGY_NAME" desc="Name of the flag that controls touch based text selection strategy.">
         Touch text selection strategy
@@ -6613,32 +6615,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
           All plugins
         </message>
       </if>
-
-      <!-- Crashes -->
-      <message name="IDS_CRASHES_TITLE" desc="Title for the chrome://crashes page.">
-        Crashes
-      </message>
-      <message name="IDS_CRASHES_CRASH_COUNT_BANNER_FORMAT" desc="Format for crash count banner on chrome://crashes">
-        Crashes (<ph name="CRASH_COUNT">$1<ex>3</ex></ph>)
-      </message>
-      <message name="IDS_CRASHES_CRASH_HEADER_FORMAT" desc="Format for crash entry headings on chrome://crashes">
-        Crash ID <ph name="CRASH_ID">$1<ex>8fa95dbb6f2ec862</ex></ph> (<ph name="CRASH_LOCAL_ID">$2<ex>Chrome</ex></ph>)
-      </message>
-      <message name="IDS_CRASHES_CRASH_TIME_FORMAT" desc="Format for crash entry occurence time on chrome://crashes">
-        Occurred <ph name="CRASH_TIME">$1<ex>Tuesday, January 25, 2011 2:58:02 PM</ex></ph>
-      </message>
-      <message name="IDS_CRASHES_BUG_LINK_LABEL" desc="Link text for filing a crash bug on chrome://crashes">
-        File bug
-      </message>
-      <message name="IDS_CRASHES_NO_CRASHES_MESSAGE" desc="The explanatory message for chrome://crashes when there are no crashes">
-        You have no recently reported crashes.  Crashes that occurred when crash reporting was disabled will not appear here.
-      </message>
-      <message name="IDS_CRASHES_DISABLED_HEADER" desc="The header for chrome://crashes when crash reporting is disabled">
-        Crash reporting is disabled.
-      </message>
-      <message name="IDS_CRASHES_UPLOAD_MESSAGE" desc="Link text for triggering crash uploading on chrome://crashes">
-        Start uploading crashes
-      </message>
 
       <!-- WebRTC logs -->
       <message name="IDS_WEBRTC_LOGS_TITLE" desc="Title for the chrome://webrtc-logs page.">
@@ -9490,6 +9466,13 @@ I don't think this site should be blocked!
         The certificate does not specify a mechanism to check whether it has been revoked.
       </message>
 
+      <message name="IDS_PAGE_INFO_SECURITY_TAB_DEPRECATED_SIGNATURE_ALGORITHM_MINOR" desc="The security summary phrase in the page information panel for a security problem where the site's certificate expires in 2016 and contains a SHA1 signature in the chain (as opposed to 2017 or later). Such certificates will not be supported in a future version of Chrome.">
+        The certificate for this site expires in 2016, and the certificate chain contains a certificate signed using SHA-1.
+      </message>
+      <message name="IDS_PAGE_INFO_SECURITY_TAB_DEPRECATED_SIGNATURE_ALGORITHM_MAJOR" desc="The security summary phrase in the page information panel for a security problem where the site's certificate expires in 2017 or later and contains a SHA1 signature in the chain (as opposed to 2016). Such certificates will not be supported in a future version of Chrome.">
+        The certificate for this site expires in 2017 or later, and the certificate chain contains a certificate signed using SHA-1.
+      </message>
+
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_CONNECTION_TEXT" desc="The text of the connection section when the connection is encrypted.">
         Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is encrypted using a modern cipher suite.
       </message>
@@ -10456,6 +10439,9 @@ I don't think this site should be blocked!
         </message>
         <message name="IDS_OPTIONS_CONTROLLED_SETTING_EXTENSION_WITH_NAME" desc="Text displayed in the controlled settings bubble when a setting's value is enforced by an extension. The name of the extension would be displayed on the following line, thus the ending with ':'.">
           This setting is controlled by:
+        </message>
+        <message name="IDS_SETTINGS_CONTROLLED_SETTING_NAMED_EXTENSION" desc="Text displayed in the controlled settings indicator tooltip when a setting's value is enforced by an extension.">
+          This setting is controlled by extension <ph name="NAME">$1<ex>Adblocker plusplus</ex></ph>
         </message>
         <message name="IDS_OPTIONS_CONTROLLED_SETTING_MANAGE_EXTENSION" desc="Text displayed for a link to manage extension from the controlled settings bubble.">
           Manage extension
@@ -13174,6 +13160,19 @@ Some features may be unavailable.  Please check that the profile exists and you 
         </message>
       </if>
 
+      <!-- Media throttle infobar -->
+      <if expr="is_android">
+        <message name="IDS_MEDIA_THROTTLE_INFOBAR_TEXT" desc="Text to display on the info bar whenever user wants to playback a video after being throttled.">
+          Android is having trouble playing media.
+        </message>
+        <message name="IDS_MEDIA_THROTTLE_INFOBAR_BLOCK_BUTTON" desc="Label for choosing 'Block' on media throttle infobar.[CHAR-LIMIT=32]">
+          Wait
+        </message>
+        <message name="IDS_MEDIA_THROTTLE_INFOBAR_ALLOW_BUTTON" desc="Label for choosing 'Allow' on media throttle infobar. [CHAR-LIMIT=32]">
+          Try again
+        </message>
+      </if>
+
       <message name="IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_TITLE" desc="The title text that is used in the manage passwords bubble when the user has generated a password.">
         Password saved
       </message>
@@ -13886,6 +13885,12 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_DESCRIPTION" desc="Description for the flag to enable the account consistency between browser and cookie jar.">
         When enabled, the browser manages signing in and out of Google accounts.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PASSWORD_SEPARATED_SIGNIN_FLOW_NAME" desc="Title for the flag to enable the new gaia password-separated sign in flow.">
+        Enable new gaia password-separated sign in flow
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PASSWORD_SEPARATED_SIGNIN_FLOW_DESCRIPTION" desc="Description for the flag to enable the new gaia password-separated sign in flow.">
+        When enabled, signing in to the browser will use a new gaia password-separated sign in flow.
       </message>
 
       <message name="IDS_FLAGS_ENABLE_GOOGLE_PROFILE_INFO_NAME" desc="Title for the flag to enable the google profile information">
@@ -15192,16 +15197,16 @@ After you create a new supervised user, you can manage their settings at any tim
       </if>
 
       <!-- Strings describing Chrome security policy for DevTools security panel -->
-      <message name="IDS_BROKEN_SHA1" desc="Summary phrase for a security problem where the site's certificate expires in 2017 or later and contains a SHA1 signature in the chain.">
+      <message name="IDS_MAJOR_SHA1" desc="Summary phrase for a security problem where the site's certificate expires in 2017 or later and contains a SHA1 signature in the chain.">
         SHA-1 Certificate
       </message>
-      <message name="IDS_BROKEN_SHA1_DESCRIPTION" desc="Description of a security problem where the site's certificate expires in 2017 or later and contains a SHA1 signature in the chain.">
+      <message name="IDS_MAJOR_SHA1_DESCRIPTION" desc="Description of a security problem where the site's certificate expires in 2017 or later and contains a SHA1 signature in the chain.">
         The certificate for this site expires in 2017 or later, and the certificate chain contains a certificate signed using SHA-1.
       </message>
-      <message name="IDS_WARNING_SHA1" desc="Summary phrase for a security problem where the site's certificate expires in 2016 and contains a SHA1 signature in the chain.">
+      <message name="IDS_MINOR_SHA1" desc="Summary phrase for a security problem where the site's certificate expires in 2016 and contains a SHA1 signature in the chain.">
         SHA-1 Certificate
       </message>
-      <message name="IDS_WARNING_SHA1_DESCRIPTION" desc="Description of a security problem where the site's certificate expires in 2016 and contains a SHA1 signature in the chain.">
+      <message name="IDS_MINOR_SHA1_DESCRIPTION" desc="Description of a security problem where the site's certificate expires in 2016 and contains a SHA1 signature in the chain.">
         The certificate for this site expires in 2016, and the certificate chain contains a certificate signed using SHA-1.
       </message>
       <message name="IDS_PASSIVE_MIXED_CONTENT" desc="Summary phrase of a security problem where the site displayed passive mixed content.">

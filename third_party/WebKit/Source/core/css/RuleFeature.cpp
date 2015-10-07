@@ -30,6 +30,7 @@
 #include "core/css/RuleFeature.h"
 
 #include "core/HTMLNames.h"
+#include "core/css/CSSCustomIdentValue.h"
 #include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSSelectorList.h"
@@ -318,7 +319,7 @@ void RuleFeatureSet::updateInvalidationSetsForContentAttribute(const RuleData& r
         CSSFunctionValue* functionValue = toCSSFunctionValue(item.get());
         if (functionValue->functionType() != CSSValueAttr)
             continue;
-        ensureAttributeInvalidationSet(AtomicString(toCSSPrimitiveValue(functionValue->item(0))->getStringValue())).setInvalidatesSelf();
+        ensureAttributeInvalidationSet(AtomicString(toCSSCustomIdentValue(functionValue->item(0))->value())).setInvalidatesSelf();
     }
 }
 
@@ -547,6 +548,7 @@ void RuleFeatureSet::clear()
     m_classInvalidationSets.clear();
     m_attributeInvalidationSets.clear();
     m_idInvalidationSets.clear();
+    m_pseudoInvalidationSets.clear();
 }
 
 void RuleFeatureSet::collectInvalidationSetsForClass(InvalidationSetVector& invalidationSets, Element& element, const AtomicString& className) const
@@ -586,10 +588,6 @@ DEFINE_TRACE(RuleFeatureSet)
 #if ENABLE(OILPAN)
     visitor->trace(siblingRules);
     visitor->trace(uncommonAttributeRules);
-    visitor->trace(m_classInvalidationSets);
-    visitor->trace(m_attributeInvalidationSets);
-    visitor->trace(m_idInvalidationSets);
-    visitor->trace(m_pseudoInvalidationSets);
 #endif
 }
 

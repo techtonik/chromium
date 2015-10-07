@@ -141,7 +141,6 @@ FrameView::FrameView(LocalFrame* frame)
     , m_scrollbarsAvoidingResizer(0)
     , m_scrollbarsSuppressed(false)
     , m_inUpdateScrollbars(false)
-    , m_clipsRepaints(true)
     , m_frameTimingRequestsDirty(true)
 
 {
@@ -1616,20 +1615,6 @@ HostWindow* FrameView::hostWindow() const
     if (!page)
         return nullptr;
     return &page->chromeClient();
-}
-
-void FrameView::contentRectangleForPaintInvalidation(const IntRect& rectInContent)
-{
-    ASSERT(!m_frame->ownerLayoutObject());
-
-    IntRect paintRect = rectInContent;
-    if (clipsPaintInvalidations())
-        paintRect.intersect(visibleContentRect());
-    if (paintRect.isEmpty())
-        return;
-
-    if (HostWindow* window = hostWindow())
-        window->invalidateRect(contentsToRootFrame(paintRect));
 }
 
 void FrameView::contentsResized()
@@ -3113,11 +3098,6 @@ void FrameView::setScrollbarModes(ScrollbarMode horizontalMode, ScrollbarMode ve
     layer->setUserScrollable(userInputScrollable(HorizontalScrollbar), userInputScrollable(VerticalScrollbar));
 }
 
-void FrameView::setClipsRepaints(bool clipsRepaints)
-{
-    m_clipsRepaints = clipsRepaints;
-}
-
 IntSize FrameView::visibleContentSize(IncludeScrollbarsInRect scrollbarInclusion) const
 {
     return scrollbarInclusion == ExcludeScrollbars ? excludeScrollbars(frameRect().size()) : frameRect().size();
@@ -3678,7 +3658,7 @@ bool FrameView::shouldPlaceVerticalScrollbarOnLeft() const
     return false;
 }
 
-LayoutRect FrameView::scrollIntoView(const LayoutRect& rectInContent, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
+LayoutRect FrameView::scrollIntoView(const LayoutRect& rectInContent, const ScrollAlignment& alignX, const ScrollAlignment& alignY, ScrollType scrollType)
 {
     LayoutRect viewRect(visibleContentRect());
     LayoutRect exposeRect = ScrollAlignment::getRectToExpose(viewRect, rectInContent, alignX, alignY);
@@ -3686,7 +3666,7 @@ LayoutRect FrameView::scrollIntoView(const LayoutRect& rectInContent, const Scro
     double xOffset = exposeRect.x();
     double yOffset = exposeRect.y();
 
-    setScrollPosition(DoublePoint(xOffset, yOffset), ProgrammaticScroll);
+    setScrollPosition(DoublePoint(xOffset, yOffset), scrollType);
 
     // Scrolling the FrameView cannot change the input rect's location relative to the document.
     return rectInContent;

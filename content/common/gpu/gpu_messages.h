@@ -373,13 +373,6 @@ IPC_SYNC_MESSAGE_CONTROL1_3(GpuHostMsg_EstablishGpuChannel,
                             IPC::ChannelHandle /* handle to channel */,
                             gpu::GPUInfo /* stats about GPU process*/)
 
-// A renderer sends this to the browser process when it wants to
-// create a GL context associated with the given view_id.
-IPC_SYNC_MESSAGE_CONTROL2_1(GpuHostMsg_CreateViewCommandBuffer,
-                            GPUCreateCommandBufferConfig, /* init_params */
-                            int32,                        /* route_id */
-                            content::CreateCommandBufferResult /* result */)
-
 // Response from GPU to a GputMsg_Initialize message.
 IPC_MESSAGE_CONTROL2(GpuHostMsg_Initialized,
                      bool /* result */,
@@ -476,6 +469,10 @@ IPC_SYNC_MESSAGE_CONTROL3_1(GpuChannelMsg_CreateOffscreenCommandBuffer,
 // object that it's hosting.
 IPC_SYNC_MESSAGE_CONTROL1_0(GpuChannelMsg_DestroyCommandBuffer,
                             int32 /* instance_id */)
+
+// Simple NOP message which can be used as fence to ensure all previous sent
+// messages have been received.
+IPC_SYNC_MESSAGE_CONTROL0_0(GpuChannelMsg_Nop)
 
 #if defined(OS_ANDROID)
 //------------------------------------------------------------------------------
@@ -597,15 +594,6 @@ IPC_MESSAGE_ROUTED2(GpuCommandBufferMsg_UpdateVSyncParameters,
 
 // Send to stub on surface visibility change.
 IPC_MESSAGE_ROUTED1(GpuCommandBufferMsg_SetSurfaceVisible, bool /* visible */)
-
-// Sent to proxy when the gpu memory manager changes its memory allocation.
-IPC_MESSAGE_ROUTED1(GpuCommandBufferMsg_SetMemoryAllocation,
-                    gpu::MemoryAllocation /* allocation */)
-
-// Sent to stub when proxy is assigned a memory allocation changed callback.
-IPC_MESSAGE_ROUTED1(
-    GpuCommandBufferMsg_SetClientHasMemoryAllocationChangedCallback,
-    bool /* has_callback */)
 
 // Inserts a sync point into the channel. This is handled on the IO thread, so
 // can be expected to be reasonably fast, but the sync point is actually

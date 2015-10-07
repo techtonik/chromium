@@ -19,6 +19,7 @@
 #include "core/css/CSSKeyframesRule.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DOMNodeIds.h"
+#include "core/inspector/InjectedScriptManager.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
@@ -32,10 +33,11 @@ static const char animationAgentEnabled[] = "animationAgentEnabled";
 
 namespace blink {
 
-InspectorAnimationAgent::InspectorAnimationAgent(InspectorPageAgent* pageAgent, InspectorDOMAgent* domAgent)
+InspectorAnimationAgent::InspectorAnimationAgent(InspectorPageAgent* pageAgent, InspectorDOMAgent* domAgent, InjectedScriptManager* injectedScriptManager)
     : InspectorBaseAgent<InspectorAnimationAgent, InspectorFrontend::Animation>("Animation")
     , m_pageAgent(pageAgent)
     , m_domAgent(domAgent)
+    , m_injectedScriptManager(injectedScriptManager)
     , m_isCloning(false)
 {
 }
@@ -204,8 +206,9 @@ Animation* InspectorAnimationAgent::animationClone(Animation* animation)
 {
     const String id = String::number(animation->sequenceNumber());
     if (!m_idToAnimationClone.get(id)) {
-        // TODO(samli): Clone the AnimationEffect as well.
-        Animation* clone = Animation::create(animation->effect(), animation->timeline());
+        KeyframeEffect* oldEffect = toKeyframeEffect(animation->effect());
+        KeyframeEffect* newEffect = KeyframeEffect::create(oldEffect->target(), oldEffect->model(), oldEffect->specifiedTiming());
+        Animation* clone = Animation::create(newEffect, animation->timeline());
         m_idToAnimationClone.set(id, clone);
         m_idToAnimation.set(String::number(clone->sequenceNumber()), clone);
     }
@@ -265,6 +268,33 @@ void InspectorAnimationAgent::setTiming(ErrorString* errorString, const String& 
     }
 }
 
+void InspectorAnimationAgent::resolveAnimation(ErrorString* errorString, const String& animationId, RefPtr<TypeBuilder::Runtime::RemoteObject>& result)
+{
+    Animation* animation = assertAnimation(errorString, animationId);
+    if (!animation)
+        return;
+    if (m_idToAnimationClone.get(animationId))
+        animation = m_idToAnimationClone.get(animationId);
+    const Element* element = toKeyframeEffect(animation->effect())->target();
+    Document* document = element->ownerDocument();
+    LocalFrame* frame = document ? document->frame() : nullptr;
+    if (!frame) {
+        *errorString = "Element not associated with a document.";
+        return;
+    }
+
+    ScriptState* scriptState = ScriptState::forMainWorld(frame);
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptFor(scriptState);
+    if (injectedScript.isEmpty())
+        return;
+
+    ScriptState::Scope scope(scriptState);
+    v8::Isolate* isolate = scriptState->isolate();
+    ScriptValue scriptValue = ScriptValue(scriptState, toV8(animation, scriptState->context()->Global(), isolate));
+    injectedScript.releaseObjectGroup("animation");
+    result = injectedScript.wrapObject(scriptValue, "animation");
+}
+
 void InspectorAnimationAgent::didCreateAnimation(unsigned sequenceNumber)
 {
     if (m_isCloning)
@@ -315,6 +345,7 @@ DEFINE_TRACE(InspectorAnimationAgent)
 #if ENABLE(OILPAN)
     visitor->trace(m_pageAgent);
     visitor->trace(m_domAgent);
+    visitor->trace(m_injectedScriptManager);
     visitor->trace(m_idToAnimation);
     visitor->trace(m_idToAnimationType);
     visitor->trace(m_idToAnimationClone);

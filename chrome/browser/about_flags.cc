@@ -26,6 +26,7 @@
 #include "chrome/grit/google_chrome_strings.h"
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/cloud_devices/common/cloud_devices_switches.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
 #include "components/dom_distiller/core/dom_distiller_switches.h"
 #include "components/enhanced_bookmarks/enhanced_bookmark_switches.h"
 #include "components/flags_ui/flags_storage.h"
@@ -33,9 +34,11 @@
 #include "components/nacl/common/nacl_switches.h"
 #include "components/offline_pages/offline_page_switches.h"
 #include "components/omnibox/browser/omnibox_switches.h"
+#include "components/password_manager/core/common/password_manager_switches.h"
 #include "components/plugins/common/plugins_switches.h"
 #include "components/proximity_auth/switches.h"
 #include "components/search/search_switches.h"
+#include "components/signin/core/common/signin_switches.h"
 #include "components/sync_driver/sync_driver_switches.h"
 #include "components/tracing/tracing_switches.h"
 #include "components/version_info/version_info.h"
@@ -1150,12 +1153,6 @@ const Experiment kExperiments[] = {
      kOsWin | kOsCrOS,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableTouchDragDrop,
                                switches::kDisableTouchDragDrop)},
-    {"enable-touch-editing",
-     IDS_FLAGS_ENABLE_TOUCH_EDITING_NAME,
-     IDS_FLAGS_ENABLE_TOUCH_EDITING_DESCRIPTION,
-     kOsCrOS | kOsWin | kOsLinux,
-     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableTouchEditing,
-                               switches::kDisableTouchEditing)},
     {"touch-selection-strategy",
      IDS_FLAGS_TOUCH_SELECTION_STRATEGY_NAME,
      IDS_FLAGS_TOUCH_SELECTION_STRATEGY_DESCRIPTION,
@@ -1397,6 +1394,12 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_IFRAME_BASED_SIGNIN_DESCRIPTION,
      kOsMac | kOsWin | kOsLinux,
      SINGLE_VALUE_TYPE(switches::kEnableIframeBasedSignin)},
+    {"enable-password-separated-signin-flow",
+     IDS_FLAGS_ENABLE_PASSWORD_SEPARATED_SIGNIN_FLOW_NAME,
+     IDS_FLAGS_ENABLE_PASSWORD_SEPARATED_SIGNIN_FLOW_DESCRIPTION,
+     kOsWin | kOsLinux,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnablePasswordSeparatedSigninFlow,
+                               switches::kDisablePasswordSeparatedSigninFlow)},
     {"enable-google-profile-info",
      IDS_FLAGS_ENABLE_GOOGLE_PROFILE_INFO_NAME,
      IDS_FLAGS_ENABLE_GOOGLE_PROFILE_INFO_DESCRIPTION,
@@ -1584,11 +1587,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_INERT_VISUAL_VIEWPORT_DESCRIPTION,
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kInertVisualViewport)},
-    {"bleeding-edge-renderer-mode",
-     IDS_FLAGS_BLEEDING_RENDERER_NAME,
-     IDS_FLAGS_BLEEDING_RENDERER_DESCRIPTION,
-     kOsAndroid,
-     SINGLE_VALUE_TYPE(switches::kEnableBleedingEdgeRenderingFastPaths)},
     {"enable-settings-window",
      IDS_FLAGS_ENABLE_SETTINGS_WINDOW_NAME,
      IDS_FLAGS_ENABLE_SETTINGS_WINDOW_DESCRIPTION,
@@ -1694,6 +1692,11 @@ const Experiment kExperiments[] = {
      SINGLE_VALUE_TYPE(
          switches::kEnableMessageCenterAlwaysScrollUpUponNotificationRemoval)},
 #endif
+    {"enable-md-policy-page",
+     IDS_FLAGS_ENABLE_MATERIAL_DESIGN_POLICY_PAGE_NAME,
+     IDS_FLAGS_ENABLE_MATERIAL_DESIGN_POLICY_PAGE_DESCRIPTION,
+     kOsDesktop,
+     SINGLE_VALUE_TYPE(switches::kEnableMaterialDesignPolicyPage)},
 #if defined(OS_CHROMEOS)
     {"memory-pressure-thresholds",
      IDS_FLAGS_MEMORY_PRESSURE_THRESHOLD_NAME,

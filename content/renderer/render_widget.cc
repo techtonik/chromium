@@ -492,7 +492,7 @@ RenderWidget::RenderWidget(CompositorDependencies* compositor_deps,
       need_update_rect_for_auto_resize_(false),
       did_show_(false),
       is_hidden_(hidden),
-      never_visible_(never_visible),
+      compositor_never_visible_(never_visible),
       is_fullscreen_granted_(false),
       display_mode_(blink::WebDisplayModeUndefined),
       has_focus_(false),
@@ -967,7 +967,7 @@ GURL RenderWidget::GetURLForGraphicsContext3D() {
 scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
   // For widgets that are never visible, we don't start the compositor, so we
   // never get a request for a cc::OutputSurface.
-  DCHECK(!never_visible_);
+  DCHECK(!compositor_never_visible_);
 
 #if defined(OS_ANDROID)
   if (SynchronousCompositorFactory* factory =
@@ -1339,6 +1339,12 @@ void RenderWidget::initializeLayerTreeView() {
 
   compositor_ = RenderWidgetCompositor::Create(this, compositor_deps_);
   compositor_->setViewportSize(size_, physical_backing_size_);
+
+  // For background pages and certain tests, we don't want to trigger
+  // OutputSurface creation.
+  if (compositor_never_visible_ || !RenderThreadImpl::current())
+    compositor_->SetNeverVisible();
+
   StartCompositor();
 }
 
@@ -1489,7 +1495,7 @@ void RenderWidget::QueueMessage(IPC::Message* msg,
 void RenderWidget::didChangeCursor(const WebCursorInfo& cursor_info) {
   // TODO(darin): Eliminate this temporary.
   WebCursor cursor;
-  InitializeCursorFromWebKitCursorInfo(&cursor, cursor_info);
+  InitializeCursorFromWebCursorInfo(&cursor, cursor_info);
   // Only send a SetCursor message if we need to make a change.
   if (!current_cursor_.IsEqual(cursor)) {
     current_cursor_ = cursor;
@@ -2168,15 +2174,8 @@ void RenderWidget::didOverscroll(
 }
 
 void RenderWidget::StartCompositor() {
-  // For widgets that are never visible, we don't need the compositor to run
-  // at all.
-  if (never_visible_)
-    return;
-  // In tests without a RenderThreadImpl, don't set ready as this kicks
-  // off creating output surfaces that the test can't create.
-  if (!RenderThreadImpl::current())
-    return;
-  compositor_->StartCompositor();
+  if (!is_hidden())
+    compositor_->setVisible(true);
 }
 
 void RenderWidget::SchedulePluginMove(const WebPluginGeometry& move) {
@@ -2353,15 +2352,10 @@ RenderWidget::CreateGraphicsContext3D(bool compositor) {
     limits.min_transfer_buffer_size = 64 * 1024;
   }
 
-  // TODO(piman): we still need to create a View command buffer until
-  // crbug.com/526196 is fixed. The surface_id doesn't matter, it just needs to
-  // be !0.
-  const int32 kDummySurfaceId = 1;
   scoped_ptr<WebGraphicsContext3DCommandBufferImpl> context(
       new WebGraphicsContext3DCommandBufferImpl(
-          kDummySurfaceId, GetURLForGraphicsContext3D(),
-          gpu_channel_host.get(), attributes, lose_context_when_out_of_memory,
-          limits, NULL));
+          0, GetURLForGraphicsContext3D(), gpu_channel_host.get(), attributes,
+          lose_context_when_out_of_memory, limits, NULL));
   return context.Pass();
 }
 

@@ -325,6 +325,8 @@ WARN_UNUSED_RESULT static bool IsSchemaKnown(LevelDBDatabase* db, bool* known) {
     *known = true;
     return true;
   }
+  if (db_schema_version < 0)
+    return false;  // Only corruption should cause this.
   if (db_schema_version > kLatestKnownSchemaVersion) {
     *known = false;
     return true;
@@ -340,7 +342,8 @@ WARN_UNUSED_RESULT static bool IsSchemaKnown(LevelDBDatabase* db, bool* known) {
     *known = true;
     return true;
   }
-
+  if (db_data_version < 0)
+    return false;  // Only corruption should cause this.
   if (db_data_version > latest_known_data_version) {
     *known = false;
     return true;
@@ -1087,8 +1090,10 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Open(
     }
 
     LOG(ERROR) << "IndexedDB backing store cleanup succeeded, reopening";
-    leveldb_factory->OpenLevelDB(file_path, comparator.get(), &db, NULL);
-    if (!db) {
+    *status =
+        leveldb_factory->OpenLevelDB(file_path, comparator.get(), &db, NULL);
+    if (!status->ok()) {
+      DCHECK(!db);
       LOG(ERROR) << "IndexedDB backing store reopen after recovery failed";
       HistogramOpenStatus(INDEXED_DB_BACKING_STORE_OPEN_CLEANUP_REOPEN_FAILED,
                           origin_url);
@@ -1108,11 +1113,14 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Open(
              task_runner,
              status);
 
-  if (clean_journal && backing_store.get() &&
-      !backing_store->CleanUpBlobJournal(LiveBlobJournalKey::Encode()).ok()) {
-    HistogramOpenStatus(
-        INDEXED_DB_BACKING_STORE_OPEN_FAILED_CLEANUP_JOURNAL_ERROR, origin_url);
-    return scoped_refptr<IndexedDBBackingStore>();
+  if (clean_journal && backing_store.get()) {
+    *status = backing_store->CleanUpBlobJournal(LiveBlobJournalKey::Encode());
+    if (!status->ok()) {
+      HistogramOpenStatus(
+          INDEXED_DB_BACKING_STORE_OPEN_FAILED_CLEANUP_JOURNAL_ERROR,
+          origin_url);
+      return scoped_refptr<IndexedDBBackingStore>();
+    }
   }
   return backing_store;
 }

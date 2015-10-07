@@ -230,8 +230,12 @@ class COMPOSITOR_EXPORT Compositor
   void SetAuthoritativeVSyncInterval(const base::TimeDelta& interval);
 
   // Sets the widget for the compositor to render into.
-  void SetAcceleratedWidgetAndStartCompositor(gfx::AcceleratedWidget widget);
-  gfx::AcceleratedWidget widget() const { return widget_; }
+  void SetAcceleratedWidget(gfx::AcceleratedWidget widget);
+  // Releases the widget previously set through SetAcceleratedWidget().
+  // After returning it will not be used for rendering anymore.
+  // The compositor must be set to invisible when taking away a widget.
+  gfx::AcceleratedWidget ReleaseAcceleratedWidget();
+  gfx::AcceleratedWidget widget() const;
 
   // Returns the vsync manager for this compositor.
   scoped_refptr<CompositorVSyncManager> vsync_manager() const;
@@ -343,6 +347,8 @@ class COMPOSITOR_EXPORT Compositor
   std::list<CompositorBeginFrameObserver*> begin_frame_observer_list_;
 
   gfx::AcceleratedWidget widget_;
+  bool widget_valid_;
+  bool output_surface_requested_;
   scoped_ptr<cc::SurfaceIdAllocator> surface_id_allocator_;
   scoped_refptr<cc::Layer> root_web_layer_;
   scoped_ptr<cc::LayerTreeHost> host_;

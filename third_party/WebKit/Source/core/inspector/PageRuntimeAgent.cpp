@@ -68,6 +68,7 @@ DEFINE_TRACE(PageRuntimeAgent)
 
 void PageRuntimeAgent::init()
 {
+    InspectorRuntimeAgent::init();
     m_instrumentingAgents->setPageRuntimeAgent(this);
 }
 

@@ -98,7 +98,6 @@ class GpuCommandBufferStub
   // GpuMemoryManagerClient implementation:
   gfx::Size GetSurfaceSize() const override;
   gpu::gles2::MemoryTracker* GetMemoryTracker() const override;
-  void SetMemoryAllocation(const gpu::MemoryAllocation& allocation) override;
   void SuggestHaveFrontBuffer(bool suggest_have_frontbuffer) override;
   bool GetTotalGpuMemory(uint64* bytes) override;
 
@@ -203,7 +202,13 @@ class GpuCommandBufferStub
   void OnSignalSyncPointAck(uint32 id);
   void OnSignalQuery(uint32 query, uint32 id);
 
-  void OnSetClientHasMemoryAllocationChangedCallback(bool has_callback);
+  void OnFenceSyncRelease(uint64_t release);
+  bool OnWaitFenceSync(gpu::CommandBufferNamespace namespace_id,
+                       uint64_t command_buffer_id,
+                       uint64_t release);
+  void OnWaitFenceSyncCompleted(gpu::CommandBufferNamespace namespace_id,
+                                uint64_t command_buffer_id,
+                                uint64_t release);
 
   void OnCreateImage(int32 id,
                      gfx::GpuMemoryBufferHandle handle,
@@ -236,7 +241,9 @@ class GpuCommandBufferStub
 
   bool CheckContextLost();
   void CheckCompleteWaits();
-  void PullTextureUpdates(uint32 sync_point);
+  void PullTextureUpdates(gpu::CommandBufferNamespace namespace_id,
+                          uint64_t command_buffer_id,
+                          uint32_t release);
 
   // The lifetime of objects of this class is managed by a GpuChannel. The
   // GpuChannels destroy all the GpuCommandBufferStubs that they own when they
@@ -267,12 +274,6 @@ class GpuCommandBufferStub
   scoped_ptr<gpu::GpuScheduler> scheduler_;
   scoped_ptr<gpu::SyncPointClient> sync_point_client_;
   scoped_refptr<gfx::GLSurface> surface_;
-
-  scoped_ptr<GpuMemoryManagerClientState> memory_manager_client_state_;
-  // The last memory allocation received from the GpuMemoryManager (used to
-  // elide redundant work).
-  bool last_memory_allocation_valid_;
-  gpu::MemoryAllocation last_memory_allocation_;
 
   GpuWatchdog* watchdog_;
 
