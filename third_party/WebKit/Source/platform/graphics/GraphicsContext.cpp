@@ -32,6 +32,7 @@
 #include "platform/graphics/ColorSpace.h"
 #include "platform/graphics/Gradient.h"
 #include "platform/graphics/ImageBuffer.h"
+#include "platform/graphics/paint/DisplayItemList.h"
 #include "platform/weborigin/KURL.h"
 #include "skia/ext/platform_device.h"
 #include "third_party/skia/include/core/SkAnnotation.h"
@@ -344,7 +345,7 @@ void GraphicsContext::compositePicture(SkPicture* picture, const FloatRect& dest
     SkMatrix pictureTransform;
     pictureTransform.setRectToRect(sourceBounds, skBounds, SkMatrix::kFill_ScaleToFit);
     m_canvas->concat(pictureTransform);
-    RefPtr<SkPictureImageFilter> pictureFilter = adoptRef(SkPictureImageFilter::CreateForLocalSpace(picture, sourceBounds, static_cast<SkFilterQuality>(imageInterpolationQuality())));
+    RefPtr<SkImageFilter> pictureFilter = adoptRef(SkPictureImageFilter::CreateForLocalSpace(picture, sourceBounds, static_cast<SkFilterQuality>(imageInterpolationQuality())));
     picturePaint.setImageFilter(pictureFilter.get());
     m_canvas->saveLayer(&sourceBounds, &picturePaint);
     m_canvas->restore();
@@ -732,7 +733,8 @@ void GraphicsContext::drawText(const Font& font, const TextRunPaintInfo& runInfo
     if (contextDisabled())
         return;
 
-    font.drawText(m_canvas, runInfo, point, m_deviceScaleFactor, paint);
+    if (font.drawText(m_canvas, runInfo, point, m_deviceScaleFactor, paint))
+        m_displayItemList->setTextPainted();
 }
 
 template<typename DrawTextFunc>
@@ -759,7 +761,8 @@ void GraphicsContext::drawText(const Font& font, const TextRunPaintInfo& runInfo
         return;
 
     drawTextPasses([&font, &runInfo, &point, this](const SkPaint& paint) {
-        font.drawText(m_canvas, runInfo, point, m_deviceScaleFactor, paint);
+        if (font.drawText(m_canvas, runInfo, point, m_deviceScaleFactor, paint))
+            m_displayItemList->setTextPainted();
     });
 }
 
@@ -779,7 +782,8 @@ void GraphicsContext::drawBidiText(const Font& font, const TextRunPaintInfo& run
         return;
 
     drawTextPasses([&font, &runInfo, &point, customFontNotReadyAction, this](const SkPaint& paint) {
-        font.drawBidiText(m_canvas, runInfo, point, customFontNotReadyAction, m_deviceScaleFactor, paint);
+        if (font.drawBidiText(m_canvas, runInfo, point, customFontNotReadyAction, m_deviceScaleFactor, paint))
+            m_displayItemList->setTextPainted();
     });
 }
 

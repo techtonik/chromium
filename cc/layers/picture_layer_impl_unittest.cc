@@ -124,6 +124,7 @@ class PictureLayerImplTest : public testing::Test {
   void SetUp() override { InitializeRenderer(); }
 
   virtual void InitializeRenderer() {
+    host_impl_.SetVisible(true);
     host_impl_.InitializeRenderer(output_surface_.get());
   }
 
@@ -1570,6 +1571,7 @@ TEST_F(PictureLayerImplTest, ClampTilesToMaxTileSize) {
   host_impl_.DidLoseOutputSurface();
   scoped_ptr<OutputSurface> new_output_surface =
       FakeOutputSurface::Create3d(context.Pass());
+  host_impl_.SetVisible(true);
   host_impl_.InitializeRenderer(new_output_surface.get());
   output_surface_ = new_output_surface.Pass();
 
@@ -1609,6 +1611,7 @@ TEST_F(PictureLayerImplTest, ClampSingleTileToToMaxTileSize) {
   host_impl_.DidLoseOutputSurface();
   scoped_ptr<OutputSurface> new_output_surface =
       FakeOutputSurface::Create3d(context.Pass());
+  host_impl_.SetVisible(true);
   host_impl_.InitializeRenderer(new_output_surface.get());
   output_surface_ = new_output_surface.Pass();
 
@@ -2065,6 +2068,34 @@ TEST_F(PictureLayerImplTest,
   EXPECT_EQ(0u, data.num_missing_tiles);
   EXPECT_EQ(0u, data.num_incomplete_tiles);
   EXPECT_FALSE(active_layer_->only_used_low_res_last_append_quads());
+}
+
+TEST_F(PictureLayerImplTest, AppendQuadsDataForCheckerboard) {
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
+
+  gfx::Size tile_size(100, 100);
+  gfx::Size layer_bounds(200, 200);
+  gfx::Rect recorded_viewport(0, 0, 150, 150);
+
+  scoped_refptr<FakeDisplayListRasterSource> pending_raster_source =
+      FakeDisplayListRasterSource::CreatePartiallyFilled(layer_bounds,
+                                                         recorded_viewport);
+  SetupPendingTreeWithFixedTileSize(pending_raster_source, tile_size, Region());
+  ActivateTree();
+
+  scoped_ptr<RenderPass> render_pass = RenderPass::Create();
+  AppendQuadsData data;
+  active_layer_->WillDraw(DRAW_MODE_SOFTWARE, nullptr);
+  active_layer_->AppendQuads(render_pass.get(), &data);
+  active_layer_->DidDraw(nullptr);
+
+  EXPECT_EQ(1u, render_pass->quad_list.size());
+  EXPECT_EQ(1u, data.num_missing_tiles);
+  EXPECT_EQ(0u, data.num_incomplete_tiles);
+  EXPECT_EQ(40000, data.checkerboarded_visible_content_area);
+  EXPECT_EQ(17500, data.checkerboarded_no_recording_content_area);
+  EXPECT_EQ(22500, data.checkerboarded_needs_raster_content_area);
+  EXPECT_TRUE(active_layer_->only_used_low_res_last_append_quads());
 }
 
 TEST_F(PictureLayerImplTest, HighResRequiredWhenActiveAllReady) {
@@ -3788,6 +3819,7 @@ class PictureLayerImplTestWithDelegatingRenderer : public PictureLayerImplTest {
   }
 
   void InitializeRenderer() override {
+    host_impl_.SetVisible(true);
     host_impl_.InitializeRenderer(output_surface_.get());
   }
 };
@@ -4453,7 +4485,8 @@ void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
   scoped_ptr<FakeLayerTreeHost> host =
       FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
-  RecordingSource* recording_source = layer->GetRecordingSourceForTesting();
+  DisplayListRecordingSource* recording_source =
+      layer->GetDisplayListRecordingSourceForTesting();
 
   int frame_number = 0;
 
@@ -4462,7 +4495,7 @@ void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
   Region invalidation(layer_rect);
   recording_source->UpdateAndExpandInvalidation(
       &client, &invalidation, layer_bounds, layer_rect, frame_number++,
-      RecordingSource::RECORD_NORMALLY);
+      DisplayListRecordingSource::RECORD_NORMALLY);
 
   scoped_refptr<RasterSource> pending_raster_source =
       recording_source->CreateRasterSource(true);
@@ -4516,7 +4549,8 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
   scoped_ptr<FakeLayerTreeHost> host =
       FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
-  RecordingSource* recording_source = layer->GetRecordingSourceForTesting();
+  DisplayListRecordingSource* recording_source =
+      layer->GetDisplayListRecordingSourceForTesting();
 
   int frame_number = 0;
 
@@ -4525,7 +4559,7 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
   Region invalidation1(layer_rect);
   recording_source->UpdateAndExpandInvalidation(
       &client, &invalidation1, layer_bounds, layer_rect, frame_number++,
-      RecordingSource::RECORD_NORMALLY);
+      DisplayListRecordingSource::RECORD_NORMALLY);
 
   scoped_refptr<RasterSource> raster_source1 =
       recording_source->CreateRasterSource(true);
@@ -4544,7 +4578,7 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
   Region invalidation2(layer_rect);
   recording_source->UpdateAndExpandInvalidation(
       &client, &invalidation2, layer_bounds, layer_rect, frame_number++,
-      RecordingSource::RECORD_NORMALLY);
+      DisplayListRecordingSource::RECORD_NORMALLY);
 
   scoped_refptr<RasterSource> raster_source2 =
       recording_source->CreateRasterSource(true);

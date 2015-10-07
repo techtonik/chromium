@@ -41,6 +41,7 @@
 #include "content/public/common/content_switches.h"
 #include "content/renderer/input/input_handler_manager.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
+#include "gpu/command_buffer/service/gpu_switches.h"
 #include "third_party/WebKit/public/platform/WebCompositeAndReadbackAsyncCallback.h"
 #include "third_party/WebKit/public/platform/WebLayoutAndPaintAsyncCallback.h"
 #include "third_party/WebKit/public/platform/WebSize.h"
@@ -213,6 +214,7 @@ RenderWidgetCompositor::RenderWidgetCompositor(
     : num_failed_recreate_attempts_(0),
       widget_(widget),
       compositor_deps_(compositor_deps),
+      never_visible_(false),
       layout_and_paint_async_callback_(nullptr),
       weak_factory_(this) {
 }
@@ -458,6 +460,9 @@ void RenderWidgetCompositor::Initialize() {
   if (base::SysInfo::IsLowEndDevice())
     settings.max_staging_buffer_usage_in_bytes /= 4;
 
+  cc::ManagedMemoryPolicy current = settings.memory_policy_;
+  settings.memory_policy_ = GetGpuMemoryPolicy(current);
+
   scoped_refptr<base::SingleThreadTaskRunner> compositor_thread_task_runner =
       compositor_deps_->GetCompositorImplThreadTaskRunner();
   scoped_refptr<base::SingleThreadTaskRunner>
@@ -494,6 +499,11 @@ void RenderWidgetCompositor::Initialize() {
 }
 
 RenderWidgetCompositor::~RenderWidgetCompositor() {}
+
+void RenderWidgetCompositor::SetNeverVisible() {
+  DCHECK(!layer_tree_host_->visible());
+  never_visible_ = true;
+}
 
 const base::WeakPtr<cc::InputHandler>&
 RenderWidgetCompositor::GetInputHandler() {
@@ -569,10 +579,6 @@ bool RenderWidgetCompositor::SendMessageToMicroBenchmark(
   return layer_tree_host_->SendMessageToMicroBenchmark(id, value.Pass());
 }
 
-void RenderWidgetCompositor::StartCompositor() {
-  layer_tree_host_->SetLayerTreeHostClientReady();
-}
-
 void RenderWidgetCompositor::setRootLayer(const blink::WebLayer& layer) {
   layer_tree_host_->SetRootLayer(
       static_cast<const cc_blink::WebLayerImpl*>(&layer)->layer());
@@ -620,10 +626,6 @@ void RenderWidgetCompositor::setDeviceScaleFactor(float device_scale) {
   layer_tree_host_->SetDeviceScaleFactor(device_scale);
 }
 
-float RenderWidgetCompositor::deviceScaleFactor() const {
-  return layer_tree_host_->device_scale_factor();
-}
-
 void RenderWidgetCompositor::setBackgroundColor(blink::WebColor color) {
   layer_tree_host_->set_background_color(color);
 }
@@ -633,6 +635,9 @@ void RenderWidgetCompositor::setHasTransparentBackground(bool transparent) {
 }
 
 void RenderWidgetCompositor::setVisible(bool visible) {
+  if (never_visible_)
+    return;
+
   layer_tree_host_->SetVisible(visible);
 }
 
@@ -1009,6 +1014,86 @@ void RenderWidgetCompositor::RecordFrameTimingEvents(
 void RenderWidgetCompositor::SetSurfaceIdNamespace(
     uint32_t surface_id_namespace) {
   layer_tree_host_->set_surface_id_namespace(surface_id_namespace);
+}
+
+cc::ManagedMemoryPolicy RenderWidgetCompositor::GetGpuMemoryPolicy(
+    const cc::ManagedMemoryPolicy& policy) {
+  cc::ManagedMemoryPolicy actual = policy;
+  actual.bytes_limit_when_visible = 0;
+
+  // If the value was overridden on the command line, use the specified value.
+  static bool client_hard_limit_bytes_overridden =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kForceGpuMemAvailableMb);
+  if (client_hard_limit_bytes_overridden) {
+    if (base::StringToSizeT(
+            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+                switches::kForceGpuMemAvailableMb),
+            &actual.bytes_limit_when_visible))
+      actual.bytes_limit_when_visible *= 1024 * 1024;
+    return actual;
+  }
+
+#if defined(OS_ANDROID)
+  // We can't query available GPU memory from the system on Android.
+  // Physical memory is also mis-reported sometimes (eg. Nexus 10 reports
+  // 1262MB when it actually has 2GB, while Razr M has 1GB but only reports
+  // 128MB java heap size). First we estimate physical memory using both.
+  size_t dalvik_mb = base::SysInfo::DalvikHeapSizeMB();
+  size_t physical_mb = base::SysInfo::AmountOfPhysicalMemoryMB();
+  size_t physical_memory_mb = 0;
+  if (dalvik_mb >= 256)
+    physical_memory_mb = dalvik_mb * 4;
+  else
+    physical_memory_mb = std::max(dalvik_mb * 4, (physical_mb * 4) / 3);
+
+  // Now we take a default of 1/8th of memory on high-memory devices,
+  // and gradually scale that back for low-memory devices (to be nicer
+  // to other apps so they don't get killed). Examples:
+  // Nexus 4/10(2GB)    256MB (normally 128MB)
+  // Droid Razr M(1GB)  114MB (normally 57MB)
+  // Galaxy Nexus(1GB)  100MB (normally 50MB)
+  // Xoom(1GB)          100MB (normally 50MB)
+  // Nexus S(low-end)   8MB (normally 8MB)
+  // Note that the compositor now uses only some of this memory for
+  // pre-painting and uses the rest only for 'emergencies'.
+  if (actual.bytes_limit_when_visible == 0) {
+    // NOTE: Non-low-end devices use only 50% of these limits,
+    // except during 'emergencies' where 100% can be used.
+    if (!base::SysInfo::IsLowEndDevice()) {
+      if (physical_memory_mb >= 1536)
+        actual.bytes_limit_when_visible = physical_memory_mb / 8;  // >192MB
+      else if (physical_memory_mb >= 1152)
+        actual.bytes_limit_when_visible = physical_memory_mb / 8;  // >144MB
+      else if (physical_memory_mb >= 768)
+        actual.bytes_limit_when_visible = physical_memory_mb / 10;  // >76MB
+      else
+        actual.bytes_limit_when_visible = physical_memory_mb / 12;  // <64MB
+    } else {
+      // Low-end devices have 512MB or less memory by definition
+      // so we hard code the limit rather than relying on the heuristics
+      // above. Low-end devices use 4444 textures so we can use a lower limit.
+      actual.bytes_limit_when_visible = 8;
+    }
+    actual.bytes_limit_when_visible =
+        actual.bytes_limit_when_visible * 1024 * 1024;
+    // Clamp the observed value to a specific range on Android.
+    actual.bytes_limit_when_visible = std::max(
+        actual.bytes_limit_when_visible, static_cast<size_t>(8 * 1024 * 1024));
+    actual.bytes_limit_when_visible =
+        std::min(actual.bytes_limit_when_visible,
+                 static_cast<size_t>(256 * 1024 * 1024));
+  }
+  actual.priority_cutoff_when_visible =
+      gpu::MemoryAllocation::CUTOFF_ALLOW_EVERYTHING;
+#else
+  // Ignore what the system said and give all clients the same maximum
+  // allocation on desktop platforms.
+  actual.bytes_limit_when_visible = 512 * 1024 * 1024;
+  actual.priority_cutoff_when_visible =
+      gpu::MemoryAllocation::CUTOFF_ALLOW_NICE_TO_HAVE;
+#endif
+  return actual;
 }
 
 }  // namespace content

@@ -7,10 +7,8 @@
 #include "content/public/test/test_browser_context.h"
 
 namespace ash {
+namespace test {
 
-// Copyright 2015 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
 TestShellContentState::TestShellContentState() {}
 TestShellContentState::~TestShellContentState() {}
 
@@ -19,4 +17,21 @@ content::BrowserContext* TestShellContentState::GetActiveBrowserContext() {
   return active_browser_context_.get();
 }
 
+content::BrowserContext* TestShellContentState::GetBrowserContextByIndex(
+    UserIndex index) {
+  return nullptr;
+}
+
+content::BrowserContext* TestShellContentState::GetBrowserContextForWindow(
+    aura::Window* window) {
+  return nullptr;
+}
+
+content::BrowserContext*
+TestShellContentState::GetUserPresentingBrowserContextForWindow(
+    aura::Window* window) {
+  return nullptr;
+}
+
+}  // namespace test
 }  // namespace ash

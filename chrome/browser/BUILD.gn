@@ -93,9 +93,9 @@ source_set("browser") {
     "//chrome:extra_resources",
     "//chrome:resources",
     "//chrome:strings",
-    "//chrome/app:generated_resources_map",
     "//chrome/app/resources:platform_locale_settings",
     "//chrome/app/theme:theme_resources",
+    "//chrome/browser/metrics/variations:chrome_ui_string_overrider_factory",
     "//chrome/browser/net:probe_message_proto",
     "//chrome/browser/ui",
     "//chrome/common",
@@ -264,9 +264,9 @@ source_set("browser") {
     deps += [
       "//apps",
       "//cc",
-      "//chrome/app:generated_resources_map",
       "//chrome/app/theme:theme_resources",
       "//chrome/browser/devtools",
+      "//chrome/browser/metrics/variations:chrome_ui_string_overrider_factory",
       "//chrome/browser/resources:component_extension_resources",
       "//chrome/common/net",
       "//chrome/installer/util",
@@ -683,7 +683,7 @@ source_set("browser") {
     ]
   }
 
-  if (!is_official_build) {
+  if (!is_chrome_branded) {
     sources += [
       "search/local_files_ntp_source.cc",
       "search/local_files_ntp_source.h",
@@ -1017,8 +1017,6 @@ source_set("test_support") {
     "notifications/notification_test_util.h",
     "password_manager/mock_password_store_service.cc",
     "password_manager/mock_password_store_service.h",
-    "password_manager/password_manager_test_base.cc",
-    "password_manager/password_manager_test_base.h",
     "password_manager/test_password_store_service.cc",
     "password_manager/test_password_store_service.h",
     "profile_resetter/profile_resetter_test_base.cc",
@@ -1045,8 +1043,6 @@ source_set("test_support") {
     "sync/profile_sync_components_factory_mock.h",
     "sync/profile_sync_service_mock.cc",
     "sync/profile_sync_service_mock.h",
-    "ui/webui/signin/login_ui_test_utils.cc",
-    "ui/webui/signin/login_ui_test_utils.h",
   ]
 
   configs += [ "//build/config:precompiled_headers" ]
@@ -1084,12 +1080,14 @@ source_set("test_support") {
 
   if (is_android) {
     sources -= [
-      "password_manager/password_manager_test_base.cc",
-      "password_manager/password_manager_test_base.h",
+      "download/test_download_shelf.cc",
+      "download/test_download_shelf.h",
+      "profile_resetter/profile_resetter_test_base.cc",
+      "profile_resetter/profile_resetter_test_base.h",
+      "sessions/session_restore_test_helper.cc",
+      "sessions/session_restore_test_helper.h",
       "sessions/session_service_test_helper.cc",
       "sessions/session_service_test_helper.h",
-      "ui/webui/signin/login_ui_test_utils.cc",
-      "ui/webui/signin/login_ui_test_utils.h",
     ]
   }
 
@@ -1227,6 +1225,29 @@ source_set("test_support") {
       "local_discovery/wifi/mock_wifi_manager.h",
     ]
   }
+}
+
+# In GYP this is part of test_support_ui.
+source_set("test_support_ui") {
+  testonly = true
+
+  # Always include this via the main test support UI target.
+  visibility = [ "//chrome/test:test_support_ui" ]
+
+  sources = [
+    "password_manager/password_manager_test_base.cc",
+    "password_manager/password_manager_test_base.h",
+    "ui/webui/signin/login_ui_test_utils.cc",
+    "ui/webui/signin/login_ui_test_utils.h",
+  ]
+
+  configs += [ "//build/config:precompiled_headers" ]
+
+  deps = [
+    "//components/metrics:test_support",
+    "//skia",
+    "//testing/gtest",
+  ]
 }
 
 if (enable_rlz_support) {

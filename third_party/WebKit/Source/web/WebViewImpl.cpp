@@ -106,7 +106,6 @@
 #include "platform/PlatformGestureEvent.h"
 #include "platform/PlatformKeyboardEvent.h"
 #include "platform/PlatformMouseEvent.h"
-#include "platform/PlatformWheelEvent.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
@@ -371,8 +370,6 @@ void WebViewImpl::setMainFrame(WebFrame* frame)
     if (frame->isWebLocalFrame()) {
         WebLocalFrameImpl* localFrame = toWebLocalFrameImpl(frame);
         localFrame->initializeCoreFrame(&page()->frameHost(), 0, nullAtom, nullAtom);
-        // Composited WebViews want repaints outside the frame visible rect.
-        localFrame->frame()->view()->setClipsRepaints(!m_layerTreeView);
     } else {
         toWebRemoteFrameImpl(frame)->initializeCoreFrame(&page()->frameHost(), 0, nullAtom);
     }
@@ -1877,7 +1874,7 @@ void WebViewImpl::beginFrame(const WebBeginFrameArgs& frameTime)
 
             PlatformGestureEvent endScrollEvent(PlatformEvent::GestureScrollEnd,
                 m_positionOnFlingStart, m_globalPositionOnFlingStart,
-                IntSize(), 0, false, false, false, false);
+                IntSize(), 0, PlatformEvent::NoModifiers);
             endScrollEvent.setScrollGestureData(0, 0, 0, 0, true, false, -1 /* null plugin id */);
 
             mainFrameImpl()->frame()->eventHandler().handleGestureScrollEnd(endScrollEvent);
@@ -3524,7 +3521,7 @@ void WebViewImpl::dragSourceEndedAt(
     WebDragOperation operation)
 {
     PlatformMouseEvent pme(clientPoint, screenPoint, LeftButton, PlatformEvent::MouseMoved,
-        0, false, false, false, false, PlatformMouseEvent::RealOrIndistinguishable, 0);
+        0, PlatformEvent::NoModifiers, PlatformMouseEvent::RealOrIndistinguishable, 0);
     m_page->deprecatedLocalMainFrame()->eventHandler().dragSourceEndedAt(pme,
         static_cast<DragOperation>(operation));
 }
@@ -3604,7 +3601,7 @@ void WebViewImpl::dragTargetDrop(const WebPoint& clientPoint,
         return;
     }
 
-    m_currentDragData->setModifiers(toPlatformMouseEventModifiers(modifiers));
+    m_currentDragData->setModifiers(modifiers);
     DragData dragData(
         m_currentDragData.get(),
         clientPoint,
@@ -3646,7 +3643,7 @@ WebDragOperation WebViewImpl::dragTargetDragEnterOrOver(const WebPoint& clientPo
 {
     ASSERT(m_currentDragData);
 
-    m_currentDragData->setModifiers(toPlatformMouseEventModifiers(modifiers));
+    m_currentDragData->setModifiers(modifiers);
     DragData dragData(
         m_currentDragData.get(),
         clientPoint,

@@ -26,12 +26,12 @@ namespace media {
 MediaSourcePlayer::MediaSourcePlayer(
     int player_id,
     MediaPlayerManager* manager,
-    const RequestMediaResourcesCB& request_media_resources_cb,
+    const OnDecoderResourcesReleasedCB& on_decoder_resources_released_cb,
     scoped_ptr<DemuxerAndroid> demuxer,
     const GURL& frame_url)
     : MediaPlayerAndroid(player_id,
                          manager,
-                         request_media_resources_cb,
+                         on_decoder_resources_released_cb,
                          frame_url),
       demuxer_(demuxer.Pass()),
       pending_event_(NO_EVENT_PENDING),
@@ -54,16 +54,13 @@ MediaSourcePlayer::MediaSourcePlayer(
                  base::Unretained(demuxer_.get()),
                  DemuxerStream::AUDIO),
       base::Bind(&MediaSourcePlayer::OnDemuxerConfigsChanged,
-                 weak_factory_.GetWeakPtr()),
-      &media_stat_->audio_frame_stats()));
+                 weak_factory_.GetWeakPtr())));
   video_decoder_job_.reset(new VideoDecoderJob(
       base::Bind(&DemuxerAndroid::RequestDemuxerData,
                  base::Unretained(demuxer_.get()),
                  DemuxerStream::VIDEO),
-      base::Bind(request_media_resources_cb_, player_id),
       base::Bind(&MediaSourcePlayer::OnDemuxerConfigsChanged,
-                 weak_factory_.GetWeakPtr()),
-      &media_stat_->video_frame_stats()));
+                 weak_factory_.GetWeakPtr())));
 
   demuxer_->Initialize(this);
   interpolator_.SetUpperBound(base::TimeDelta());
@@ -193,6 +190,7 @@ void MediaSourcePlayer::Release() {
   decoder_starvation_callback_.Cancel();
 
   DetachListener();
+  on_decoder_resources_released_cb_.Run(player_id());
 }
 
 void MediaSourcePlayer::SetVolume(double volume) {
@@ -212,7 +210,7 @@ bool MediaSourcePlayer::CanSeekBackward() {
 }
 
 bool MediaSourcePlayer::IsPlayerReady() {
-  return audio_decoder_job_ || video_decoder_job_;
+  return HasAudio() || HasVideo();
 }
 
 void MediaSourcePlayer::StartInternal() {
@@ -439,7 +437,9 @@ void MediaSourcePlayer::ProcessPendingEvents() {
 }
 
 void MediaSourcePlayer::MediaDecoderCallback(
-    bool is_audio, MediaCodecStatus status,
+    bool is_audio,
+    MediaCodecStatus status,
+    bool is_late_frame,
     base::TimeDelta current_presentation_timestamp,
     base::TimeDelta max_presentation_timestamp) {
   DVLOG(1) << __FUNCTION__ << ": " << is_audio << ", " << status;
@@ -474,6 +474,15 @@ void MediaSourcePlayer::MediaDecoderCallback(
     manager()->OnError(player_id(), MEDIA_ERROR_DECODE);
     media_stat_->StopAndReport(GetCurrentTime());
     return;
+  }
+
+  // Increment frame counts for UMA.
+  if (current_presentation_timestamp != kNoTimestamp()) {
+    FrameStatistics& frame_stats = is_audio ? media_stat_->audio_frame_stats()
+                                            : media_stat_->video_frame_stats();
+    frame_stats.IncrementFrameCount();
+    if (is_late_frame)
+      frame_stats.IncrementLateFrameCount();
   }
 
   DCHECK(!IsEventPending(PREFETCH_DONE_EVENT_PENDING));

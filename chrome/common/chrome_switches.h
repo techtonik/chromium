@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Defines all the command-line switches used by Chrome.
+// Defines the shared command-line switches used by code in the Chrome
+// directory that don't have anywhere more specific to go.
 
 #ifndef CHROME_COMMON_CHROME_SWITCHES_H_
 #define CHROME_COMMON_CHROME_SWITCHES_H_
 
 #include "build/build_config.h"
 
-#include "base/base_switches.h"
-#include "components/autofill/core/common/autofill_switches.h"
-#include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
-#include "components/password_manager/core/common/password_manager_switches.h"
-#include "components/signin/core/common/signin_switches.h"
+// Don't add more switch files here. This is linked into some places like the
+// installer where dependencies should be limited. Instead, have files
+// directly include your switch file.
+//
+// TODO(brettw) delete content_switches.h include and make callers include that
+// file manually if they need a content switch.
 #include "content/public/common/content_switches.h"
 
 namespace switches {
@@ -130,6 +132,7 @@ extern const char kEnableFastUnload[];
 extern const char kEnableInsecureQuic[];
 extern const char kEnableMaterialDesignDownloads[];
 extern const char kEnableMaterialDesignExtensions[];
+extern const char kEnableMaterialDesignPolicyPage[];
 extern const char kEnableMediaRouter[];
 extern const char kEnableNaCl[];
 extern const char kEnableNavigationTracing[];
@@ -189,6 +192,7 @@ extern const char kIncognito[];
 extern const char kInstallChromeApp[];
 extern const char kInstallSupervisedUserWhitelists[];
 extern const char kInstantProcess[];
+extern const char kInterestsURL[];
 extern const char kInvalidationUseGCMChannel[];
 extern const char kIpcDumpDirectory[];
 extern const char kIsolateExtensions[];
@@ -198,7 +202,7 @@ extern const char kKioskMode[];
 extern const char kKioskModePrinting[];
 extern const char kLoadComponentExtension[];
 extern const char kLoadExtension[];
-#if !defined(OFFICIAL_BUILD)
+#if !defined(GOOGLE_CHROME_BUILD)
 extern const char kLocalNtpReload[];
 #endif
 extern const char kMakeDefaultBrowser[];
@@ -405,6 +409,7 @@ extern const char kDisableNewTaskManager[];
 
 bool AboutInSettingsEnabled();
 bool MdExtensionsEnabled();
+bool MdPolicyPageEnabled();
 bool MediaRouterEnabled();
 bool PdfMaterialUIEnabled();
 bool SettingsWindowEnabled();

@@ -10,6 +10,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "cc/input/top_controls_state.h"
+#include "cc/output/managed_memory_policy.h"
 #include "cc/output/swap_promise.h"
 #include "cc/trees/layer_tree_host_client.h"
 #include "cc/trees/layer_tree_host_single_thread_client.h"
@@ -48,6 +49,7 @@ class CONTENT_EXPORT RenderWidgetCompositor
 
   ~RenderWidgetCompositor() override;
 
+  void SetNeverVisible();
   const base::WeakPtr<cc::InputHandler>& GetInputHandler();
   bool BeginMainFrameRequested() const;
   void SetNeedsDisplayOnAllLayers();
@@ -76,8 +78,9 @@ class CONTENT_EXPORT RenderWidgetCompositor
       scoped_ptr<base::Value> value,
       const base::Callback<void(scoped_ptr<base::Value>)>& callback);
   bool SendMessageToMicroBenchmark(int id, scoped_ptr<base::Value> value);
-  void StartCompositor();
   void SetSurfaceIdNamespace(uint32_t surface_id_namespace);
+  cc::ManagedMemoryPolicy GetGpuMemoryPolicy(
+      const cc::ManagedMemoryPolicy& policy);
 
   // WebLayerTreeView implementation.
   void setRootLayer(const blink::WebLayer& layer) override;
@@ -93,7 +96,6 @@ class CONTENT_EXPORT RenderWidgetCompositor
   virtual blink::WebFloatPoint adjustEventPointForPinchZoom(
       const blink::WebFloatPoint& point) const;
   void setDeviceScaleFactor(float device_scale) override;
-  float deviceScaleFactor() const override;
   void setBackgroundColor(blink::WebColor color) override;
   void setHasTransparentBackground(bool transparent) override;
   void setVisible(bool visible) override;
@@ -187,6 +189,7 @@ class CONTENT_EXPORT RenderWidgetCompositor
   RenderWidget* widget_;
   CompositorDependencies* compositor_deps_;
   scoped_ptr<cc::LayerTreeHost> layer_tree_host_;
+  bool never_visible_;
 
   blink::WebLayoutAndPaintAsyncCallback* layout_and_paint_async_callback_;
   scoped_ptr<cc::CopyOutputRequest> temporary_copy_output_request_;

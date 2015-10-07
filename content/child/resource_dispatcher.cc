@@ -18,6 +18,7 @@
 #include "base/strings/string_util.h"
 #include "content/child/request_extra_data.h"
 #include "content/child/request_info.h"
+#include "content/child/resource_scheduling_filter.h"
 #include "content/child/shared_memory_received_data_factory.h"
 #include "content/child/site_isolation_stats_gatherer.h"
 #include "content/child/sync_load_response.h"
@@ -207,6 +208,9 @@ void ResourceDispatcher::OnSetDataBuffer(int request_id,
     return;
   }
 
+  // TODO(erikchen): Temporary debugging. http://crbug.com/527588.
+  CHECK_GE(shm_size, 0);
+  CHECK_LE(shm_size, 512 * 1024);
   request_info->buffer_size = shm_size;
 }
 
@@ -221,6 +225,14 @@ void ResourceDispatcher::OnReceivedData(int request_id,
   if (request_info && data_length > 0) {
     CHECK(base::SharedMemory::IsHandleValid(request_info->buffer->handle()));
     CHECK_GE(request_info->buffer_size, data_offset + data_length);
+
+    // TODO(erikchen): Temporary debugging. http://crbug.com/527588.
+    CHECK_GE(request_info->buffer_size, 0);
+    CHECK_LE(request_info->buffer_size, 512 * 1024);
+    CHECK_GE(data_length, 0);
+    CHECK_LE(data_length, 512 * 1024);
+    CHECK_GE(data_offset, 0);
+    CHECK_LE(data_offset, 512 * 1024);
 
     // Ensure that the SHM buffer remains valid for the duration of this scope.
     // It is possible for Cancel() to be called before we exit this scope.
@@ -402,6 +414,9 @@ bool ResourceDispatcher::RemovePendingRequest(int request_id) {
     message_sender_->Send(
         new ResourceHostMsg_ReleaseDownloadedFile(request_id));
   }
+
+  if (resource_scheduling_filter_.get())
+    resource_scheduling_filter_->ClearRequestIdTaskRunner(request_id);
 
   return true;
 }
@@ -587,6 +602,13 @@ int ResourceDispatcher::StartAsync(const RequestInfo& request_info,
                          frame_origin,
                          request->url,
                          request_info.download_to_file);
+
+  if (resource_scheduling_filter_.get() &&
+      request_info.loading_web_task_runner) {
+    resource_scheduling_filter_->SetRequestIdTaskRunner(
+        request_id,
+        make_scoped_ptr(request_info.loading_web_task_runner->clone()));
+  }
 
   message_sender_->Send(new ResourceHostMsg_RequestResource(
       request_info.routing_id, request_id, *request));
@@ -792,6 +814,11 @@ scoped_ptr<ResourceHostMsg_Request> ResourceDispatcher::CreateRequest(
   if (frame_origin)
     *frame_origin = extra_data->frame_origin();
   return request.Pass();
+}
+
+void ResourceDispatcher::SetResourceSchedulingFilter(
+    scoped_refptr<ResourceSchedulingFilter> resource_scheduling_filter) {
+  resource_scheduling_filter_ = resource_scheduling_filter;
 }
 
 }  // namespace content

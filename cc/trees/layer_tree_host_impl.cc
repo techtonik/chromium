@@ -129,16 +129,6 @@ void DidVisibilityChange(LayerTreeHostImpl* id, bool visible) {
   TRACE_EVENT_ASYNC_END0("cc", "LayerTreeHostImpl::SetVisible", id);
 }
 
-size_t GetDefaultMemoryAllocationLimit() {
-  // TODO(ccameron): (http://crbug.com/137094) This 64MB default is a straggler
-  // from the old texture manager and is just to give us a default memory
-  // allocation before we get a callback from the GPU memory manager. We
-  // should probaby either:
-  // - wait for the callback before rendering anything instead
-  // - push this into the GPU memory manager somehow.
-  return 64 * 1024 * 1024;
-}
-
 }  // namespace
 
 LayerTreeHostImpl::FrameData::FrameData()
@@ -186,11 +176,8 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       scroll_layer_id_when_mouse_over_scrollbar_(0),
       tile_priorities_dirty_(false),
       settings_(settings),
-      visible_(true),
-      cached_managed_memory_policy_(
-          GetDefaultMemoryAllocationLimit(),
-          gpu::MemoryAllocation::CUTOFF_ALLOW_EVERYTHING,
-          ManagedMemoryPolicy::kDefaultNumResourcesLimit),
+      visible_(false),
+      cached_managed_memory_policy_(settings.memory_policy_),
       is_synchronous_single_threaded_(!proxy->HasImplThread() &&
                                       !settings.single_thread_proxy_scheduler),
       // Must be initialized after is_synchronous_single_threaded_ and proxy_.
@@ -847,6 +834,8 @@ DrawResult LayerTreeHostImpl::CalculateRenderPasses(
 
   int num_missing_tiles = 0;
   int num_incomplete_tiles = 0;
+  int64 checkerboarded_no_recording_content_area = 0;
+  int64 checkerboarded_needs_raster_content_area = 0;
   bool have_copy_request = false;
   bool have_missing_animated_tiles = false;
 
@@ -923,9 +912,17 @@ DrawResult LayerTreeHostImpl::CalculateRenderPasses(
         append_quads_data.approximated_visible_content_area);
     rendering_stats_instrumentation_->AddCheckerboardedVisibleContentArea(
         append_quads_data.checkerboarded_visible_content_area);
+    rendering_stats_instrumentation_->AddCheckerboardedNoRecordingContentArea(
+        append_quads_data.checkerboarded_no_recording_content_area);
+    rendering_stats_instrumentation_->AddCheckerboardedNeedsRasterContentArea(
+        append_quads_data.checkerboarded_needs_raster_content_area);
 
     num_missing_tiles += append_quads_data.num_missing_tiles;
     num_incomplete_tiles += append_quads_data.num_incomplete_tiles;
+    checkerboarded_no_recording_content_area +=
+        append_quads_data.checkerboarded_no_recording_content_area;
+    checkerboarded_needs_raster_content_area +=
+        append_quads_data.checkerboarded_needs_raster_content_area;
 
     if (append_quads_data.num_missing_tiles) {
       bool layer_has_animating_transform =
@@ -995,6 +992,14 @@ DrawResult LayerTreeHostImpl::CalculateRenderPasses(
     UMA_HISTOGRAM_COUNTS_100(
         "Compositing.RenderPass.AppendQuadData.NumIncompleteTiles",
         num_incomplete_tiles);
+    UMA_HISTOGRAM_COUNTS(
+        "Compositing.RenderPass.AppendQuadData."
+        "CheckerboardedNoRecordingContentArea",
+        checkerboarded_no_recording_content_area);
+    UMA_HISTOGRAM_COUNTS(
+        "Compositing.RenderPass.AppendQuadData."
+        "CheckerboardedNeedRasterContentArea",
+        checkerboarded_needs_raster_content_area);
   }
 
   // Should only have one render pass in resourceless software mode.

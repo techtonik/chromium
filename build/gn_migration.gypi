@@ -290,6 +290,7 @@
             '../breakpad/breakpad.gyp:dump_syms',
             '../build/android/rezip.gyp:rezip_apk_jar',
             #"//clank" TODO(GYP) - conditional somehow?
+            '../tools/android/heap_profiler/heap_profiler_unittests_apk',
             '../tools/imagediff/image_diff.gyp:image_diff#host',
             '../tools/telemetry/telemetry.gyp:bitmaptools#host',
 
@@ -356,6 +357,7 @@
             '../chrome/chrome.gyp:chrome_public_apk',
             '../chrome/chrome.gyp:chrome_public_test_apk',
             '../chrome/chrome.gyp:chromedriver_webview_shell_apk',
+            '../third_party/custom_tabs_client/custom_tabs_client.gyp:custom_tabs_client_example_apk',
           ],
         }],
         ['OS=="android" or OS=="linux"', {
@@ -655,7 +657,6 @@
         ['OS=="win"', {
           'dependencies': [
             # TODO(GYP): All of these targets still need to be converted.
-            '../chrome/chrome.gyp:app_shim',
             '../chrome/chrome.gyp:gcapi_dll',
             '../chrome/chrome.gyp:gcapi_test',
             '../chrome/chrome.gyp:pack_policy_templates',

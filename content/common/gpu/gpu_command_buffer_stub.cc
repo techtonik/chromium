@@ -205,7 +205,6 @@ GpuCommandBufferStub::GpuCommandBufferStub(
       route_id_(route_id),
       offscreen_(offscreen),
       last_flush_count_(0),
-      last_memory_allocation_valid_(false),
       watchdog_(watchdog),
       waiting_for_sync_point_(false),
       previous_processed_num_(0),
@@ -278,9 +277,7 @@ bool GpuCommandBufferStub::OnMessageReceived(const IPC::Message& message) {
       message.type() != GpuCommandBufferMsg_RegisterTransferBuffer::ID &&
       message.type() != GpuCommandBufferMsg_DestroyTransferBuffer::ID &&
       message.type() != GpuCommandBufferMsg_RetireSyncPoint::ID &&
-      message.type() != GpuCommandBufferMsg_SignalSyncPoint::ID &&
-      message.type() !=
-          GpuCommandBufferMsg_SetClientHasMemoryAllocationChangedCallback::ID) {
+      message.type() != GpuCommandBufferMsg_SignalSyncPoint::ID) {
     if (!MakeCurrent())
       return false;
     have_context = true;
@@ -317,9 +314,6 @@ bool GpuCommandBufferStub::OnMessageReceived(const IPC::Message& message) {
                         OnSignalSyncPoint)
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_SignalQuery,
                         OnSignalQuery)
-    IPC_MESSAGE_HANDLER(
-        GpuCommandBufferMsg_SetClientHasMemoryAllocationChangedCallback,
-        OnSetClientHasMemoryAllocationChangedCallback)
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_CreateImage, OnCreateImage);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_DestroyImage, OnDestroyImage);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_CreateStreamTexture,
@@ -477,8 +471,6 @@ void GpuCommandBufferStub::Destroy() {
     }
   }
 
-  memory_manager_client_state_.reset();
-
   while (!sync_points_.empty())
     OnRetireSyncPoint(sync_points_.front());
 
@@ -544,11 +536,9 @@ void GpuCommandBufferStub::OnInitialize(
   scheduler_.reset(new gpu::GpuScheduler(command_buffer_.get(),
                                          decoder_.get(),
                                          decoder_.get()));
-  sync_point_client_ =
-      sync_point_manager->CreateSyncPointClient(
-          channel_->GetSyncPointClientState(),
-          gpu::CommandBufferNamespace::GPU_IO,
-          command_buffer_id_);
+  sync_point_client_ = sync_point_manager->CreateSyncPointClient(
+      channel_->GetSyncPointOrderData(), gpu::CommandBufferNamespace::GPU_IO,
+      command_buffer_id_);
 
   if (preemption_flag_.get())
     scheduler_->SetPreemptByFlag(preemption_flag_);
@@ -653,6 +643,10 @@ void GpuCommandBufferStub::OnInitialize(
   decoder_->SetWaitSyncPointCallback(
       base::Bind(&GpuCommandBufferStub::OnWaitSyncPoint,
                  base::Unretained(this)));
+  decoder_->SetFenceSyncReleaseCallback(base::Bind(
+      &GpuCommandBufferStub::OnFenceSyncRelease, base::Unretained(this)));
+  decoder_->SetWaitFenceSyncCallback(base::Bind(
+      &GpuCommandBufferStub::OnWaitFenceSync, base::Unretained(this)));
 
   command_buffer_->SetPutOffsetChangeCallback(
       base::Bind(&GpuCommandBufferStub::PutChanged, base::Unretained(this)));
@@ -924,10 +918,9 @@ void GpuCommandBufferStub::OnCreateVideoEncoder(
   // self-delete during destruction of this stub.
 }
 
+// TODO(sohanjg): cleanup this and the client side too.
 void GpuCommandBufferStub::OnSetSurfaceVisible(bool visible) {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnSetSurfaceVisible");
-  if (memory_manager_client_state_)
-    memory_manager_client_state_->SetVisible(visible);
 }
 
 void GpuCommandBufferStub::AddSyncPoint(uint32 sync_point, bool retire) {
@@ -942,8 +935,15 @@ void GpuCommandBufferStub::OnRetireSyncPoint(uint32 sync_point) {
 
   gpu::gles2::MailboxManager* mailbox_manager =
       context_group_->mailbox_manager();
-  if (mailbox_manager->UsesSync() && MakeCurrent())
-    mailbox_manager->PushTextureUpdates(sync_point);
+  if (mailbox_manager->UsesSync() && MakeCurrent()) {
+    // Old sync points are global and do not have a command buffer ID,
+    // We can simply use the global sync point number as the release count with
+    // 0 for the command buffer ID (under normal circumstances 0 is invalid so
+    // will not be used) until the old sync points are replaced.
+    gpu::gles2::SyncToken sync_token = {gpu::CommandBufferNamespace::GPU_IO, 0,
+                                        sync_point};
+    mailbox_manager->PushTextureUpdates(sync_token);
+  }
 
   GpuChannelManager* manager = channel_->gpu_channel_manager();
   manager->sync_point_manager()->RetireSyncPoint(sync_point);
@@ -956,7 +956,11 @@ bool GpuCommandBufferStub::OnWaitSyncPoint(uint32 sync_point) {
     return true;
   GpuChannelManager* manager = channel_->gpu_channel_manager();
   if (manager->sync_point_manager()->IsSyncPointRetired(sync_point)) {
-    PullTextureUpdates(sync_point);
+    // Old sync points are global and do not have a command buffer ID,
+    // We can simply use the global sync point number as the release count with
+    // 0 for the command buffer ID (under normal circumstances 0 is invalid so
+    // will not be used) until the old sync points are replaced.
+    PullTextureUpdates(gpu::CommandBufferNamespace::GPU_IO, 0, sync_point);
     return true;
   }
 
@@ -978,16 +982,26 @@ void GpuCommandBufferStub::OnWaitSyncPointCompleted(uint32 sync_point) {
   DCHECK(!scheduler_->scheduled());
   TRACE_EVENT_ASYNC_END1("gpu", "WaitSyncPoint", this, "GpuCommandBufferStub",
                          this);
-  PullTextureUpdates(sync_point);
+  // Old sync points are global and do not have a command buffer ID,
+  // We can simply use the global sync point number as the release count with
+  // 0 for the command buffer ID (under normal circumstances 0 is invalid so
+  // will not be used) until the old sync points are replaced.
+  PullTextureUpdates(gpu::CommandBufferNamespace::GPU_IO, 0, sync_point);
   waiting_for_sync_point_ = false;
   scheduler_->SetScheduled(true);
 }
 
-void GpuCommandBufferStub::PullTextureUpdates(uint32 sync_point) {
+void GpuCommandBufferStub::PullTextureUpdates(
+    gpu::CommandBufferNamespace namespace_id,
+    uint64_t command_buffer_id,
+    uint32_t release) {
   gpu::gles2::MailboxManager* mailbox_manager =
       context_group_->mailbox_manager();
-  if (mailbox_manager->UsesSync() && MakeCurrent())
-    mailbox_manager->PullTextureUpdates(sync_point);
+  if (mailbox_manager->UsesSync() && MakeCurrent()) {
+    gpu::gles2::SyncToken sync_token = {namespace_id, command_buffer_id,
+                                        release};
+    mailbox_manager->PullTextureUpdates(sync_token);
+  }
 }
 
 void GpuCommandBufferStub::OnSignalSyncPoint(uint32 sync_point, uint32 id) {
@@ -1022,20 +1036,71 @@ void GpuCommandBufferStub::OnSignalQuery(uint32 query_id, uint32 id) {
   OnSignalSyncPointAck(id);
 }
 
-
-void GpuCommandBufferStub::OnSetClientHasMemoryAllocationChangedCallback(
-    bool has_callback) {
-  TRACE_EVENT0(
-      "gpu",
-      "GpuCommandBufferStub::OnSetClientHasMemoryAllocationChangedCallback");
-  if (has_callback) {
-    if (!memory_manager_client_state_) {
-      memory_manager_client_state_.reset(
-          GetMemoryManager()->CreateClientState(this, !offscreen_, true));
-    }
-  } else {
-    memory_manager_client_state_.reset();
+void GpuCommandBufferStub::OnFenceSyncRelease(uint64_t release) {
+  if (sync_point_client_->client_state()->IsFenceSyncReleased(release)) {
+    DLOG(ERROR) << "Fence Sync has already been released.";
+    return;
   }
+
+  gpu::gles2::MailboxManager* mailbox_manager =
+      context_group_->mailbox_manager();
+  if (mailbox_manager->UsesSync() && MakeCurrent()) {
+    gpu::gles2::SyncToken sync_token = {gpu::CommandBufferNamespace::GPU_IO,
+                                        command_buffer_id_, release};
+    mailbox_manager->PushTextureUpdates(sync_token);
+  }
+
+  sync_point_client_->ReleaseFenceSync(release);
+}
+
+bool GpuCommandBufferStub::OnWaitFenceSync(
+    gpu::CommandBufferNamespace namespace_id,
+    uint64_t command_buffer_id,
+    uint64_t release) {
+  DCHECK(!waiting_for_sync_point_);
+  DCHECK(scheduler_->scheduled());
+
+  GpuChannelManager* manager = channel_->gpu_channel_manager();
+  DCHECK(manager);
+
+  gpu::SyncPointManager* sync_point_manager = manager->sync_point_manager();
+  DCHECK(sync_point_manager);
+
+  scoped_refptr<gpu::SyncPointClientState> release_state =
+      sync_point_manager->GetSyncPointClientState(namespace_id,
+                                                  command_buffer_id);
+
+  if (!release_state)
+    return true;
+
+  if (release_state->IsFenceSyncReleased(release)) {
+    PullTextureUpdates(namespace_id, command_buffer_id, release);
+    return true;
+  }
+
+  TRACE_EVENT_ASYNC_BEGIN1("gpu", "WaitFenceSync", this, "GpuCommandBufferStub",
+                           this);
+  scheduler_->SetScheduled(false);
+  waiting_for_sync_point_ = true;
+  sync_point_client_->WaitNonThreadSafe(
+      release_state.get(), release, task_runner_,
+      base::Bind(&GpuCommandBufferStub::OnWaitFenceSyncCompleted,
+                 this->AsWeakPtr(), namespace_id, command_buffer_id, release));
+
+  return scheduler_->scheduled();
+}
+
+void GpuCommandBufferStub::OnWaitFenceSyncCompleted(
+    gpu::CommandBufferNamespace namespace_id,
+    uint64_t command_buffer_id,
+    uint64_t release) {
+  DCHECK(waiting_for_sync_point_);
+  DCHECK(!scheduler_->scheduled());
+  TRACE_EVENT_ASYNC_END1("gpu", "WaitFenceSync", this, "GpuCommandBufferStub",
+                         this);
+  PullTextureUpdates(namespace_id, command_buffer_id, release);
+  waiting_for_sync_point_ = false;
+  scheduler_->SetScheduled(true);
 }
 
 void GpuCommandBufferStub::OnCreateImage(int32 id,
@@ -1141,18 +1206,6 @@ const gpu::gles2::FeatureInfo* GpuCommandBufferStub::GetFeatureInfo() const {
 
 gpu::gles2::MemoryTracker* GpuCommandBufferStub::GetMemoryTracker() const {
   return context_group_->memory_tracker();
-}
-
-void GpuCommandBufferStub::SetMemoryAllocation(
-    const gpu::MemoryAllocation& allocation) {
-  if (!last_memory_allocation_valid_ ||
-      !allocation.Equals(last_memory_allocation_)) {
-    Send(new GpuCommandBufferMsg_SetMemoryAllocation(
-        route_id_, allocation));
-  }
-
-  last_memory_allocation_valid_ = true;
-  last_memory_allocation_ = allocation;
 }
 
 void GpuCommandBufferStub::SuggestHaveFrontBuffer(

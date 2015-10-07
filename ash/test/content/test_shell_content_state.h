@@ -13,22 +13,35 @@ class BrowserContext;
 }
 
 namespace ash {
+namespace test {
 
 class TestShellContentState : public ShellContentState {
  public:
   TestShellContentState();
+
+#if defined(OS_CHROMEOS)
+  content::ScreenOrientationDelegate* screen_orientation_delegate() {
+    return &orientation_delegate_;
+  }
+#endif
 
  private:
   ~TestShellContentState() override;
 
   // Overridden from ShellContentState:
   content::BrowserContext* GetActiveBrowserContext() override;
+  content::BrowserContext* GetBrowserContextByIndex(UserIndex index) override;
+  content::BrowserContext* GetBrowserContextForWindow(
+      aura::Window* window) override;
+  content::BrowserContext* GetUserPresentingBrowserContextForWindow(
+      aura::Window* window) override;
 
   scoped_ptr<content::BrowserContext> active_browser_context_;
 
   DISALLOW_COPY_AND_ASSIGN(TestShellContentState);
 };
 
+}  // namespace test
 }  // namespace ash
 
 #endif  // ASH_TEST_CONTENT_TEST_SHELL_CONTENT_STATE_H_

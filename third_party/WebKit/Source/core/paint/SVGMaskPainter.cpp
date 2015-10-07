@@ -29,10 +29,7 @@ bool SVGMaskPainter::prepareEffect(const LayoutObject& object, GraphicsContext* 
         return false;
 
     ASSERT(context->displayItemList());
-    if (context->displayItemList()->displayItemConstructionIsDisabled())
-        return true;
     context->displayItemList()->createAndAppend<BeginCompositingDisplayItem>(object, SkXfermode::kSrcOver_Mode, 1, &paintInvalidationRect);
-
     return true;
 }
 
@@ -51,12 +48,7 @@ void SVGMaskPainter::finishEffect(const LayoutObject& object, GraphicsContext* c
     }
 
     ASSERT(context->displayItemList());
-    if (!context->displayItemList()->displayItemConstructionIsDisabled()) {
-        if (context->displayItemList()->lastDisplayItemIsNoopBegin())
-            context->displayItemList()->removeLastDisplayItem();
-        else
-            context->displayItemList()->createAndAppend<EndCompositingDisplayItem>(object);
-    }
+    context->displayItemList()->endItem<EndCompositingDisplayItem>(object);
 }
 
 void SVGMaskPainter::drawMaskForLayoutObject(GraphicsContext* context, const LayoutObject& layoutObject, const FloatRect& targetBoundingBox, const FloatRect& targetPaintInvalidationRect)

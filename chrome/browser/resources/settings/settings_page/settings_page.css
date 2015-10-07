@@ -23,7 +23,7 @@
   width: 760px;
 }
 
-cr-settings-checkbox {
+settings-checkbox {
   -webkit-margin-end: 10px;
   -webkit-margin-start: 0;
   margin-bottom: 10px;
@@ -65,6 +65,7 @@ h2 {
   padding: 8px;
 }
 
-.button-strip {
-  text-align: end;
+.button-row {
+  display: flex;
+  margin-top: 25px;
 }

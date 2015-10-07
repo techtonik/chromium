@@ -688,6 +688,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
 
   void SetShaderCacheCallback(const ShaderCacheCallback& callback) override;
   void SetWaitSyncPointCallback(const WaitSyncPointCallback& callback) override;
+  void SetFenceSyncReleaseCallback(
+      const FenceSyncReleaseCallback& callback) override;
+  void SetWaitFenceSyncCallback(const WaitFenceSyncCallback& callback) override;
 
   void SetIgnoreCachedStateForTest(bool ignore) override;
   void ProcessFinishedAsyncTransfers();
@@ -1989,6 +1992,8 @@ class GLES2DecoderImpl : public GLES2Decoder,
   base::Callback<void(gfx::Size, float)> resize_callback_;
 
   WaitSyncPointCallback wait_sync_point_callback_;
+  FenceSyncReleaseCallback fence_sync_release_callback_;
+  WaitFenceSyncCallback wait_fence_sync_callback_;
 
   ShaderCacheCallback shader_cache_callback_;
 
@@ -3946,6 +3951,16 @@ void GLES2DecoderImpl::SetShaderCacheCallback(
 void GLES2DecoderImpl::SetWaitSyncPointCallback(
     const WaitSyncPointCallback& callback) {
   wait_sync_point_callback_ = callback;
+}
+
+void GLES2DecoderImpl::SetFenceSyncReleaseCallback(
+    const FenceSyncReleaseCallback& callback) {
+  fence_sync_release_callback_ = callback;
+}
+
+void GLES2DecoderImpl::SetWaitFenceSyncCallback(
+    const WaitFenceSyncCallback& callback) {
+  wait_fence_sync_callback_ = callback;
 }
 
 bool GLES2DecoderImpl::GetServiceTextureId(uint32 client_texture_id,
@@ -7886,12 +7901,9 @@ error::Error GLES2DecoderImpl::HandleDrawArraysInstancedANGLE(
     const void* cmd_data) {
   const gles2::cmds::DrawArraysInstancedANGLE& c =
       *static_cast<const gles2::cmds::DrawArraysInstancedANGLE*>(cmd_data);
-  if (!features().angle_instanced_arrays) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glDrawArraysInstancedANGLE", "function not available");
-    return error::kNoError;
-  }
+  if (!features().angle_instanced_arrays)
+    return error::kUnknownCommand;
+
   return DoDrawArrays("glDrawArraysIntancedANGLE",
                       true,
                       static_cast<GLenum>(c.mode),
@@ -8034,12 +8046,9 @@ error::Error GLES2DecoderImpl::HandleDrawElementsInstancedANGLE(
     const void* cmd_data) {
   const gles2::cmds::DrawElementsInstancedANGLE& c =
       *static_cast<const gles2::cmds::DrawElementsInstancedANGLE*>(cmd_data);
-  if (!features().angle_instanced_arrays) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glDrawElementsInstancedANGLE", "function not available");
-    return error::kNoError;
-  }
+  if (!features().angle_instanced_arrays)
+    return error::kUnknownCommand;
+
   return DoDrawElements("glDrawElementsInstancedANGLE",
                         true,
                         static_cast<GLenum>(c.mode),
@@ -8732,12 +8741,9 @@ error::Error GLES2DecoderImpl::HandleVertexAttribDivisorANGLE(
     const void* cmd_data) {
   const gles2::cmds::VertexAttribDivisorANGLE& c =
       *static_cast<const gles2::cmds::VertexAttribDivisorANGLE*>(cmd_data);
-  if (!features().angle_instanced_arrays) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glVertexAttribDivisorANGLE", "function not available");
-    return error::kNoError;
-  }
+  if (!features().angle_instanced_arrays)
+    return error::kUnknownCommand;
+
   GLuint index = c.index;
   GLuint divisor = c.divisor;
   if (index >= group_->max_vertex_attribs()) {
@@ -9271,10 +9277,9 @@ error::Error GLES2DecoderImpl::GetAttribLocationHelper(
   if (!location) {
     return error::kOutOfBounds;
   }
-  // Require the client to init this incase the context is lost and we are no
-  // longer executing commands.
+  // Check that the client initialized the result.
   if (*location != -1) {
-    return error::kGenericError;
+    return error::kInvalidArguments;
   }
   *location = program->GetAttribLocation(name_str);
   return error::kNoError;
@@ -9320,10 +9325,9 @@ error::Error GLES2DecoderImpl::GetUniformLocationHelper(
   if (!location) {
     return error::kOutOfBounds;
   }
-  // Require the client to init this incase the context is lost an we are no
-  // longer executing commands.
+  // Check that the client initialized the result.
   if (*location != -1) {
-    return error::kGenericError;
+    return error::kInvalidArguments;
   }
   *location = program->GetUniformFakeLocation(name_str);
   return error::kNoError;
@@ -9406,10 +9410,9 @@ error::Error GLES2DecoderImpl::GetFragDataLocationHelper(
   if (!location) {
     return error::kOutOfBounds;
   }
-  // Require the client to init this incase the context is lost and we are no
-  // longer executing commands.
+  // Check that the client initialized the result.
   if (*location != -1) {
-    return error::kGenericError;
+    return error::kInvalidArguments;
   }
   Program* program = GetProgramInfoNotShader(
       client_id, "glGetFragDataLocation");
@@ -9458,10 +9461,9 @@ error::Error GLES2DecoderImpl::HandleGetUniformBlockIndex(
   if (!index) {
     return error::kOutOfBounds;
   }
-  // Require the client to init this in case the context is lost and we are no
-  // longer executing commands.
+  // Check that the client initialized the result.
   if (*index != GL_INVALID_INDEX) {
-    return error::kGenericError;
+    return error::kInvalidArguments;
   }
   Program* program = GetProgramInfoNotShader(
       c.program, "glGetUniformBlockIndex");
@@ -12242,6 +12244,42 @@ error::Error GLES2DecoderImpl::HandleWaitSyncPointCHROMIUM(
       error::kNoError : error::kDeferCommandUntilLater;
 }
 
+error::Error GLES2DecoderImpl::HandleInsertFenceSyncCHROMIUM(
+    uint32 immediate_data_size,
+    const void* cmd_data) {
+  const gles2::cmds::InsertFenceSyncCHROMIUM& c =
+      *static_cast<const gles2::cmds::InsertFenceSyncCHROMIUM*>(cmd_data);
+
+  const uint64_t release_count = c.release_count;
+  if (!fence_sync_release_callback_.is_null())
+    fence_sync_release_callback_.Run(release_count);
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderImpl::HandleGenSyncTokenCHROMIUMImmediate(
+    uint32 immediate_data_size,
+    const void* cmd_data) {
+  return error::kUnknownCommand;
+}
+
+error::Error GLES2DecoderImpl::HandleWaitSyncTokenCHROMIUM(
+    uint32 immediate_data_size,
+    const void* cmd_data) {
+  const gles2::cmds::WaitSyncTokenCHROMIUM& c =
+      *static_cast<const gles2::cmds::WaitSyncTokenCHROMIUM*>(cmd_data);
+
+  const gpu::CommandBufferNamespace namespace_id =
+      static_cast<gpu::CommandBufferNamespace>(c.namespace_id);
+  const uint64_t command_buffer_id = c.command_buffer_id;
+  const uint64_t release = c.release_count;
+  if (wait_fence_sync_callback_.is_null())
+    return error::kNoError;
+
+  return wait_fence_sync_callback_.Run(namespace_id, command_buffer_id, release)
+             ? error::kNoError
+             : error::kDeferCommandUntilLater;
+}
+
 error::Error GLES2DecoderImpl::HandleDiscardBackbufferCHROMIUM(
     uint32 immediate_data_size,
     const void* cmd_data) {
@@ -14610,11 +14648,8 @@ error::Error GLES2DecoderImpl::HandleGenPathsCHROMIUM(
   static const char kFunctionName[] = "glGenPathsCHROMIUM";
   const gles2::cmds::GenPathsCHROMIUM& c =
       *static_cast<const gles2::cmds::GenPathsCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
 
   GLsizei range = static_cast<GLsizei>(c.range);
   if (range < 0) {
@@ -14640,11 +14675,8 @@ error::Error GLES2DecoderImpl::HandleDeletePathsCHROMIUM(
   static const char kFunctionName[] = "glDeletePathsCHROMIUM";
   const gles2::cmds::DeletePathsCHROMIUM& c =
       *static_cast<const gles2::cmds::DeletePathsCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
 
   GLsizei range = static_cast<GLsizei>(c.range);
   if (range < 0) {
@@ -14670,11 +14702,8 @@ error::Error GLES2DecoderImpl::HandlePathCommandsCHROMIUM(
   static const char kFunctionName[] = "glPathCommandsCHROMIUM";
   const gles2::cmds::PathCommandsCHROMIUM& c =
       *static_cast<const gles2::cmds::PathCommandsCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
 
   GLuint service_id = 0;
   if (!path_manager()->GetPath(static_cast<GLuint>(c.path), &service_id)) {
@@ -14778,11 +14807,9 @@ error::Error GLES2DecoderImpl::HandlePathParameterfCHROMIUM(
   static const char kFunctionName[] = "glPathParameterfCHROMIUM";
   const gles2::cmds::PathParameterfCHROMIUM& c =
       *static_cast<const gles2::cmds::PathParameterfCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLuint service_id = 0;
   if (!path_manager()->GetPath(static_cast<GLuint>(c.path), &service_id)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
@@ -14832,11 +14859,9 @@ error::Error GLES2DecoderImpl::HandlePathParameteriCHROMIUM(
   static const char kFunctionName[] = "glPathParameteriCHROMIUM";
   const gles2::cmds::PathParameteriCHROMIUM& c =
       *static_cast<const gles2::cmds::PathParameteriCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLuint service_id = 0;
   if (!path_manager()->GetPath(static_cast<GLuint>(c.path), &service_id)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
@@ -14884,11 +14909,9 @@ error::Error GLES2DecoderImpl::HandleStencilFillPathCHROMIUM(
   static const char kFunctionName[] = "glStencilFillPathCHROMIUM";
   const gles2::cmds::StencilFillPathCHROMIUM& c =
       *static_cast<const gles2::cmds::StencilFillPathCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLenum fill_mode = static_cast<GLenum>(c.fillMode);
   if (!validators_->path_fill_mode.IsValid(fill_mode)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(kFunctionName, fill_mode, "fillMode");
@@ -14917,14 +14940,11 @@ error::Error GLES2DecoderImpl::HandleStencilFillPathCHROMIUM(
 error::Error GLES2DecoderImpl::HandleStencilStrokePathCHROMIUM(
     uint32 immediate_data_size,
     const void* cmd_data) {
-  static const char kFunctionName[] = "glStencilStrokePathCHROMIUM";
   const gles2::cmds::StencilStrokePathCHROMIUM& c =
       *static_cast<const gles2::cmds::StencilStrokePathCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLuint service_id = 0;
   if (!path_manager()->GetPath(static_cast<GLuint>(c.path), &service_id)) {
     return error::kNoError;
@@ -14942,11 +14962,9 @@ error::Error GLES2DecoderImpl::HandleCoverFillPathCHROMIUM(
   static const char kFunctionName[] = "glCoverFillPathCHROMIUM";
   const gles2::cmds::CoverFillPathCHROMIUM& c =
       *static_cast<const gles2::cmds::CoverFillPathCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLenum cover_mode = static_cast<GLenum>(c.coverMode);
   if (!validators_->path_cover_mode.IsValid(cover_mode)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(kFunctionName, cover_mode, "coverMode");
@@ -14967,11 +14985,9 @@ error::Error GLES2DecoderImpl::HandleCoverStrokePathCHROMIUM(
   static const char kFunctionName[] = "glCoverStrokePathCHROMIUM";
   const gles2::cmds::CoverStrokePathCHROMIUM& c =
       *static_cast<const gles2::cmds::CoverStrokePathCHROMIUM*>(cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLenum cover_mode = static_cast<GLenum>(c.coverMode);
   if (!validators_->path_cover_mode.IsValid(cover_mode)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(kFunctionName, cover_mode, "coverMode");
@@ -14993,11 +15009,9 @@ error::Error GLES2DecoderImpl::HandleStencilThenCoverFillPathCHROMIUM(
   const gles2::cmds::StencilThenCoverFillPathCHROMIUM& c =
       *static_cast<const gles2::cmds::StencilThenCoverFillPathCHROMIUM*>(
           cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLenum fill_mode = static_cast<GLenum>(c.fillMode);
   if (!validators_->path_fill_mode.IsValid(fill_mode)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(kFunctionName, fill_mode, "fillMode");
@@ -15032,11 +15046,9 @@ error::Error GLES2DecoderImpl::HandleStencilThenCoverStrokePathCHROMIUM(
   const gles2::cmds::StencilThenCoverStrokePathCHROMIUM& c =
       *static_cast<const gles2::cmds::StencilThenCoverStrokePathCHROMIUM*>(
           cmd_data);
-  if (!features().chromium_path_rendering) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, kFunctionName,
-                       "function not available");
-    return error::kNoError;
-  }
+  if (!features().chromium_path_rendering)
+    return error::kUnknownCommand;
+
   GLenum cover_mode = static_cast<GLenum>(c.coverMode);
   if (!validators_->path_cover_mode.IsValid(cover_mode)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(kFunctionName, cover_mode, "coverMode");

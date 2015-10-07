@@ -503,8 +503,9 @@ static bool isDisallowedAutoscroll(HTMLFrameOwnerElement* ownerElement, FrameVie
     return false;
 }
 
-void LayoutBox::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
+void LayoutBox::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignment& alignX, const ScrollAlignment& alignY, ScrollType scrollType)
 {
+    ASSERT(scrollType == ProgrammaticScroll || scrollType == UserScroll);
     // Presumably the same issue as in setScrollTop. See crbug.com/343132.
     DisableCompositingQueryAsserts disabler;
 
@@ -520,12 +521,12 @@ void LayoutBox::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignmen
     if (hasOverflowClip() && !restrictedByLineClamp) {
         // Don't scroll to reveal an overflow layer that is restricted by the -webkit-line-clamp property.
         // This will prevent us from revealing text hidden by the slider in Safari RSS.
-        newRect = layer()->scrollableArea()->scrollIntoView(rect, alignX, alignY);
+        newRect = layer()->scrollableArea()->scrollIntoView(rect, alignX, alignY, scrollType);
     } else if (!parentBox && canBeProgramaticallyScrolled()) {
         if (FrameView* frameView = this->frameView()) {
             HTMLFrameOwnerElement* ownerElement = document().ownerElement();
             if (!isDisallowedAutoscroll(ownerElement, frameView)) {
-                frameView->scrollableArea()->scrollIntoView(rect, alignX, alignY);
+                frameView->scrollableArea()->scrollIntoView(rect, alignX, alignY, scrollType);
 
                 if (ownerElement && ownerElement->layoutObject()) {
                     if (frameView->safeToPropagateScrollToParent()) {
@@ -550,7 +551,7 @@ void LayoutBox::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignmen
         parentBox = enclosingScrollableBox();
 
     if (parentBox)
-        parentBox->scrollRectToVisible(newRect, alignX, alignY);
+        parentBox->scrollRectToVisible(newRect, alignX, alignY, scrollType);
 }
 
 void LayoutBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
@@ -773,7 +774,7 @@ void LayoutBox::autoscroll(const IntPoint& positionInRootFrame)
         return;
 
     IntPoint positionInContent = frameView->rootFrameToContents(positionInRootFrame);
-    scrollRectToVisible(LayoutRect(positionInContent, LayoutSize(1, 1)), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded);
+    scrollRectToVisible(LayoutRect(positionInContent, LayoutSize(1, 1)), ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignToEdgeIfNeeded, UserScroll);
 }
 
 // There are two kinds of layoutObject that can autoscroll.
@@ -1230,6 +1231,8 @@ bool LayoutBox::backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect) c
 
     // FIXME: Use rounded rect if border radius is present.
     if (style()->hasBorderRadius())
+        return false;
+    if (hasClipPath())
         return false;
     // FIXME: The background color clip is defined by the last layer.
     if (style()->backgroundLayers().next())
@@ -1769,6 +1772,13 @@ void LayoutBox::clearSpannerPlaceholder()
     m_rareData->m_spannerPlaceholder = nullptr;
 }
 
+void LayoutBox::setPaginationStrut(LayoutUnit strut)
+{
+    if (!strut && !m_rareData)
+        return;
+    ensureRareData().m_paginationStrut = strut;
+}
+
 LayoutRect LayoutBox::clippedOverflowRectForPaintInvalidation(const LayoutBoxModelObject* paintInvalidationContainer, const PaintInvalidationState* paintInvalidationState) const
 {
     if (style()->visibility() != VISIBLE) {
@@ -2030,9 +2040,12 @@ LayoutUnit LayoutBox::fillAvailableMeasure(LayoutUnit availableLogicalWidth) con
 
 LayoutUnit LayoutBox::fillAvailableMeasure(LayoutUnit availableLogicalWidth, LayoutUnit& marginStart, LayoutUnit& marginEnd) const
 {
+    ASSERT(availableLogicalWidth >= 0);
     marginStart = minimumValueForLength(style()->marginStart(), availableLogicalWidth);
     marginEnd = minimumValueForLength(style()->marginEnd(), availableLogicalWidth);
-    return availableLogicalWidth - marginStart - marginEnd;
+    LayoutUnit available = availableLogicalWidth - marginStart - marginEnd;
+    available = std::max(available, LayoutUnit());
+    return available;
 }
 
 LayoutUnit LayoutBox::computeIntrinsicLogicalWidthUsing(const Length& logicalWidthLength, LayoutUnit availableLogicalWidth, LayoutUnit borderAndPadding) const

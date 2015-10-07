@@ -25,16 +25,13 @@ void CalculateVisibleRects(const std::vector<LayerType*>& visible_layer_list,
                            const ClipTree& clip_tree,
                            const TransformTree& transform_tree) {
   for (auto& layer : visible_layer_list) {
-    // TODO(ajuma): Compute content_scale rather than using it. Note that for
-    // PictureLayer and PictureImageLayers, content_bounds == bounds and
-    // content_scale_x == content_scale_y == 1.0, so once impl painting is on
-    // everywhere, this code will be unnecessary.
     gfx::Size layer_bounds = layer->bounds();
-    const bool has_clip = layer->clip_tree_index() > 0;
+    const ClipNode* clip_node = clip_tree.Node(layer->clip_tree_index());
+    const bool is_unclipped =
+        clip_node->data.resets_clip && !clip_node->data.applies_local_clip;
     const TransformNode* transform_node =
         transform_tree.Node(layer->transform_tree_index());
-    if (has_clip) {
-      const ClipNode* clip_node = clip_tree.Node(layer->clip_tree_index());
+    if (!is_unclipped) {
       const TransformNode* target_node =
           transform_tree.Node(transform_node->data.content_target_id);
 
@@ -407,19 +404,20 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
     }
     const TransformNode* transform_node =
         transform_tree.Node(clip_node->data.transform_id);
+    ClipNode* parent_clip_node = clip_tree->parent(clip_node);
 
-    // Only descendants of a real clipping layer (i.e., not 0) may have their
-    // clip adjusted due to intersecting with an ancestor clip.
-    const bool is_clipped = clip_node->parent_id > 0;
-    if (!is_clipped) {
-      clip_node->data.clip_in_target_space = MathUtil::MapClippedRect(
-          transform_node->data.to_target, clip_node->data.clip);
-      clip_node->data.combined_clip_in_target_space =
-          clip_node->data.clip_in_target_space;
+    // Only nodes affected by ancestor clips will have their combined clip
+    // adjusted due to intersecting with an ancestor clip.
+    if (clip_node->data.resets_clip) {
+      if (clip_node->data.applies_local_clip) {
+        clip_node->data.clip_in_target_space = MathUtil::MapClippedRect(
+            transform_node->data.to_target, clip_node->data.clip);
+        clip_node->data.combined_clip_in_target_space =
+            clip_node->data.clip_in_target_space;
+      }
       continue;
     }
 
-    ClipNode* parent_clip_node = clip_tree->parent(clip_node);
     gfx::Transform parent_to_current;
     const TransformNode* parent_transform_node =
         transform_tree.Node(parent_clip_node->data.transform_id);
@@ -456,7 +454,8 @@ void ComputeClips(ClipTree* clip_tree, const TransformTree& transform_tree) {
           parent_clip_node->data.combined_clip_in_target_space);
     }
 
-    if (clip_node->data.use_only_parent_clip) {
+    bool use_only_parent_clip = !clip_node->data.applies_local_clip;
+    if (use_only_parent_clip) {
       clip_node->data.combined_clip_in_target_space =
           parent_combined_clip_in_target_space;
       if (!clip_node->data.render_surface_is_clipped) {
@@ -886,6 +885,45 @@ void ComputeSurfaceDrawPropertiesUsingPropertyTrees(
   draw_properties->clip_rect = SurfaceClipRect(
       render_surface, property_trees->clip_tree.parent(clip_node),
       draw_properties->is_clipped);
+}
+
+template <typename LayerType>
+void UpdatePageScaleFactorInPropertyTreesInternal(
+    PropertyTrees* property_trees,
+    const LayerType* page_scale_layer,
+    float page_scale_factor) {
+  if (property_trees->transform_tree.page_scale_factor() == page_scale_factor)
+    return;
+
+  property_trees->transform_tree.set_page_scale_factor(page_scale_factor);
+  DCHECK(page_scale_layer);
+  DCHECK_GE(page_scale_layer->transform_tree_index(), 0);
+  TransformNode* node = property_trees->transform_tree.Node(
+      page_scale_layer->transform_tree_index());
+  // TODO(enne): property trees can't ask the layer these things, but
+  // the page scale layer should *just* be the page scale.
+  DCHECK_EQ(page_scale_layer->position().ToString(), gfx::PointF().ToString());
+  DCHECK_EQ(page_scale_layer->transform_origin().ToString(),
+            gfx::Point3F().ToString());
+
+  node->data.post_local_scale_factor = page_scale_factor;
+  node->data.needs_local_transform_update = true;
+  node->data.update_post_local_transform(gfx::PointF(), gfx::Point3F());
+  property_trees->transform_tree.set_needs_update(true);
+}
+
+void UpdatePageScaleFactorInPropertyTrees(PropertyTrees* property_trees,
+                                          const LayerImpl* page_scale_layer,
+                                          float page_scale_factor) {
+  UpdatePageScaleFactorInPropertyTreesInternal(property_trees, page_scale_layer,
+                                               page_scale_factor);
+}
+
+void UpdatePageScaleFactorInPropertyTrees(PropertyTrees* property_trees,
+                                          const Layer* page_scale_layer,
+                                          float page_scale_factor) {
+  UpdatePageScaleFactorInPropertyTreesInternal(property_trees, page_scale_layer,
+                                               page_scale_factor);
 }
 
 }  // namespace cc

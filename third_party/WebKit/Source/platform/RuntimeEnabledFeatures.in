@@ -30,10 +30,6 @@ AuthorShadowDOMForAnyElement
 BackgroundSync status=experimental
 BackgroundSyncPeriodic status=experimental
 BackgroundSyncV2 status=experimental
-// Enable bleeding-edge code to make Blink draw content faster.
-// The changes enabled behind this flag are very likely to break lots of content.
-// ** DO NOT use this flag unless you know what you are doing. **
-BleedingEdgeFastPaths
 CacheStorageMatchAll status=stable
 ClientHints status=stable
 ColumnFill status=experimental
@@ -156,7 +152,7 @@ ShadowRootDelegatesFocus status=experimental
 SharedArrayBuffer
 SharedWorker status=stable
 SlimmingPaintV2
-SlimmingPaintOffsetCaching implied_by=SlimmingPaintV2
+SlimmingPaintOffsetCaching implied_by=SlimmingPaintV2, implied_by=SlimmingPaintSynchronizedPainting
 SlimmingPaintStrictCullRectClipping
 SlimmingPaintSubsequenceCaching implied_by=SlimmingPaintV2
 SlimmingPaintSynchronizedPainting implied_by=SlimmingPaintV2

@@ -43,6 +43,7 @@ WebInspector.NetworkProjectDelegate = function(target, workspace, projectId, pro
     this._target = target;
     this._id = projectId;
     WebInspector.ContentProviderBasedProjectDelegate.call(this, workspace, projectId, projectType);
+    this.project()[WebInspector.NetworkProject._targetSymbol] = target;
 }
 
 WebInspector.NetworkProjectDelegate.prototype = {
@@ -169,9 +170,11 @@ WebInspector.NetworkProject = function(target, workspace, networkMapping)
         cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetAdded, this._styleSheetAdded, this);
         cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetRemoved, this._styleSheetRemoved, this);
     }
+    target.targetManager().addEventListener(WebInspector.TargetManager.Events.SuspendStateChanged, this._suspendStateChanged, this);
 }
 
 WebInspector.NetworkProject._networkProjectSymbol = Symbol("networkProject");
+WebInspector.NetworkProject._targetSymbol = Symbol("target");
 WebInspector.NetworkProject._contentTypeSymbol = Symbol("networkContentType");
 
 /**
@@ -191,8 +194,7 @@ WebInspector.NetworkProject.projectId = function(target, projectURL, isContentSc
  */
 WebInspector.NetworkProject._targetForProject = function(project)
 {
-    var targetId = parseInt(project.id(), 10);
-    return WebInspector.targetManager.targetById(targetId);
+    return project[WebInspector.NetworkProject._targetSymbol];
 }
 
 /**
@@ -361,6 +363,14 @@ WebInspector.NetworkProject.prototype = {
     {
         this._reset();
         this._populate();
+    },
+
+    _suspendStateChanged: function()
+    {
+        if (this.target().targetManager().allTargetsSuspended())
+            this._reset();
+        else
+            this._populate();
     },
 
     /**

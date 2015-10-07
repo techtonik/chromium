@@ -74,8 +74,8 @@ public:
     void update(PassRefPtrWillBeRawPtr<FontSelector>) const;
 
     enum CustomFontNotReadyAction { DoNotPaintIfFontNotReady, UseFallbackIfFontNotReady };
-    void drawText(SkCanvas*, const TextRunPaintInfo&, const FloatPoint&, float deviceScaleFactor, const SkPaint&) const;
-    void drawBidiText(SkCanvas*, const TextRunPaintInfo&, const FloatPoint&, CustomFontNotReadyAction, float deviceScaleFactor, const SkPaint&) const;
+    bool drawText(SkCanvas*, const TextRunPaintInfo&, const FloatPoint&, float deviceScaleFactor, const SkPaint&) const;
+    bool drawBidiText(SkCanvas*, const TextRunPaintInfo&, const FloatPoint&, CustomFontNotReadyAction, float deviceScaleFactor, const SkPaint&) const;
     void drawEmphasisMarks(SkCanvas*, const TextRunPaintInfo&, const AtomicString& mark, const FloatPoint&, float deviceScaleFactor, const SkPaint&) const;
 
     // Glyph bounds will be the minimum rect containing all glyph strokes, in coordinates using
@@ -162,6 +162,9 @@ private:
     mutable RefPtr<FontFallbackList> m_fontFallbackList;
     mutable unsigned m_canShapeWordByWord : 1;
     mutable unsigned m_shapeWordByWordComputed : 1;
+
+    // For accessing buildGlyphBuffer and retrieving fonts used in rendering a node.
+    friend class InspectorCSSAgent;
 };
 
 inline Font::~Font()

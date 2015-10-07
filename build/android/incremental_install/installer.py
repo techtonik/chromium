@@ -34,6 +34,18 @@ def _TransformDexPaths(paths):
   return [p[prefix_len:].replace(os.sep, '.') for p in paths]
 
 
+def _Execute(concurrently, *funcs):
+  """Calls all functions in |funcs| concurrently or in sequence."""
+  timer = time_profile.TimeProfile()
+  if concurrently:
+    reraiser_thread.RunAsync(funcs)
+  else:
+    for f in funcs:
+      f()
+  timer.Stop(log=False)
+  return timer
+
+
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('apk_path',
@@ -58,9 +70,16 @@ def main():
   parser.add_argument('--output-directory',
                       help='Path to the root build directory.')
   parser.add_argument('--no-threading',
-                      action='store_true',
-                      default=False,
+                      action='store_false',
+                      default=True,
+                      dest='threading',
                       help='Do not install and push concurrently')
+  parser.add_argument('--no-cache',
+                      action='store_false',
+                      default=True,
+                      dest='cache',
+                      help='Do not use cached information about what files are '
+                           'currently on the target device.')
   parser.add_argument('-v',
                       '--verbose',
                       dest='verbose_count',
@@ -83,9 +102,11 @@ def main():
   if args.device:
     # Retries are annoying when commands fail for legitimate reasons. Might want
     # to enable them if this is ever used on bots though.
-    device = device_utils.DeviceUtils(args.device, default_retries=0)
+    device = device_utils.DeviceUtils(
+        args.device, default_retries=0, enable_device_files_cache=True)
   else:
-    devices = device_utils.DeviceUtils.HealthyDevices(default_retries=0)
+    devices = device_utils.DeviceUtils.HealthyDevices(
+        default_retries=0, enable_device_files_cache=True)
     if not devices:
       raise device_errors.NoDevicesError()
     elif len(devices) == 1:
@@ -110,12 +131,6 @@ def main():
                            check_return=True)
     logging.info('Uninstall took %s seconds.', main_timer.GetDelta())
     return
-
-  if device.build_version_sdk >= version_codes.MARSHMALLOW:
-    if apk_help.HasIsolatedProcesses():
-      raise Exception('Cannot use perform incremental installs on Android M+ '
-                      'without first disabling isolated processes. Use GN arg: '
-                      'disable_incremental_isolated_processes=true to do so.')
 
   # Install .apk(s) if any of them have changed.
   def do_install():
@@ -153,6 +168,37 @@ def main():
                                 delete_device_stale=True)
       push_dex_timer.Stop(log=False)
 
+  def check_selinux():
+    # Samsung started using SELinux before Marshmallow. There may be even more
+    # cases where this is required...
+    has_selinux = (device.build_version_sdk >= version_codes.MARSHMALLOW or
+                   device.GetProp('selinux.policy_version'))
+    if has_selinux and apk_help.HasIsolatedProcesses():
+      raise Exception('Cannot use incremental installs on versions of Android '
+                      'where isoloated processes cannot access the filesystem '
+                      '(this includes Android M+, and Samsung L+) without '
+                      'first disabling isoloated processes.\n'
+                      'To do so, use GN arg:\n'
+                      '    disable_incremental_isolated_processes=true')
+
+  cache_path = '%s/files-cache.json' % device_incremental_dir
+  def restore_cache():
+    if not args.cache:
+      logging.info('Ignoring device cache')
+      return
+    # Delete the cached file so that any exceptions cause the next attempt
+    # to re-compute md5s.
+    cmd = 'P=%s;cat $P 2>/dev/null && rm $P' % cache_path
+    lines = device.RunShellCommand(cmd, check_return=False, large_output=True)
+    if lines:
+      device.LoadCacheData(lines[0])
+    else:
+      logging.info('Device cache not found: %s', cache_path)
+
+  def save_cache():
+    cache_data = device.DumpCacheData()
+    device.WriteFile(cache_path, cache_data)
+
   # Create 2 lock files:
   # * install.lock tells the app to pause on start-up (until we release it).
   # * firstrun.lock is used by the app to pause all secondary processes until
@@ -169,19 +215,21 @@ def main():
     device.RunShellCommand('echo > %s/install.lock' % device_incremental_dir,
                            check_return=True)
 
-  create_lock_files()
   # Concurrency here speeds things up quite a bit, but DeviceUtils hasn't
   # been designed for multi-threading. Enabling only because this is a
   # developer-only tool.
-  if args.no_threading:
-    do_install()
-    do_push_files()
-  else:
-    reraiser_thread.RunAsync((do_install, do_push_files))
-  release_installer_lock()
-  logging.info('Took %s seconds (install=%s, libs=%s, dex=%s)',
-               main_timer.GetDelta(), install_timer.GetDelta(),
-               push_native_timer.GetDelta(), push_dex_timer.GetDelta())
+  setup_timer = _Execute(
+      args.threading, create_lock_files, restore_cache, check_selinux)
+
+  _Execute(args.threading, do_install, do_push_files)
+
+  finalize_timer = _Execute(args.threading, release_installer_lock, save_cache)
+
+  logging.info(
+      'Took %s seconds (setup=%s, install=%s, libs=%s, dex=%s, finalize=%s)',
+      main_timer.GetDelta(), setup_timer.GetDelta(), install_timer.GetDelta(),
+      push_native_timer.GetDelta(), push_dex_timer.GetDelta(),
+      finalize_timer.GetDelta())
 
 
 if __name__ == '__main__':
