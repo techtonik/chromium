@@ -247,6 +247,9 @@ static const GLEnums::EnumToString enum_to_string_table[] = {
         0x8A53, "GL_SYNC_OBJECT_APPLE",
     },
     {
+        0x78FB, "GL_RGB_YCBCR_422_CHROMIUM",
+    },
+    {
         0x8DF8, "GL_SHADER_BINARY_FORMATS",
     },
     {
@@ -2852,6 +2855,9 @@ static const GLEnums::EnumToString enum_to_string_table[] = {
     },
     {
         0x00100000, "GL_STENCIL_BUFFER_BIT4_QCOM",
+    },
+    {
+        24, "GL_SYNC_TOKEN_SIZE_CHROMIUM",
     },
     {
         0x8E4E, "GL_LAST_VERTEX_CONVENTION_EXT",

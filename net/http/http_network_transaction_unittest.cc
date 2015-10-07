@@ -2554,32 +2554,35 @@ TEST_P(HttpNetworkTransactionTest, BasicAuthProxyNoKeepAliveHttp10) {
 
   // Since we have proxy, should try to establish tunnel.
   MockWrite data_writes1[] = {
-      MockWrite(
-          "CONNECT www.example.org:443 HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Proxy-Connection: keep-alive\r\n\r\n"),
-
-      // After calling trans->RestartWithAuth(), this is the request we should
-      // be issuing -- the final header line contains the credentials.
-      MockWrite(
-          "CONNECT www.example.org:443 HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Proxy-Connection: keep-alive\r\n"
-          "Proxy-Authorization: Basic Zm9vOmJhcg==\r\n\r\n"),
-
-      MockWrite(
-          "GET / HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Connection: keep-alive\r\n\r\n"),
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
   };
 
-  // The proxy responds to the connect with a 407, using a persistent
+  // The proxy responds to the connect with a 407, using a non-persistent
   // connection.
   MockRead data_reads1[] = {
       // No credentials.
       MockRead("HTTP/1.0 407 Proxy Authentication Required\r\n"),
       MockRead("Proxy-Authenticate: Basic realm=\"MyRealm1\"\r\n\r\n"),
+  };
 
+  // Since the first connection couldn't be reused, need to establish another
+  // once given credentials.
+  MockWrite data_writes2[] = {
+      // After calling trans->RestartWithAuth(), this is the request we should
+      // be issuing -- the final header line contains the credentials.
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: Basic Zm9vOmJhcg==\r\n\r\n"),
+
+      MockWrite("GET / HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Connection: keep-alive\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
       MockRead("HTTP/1.0 200 Connection Established\r\n\r\n"),
 
       MockRead("HTTP/1.1 200 OK\r\n"),
@@ -2591,6 +2594,9 @@ TEST_P(HttpNetworkTransactionTest, BasicAuthProxyNoKeepAliveHttp10) {
   StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
                                  data_writes1, arraysize(data_writes1));
   session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
   SSLSocketDataProvider ssl(ASYNC, OK);
   session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
 
@@ -2672,44 +2678,48 @@ TEST_P(HttpNetworkTransactionTest, BasicAuthProxyNoKeepAliveHttp11) {
 
   // Since we have proxy, should try to establish tunnel.
   MockWrite data_writes1[] = {
-      MockWrite(
-          "CONNECT www.example.org:443 HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Proxy-Connection: keep-alive\r\n\r\n"),
-
-      // After calling trans->RestartWithAuth(), this is the request we should
-      // be issuing -- the final header line contains the credentials.
-      MockWrite(
-          "CONNECT www.example.org:443 HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Proxy-Connection: keep-alive\r\n"
-          "Proxy-Authorization: Basic Zm9vOmJhcg==\r\n\r\n"),
-
-      MockWrite(
-          "GET / HTTP/1.1\r\n"
-          "Host: www.example.org\r\n"
-          "Connection: keep-alive\r\n\r\n"),
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
   };
 
-  // The proxy responds to the connect with a 407, using a persistent
+  // The proxy responds to the connect with a 407, using a non-persistent
   // connection.
   MockRead data_reads1[] = {
-    // No credentials.
-    MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
-    MockRead("Proxy-Authenticate: Basic realm=\"MyRealm1\"\r\n"),
-    MockRead("Proxy-Connection: close\r\n\r\n"),
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Basic realm=\"MyRealm1\"\r\n"),
+      MockRead("Proxy-Connection: close\r\n\r\n"),
+  };
 
-    MockRead("HTTP/1.1 200 Connection Established\r\n\r\n"),
+  MockWrite data_writes2[] = {
+      // After calling trans->RestartWithAuth(), this is the request we should
+      // be issuing -- the final header line contains the credentials.
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: Basic Zm9vOmJhcg==\r\n\r\n"),
 
-    MockRead("HTTP/1.1 200 OK\r\n"),
-    MockRead("Content-Type: text/html; charset=iso-8859-1\r\n"),
-    MockRead("Content-Length: 5\r\n\r\n"),
-    MockRead(SYNCHRONOUS, "hello"),
+      MockWrite("GET / HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Connection: keep-alive\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
+      MockRead("HTTP/1.1 200 Connection Established\r\n\r\n"),
+
+      MockRead("HTTP/1.1 200 OK\r\n"),
+      MockRead("Content-Type: text/html; charset=iso-8859-1\r\n"),
+      MockRead("Content-Length: 5\r\n\r\n"),
+      MockRead(SYNCHRONOUS, "hello"),
   };
 
   StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
                                  data_writes1, arraysize(data_writes1));
   session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
   SSLSocketDataProvider ssl(ASYNC, OK);
   session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
 
@@ -2987,6 +2997,97 @@ TEST_P(HttpNetworkTransactionTest, BasicAuthProxyKeepAliveHttp11) {
   session->CloseAllConnections();
 }
 
+// Test the case a proxy closes a socket while the challenge body is being
+// drained.
+TEST_P(HttpNetworkTransactionTest, BasicAuthProxyKeepAliveHangupDuringBody) {
+  HttpRequestInfo request;
+  request.method = "GET";
+  request.url = GURL("https://www.example.org/");
+  // Ensure that proxy authentication is attempted even
+  // when the no authentication data flag is set.
+  request.load_flags = LOAD_DO_NOT_SEND_AUTH_DATA;
+
+  // Configure against proxy server "myproxy:70".
+  session_deps_.proxy_service = ProxyService::CreateFixed("myproxy:70");
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+
+  // Since we have proxy, should try to establish tunnel.
+  MockWrite data_writes1[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+  };
+
+  // The proxy responds to the connect with a 407, using a persistent
+  // connection.
+  MockRead data_reads1[] = {
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Basic realm=\"MyRealm1\"\r\n"),
+      MockRead("Content-Length: 10\r\n\r\n"), MockRead("spam!"),
+      // Server hands up in the middle of the body.
+      MockRead(ASYNC, ERR_CONNECTION_CLOSED),
+  };
+
+  MockWrite data_writes2[] = {
+      // After calling trans->RestartWithAuth(), this is the request we should
+      // be issuing -- the final header line contains the credentials.
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: Basic Zm9vOmJhcg==\r\n\r\n"),
+
+      MockWrite("GET / HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Connection: keep-alive\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
+      MockRead("HTTP/1.1 200 Connection Established\r\n\r\n"),
+
+      MockRead("HTTP/1.1 200 OK\r\n"),
+      MockRead("Content-Type: text/html; charset=iso-8859-1\r\n"),
+      MockRead("Content-Length: 5\r\n\r\n"),
+      MockRead(SYNCHRONOUS, "hello"),
+  };
+
+  StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
+                                 data_writes1, arraysize(data_writes1));
+  session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
+
+  TestCompletionCallback callback;
+
+  int rv = trans->Start(&request, callback.callback(), BoundNetLog());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  const HttpResponseInfo* response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_TRUE(CheckBasicProxyAuth(response->auth_challenge.get()));
+
+  rv = trans->RestartWithAuth(AuthCredentials(kFoo, kBar), callback.callback());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(200, response->headers->response_code());
+  std::string body;
+  EXPECT_EQ(OK, ReadTransaction(trans.get(), &body));
+  EXPECT_EQ("hello", body);
+}
+
 // Test that we don't read the response body when we fail to establish a tunnel,
 // even if the user cancels the proxy's auth attempt.
 TEST_P(HttpNetworkTransactionTest, BasicAuthProxyCancelTunnel) {
@@ -3216,6 +3317,446 @@ TEST_P(HttpNetworkTransactionTest,
       entries, pos,
       NetLog::TYPE_HTTP_TRANSACTION_READ_TUNNEL_RESPONSE_HEADERS,
       NetLog::PHASE_NONE);
+}
+
+// Test a proxy auth scheme that allows default credentials and a proxy server
+// that uses non-persistent connections.
+TEST_P(HttpNetworkTransactionTest,
+       AuthAllowsDefaultCredentialsTunnelConnectionClose) {
+  HttpRequestInfo request;
+  request.method = "GET";
+  request.url = GURL("https://www.example.org/");
+
+  // Configure against proxy server "myproxy:70".
+  session_deps_.proxy_service =
+      ProxyService::CreateFixedFromPacResult("PROXY myproxy:70");
+
+  scoped_ptr<HttpAuthHandlerMock::Factory> auth_handler_factory(
+      new HttpAuthHandlerMock::Factory());
+  auth_handler_factory->set_do_init_from_challenge(true);
+  scoped_ptr<HttpAuthHandlerMock> mock_handler(new HttpAuthHandlerMock());
+  mock_handler->set_allows_default_credentials(true);
+  auth_handler_factory->AddMockHandler(mock_handler.release(),
+                                       HttpAuth::AUTH_PROXY);
+  session_deps_.http_auth_handler_factory = auth_handler_factory.Pass();
+
+  // Add NetLog just so can verify load timing information gets a NetLog ID.
+  NetLog net_log;
+  session_deps_.net_log = &net_log;
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+
+  // Since we have proxy, should try to establish tunnel.
+  MockWrite data_writes1[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+  };
+
+  // The proxy responds to the connect with a 407, using a non-persistent
+  // connection.
+  MockRead data_reads1[] = {
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Mock\r\n"),
+      MockRead("Proxy-Connection: close\r\n\r\n"),
+  };
+
+  // Since the first connection couldn't be reused, need to establish another
+  // once given credentials.
+  MockWrite data_writes2[] = {
+      // After calling trans->RestartWithAuth(), this is the request we should
+      // be issuing -- the final header line contains the credentials.
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: auth_token\r\n\r\n"),
+
+      MockWrite("GET / HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Connection: keep-alive\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
+      MockRead("HTTP/1.0 200 Connection Established\r\n\r\n"),
+
+      MockRead("HTTP/1.1 200 OK\r\n"),
+      MockRead("Content-Type: text/html; charset=iso-8859-1\r\n"),
+      MockRead("Content-Length: 5\r\n\r\n"),
+      MockRead(SYNCHRONOUS, "hello"),
+  };
+
+  StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
+                                 data_writes1, arraysize(data_writes1));
+  session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
+
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+
+  TestCompletionCallback callback;
+  int rv = trans->Start(&request, callback.callback(), BoundNetLog());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  const HttpResponseInfo* response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_FALSE(response->headers->IsKeepAlive());
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+  EXPECT_TRUE(trans->IsReadyToRestartForAuth());
+  EXPECT_FALSE(response->auth_challenge.get());
+
+  LoadTimingInfo load_timing_info;
+  // CONNECT requests and responses are handled at the connect job level, so
+  // the transaction does not yet have a connection.
+  EXPECT_FALSE(trans->GetLoadTimingInfo(&load_timing_info));
+
+  rv = trans->RestartWithAuth(AuthCredentials(), callback.callback());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+  response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(200, response->headers->response_code());
+  EXPECT_EQ(5, response->headers->GetContentLength());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+
+  // The password prompt info should not be set.
+  EXPECT_FALSE(response->auth_challenge);
+
+  EXPECT_TRUE(trans->GetLoadTimingInfo(&load_timing_info));
+  TestLoadTimingNotReusedWithPac(load_timing_info,
+                                 CONNECT_TIMING_HAS_SSL_TIMES);
+
+  trans.reset();
+  session->CloseAllConnections();
+}
+
+// Test a proxy auth scheme that allows default credentials and a proxy server
+// that hangs up when credentials are initially sent.
+TEST_P(HttpNetworkTransactionTest,
+       AuthAllowsDefaultCredentialsTunnelServerClosesConnection) {
+  HttpRequestInfo request;
+  request.method = "GET";
+  request.url = GURL("https://www.example.org/");
+
+  // Configure against proxy server "myproxy:70".
+  session_deps_.proxy_service =
+      ProxyService::CreateFixedFromPacResult("PROXY myproxy:70");
+
+  scoped_ptr<HttpAuthHandlerMock::Factory> auth_handler_factory(
+      new HttpAuthHandlerMock::Factory());
+  auth_handler_factory->set_do_init_from_challenge(true);
+  scoped_ptr<HttpAuthHandlerMock> mock_handler(new HttpAuthHandlerMock());
+  mock_handler->set_allows_default_credentials(true);
+  auth_handler_factory->AddMockHandler(mock_handler.release(),
+                                       HttpAuth::AUTH_PROXY);
+  session_deps_.http_auth_handler_factory = auth_handler_factory.Pass();
+
+  // Add NetLog just so can verify load timing information gets a NetLog ID.
+  NetLog net_log;
+  session_deps_.net_log = &net_log;
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+
+  // Should try to establish tunnel.
+  MockWrite data_writes1[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: auth_token\r\n\r\n"),
+  };
+
+  // The proxy responds to the connect with a 407, using a non-persistent
+  // connection.
+  MockRead data_reads1[] = {
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Mock\r\n\r\n"),
+      MockRead(SYNCHRONOUS, ERR_CONNECTION_CLOSED),
+  };
+
+  // Since the first connection was closed, need to establish another once given
+  // credentials.
+  MockWrite data_writes2[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: auth_token\r\n\r\n"),
+
+      MockWrite("GET / HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Connection: keep-alive\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
+      MockRead("HTTP/1.0 200 Connection Established\r\n\r\n"),
+
+      MockRead("HTTP/1.1 200 OK\r\n"),
+      MockRead("Content-Type: text/html; charset=iso-8859-1\r\n"),
+      MockRead("Content-Length: 5\r\n\r\n"),
+      MockRead(SYNCHRONOUS, "hello"),
+  };
+
+  StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
+                                 data_writes1, arraysize(data_writes1));
+  session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
+
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+
+  TestCompletionCallback callback;
+  int rv = trans->Start(&request, callback.callback(), BoundNetLog());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  const HttpResponseInfo* response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+  EXPECT_TRUE(trans->IsReadyToRestartForAuth());
+  EXPECT_FALSE(response->auth_challenge);
+
+  LoadTimingInfo load_timing_info;
+  // CONNECT requests and responses are handled at the connect job level, so
+  // the transaction does not yet have a connection.
+  EXPECT_FALSE(trans->GetLoadTimingInfo(&load_timing_info));
+
+  rv = trans->RestartWithAuth(AuthCredentials(), callback.callback());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(200, response->headers->response_code());
+  EXPECT_EQ(5, response->headers->GetContentLength());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+
+  // The password prompt info should not be set.
+  EXPECT_TRUE(response->auth_challenge.get() == NULL);
+
+  EXPECT_TRUE(trans->GetLoadTimingInfo(&load_timing_info));
+  TestLoadTimingNotReusedWithPac(load_timing_info,
+                                 CONNECT_TIMING_HAS_SSL_TIMES);
+
+  trans.reset();
+  session->CloseAllConnections();
+}
+
+// Test a proxy auth scheme that allows default credentials and a proxy server
+// that hangs up when credentials are initially sent, and hangs up again when
+// they are retried.
+TEST_P(HttpNetworkTransactionTest,
+       AuthAllowsDefaultCredentialsTunnelServerClosesConnectionTwice) {
+  HttpRequestInfo request;
+  request.method = "GET";
+  request.url = GURL("https://www.example.org/");
+
+  // Configure against proxy server "myproxy:70".
+  session_deps_.proxy_service =
+      ProxyService::CreateFixedFromPacResult("PROXY myproxy:70");
+
+  scoped_ptr<HttpAuthHandlerMock::Factory> auth_handler_factory(
+      new HttpAuthHandlerMock::Factory());
+  auth_handler_factory->set_do_init_from_challenge(true);
+  scoped_ptr<HttpAuthHandlerMock> mock_handler(new HttpAuthHandlerMock());
+  mock_handler->set_allows_default_credentials(true);
+  auth_handler_factory->AddMockHandler(mock_handler.release(),
+                                       HttpAuth::AUTH_PROXY);
+  session_deps_.http_auth_handler_factory = auth_handler_factory.Pass();
+
+  // Add NetLog just so can verify load timing information gets a NetLog ID.
+  NetLog net_log;
+  session_deps_.net_log = &net_log;
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+
+  // Should try to establish tunnel.
+  MockWrite data_writes1[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: auth_token\r\n\r\n"),
+  };
+
+  // The proxy responds to the connect with a 407, and then hangs up after the
+  // second request is sent.
+  MockRead data_reads1[] = {
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Content-Length: 0\r\n"),
+      MockRead("Proxy-Connection: keep-alive\r\n"),
+      MockRead("Proxy-Authenticate: Mock\r\n\r\n"),
+      MockRead(SYNCHRONOUS, ERR_CONNECTION_CLOSED),
+  };
+
+  // HttpNetworkTransaction sees a reused connection that was closed with
+  // ERR_CONNECTION_CLOSED, realized it might have been a race, so retries the
+  // request.
+  MockWrite data_writes2[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+  };
+
+  // The proxy, having had more than enough of us, just hangs up.
+  MockRead data_reads2[] = {
+      // No credentials.
+      MockRead(SYNCHRONOUS, ERR_CONNECTION_CLOSED),
+  };
+
+  StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
+                                 data_writes1, arraysize(data_writes1));
+  session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
+
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+
+  TestCompletionCallback callback;
+  int rv = trans->Start(&request, callback.callback(), BoundNetLog());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  const HttpResponseInfo* response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_TRUE(response->headers->IsKeepAlive());
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+  EXPECT_TRUE(trans->IsReadyToRestartForAuth());
+  EXPECT_FALSE(response->auth_challenge);
+
+  LoadTimingInfo load_timing_info;
+  EXPECT_FALSE(trans->GetLoadTimingInfo(&load_timing_info));
+
+  rv = trans->RestartWithAuth(AuthCredentials(), callback.callback());
+  EXPECT_EQ(ERR_EMPTY_RESPONSE, callback.GetResult(rv));
+
+  trans.reset();
+  session->CloseAllConnections();
+}
+
+// Test a proxy auth scheme that allows default credentials and a proxy server
+// that hangs up when credentials are initially sent, and sends a challenge
+// again they are retried.
+TEST_P(HttpNetworkTransactionTest,
+       AuthAllowsDefaultCredentialsTunnelServerChallengesTwice) {
+  HttpRequestInfo request;
+  request.method = "GET";
+  request.url = GURL("https://www.example.org/");
+
+  // Configure against proxy server "myproxy:70".
+  session_deps_.proxy_service =
+      ProxyService::CreateFixedFromPacResult("PROXY myproxy:70");
+
+  scoped_ptr<HttpAuthHandlerMock::Factory> auth_handler_factory(
+      new HttpAuthHandlerMock::Factory());
+  auth_handler_factory->set_do_init_from_challenge(true);
+  scoped_ptr<HttpAuthHandlerMock> mock_handler(new HttpAuthHandlerMock());
+  mock_handler->set_allows_default_credentials(true);
+  auth_handler_factory->AddMockHandler(mock_handler.release(),
+                                       HttpAuth::AUTH_PROXY);
+  // Add another handler for the second challenge. It supports default
+  // credentials, but they shouldn't be used, since they were already tried.
+  mock_handler.reset(new HttpAuthHandlerMock());
+  mock_handler->set_allows_default_credentials(true);
+  auth_handler_factory->AddMockHandler(mock_handler.release(),
+                                       HttpAuth::AUTH_PROXY);
+  session_deps_.http_auth_handler_factory = auth_handler_factory.Pass();
+
+  // Add NetLog just so can verify load timing information gets a NetLog ID.
+  NetLog net_log;
+  session_deps_.net_log = &net_log;
+  scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
+
+  // Should try to establish tunnel.
+  MockWrite data_writes1[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n\r\n"),
+  };
+
+  // The proxy responds to the connect with a 407, using a non-persistent
+  // connection.
+  MockRead data_reads1[] = {
+      // No credentials.
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Mock\r\n"),
+      MockRead("Proxy-Connection: close\r\n\r\n"),
+  };
+
+  // Since the first connection was closed, need to establish another once given
+  // credentials.
+  MockWrite data_writes2[] = {
+      MockWrite("CONNECT www.example.org:443 HTTP/1.1\r\n"
+                "Host: www.example.org\r\n"
+                "Proxy-Connection: keep-alive\r\n"
+                "Proxy-Authorization: auth_token\r\n\r\n"),
+  };
+
+  MockRead data_reads2[] = {
+      MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
+      MockRead("Proxy-Authenticate: Mock\r\n"),
+      MockRead("Proxy-Connection: close\r\n\r\n"),
+  };
+
+  StaticSocketDataProvider data1(data_reads1, arraysize(data_reads1),
+                                 data_writes1, arraysize(data_writes1));
+  session_deps_.socket_factory->AddSocketDataProvider(&data1);
+  StaticSocketDataProvider data2(data_reads2, arraysize(data_reads2),
+                                 data_writes2, arraysize(data_writes2));
+  session_deps_.socket_factory->AddSocketDataProvider(&data2);
+  SSLSocketDataProvider ssl(ASYNC, OK);
+  session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl);
+
+  scoped_ptr<HttpTransaction> trans(
+      new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
+
+  TestCompletionCallback callback;
+  int rv = trans->Start(&request, callback.callback(), BoundNetLog());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+
+  const HttpResponseInfo* response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_TRUE(HttpVersion(1, 1) == response->headers->GetHttpVersion());
+  EXPECT_TRUE(trans->IsReadyToRestartForAuth());
+  EXPECT_FALSE(response->auth_challenge);
+
+  LoadTimingInfo load_timing_info;
+  EXPECT_FALSE(trans->GetLoadTimingInfo(&load_timing_info));
+
+  rv = trans->RestartWithAuth(AuthCredentials(), callback.callback());
+  EXPECT_EQ(OK, callback.GetResult(rv));
+  response = trans->GetResponseInfo();
+  ASSERT_TRUE(response);
+  ASSERT_TRUE(response->headers);
+  EXPECT_EQ(407, response->headers->response_code());
+  EXPECT_FALSE(trans->IsReadyToRestartForAuth());
+  EXPECT_TRUE(response->auth_challenge);
+
+  trans.reset();
+  session->CloseAllConnections();
 }
 
 // Test the load timing for HTTPS requests with an HTTP proxy.
@@ -10560,8 +11101,7 @@ TEST_P(HttpNetworkTransactionTest, GenerateAuthToken) {
 
       // kProxyChallenge uses Proxy-Connection: close which means that the
       // socket is closed and a new one will be created for the next request.
-      if (read_write_round.read.data == kProxyChallenge.data &&
-          read_write_round.write.data != kConnect.data) {
+      if (read_write_round.read.data == kProxyChallenge.data) {
         mock_reads.push_back(std::vector<MockRead>());
         mock_writes.push_back(std::vector<MockWrite>());
       }
@@ -11015,23 +11555,20 @@ TEST_P(HttpNetworkTransactionTest, SpdyAlternateProtocolThroughProxy) {
       // SPDY request
       CreateMockWrite(*req, 4),
   };
-  const char kRejectConnectResponse[] = ("HTTP/1.1 407 Unauthorized\r\n"
-                                         "Proxy-Authenticate: Mock\r\n"
-                                         "Proxy-Connection: close\r\n"
-                                         "\r\n");
-  const char kAcceptConnectResponse[] = "HTTP/1.1 200 Connected\r\n\r\n";
   MockRead data_reads_2[] = {
       // First connection attempt fails
-      MockRead(ASYNC, kRejectConnectResponse,
-               arraysize(kRejectConnectResponse) - 1, 1),
+      MockRead(ASYNC, 1,
+               "HTTP/1.1 407 Unauthorized\r\n"
+               "Proxy-Authenticate: Mock\r\n"
+               "Content-Length: 0\r\n"
+               "Proxy-Connection: keep-alive\r\n"
+               "\r\n"),
 
       // Second connection attempt passes
-      MockRead(ASYNC, kAcceptConnectResponse,
-               arraysize(kAcceptConnectResponse) - 1, 3),
+      MockRead(ASYNC, 3, "HTTP/1.1 200 Connected\r\n\r\n"),
 
       // SPDY response
-      CreateMockRead(*resp.get(), 5),
-      CreateMockRead(*data.get(), 6),
+      CreateMockRead(*resp.get(), 5), CreateMockRead(*data.get(), 6),
       MockRead(ASYNC, 0, 0, 7),
   };
   SequencedSocketData data_2(data_reads_2, arraysize(data_reads_2),
@@ -14497,7 +15034,8 @@ TEST_P(HttpNetworkTransactionTest, ProxyHeadersNotSentOverWssTunnel) {
       // No credentials.
       MockRead("HTTP/1.1 407 Proxy Authentication Required\r\n"),
       MockRead("Proxy-Authenticate: Basic realm=\"MyRealm1\"\r\n"),
-      MockRead("Proxy-Connection: close\r\n\r\n"),
+      MockRead("Content-Length: 0\r\n"),
+      MockRead("Proxy-Connection: keep-alive\r\n\r\n"),
 
       MockRead("HTTP/1.1 200 Connection Established\r\n\r\n"),
 

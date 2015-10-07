@@ -27,8 +27,7 @@ MediaCodecVideoDecoder::MediaCodecVideoDecoder(
     const base::Closure& waiting_for_decryption_key_cb,
     const base::Closure& error_cb,
     const SetTimeCallback& update_current_time_cb,
-    const VideoSizeChangedCallback& video_size_changed_cb,
-    const base::Closure& codec_created_cb)
+    const VideoSizeChangedCallback& video_size_changed_cb)
     : MediaCodecDecoder("VideoDecoder",
                         media_task_runner,
                         frame_statistics,
@@ -40,8 +39,7 @@ MediaCodecVideoDecoder::MediaCodecVideoDecoder(
                         error_cb),
       is_protected_surface_required_(false),
       update_current_time_cb_(update_current_time_cb),
-      video_size_changed_cb_(video_size_changed_cb),
-      codec_created_cb_(codec_created_cb) {
+      video_size_changed_cb_(video_size_changed_cb) {
 }
 
 MediaCodecVideoDecoder::~MediaCodecVideoDecoder() {
@@ -187,8 +185,6 @@ MediaCodecDecoder::ConfigStatus MediaCodecVideoDecoder::ConfigureInternal(
 
   DVLOG(0) << class_name() << "::" << __FUNCTION__ << " succeeded";
 
-  media_task_runner_->PostTask(FROM_HERE, codec_created_cb_);
-
   if (!codec_created_for_tests_cb_.is_null())
     media_task_runner_->PostTask(FROM_HERE, codec_created_for_tests_cb_);
 
@@ -292,8 +288,9 @@ void MediaCodecVideoDecoder::Render(int buffer_index,
       frame_statistics_->IncrementLateFrameCount();
     }
 
-    // Skip late frames
-    ReleaseOutputBuffer(buffer_index, pts, false, update_time, eos_encountered);
+    // Render late frames immediately.
+    ReleaseOutputBuffer(buffer_index, pts, render, update_time,
+                        eos_encountered);
     return;
   }
 

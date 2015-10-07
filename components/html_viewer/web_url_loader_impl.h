@@ -47,6 +47,7 @@ class WebURLLoaderImpl : public blink::WebURLLoader {
                                   blink::WebURLLoaderClient* client);
   virtual void cancel();
   virtual void setDefersLoading(bool defers_loading);
+  virtual void setLoadingTaskRunner(blink::WebTaskRunner* web_task_runner);
 
   void OnReceivedResponse(const blink::WebURLRequest& request,
                           mojo::URLResponsePtr response);
@@ -67,6 +68,11 @@ class WebURLLoaderImpl : public blink::WebURLLoader {
   mojo::URLLoaderPtr url_loader_;
   mojo::ScopedDataPipeConsumerHandle response_body_stream_;
   mojo::common::HandleWatcher handle_watcher_;
+
+  // Please see the comments in ReadMore() for why we need these two members.
+  // -1 if Content-Length is not specified.
+  int64 expected_content_length_;
+  size_t current_length_;
 
   base::WeakPtrFactory<WebURLLoaderImpl> weak_factory_;
 

@@ -38,6 +38,7 @@ class CSSBasicShapeEllipseValue;
 class CSSBasicShapeCircleValue;
 class CSSBasicShapeInsetValue;
 class CSSBasicShapePolygonValue;
+class CSSCustomIdentValue;
 class CSSFunctionValue;
 class CSSGradientValue;
 class CSSGridLineNamesValue;
@@ -48,6 +49,7 @@ class CSSPrimitiveValue;
 class CSSProperty;
 class CSSQuadValue;
 class CSSShadowValue;
+class CSSStringValue;
 class CSSValue;
 class CSSValueList;
 class StylePropertyShorthand;
@@ -161,12 +163,13 @@ private:
     bool parseColumnsShorthand(bool important);
 
     PassRefPtrWillBeRawPtr<CSSValue> parseGridPosition();
-    bool parseIntegerOrCustomIdentFromGridPosition(RefPtrWillBeRawPtr<CSSPrimitiveValue>& numericValue, RefPtrWillBeRawPtr<CSSPrimitiveValue>& gridLineName);
+    bool parseIntegerOrCustomIdentFromGridPosition(RefPtrWillBeRawPtr<CSSPrimitiveValue>& numericValue, RefPtrWillBeRawPtr<CSSCustomIdentValue>& gridLineName);
     bool parseGridItemPositionShorthand(CSSPropertyID, bool important);
     bool parseGridTemplateRowsAndAreas(PassRefPtrWillBeRawPtr<CSSValue>, bool important);
     bool parseGridTemplateShorthand(bool important);
     bool parseGridShorthand(bool important);
     bool parseGridAreaShorthand(bool important);
+    bool parseGridGapShorthand(bool important);
     bool parseSingleGridAreaLonghand(RefPtrWillBeRawPtr<CSSValue>&);
     PassRefPtrWillBeRawPtr<CSSValue> parseGridTrackList();
     bool parseGridTrackRepeatFunction(CSSValueList&);
@@ -193,9 +196,10 @@ private:
     PassRefPtrWillBeRawPtr<CSSBasicShapePolygonValue> parseBasicShapePolygon(CSSParserValueList* args);
     PassRefPtrWillBeRawPtr<CSSBasicShapeInsetValue> parseBasicShapeInset(CSSParserValueList* args);
 
-    bool parseFont(bool important);
-    bool parseSystemFont(bool important);
-    PassRefPtrWillBeRawPtr<CSSValueList> parseFontFamily();
+    bool consumeFont(bool important);
+    bool consumeSystemFont(bool important);
+
+    bool consumeBorderSpacing(bool important);
 
     PassRefPtrWillBeRawPtr<CSSValue> parseCounter(int defaultValue);
     PassRefPtrWillBeRawPtr<CSSValue> parseCounterContent(CSSParserValueList* args, bool counters);
@@ -207,9 +211,6 @@ private:
 
     bool acceptQuirkyColors(CSSPropertyID) const;
 
-    PassRefPtrWillBeRawPtr<CSSPrimitiveValue> parseLineHeight();
-    bool parseFontSize(bool important);
-    bool parseFontWeight(bool important);
     PassRefPtrWillBeRawPtr<CSSValueList> consumeFontFaceSrc();
 
     bool parseSVGValue(CSSPropertyID propId, bool important);
@@ -272,8 +273,8 @@ private:
     bool parseGeneratedImage(CSSParserValueList*, RefPtrWillBeRawPtr<CSSValue>&);
 
     PassRefPtrWillBeRawPtr<CSSPrimitiveValue> createPrimitiveNumericValue(CSSParserValue*);
-    PassRefPtrWillBeRawPtr<CSSPrimitiveValue> createPrimitiveStringValue(CSSParserValue*);
-    PassRefPtrWillBeRawPtr<CSSPrimitiveValue> createPrimitiveCustomIdentValue(CSSParserValue*);
+    PassRefPtrWillBeRawPtr<CSSStringValue> createPrimitiveStringValue(CSSParserValue*);
+    PassRefPtrWillBeRawPtr<CSSCustomIdentValue> createPrimitiveCustomIdentValue(CSSParserValue*);
 
     PassRefPtrWillBeRawPtr<CSSValue> createCSSImageValueWithReferrer(const AtomicString& rawValue, const KURL&);
 
@@ -372,7 +373,6 @@ private:
 
     // Outputs:
     WillBeHeapVector<CSSProperty, 256>& m_parsedProperties;
-    StyleRule::Type m_ruleType;
 
     // Locals during parsing:
     int m_inParseShorthand;

@@ -564,10 +564,6 @@
         'test/embedded_test_server/http_request.h',
         'test/embedded_test_server/http_response.cc',
         'test/embedded_test_server/http_response.h',
-        'test/embedded_test_server/stream_listen_socket.cc',
-        'test/embedded_test_server/stream_listen_socket.h',
-        'test/embedded_test_server/tcp_listen_socket.cc',
-        'test/embedded_test_server/tcp_listen_socket.h',
         'test/event_waiter.h',
         'test/net_test_suite.cc',
         'test/net_test_suite.h',
@@ -1389,6 +1385,7 @@
             'cert_verify_status_android_java',
             'certificate_mime_types_java',
             'network_change_notifier_types_java',
+            'network_change_notifier_android_types_java',
             'net_errors_java',
             'private_key_types_java',
             'remote_android_keystore_aidl',
@@ -1481,6 +1478,14 @@
           'type': 'none',
           'variables': {
             'source_file': 'base/network_change_notifier.h',
+          },
+          'includes': [ '../build/android/java_cpp_enum.gypi' ],
+        },
+        {
+          'target_name': 'network_change_notifier_android_types_java',
+          'type': 'none',
+          'variables': {
+            'source_file': 'android/network_change_notifier_android.cc',
           },
           'includes': [ '../build/android/java_cpp_enum.gypi' ],
         },

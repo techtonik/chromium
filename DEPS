@@ -39,11 +39,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and whatever else without interference from each other.
-  'skia_revision': '9442ab8a40dd0effde253e3b2d166bcf47222e92',
+  'skia_revision': '9011bcf36e7ef9d6e7dab7f6e04c47c18972fbeb',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '5d866a56e5778c1094d343c93dfbbe323772562d',
+  'v8_revision': '7ecf5c4f4f02297c5698bc65044718435fed1395',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -51,15 +51,15 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '8bd4b6c52e8a97093ed6c603287658cb46c334fd',
+  'angle_revision': '566273222683314dfc8ac1cdb9bf6deb5d2b4c65',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  'buildtools_revision': '0c88009d5c50b9f21b6f8849db08abfb9eb29f1e',
+  'buildtools_revision': '5fc8d3943e163ee627c8af50366c700c0325bba2',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '9b6735445f20ae17b883b5739bf79a7c1f99e139',
+  'pdfium_revision': '35902e725aa6cc83a317c3b6fdd1926b81b8e44b',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -115,7 +115,7 @@ deps = {
    Var('chromium_git') + '/external/github.com/google/open-vcdiff.git' + '@' + '21d7d0b9c3d0c3ccbdb221c85ae889373f0a2a58',
 
   'src/testing/gtest':
-   Var('chromium_git') + '/external/googletest.git' + '@' + '9855a87157778d39b95eccfb201a9dc90f6d61c6', # from svn revision 746
+   Var('chromium_git') + '/external/github.com/google/googletest.git' + '@' + '6f8a66431cb592dad629028a50b3dd418a408c87',
 
   'src/testing/gmock':
    Var('chromium_git') + '/external/googlemock.git' + '@' + '0421b6f358139f02e102c9c332ce19a33faf75be', # from svn revision 566
@@ -187,13 +187,13 @@ deps = {
     Var('chromium_git') + '/external/selenium/py.git' + '@' + '5fd78261a75fe08d27ca4835fb6c5ce4b42275bd',
 
   'src/third_party/libvpx_new/source/libvpx':
-   Var('chromium_git') + '/webm/libvpx.git' + '@' +  '7d28d12ef34f6cbb6b1e18f3b23b71392fd3ddf5',
+   Var('chromium_git') + '/webm/libvpx.git' + '@' +  'ce3f4ade670cf02e05998f4ca50e08736802f5e7',
 
   'src/third_party/ffmpeg':
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '525a71ab8ee3b61da48138f7e1c406989d2879fc',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '302b7195a9044da3e539ca6929241d04f3e34bc4', # commit position 10148
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'cb124eec069bd28f486bde5f95b5603e2b823219', # commit position 10196
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -217,7 +217,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '5dd7527392d8867c78b850ff2b40d582f1fb00f5', # commit position 10155
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'dd1d405d54622392d726dacf0b36b454c189c1f2', # commit position 10197
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -442,7 +442,7 @@ deps_os = {
      Var('chromium_git') + '/chromium/deps/findbugs.git' + '@' + '57f05238d3ac77ea0a194813d3065dd780c6e566',
 
     'src/third_party/freetype-android/src':
-     Var('chromium_git') + '/chromium/src/third_party/freetype2.git' + '@' + 'e186230678ee8e4ea4ac4797ece8125761e3225a',
+     Var('chromium_git') + '/chromium/src/third_party/freetype2.git' + '@' + '30fe5e762e062612fdf4b56b50d813525a5aa311',
 
    'src/third_party/elfutils/src':
      Var('chromium_git') + '/external/elfutils.git' + '@' + '249673729a7e5dbd5de4f3760bdcaa3d23d154d7',

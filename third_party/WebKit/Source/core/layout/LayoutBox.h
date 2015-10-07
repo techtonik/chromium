@@ -76,8 +76,98 @@ public:
     LayoutRect m_previousLayoutOverflowRect;
 
     LayoutUnit m_pageLogicalOffset;
+
+    LayoutUnit m_paginationStrut;
 };
 
+// LayoutBox implements the full CSS box model.
+//
+// LayoutBoxModelObject only introduces some abstractions for LayoutInline and
+// LayoutBox. The logic for the model is in LayoutBox, e.g. the storage for the
+// rectangle and offset forming the CSS box (m_frameRect) and the getters for
+// the different boxes.
+//
+// LayoutBox is also the uppermost class to support scrollbars, however the
+// logic is delegated to PaintLayerScrollableArea.
+// Per the CSS specification, scrollbars should "be inserted between the inner
+// border edge and the outer padding edge".
+// (see http://www.w3.org/TR/CSS21/visufx.html#overflow)
+// Also the scrollbar width / height are removed from the content box. Taking
+// the following example:
+//
+// <!DOCTYPE html>
+// <style>
+// ::-webkit-scrollbar {
+//     /* Force non-overlay scrollbars */
+//     width: 10px;
+//     height: 20px;
+// }
+// </style>
+// <div style="overflow:scroll; width: 100px; height: 100px">
+//
+// The <div>'s content box is not 100x100 as specified in the style but 90x80 as
+// we remove the scrollbars from the box.
+//
+// The presence of scrollbars is determined by the 'overflow' property and can
+// be conditioned on having layout overflow (see OverflowModel for more details
+// on how we track overflow).
+//
+// There are 2 types of scrollbars:
+// - non-overlay scrollbars take space from the content box.
+// - overlay scrollbars don't and just overlay hang off from the border box,
+//   potentially overlapping with the padding box's content.
+//
+//
+// ***** THE BOX MODEL *****
+// The CSS box model is based on a series of nested boxes:
+// http://www.w3.org/TR/CSS21/box.html
+//
+//       |----------------------------------------------------|
+//       |                                                    |
+//       |                   margin-top                       |
+//       |                                                    |
+//       |     |-----------------------------------------|    |
+//       |     |                                         |    |
+//       |     |             border-top                  |    |
+//       |     |                                         |    |
+//       |     |    |--------------------------|----|    |    |
+//       |     |    |                          |    |    |    |
+//       |     |    |       padding-top        |####|    |    |
+//       |     |    |                          |####|    |    |
+//       |     |    |    |----------------|    |####|    |    |
+//       |     |    |    |                |    |    |    |    |
+//       | ML  | BL | PL |  content box   | PR | SW | BR | MR |
+//       |     |    |    |                |    |    |    |    |
+//       |     |    |    |----------------|    |    |    |    |
+//       |     |    |                          |    |    |    |
+//       |     |    |      padding-bottom      |    |    |    |
+//       |     |    |--------------------------|----|    |    |
+//       |     |    |                      ####|    |    |    |
+//       |     |    |     scrollbar height ####| SC |    |    |
+//       |     |    |                      ####|    |    |    |
+//       |     |    |-------------------------------|    |    |
+//       |     |                                         |    |
+//       |     |           border-bottom                 |    |
+//       |     |                                         |    |
+//       |     |-----------------------------------------|    |
+//       |                                                    |
+//       |                 margin-bottom                      |
+//       |                                                    |
+//       |----------------------------------------------------|
+//
+// BL = border-left
+// BR = border-right
+// ML = margin-left
+// MR = margin-right
+// PL = padding-left
+// PR = padding-right
+// SC = scroll corner (contains UI for resizing (see the 'resize' property)
+// SW = scrollbar width
+//
+// Those are just the boxes from the CSS model. Extra boxes are tracked by Blink
+// (e.g. the overflows). Thus it is paramount to know which box a function is
+// manipulating. Also of critical importance is the coordinate system used (see
+// the COORDINATE SYSTEMS section in LayoutBoxModelObject).
 class CORE_EXPORT LayoutBox : public LayoutBoxModelObject {
 public:
     explicit LayoutBox(ContainerNode*);
@@ -334,7 +424,7 @@ public:
 
     void scrollToOffset(const DoubleSize&, ScrollBehavior = ScrollBehaviorInstant);
     void scrollByRecursively(const DoubleSize& delta, ScrollOffsetClamping = ScrollOffsetUnclamped);
-    void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
+    void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY, ScrollType = ProgrammaticScroll);
 
     LayoutRectOutsets marginBoxOutsets() const override { return m_marginBoxOutsets; }
     LayoutUnit marginTop() const override { return m_marginBoxOutsets.top(); }
@@ -482,6 +572,23 @@ public:
     void setSpannerPlaceholder(LayoutMultiColumnSpannerPlaceholder&);
     void clearSpannerPlaceholder();
     LayoutMultiColumnSpannerPlaceholder* spannerPlaceholder() const final { return m_rareData ? m_rareData->m_spannerPlaceholder : 0; }
+
+    // A pagination strut is the amount of space needed to push an in-flow block-level object (or
+    // float) to the logical top of the next page or column. It will be set both for forced breaks
+    // (e.g. page-break-before:always) and soft breaks (when there's not enough space in the current
+    // page / column for the object). The strut is baked into the logicalTop() of the object, so
+    // that logicalTop() - paginationStrut() == the original position in the previous column before
+    // deciding to break.
+    //
+    // Pagination struts are either set in front of a block-level box (here) or before a line
+    // (RootInlineBox::paginationStrut()).
+    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : LayoutUnit(); }
+    void setPaginationStrut(LayoutUnit);
+    void resetPaginationStrut()
+    {
+        if (m_rareData)
+            m_rareData->m_paginationStrut = LayoutUnit();
+    }
 
     LayoutRect clippedOverflowRectForPaintInvalidation(const LayoutBoxModelObject* paintInvalidationContainer, const PaintInvalidationState* = nullptr) const override;
     void mapRectToPaintInvalidationBacking(const LayoutBoxModelObject* paintInvalidationContainer, LayoutRect&, const PaintInvalidationState*) const override;

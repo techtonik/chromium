@@ -45,9 +45,6 @@ source_set("test_support") {
     "base/find_in_page_observer.h",
     "base/history_index_restore_observer.cc",
     "base/history_index_restore_observer.h",
-    "base/in_process_browser_test.cc",
-    "base/in_process_browser_test.h",
-    "base/in_process_browser_test_mac.cc",
     "base/profile_mock.cc",
     "base/profile_mock.h",
     "base/scoped_browser_locale.cc",
@@ -76,8 +73,6 @@ source_set("test_support") {
     "base/testing_profile_manager.h",
     "base/tracing.cc",
     "base/tracing.h",
-    "base/ui_test_utils.cc",
-    "base/ui_test_utils.h",
     "logging/win/file_logger.cc",
     "logging/win/file_logger.h",
     "logging/win/log_file_printer.cc",
@@ -166,15 +161,12 @@ source_set("test_support") {
   }
 
   if (is_android) {
+    deps -= [ "//ui/message_center:test_support" ]
     sources -= [
       "base/dialog_test_browser_window.cc",
       "base/dialog_test_browser_window.h",
-      "base/in_process_browser_test.cc",
-      "base/in_process_browser_test.h",
       "base/test_browser_window.cc",
       "base/test_browser_window.h",
-      "base/ui_test_utils.cc",
-      "base/ui_test_utils.h",
     ]
   }
 
@@ -212,10 +204,6 @@ source_set("test_support") {
   }
 
   if (enable_plugins) {
-    sources += [
-      "ppapi/ppapi_test.cc",
-      "ppapi/ppapi_test.h",
-    ]
     deps += [ "//pdf" ]
   }
 
@@ -232,6 +220,50 @@ source_set("test_support") {
       "//extensions:test_support",
     ]
   }
+}
+
+# GYP version: chrome/chrome_tests.gypi:test_support_ui
+source_set("test_support_ui") {
+  defines = []
+  testonly = true
+
+  sources = [
+    "base/in_process_browser_test.cc",
+    "base/in_process_browser_test.h",
+    "base/in_process_browser_test_mac.cc",
+    "base/ui_test_utils.cc",
+    "base/ui_test_utils.h",
+  ]
+
+  configs += [ "//build/config:precompiled_headers" ]
+
+  public_deps = [
+    "//chrome/browser:test_support_ui",
+  ]
+  deps = [
+    "//components/metrics:test_support",
+    "//skia",
+    "//testing/gtest",
+  ]
+
+  if (enable_plugins) {
+    sources += [
+      "ppapi/ppapi_test.cc",
+      "ppapi/ppapi_test.h",
+    ]
+  }
+}
+
+group("telemetry_binary_deps") {
+  data_deps = []
+
+  if (is_win) {
+    data_deps += [ "//content/shell:crash_service" ]
+  }
+
+  data = [
+    "//tools/perf/core/binary_dependencies.json",
+  ]
 }
 
 if (!is_android) {
@@ -293,11 +325,12 @@ if (!is_android) {
     ldflags = []
 
     deps = [
+      ":test_support",
+      ":test_support_ui",
       "//base/allocator",
       "//chrome/browser",
       "//chrome/browser/devtools",
       "//chrome/renderer",
-      "//chrome/test:test_support",
       "//chrome:resources",
       "//chrome:strings",
       "//chrome:packed_extra_resources",
@@ -615,6 +648,10 @@ if (!is_android) {
   }
 
   group("telemetry_gpu_test") {
+    deps = [
+      "//tools/telemetry:telemetry_test_support",
+      ":telemetry_binary_deps",
+    ]
     data_deps = [
       # TODO(kbr): this used to be "//chrome". Had to change this to
       # chrome_initial temporarily to work around crbug.com/536192.
@@ -633,18 +670,6 @@ if (!is_android) {
       # For webgl_conformance
       "//third_party/webgl/",
       "//content/test/gpu/run_gpu_test.py",
-
-      # Generic telemetry deps
-      # TODO(GYP): These should probably be specified somewhere else
-      # and pulled in via a deps entry.
-      "//build/android/devil/",
-      "//build/android/pylib/",
-      "//build/util/",
-      "//third_party/WebKit/PerformanceTests/resources/jquery.tablesorter.min.js",
-      "//third_party/WebKit/PerformanceTests/resources/statistics.js",
-      "//third_party/flot/jquery.flot.min.js",
-      "//third_party/webpagereplay/",
-      "//tools/telemetry/",
     ]
 
     if (is_win && (symbol_level == 1 || symbol_level == 2)) {
@@ -669,6 +694,10 @@ if (!is_android) {
   }
 
   group("telemetry_gpu_unittests") {
+    deps = [
+      "//tools/telemetry:telemetry_test_support",
+      ":telemetry_binary_deps",
+    ]
     data = [
       # TODO(kbr): refactor the telemetry dependencies more cleanly.
       "//content/test/gpu/",
@@ -685,7 +714,6 @@ if (!is_android) {
       "//build/android/devil/",
       "//build/android/pylib/",
       "//build/util/",
-      "//tools/telemetry/",
 
       # From telemetry_gpu_unittests.isolate
       "//third_party/typ/",
@@ -770,6 +798,7 @@ if (!is_android) {
       ":browser_tests_js_webui",
       ":sync_integration_test_support",
       ":test_support",
+      ":test_support_ui",
       "//base",
       "//base:i18n",
       "//base/allocator",
@@ -1242,6 +1271,7 @@ if (!is_android) {
     deps = [
       ":sync_integration_test_support",
       ":test_support",
+      ":test_support_ui",
       "//base/allocator",
       "//chrome:packed_extra_resources",
       "//chrome:packed_resources",
@@ -1326,6 +1356,7 @@ if (!is_android) {
 
     deps = [
       ":sync_integration_test_support",
+      ":test_support_ui",
       "//base/allocator",
       "//crypto:platform",
       "//sync",
@@ -2027,6 +2058,7 @@ if (!is_android) {
 
       deps = [
         ":test_support",
+        ":test_support_ui",
         "//base",
         "//base:i18n",
         "//base/test:test_support",

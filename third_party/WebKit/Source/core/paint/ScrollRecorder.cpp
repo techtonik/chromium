@@ -17,20 +17,13 @@ ScrollRecorder::ScrollRecorder(GraphicsContext& context, const DisplayItemClient
     , m_context(context)
 {
     ASSERT(m_context.displayItemList());
-    if (m_context.displayItemList()->displayItemConstructionIsDisabled())
-        return;
     m_context.displayItemList()->createAndAppend<BeginScrollDisplayItem>(m_client, m_beginItemType, currentOffset);
 }
 
 ScrollRecorder::~ScrollRecorder()
 {
     ASSERT(m_context.displayItemList());
-    if (!m_context.displayItemList()->displayItemConstructionIsDisabled()) {
-        if (m_context.displayItemList()->lastDisplayItemIsNoopBegin())
-            m_context.displayItemList()->removeLastDisplayItem();
-        else
-            m_context.displayItemList()->createAndAppend<EndScrollDisplayItem>(m_client, DisplayItem::scrollTypeToEndScrollType(m_beginItemType));
-    }
+    m_context.displayItemList()->endItem<EndScrollDisplayItem>(m_client, DisplayItem::scrollTypeToEndScrollType(m_beginItemType));
 }
 
 } // namespace blink

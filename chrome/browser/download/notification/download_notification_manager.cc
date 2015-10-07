@@ -24,7 +24,9 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 bool DownloadNotificationManager::IsEnabled() {
-  bool enable_download_notification = true;
+  // Disabled by default.
+  bool enable_download_notification = false;
+
   std::string arg = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
       switches::kEnableDownloadNotification);
   if (!arg.empty()) {
@@ -83,7 +85,7 @@ DownloadNotificationManagerForProfile::DownloadNotificationManagerForProfile(
 
 DownloadNotificationManagerForProfile::
     ~DownloadNotificationManagerForProfile() {
-  for (auto download : items_) {
+  for (const auto& download : items_) {
     download.first->RemoveObserver(this);
   }
 }
@@ -143,8 +145,13 @@ void DownloadNotificationManagerForProfile::OnNewDownloadReady(
 
   download->AddObserver(this);
 
-  // |item| object will be inserted to |items_| by |OnCreated()| called in the
-  // constructor.
+  for (auto& item : items_) {
+    content::DownloadItem* download_item = item.first;
+    DownloadItemNotification* download_notification = item.second;
+    if (download_item->GetState() == content::DownloadItem::IN_PROGRESS)
+      download_notification->DisablePopup();
+  }
+
   DownloadItemNotification* item = new DownloadItemNotification(download, this);
   items_.insert(std::make_pair(download, item));
 }

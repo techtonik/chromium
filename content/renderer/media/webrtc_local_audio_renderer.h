@@ -54,7 +54,8 @@ class CONTENT_EXPORT WebRtcLocalAudioRenderer
   WebRtcLocalAudioRenderer(const blink::WebMediaStreamTrack& audio_track,
                            int source_render_frame_id,
                            int session_id,
-                           int frames_per_buffer);
+                           const std::string& device_id,
+                           const url::Origin& security_origin);
 
   // MediaStreamAudioRenderer implementation.
   // Called on the main thread.
@@ -145,12 +146,10 @@ class CONTENT_EXPORT WebRtcLocalAudioRenderer
   // Protects |audio_shifter_|, |playing_| and |sink_|.
   mutable base::Lock thread_lock_;
 
-  // The preferred buffer size provided via the ctor.
-  const int frames_per_buffer_;
-
   // The preferred device id of the output device or empty for the default
   // output device.
   const std::string output_device_id_;
+  const url::Origin security_origin_;
 
   // Cache value for the volume.
   float volume_;

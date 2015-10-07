@@ -24,6 +24,12 @@ const DisplayItems& DisplayItemList::displayItems() const
     return m_currentDisplayItems;
 }
 
+const Vector<PaintChunk>& DisplayItemList::paintChunks() const
+{
+    ASSERT(m_newPaintChunks.isInInitialState());
+    return m_currentPaintChunks;
+}
+
 bool DisplayItemList::lastDisplayItemIsNoopBegin() const
 {
     if (m_newDisplayItems.isEmpty())
@@ -48,6 +54,9 @@ void DisplayItemList::removeLastDisplayItem()
     }
 #endif
     m_newDisplayItems.removeLast();
+
+    if (RuntimeEnabledFeatures::slimmingPaintV2Enabled())
+        m_newPaintChunks.decrementDisplayItemIndex();
 }
 
 void DisplayItemList::processNewItem(DisplayItem& displayItem)
@@ -85,6 +94,14 @@ void DisplayItemList::processNewItem(DisplayItem& displayItem)
 
     if (skippingCache())
         displayItem.setSkippedCache();
+
+    if (RuntimeEnabledFeatures::slimmingPaintV2Enabled())
+        m_newPaintChunks.incrementDisplayItemIndex();
+}
+
+void DisplayItemList::updateCurrentPaintProperties(const PaintProperties& newPaintProperties)
+{
+    m_newPaintChunks.updateCurrentPaintProperties(newPaintProperties);
 }
 
 void DisplayItemList::beginScope()
@@ -102,7 +119,8 @@ void DisplayItemList::endScope()
 
 void DisplayItemList::invalidate(const DisplayItemClientWrapper& client, PaintInvalidationReason paintInvalidationReason, const IntRect& previousPaintInvalidationRect, const IntRect& newPaintInvalidationRect)
 {
-    invalidateUntracked(client.displayItemClient());
+    invalidateClient(client);
+
     if (RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled()) {
         Invalidation invalidation = { previousPaintInvalidationRect, paintInvalidationReason };
         if (!previousPaintInvalidationRect.isEmpty())
@@ -112,15 +130,19 @@ void DisplayItemList::invalidate(const DisplayItemClientWrapper& client, PaintIn
             m_invalidations.append(invalidation);
         }
     }
+}
 
+void DisplayItemList::invalidateClient(const DisplayItemClientWrapper& client)
+{
+    invalidateUntracked(client.displayItemClient());
     if (RuntimeEnabledFeatures::slimmingPaintV2Enabled() && m_trackedPaintInvalidationObjects)
         m_trackedPaintInvalidationObjects->append(client.debugName());
 }
 
 void DisplayItemList::invalidateUntracked(DisplayItemClient client)
 {
-    // Can only be called during layout/paintInvalidation, not during painting.
-    ASSERT(m_newDisplayItems.isEmpty());
+    // This can be called during painting, but we can't invalidate already painted clients.
+    ASSERT(!m_newDisplayItemIndicesByClient.contains(client));
     updateValidlyCachedClientsIfNeeded();
     m_validlyCachedClients.remove(client);
 }
@@ -148,20 +170,11 @@ bool DisplayItemList::clientCacheIsValid(DisplayItemClient client) const
 void DisplayItemList::invalidatePaintOffset(const DisplayItemClientWrapper& client)
 {
     ASSERT(RuntimeEnabledFeatures::slimmingPaintOffsetCachingEnabled());
-
-    updateValidlyCachedClientsIfNeeded();
-    m_validlyCachedClients.remove(client.displayItemClient());
-
-    if (RuntimeEnabledFeatures::slimmingPaintV2Enabled() && m_trackedPaintInvalidationObjects)
-        m_trackedPaintInvalidationObjects->append(client.debugName());
+    invalidateClient(client);
 
 #if ENABLE(ASSERT)
+    ASSERT(!paintOffsetWasInvalidated(client.displayItemClient()));
     m_clientsWithPaintOffsetInvalidations.add(client.displayItemClient());
-
-    // Ensure no phases slipped in using the old paint offset which would indicate
-    // different phases used different paint offsets, which should not happen.
-    for (const auto& item : m_newDisplayItems)
-        ASSERT(!item.isCached() || item.client() != client.displayItemClient());
 #endif
 }
 
@@ -270,6 +283,7 @@ void DisplayItemList::commitNewDisplayItems(GraphicsLayer* graphicsLayer)
         for (const auto& invalidation : m_invalidations)
             graphicsLayer->setNeedsDisplayInRect(invalidation.rect, invalidation.invalidationReason);
         m_invalidations.clear();
+        m_clientsCheckedPaintInvalidation.clear();
     }
 
     // These data structures are used during painting only.
@@ -279,6 +293,7 @@ void DisplayItemList::commitNewDisplayItems(GraphicsLayer* graphicsLayer)
     ASSERT(!skippingCache());
 #if ENABLE(ASSERT)
     m_newDisplayItemIndicesByClient.clear();
+    m_clientsWithPaintOffsetInvalidations.clear();
 #endif
 
     if (m_currentDisplayItems.isEmpty()) {
@@ -287,6 +302,7 @@ void DisplayItemList::commitNewDisplayItems(GraphicsLayer* graphicsLayer)
             ASSERT(!item.isCached());
 #endif
         m_currentDisplayItems.swap(m_newDisplayItems);
+        m_currentPaintChunks = m_newPaintChunks.releasePaintChunks();
         m_validlyCachedClientsDirty = true;
         m_numCachedItems = 0;
         return;
@@ -303,6 +319,7 @@ void DisplayItemList::commitNewDisplayItems(GraphicsLayer* graphicsLayer)
 
     // TODO(jbroman): Consider revisiting this heuristic.
     DisplayItems updatedList(std::max(m_currentDisplayItems.usedCapacityInBytes(), m_newDisplayItems.usedCapacityInBytes()));
+    Vector<PaintChunk> updatedPaintChunks;
     DisplayItems::iterator currentIt = m_currentDisplayItems.begin();
     DisplayItems::iterator currentEnd = m_currentDisplayItems.end();
     for (DisplayItems::iterator newIt = m_newDisplayItems.begin(); newIt != m_newDisplayItems.end(); ++newIt) {
@@ -365,14 +382,14 @@ void DisplayItemList::commitNewDisplayItems(GraphicsLayer* graphicsLayer)
         checkNoRemainingCachedDisplayItems();
 #endif // ENABLE(ASSERT)
 
+    // TODO(jbroman): When subsequence caching applies to SPv2, we'll need to
+    // merge the paint chunks as well.
+    m_currentPaintChunks = m_newPaintChunks.releasePaintChunks();
+
     m_newDisplayItems.clear();
     m_validlyCachedClientsDirty = true;
     m_currentDisplayItems.swap(updatedList);
     m_numCachedItems = 0;
-
-#if ENABLE(ASSERT)
-    m_clientsWithPaintOffsetInvalidations.clear();
-#endif
 }
 
 size_t DisplayItemList::approximateUnsharedMemoryUsage() const

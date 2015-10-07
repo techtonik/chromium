@@ -12,6 +12,8 @@
 #include "platform/graphics/ContiguousContainer.h"
 #include "platform/graphics/PaintInvalidationReason.h"
 #include "platform/graphics/paint/DisplayItem.h"
+#include "platform/graphics/paint/PaintChunk.h"
+#include "platform/graphics/paint/PaintChunker.h"
 #include "platform/graphics/paint/Transform3DDisplayItem.h"
 #include "wtf/Alignment.h"
 #include "wtf/HashMap.h"
@@ -75,17 +77,39 @@ public:
 #endif
 
     // These methods are called during painting.
+
+    // Provide a new set of paint properties to apply to recorded display items,
+    // for Slimming Paint v2.
+    void updateCurrentPaintProperties(const PaintProperties&);
+
     template <typename DisplayItemClass, typename... Args>
-    DisplayItemClass& createAndAppend(Args&&... args)
+    void createAndAppend(Args&&... args)
     {
         static_assert(WTF::IsSubclass<DisplayItemClass, DisplayItem>::value,
             "Can only createAndAppend subclasses of DisplayItem.");
         static_assert(sizeof(DisplayItemClass) <= kMaximumDisplayItemSize,
             "DisplayItem subclass is larger than kMaximumDisplayItemSize.");
 
+        if (displayItemConstructionIsDisabled())
+            return;
         DisplayItemClass& displayItem = m_newDisplayItems.allocateAndConstruct<DisplayItemClass>(WTF::forward<Args>(args)...);
         processNewItem(displayItem);
-        return displayItem;
+    }
+
+    // Creates and appends an ending display item to pair with a preceding
+    // beginning item iff the display item actually draws content. For no-op
+    // items, rather than creating an ending item, the begin item will
+    // instead be removed, thereby maintaining brevity of the list. If display
+    // item construction is disabled, no list mutations will be performed.
+    template <typename DisplayItemClass, typename... Args>
+    void endItem(Args&&... args)
+    {
+        if (displayItemConstructionIsDisabled())
+            return;
+        if (lastDisplayItemIsNoopBegin())
+            removeLastDisplayItem();
+        else
+            createAndAppend<DisplayItemClass>(WTF::forward<Args>(args)...);
     }
 
     // Scopes must be used to avoid duplicated display item ids when we paint some object
@@ -114,6 +138,9 @@ public:
     // Get the paint list generated after the last painting.
     const DisplayItems& displayItems() const;
 
+    // Get the paint chunks generated after the last painting.
+    const Vector<PaintChunk>& paintChunks() const;
+
     bool clientCacheIsValid(DisplayItemClient) const;
 
     // Commits the new display items and plays back the updated display items into the given context.
@@ -128,6 +155,9 @@ public:
 
     bool displayItemConstructionIsDisabled() const { return m_constructionDisabled; }
     void setDisplayItemConstructionIsDisabled(const bool disable) { m_constructionDisabled = disable; }
+
+    bool textPainted() const { return m_textPainted; }
+    void setTextPainted() { m_textPainted = true; }
 
     // Returns displayItems added using createAndAppend() since beginning or the last
     // commitNewDisplayItems(). Use with care.
@@ -153,12 +183,24 @@ public:
         return m_trackedPaintInvalidationObjects ? *m_trackedPaintInvalidationObjects : Vector<String>();
     }
 
+    bool clientHasCheckedPaintInvalidation(DisplayItemClient client) const
+    {
+        ASSERT(RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled());
+        return m_clientsCheckedPaintInvalidation.contains(client);
+    }
+    void setClientHasCheckedPaintInvalidation(DisplayItemClient client)
+    {
+        ASSERT(RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled());
+        m_clientsCheckedPaintInvalidation.add(client);
+    }
+
 protected:
     DisplayItemList()
         : m_currentDisplayItems(0)
         , m_newDisplayItems(kInitialDisplayItemsCapacity * kMaximumDisplayItemSize)
         , m_validlyCachedClientsDirty(false)
         , m_constructionDisabled(false)
+        , m_textPainted(false)
         , m_skippingCacheCount(0)
         , m_numCachedItems(0)
         , m_nextScope(1) { }
@@ -168,6 +210,8 @@ private:
     void processNewItem(DisplayItem&);
 
     void updateValidlyCachedClientsIfNeeded() const;
+
+    void invalidateClient(const DisplayItemClientWrapper&);
 
 #ifndef NDEBUG
     WTF::String displayItemsAsDebugString(const DisplayItems&) const;
@@ -198,12 +242,23 @@ private:
     DisplayItems m_currentDisplayItems;
     DisplayItems m_newDisplayItems;
 
+    // In Slimming Paint v2, paint properties (e.g. transform) useful for
+    // compositing are stored in corresponding paint chunks instead of in the
+    // display items.
+    Vector<PaintChunk> m_currentPaintChunks;
+    PaintChunker m_newPaintChunks;
+
     // Contains all clients having valid cached paintings if updated.
     // It's lazily updated in updateValidlyCachedClientsIfNeeded().
-    // FIXME: In the future we can replace this with client-side repaint flags
+    // TODO(wangxianzhu): In the future we can replace this with client-side repaint flags
     // to avoid the cost of building and querying the hash table.
     mutable HashSet<DisplayItemClient> m_validlyCachedClients;
     mutable bool m_validlyCachedClientsDirty;
+
+    // Used during painting. Contains clients that have checked paint invalidation and
+    // are known to be valid.
+    // TODO(wangxianzhu): Use client side flag to avoid const of hash table.
+    HashSet<DisplayItemClient> m_clientsCheckedPaintInvalidation;
 
 #if ENABLE(ASSERT)
     // Set of clients which had paint offset changes since the last commit. This is used for
@@ -214,6 +269,9 @@ private:
     // Allow display item construction to be disabled to isolate the costs of construction
     // in performance metrics.
     bool m_constructionDisabled;
+
+    // Indicates this DisplayItemList has ever had text. It is never reset to false.
+    bool m_textPainted;
 
     int m_skippingCacheCount;
 

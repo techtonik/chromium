@@ -3,8 +3,8 @@ crbug.com/524134 paint/invalidation/spv2 [ Skip ]
 
 # TODO(wangxianzhu): Triage the failures
 crbug.com/524134 virtual/spv2/paint/invalidation/invalidate-after-composited-scroll.html [ Failure ]
-crbug.com/524134 virtual/spv2/paint/selection/text-selection-drag.html [ ImageOnlyFailure ]
-crbug.com/524134 virtual/spv2/paint/deprecatedpaintlayer/non-self-painting-layer-overrides-visibility.html [ Crash ImageOnlyFailure Timeout ]
+crbug.com/524134 crbug.com/539546 virtual/spv2/paint/selection/text-selection-drag.html [ ImageOnlyFailure Pass Failure ]
+crbug.com/524134 virtual/spv2/paint/paintlayer/non-self-painting-layer-overrides-visibility.html [ Crash ImageOnlyFailure Timeout ]
 crbug.com/524134 virtual/spv2/paint/invalidation/spv2/focus-ring-on-continuation-move.html [ ImageOnlyFailure ]
 
 crbug.com/524236 virtual/spv2/paint/invalidation/spv2/clipping-should-not-repaint-composited-descendants-as-text.html [ Failure ]
@@ -43,6 +43,14 @@ crbug.com/502531 fast/borders/border-antialiasing.html [ ImageOnlyFailure ]
 
 crbug.com/538697 [ Win7 Debug ] virtual/threaded/printing/webgl-oversized-printing.html [ Crash ]
 crbug.com/538697 [ Win7 Debug ] printing/webgl-oversized-printing.html [ Crash ]
+
+crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-cross-origin-response-handling.html [ Timeout ]
+crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-redirect-response-handling.html [ Timeout ]
+crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-preflight-handling.html [ Timeout ]
+
+crbug.com/539247 [ Win10 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-cross-origin-response-handling.html [ Timeout Failure ]
+crbug.com/539247 [ Win10 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-redirect-response-handling.html [ Timeout Failure ]
+crbug.com/539247 [ Win10 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-preflight-handling.html [ Timeout Failure ]
 
 crbug.com/417782 [ Linux Win ] virtual/rootlayerscrolls/fast/scrolling/fractional-scroll-offset-fixed-position-non-composited.html [ ImageOnlyFailure ]
 crbug.com/492664 [ Linux XP ] imported/csswg-test/css-writing-modes-3/box-offsets-rel-pos-vlr-005.xht [ ImageOnlyFailure ]
@@ -395,6 +403,8 @@ crbug.com/505364 imported/web-platform-tests/shadow-dom/untriaged/shadow-trees/u
 crbug.com/505364 imported/web-platform-tests/shadow-dom/untriaged/shadow-trees/upper-boundary-encapsulation/ownerdocument-002.html [ Failure ]
 crbug.com/505364 crbug.com/520616 imported/web-platform-tests/shadow-dom/untriaged/shadow-trees/upper-boundary-encapsulation/test-009.html [ Failure ]
 
+crbug.com/539623 [ SnowLeopard ] fast/repaint/selection-change-in-iframe-with-relative-parent.html [ Pass Failure ImageOnlyFailure ]
+
 # Temporarily disabled until Chromium side supports meaningful MediaStreamTracks.
 crbug.com/532509 fast/mediarecorder/MediaRecorder-basic-video.html [ Skip ]
 
@@ -548,6 +558,10 @@ crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-column-order-002.
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-column-order-003.xht [ ImageOnlyFailure ]
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-column-order-004.xht [ ImageOnlyFailure ]
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-column-order-005.xht [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-progression-vlr-001.html [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-progression-vlr-004.html [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-progression-vrl-001.html [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/table-progression-vrl-004.html [ ImageOnlyFailure ]
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/writing-mode-stretch-001.html [ ImageOnlyFailure ]
 
 # Either "combo" or split should run: http://testthewebforward.org/docs/css-naming.html
@@ -628,6 +642,7 @@ crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/row-progression
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/row-progression-009.xht [ ImageOnlyFailure ]
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/text-baseline-006.xht [ ImageOnlyFailure ]
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/text-baseline-007.xht [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/vertical-alignment-026-rl.xht [ ImageOnlyFailure ]
 
 crbug.com/498845 [ Win ] fast/multicol/vertical-rl/float-content-break.html [ ImageOnlyFailure ]
 
@@ -645,6 +660,16 @@ crbug.com/381684 [ Win Android Mac ] fonts/family-fallback-gardiner.html [ Skip 
 crbug.com/467635 fast/dom/HTMLImageElement/image-sizes-meta-viewport.html [ Skip ]
 
 crbug.com/517898 [ SnowLeopard Debug ] fast/text/international/bidi-neutral-run.html [ Crash ]
+
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001b.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001c.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001d.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001i.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001j.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001m.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001n.html [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-022-rl.xht [ Pass Failure ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-024-rl.xht [ Pass Failure ImageOnlyFailure ]
 
 # crbug.com/396823 [ Mac ] fast/multicol/multicol-with-child-renderLayer-for-input.html [ ImageOnlyFailure ]
 
@@ -709,6 +734,7 @@ crbug.com/357427 http/tests/workers/terminate-during-sync-operation-file.html [ 
 crbug.com/357427 http/tests/workers/terminate-during-sync-operation-filesystem.html [ Crash Pass Slow Timeout ]
 
 crbug.com/356957 [ Win Mac Debug ] editing/spelling/spellcheck-editable-on-focus.html [ Timeout ]
+crbug.com/539693 [ XP Win10 ] editing/selection/doubleclick-crash.html [ Failure ]
 
 crbug.com/365400 [ Mac ] compositing/images/direct-pdf-image.html [ Failure ]
 
@@ -747,6 +773,8 @@ crbug.com/528062 [ Win ] http/tests/security/xssAuditor/chunked-big-script.html 
 crbug.com/374961 [ SnowLeopard Debug ] inspector/sources/debugger-frameworks/frameworks-skip-step-in.html [ Crash ]
 crbug.com/374961 [ SnowLeopard Debug ] inspector/sources/debugger-frameworks/frameworks-steppings.html [ Crash ]
 crbug.com/374961 [ SnowLeopard Debug ] inspector/sources/debugger-async/async-callstack-get-as-string.html [ Crash ]
+
+crbug.com/539725 [ Linux Debug ] inspector/elements/shadow/elements-panel-shadow-selection-on-refresh.html [ Slow Failure ]
 
 crbug.com/392706 virtual/threaded/animations/play-state-initially-paused.html [ Failure ]
 
@@ -835,7 +863,6 @@ crbug.com/498021 [ Linux ] svg/custom/use-on-symbol-inside-pattern.svg [ Failure
 crbug.com/498021 [ Linux ] fast/forms/month/month-appearance-l10n.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/ellipsis-stroked.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/emphasis-complex.html [ ImageOnlyFailure ]
-crbug.com/498021 [ Linux ] fast/text/international/complex-joining-using-gpos.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/international/danda-space.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/international/hindi-whitespace.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/international/thai-line-breaks.html [ ImageOnlyFailure ]
@@ -1100,8 +1127,6 @@ crbug.com/464736 http/tests/xmlhttprequest/ontimeout-event-override-after-failur
 
 # Unclear semantics of ToString (actually ToPrimitive) across iframes.
 crbug.com/532469 http/tests/security/cross-frame-access-custom.html [ NeedsManualRebaseline ]
-
-crbug.com/474759 fast/block/line-layout/selection-highlight-overlap.html [ ImageOnlyFailure ]
 
 # Win10 specific failures that still need triaging.
 crbug.com/521730 [ Win10 ] fast/dom/Window/property-access-on-cached-properties-after-frame-navigated.html [ Failure ]
@@ -1477,11 +1502,14 @@ crbug.com/521764 [ Win10 ] fast/loader/javascript-detached-frame-no-crash.html [
 crbug.com/521764 [ Win10 ] virtual/display_list_2d_canvas/fast/canvas/canvas-resize-reset.html [ Pass Timeout ]
 crbug.com/521764 [ Win10 ] transitions/equivalent-background-image-no-transition.html [ Pass Timeout ]
 
+crbug.com/474759 fast/writing-mode/vertical-rl-replaced-selection.html [ ImageOnlyFailure ]
+crbug.com/474759 fast/block/line-layout/selection-highlight-overlap.html [ ImageOnlyFailure ]
+
 # GrGLConvolutionEffect optimization causes blink layout test image differences
 crbug.com/505086 css3/filters/effect-blur-hw.html [ NeedsManualRebaseline ]
 crbug.com/505086 css3/filters/effect-brightness-clamping-hw.html [ NeedsManualRebaseline ]
 crbug.com/505086 css3/filters/effect-combined-hw.html [ NeedsManualRebaseline ]
-crbug.com/505086 css3/filters/effect-reference-zoom-hw.html [ NeedsManualRebaseline ]
+crbug.com/505086 css3/filters/effect-reference-zoom-hw.html [ Crash NeedsManualRebaseline ]
 
 crbug.com/502927 [ XP ] paint/frames/frameset-with-stacking-context-and-not-stacking-context-children.html [ Failure ]
 crbug.com/502927 [ XP ] paint/frames/frameset-with-stacking-contexts.html [ Failure ]
@@ -1575,9 +1603,14 @@ crbug.com/531286 virtual/gpu/fast/canvas/yuv-video-on-accelerated-canvas.html [ 
 
 crbug.com/535478 [ Win ] virtual/threaded/inspector/tracing/decode-resize.html [ Slow Pass Failure ]
 
-crbug.com/538522 css3/filters/effect-reference-colorspace-hw.html [ ImageOnlyFailure ]
+crbug.com/538522 css3/filters/effect-reference-colorspace-hw.html [ Crash ImageOnlyFailure ]
 
 crbug.com/524646 [ Yosemite ] fast/dom/shadow/shadowdom-for-button.html [ ImageOnlyFailure ]
 
 crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-window.html [ Failure Pass ]
 crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-worker.html [ Failure Pass ]
+
+crbug.com/502267 fast/css/image-orientation/image-orientation-from-image-composited-dynamic.html [ NeedsRebaseline ]
+crbug.com/502267 fast/css/image-orientation/image-orientation-default.html [ NeedsRebaseline ]
+
+crbug.com/499780 fast/css/font_property_normal.html [ NeedsRebaseline ]

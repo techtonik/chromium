@@ -541,6 +541,11 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyScale: return 506;
     case CSSPropertyImageOrientation: return 507;
     case CSSPropertyBackdropFilter: return 508;
+    case CSSPropertyTextCombineUpright: return 509;
+    case CSSPropertyTextOrientation: return 510;
+    case CSSPropertyGridColumnGap: return 511;
+    case CSSPropertyGridRowGap: return 512;
+    case CSSPropertyGridGap: return 513;
 
     // 1. Add new features above this line (don't change the assigned numbers of the existing
     // items).
@@ -557,7 +562,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 508; }
+static int maximumCSSSampleId() { return 513; }
 
 void UseCounter::muteForInspector()
 {

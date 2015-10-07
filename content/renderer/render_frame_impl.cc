@@ -1178,7 +1178,7 @@ void RenderFrameImpl::NavigateToSwappedOutURL() {
 void RenderFrameImpl::BindServiceRegistry(
     mojo::InterfaceRequest<mojo::ServiceProvider> services,
     mojo::ServiceProviderPtr exposed_services) {
-  service_registry_.Bind(services.Pass());
+  service_registry_.Bind(services.Pass(), 20);
   service_registry_.BindRemoteServiceProvider(exposed_services.Pass());
 }
 
@@ -2610,8 +2610,9 @@ void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame,
   if (!ds)
     return;
 
-  TRACE_EVENT2("navigation", "RenderFrameImpl::didStartProvisionalLoad",
-               "id", routing_id_, "url", ds->request().url().string().utf8());
+  TRACE_EVENT2("navigation,benchmark",
+               "RenderFrameImpl::didStartProvisionalLoad", "id", routing_id_,
+               "url", ds->request().url().string().utf8());
   DocumentState* document_state = DocumentState::FromDataSource(ds);
 
   // We should only navigate to swappedout:// when is_swapped_out_ is true.
@@ -2658,8 +2659,8 @@ void RenderFrameImpl::didFailProvisionalLoad(
     blink::WebLocalFrame* frame,
     const blink::WebURLError& error,
     blink::WebHistoryCommitType commit_type) {
-  TRACE_EVENT1("navigation", "RenderFrameImpl::didFailProvisionalLoad",
-               "id", routing_id_);
+  TRACE_EVENT1("navigation,benchmark",
+               "RenderFrameImpl::didFailProvisionalLoad", "id", routing_id_);
   DCHECK(!frame_ || frame_ == frame);
   WebDataSource* ds = frame->provisionalDataSource();
   DCHECK(ds);
@@ -2930,7 +2931,7 @@ void RenderFrameImpl::didChangeIcon(blink::WebLocalFrame* frame,
 
 void RenderFrameImpl::didFinishDocumentLoad(blink::WebLocalFrame* frame,
                                             bool document_is_empty) {
-  TRACE_EVENT1("navigation", "RenderFrameImpl::didFinishDocumentLoad",
+  TRACE_EVENT1("navigation,benchmark", "RenderFrameImpl::didFinishDocumentLoad",
                "id", routing_id_);
   DCHECK(!frame_ || frame_ == frame);
   WebDataSource* ds = frame->dataSource();
@@ -3022,14 +3023,14 @@ void RenderFrameImpl::didFailLoad(blink::WebLocalFrame* frame,
 }
 
 void RenderFrameImpl::didFinishLoad(blink::WebLocalFrame* frame) {
-  TRACE_EVENT1("navigation", "RenderFrameImpl::didFinishLoad",
-               "id", routing_id_);
+  TRACE_EVENT1("navigation,benchmark", "RenderFrameImpl::didFinishLoad", "id",
+               routing_id_);
   DCHECK(!frame_ || frame_ == frame);
   WebDataSource* ds = frame->dataSource();
   DocumentState* document_state = DocumentState::FromDataSource(ds);
   if (document_state->finish_load_time().is_null()) {
     if (!frame->parent()) {
-      TRACE_EVENT_INSTANT0("WebCore", "LoadFinished",
+      TRACE_EVENT_INSTANT0("WebCore,benchmark", "LoadFinished",
                            TRACE_EVENT_SCOPE_PROCESS);
     }
     document_state->set_finish_load_time(Time::Now());
@@ -4272,6 +4273,18 @@ void RenderFrameImpl::OnFailedNavigation(
 WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
     RenderFrame* render_frame,
     const NavigationPolicyInfo& info) {
+#ifdef OS_ANDROID
+  // The handlenavigation API is deprecated and will be removed once
+  // crbug.com/325351 is resolved.
+  if (info.urlRequest.url() != GURL(kSwappedOutURL) &&
+      GetContentClient()->renderer()->HandleNavigation(
+          render_frame, static_cast<DocumentState*>(info.extraData),
+          render_view_->opener_id_, info.frame, info.urlRequest,
+          info.navigationType, info.defaultPolicy, info.isRedirect)) {
+    return blink::WebNavigationPolicyIgnore;
+  }
+#endif
+
   Referrer referrer(RenderViewImpl::GetReferrerFromRequest(info.frame,
                                                            info.urlRequest));
 
@@ -4914,12 +4927,30 @@ void RenderFrameImpl::BeginNavigation(blink::WebURLRequest* request) {
   if (data_source && render_view_->history_list_length_ > 0) {
     should_replace_current_entry = data_source->replacesCurrentHistoryItem();
   }
+
+  // These values are assumed on the browser side for navigations. These checks
+  // ensure the renderer has the correct values.
+  DCHECK_EQ(FETCH_REQUEST_MODE_SAME_ORIGIN,
+            GetFetchRequestModeForWebURLRequest(*request));
+  DCHECK_EQ(FETCH_CREDENTIALS_MODE_INCLUDE,
+            GetFetchCredentialsModeForWebURLRequest(*request));
+  DCHECK(GetFetchRedirectModeForWebURLRequest(*request) ==
+         FetchRedirectMode::MANUAL_MODE);
+  DCHECK_IMPLIES(!frame_->parent(),
+                 GetRequestContextFrameTypeForWebURLRequest(*request) ==
+                 REQUEST_CONTEXT_FRAME_TYPE_TOP_LEVEL);
+  DCHECK_IMPLIES(frame_->parent(),
+                 GetRequestContextFrameTypeForWebURLRequest(*request) ==
+                 REQUEST_CONTEXT_FRAME_TYPE_NESTED);
+
   Send(new FrameHostMsg_BeginNavigation(
       routing_id_,
       MakeCommonNavigationParams(request, should_replace_current_entry),
       BeginNavigationParams(
           request->httpMethod().latin1(), GetWebURLRequestHeaders(*request),
-          GetLoadFlagsForWebURLRequest(*request), request->hasUserGesture()),
+          GetLoadFlagsForWebURLRequest(*request), request->hasUserGesture(),
+          request->skipServiceWorker(),
+          GetRequestContextTypeForWebURLRequest(*request)),
       GetRequestBodyForWebURLRequest(*request)));
 }
 
@@ -5181,7 +5212,7 @@ void RenderFrameImpl::RegisterMojoServices() {
 mojo::ServiceProviderPtr RenderFrameImpl::ConnectToApplication(
     const GURL& url) {
   DCHECK(mojo_shell_);
-  mojo::ServiceProviderPtr service_provider;
+  mojo::ServiceProviderPtr service_provider(21);
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From(url);
   mojo_shell_->ConnectToApplication(request.Pass(), GetProxy(&service_provider),

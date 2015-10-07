@@ -28,9 +28,11 @@
 
 #include "SkImageFilter.h"
 #include "SkMatrix44.h"
+#include "platform/DragImage.h"
 #include "platform/TraceEvent.h"
 #include "platform/geometry/FloatRect.h"
 #include "platform/geometry/LayoutRect.h"
+#include "platform/graphics/BitmapImage.h"
 #include "platform/graphics/FirstPaintInvalidationTracking.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "platform/graphics/GraphicsLayerFactory.h"
@@ -100,6 +102,7 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_hasScrollParent(false)
     , m_hasClipParent(false)
     , m_needsDisplay(true)
+    , m_textPainted(false)
     , m_paintingPhase(GraphicsLayerPaintAllWithOverflowClip)
     , m_parent(0)
     , m_maskLayer(0)
@@ -306,6 +309,10 @@ void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const I
     }
 #endif
     m_client->paintContents(this, context, m_paintingPhase, clip);
+    if (!m_textPainted && m_displayItemList->textPainted()) {
+        m_textPainted = true;
+        m_client->notifyTextPainted();
+    }
 }
 
 void GraphicsLayer::updateChildList()
@@ -1044,13 +1051,17 @@ void GraphicsLayer::setContentsRect(const IntRect& rect)
     updateContentsRect();
 }
 
-void GraphicsLayer::setContentsToImage(Image* image)
+void GraphicsLayer::setContentsToImage(Image* image, RespectImageOrientationEnum respectImageOrientation)
 {
     RefPtr<SkImage> skImage = image ? image->imageForCurrentFrame() : nullptr;
     if (image && skImage) {
         if (!m_imageLayer) {
             m_imageLayer = adoptPtr(Platform::current()->compositorSupport()->createImageLayer());
             registerContentsLayer(m_imageLayer->layer());
+        }
+        if (respectImageOrientation == RespectImageOrientation && image->isBitmapImage()) {
+            ImageOrientation imageOrientation = toBitmapImage(image)->currentFrameOrientation();
+            skImage = DragImage::resizeAndOrientImage(skImage.release(), imageOrientation);
         }
         m_imageLayer->setImage(skImage.get());
         m_imageLayer->layer()->setOpaque(image->currentFrameKnownToBeOpaque());

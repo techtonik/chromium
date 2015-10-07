@@ -51,19 +51,6 @@ void WebRuntimeFeatures::enableFeatureFromString(const std::string& name, bool e
     RuntimeEnabledFeatures::setFeatureEnabledFromString(name, enable);
 }
 
-// TODO(bashi): Remove.
-void WebRuntimeFeatures::enableFeatureFromString(const WebString& name, bool enable)
-{
-    RuntimeEnabledFeatures::setFeatureEnabledFromString(name.latin1(), enable);
-}
-
-void WebRuntimeFeatures::enableBleedingEdgeFastPaths(bool enable)
-{
-    ASSERT(enable);
-    RuntimeEnabledFeatures::setBleedingEdgeFastPathsEnabled(enable);
-    RuntimeEnabledFeatures::setWebAnimationsAPIEnabled(enable);
-}
-
 void WebRuntimeFeatures::enableCompositorAnimationTimelines(bool enable)
 {
     RuntimeEnabledFeatures::setCompositorAnimationTimelinesEnabled(enable);

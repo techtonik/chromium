@@ -2099,6 +2099,21 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Autofill.DaysSinceLastUse.CreditCard" units="days">
+  <owner>sebsg@chromium.org</owner>
+  <summary>
+    Logs the number of days that have passed since the credit card was last
+    used.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.DaysSinceLastUse.Profile" units="days">
+  <owner>sebsg@chromium.org</owner>
+  <summary>
+    Logs the number of days that have passed since the profile was last used.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.DeveloperEngagement"
     enum="AutofillDeveloperEngagement">
   <owner>isherman@chromium.org</owner>
@@ -3451,6 +3466,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Cast.Sender.UrlResolveResult"
+    enum="RemotePlaybackUrlResolveResult">
+  <owner>aberent@google.com</owner>
+  <summary>
+    Records the result of resolving the video URL for cast, including checking
+    its CORS header.
+  </summary>
+</histogram>
+
 <histogram name="Cast.Sender.VideoEncodeAcceleratorInitializeSuccess"
     enum="BooleanSuccess">
   <owner>posciak@chromium.org</owner>
@@ -4660,8 +4684,30 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram
+    name="Compositing.RenderPass.AppendQuadData.CheckerboardedNeedsRasterContentArea"
+    units="pixels/frame">
+  <owner>weiliangc@chromium.org</owner>
+  <summary>
+    Checkerboarded area, in number of pixels, that has recording but does not
+    have time to finish rastering yet. A sample is recorded everytime a frame is
+    drawn while a scroll is in progress. Tracking bug 535732.
+  </summary>
+</histogram>
+
+<histogram
+    name="Compositing.RenderPass.AppendQuadData.CheckerboardedNoRecordingContentArea"
+    units="pixels/frame">
+  <owner>weiliangc@chromium.org</owner>
+  <summary>
+    Checkerboarded area, in number of pixels, that has no recording to raster
+    from. A sample is recorded everytime a frame is drawn while a scroll is in
+    progress. Tracking bug 535732.
+  </summary>
+</histogram>
+
 <histogram name="Compositing.RenderPass.AppendQuadData.NumIncompleteTiles">
-  <owner>weiliangc@chromium.org.</owner>
+  <owner>weiliangc@chromium.org</owner>
   <summary>
     Keeps track of number of incomplete tiles in a drawn compositor frame while
     scrolling. This is a rough measurement of ugliness during user interaction.
@@ -4671,7 +4717,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Compositing.RenderPass.AppendQuadData.NumMissingTiles">
-  <owner>weiliangc@chromium.org.</owner>
+  <owner>weiliangc@chromium.org</owner>
   <summary>
     Keeps track of number of missing tiles in a drawn compositor frame while
     scrolling. This is a rough measurement of ugliness during user interaction.
@@ -4829,8 +4875,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="ContentSettings.LastSettingParsed" enum="LastSettingParsed">
-<!-- TODO: Remove histogram by 2015. crbug.com/433475 -->
-
+  <obsolete>
+    Deprecated 2015-10-05 in Issue 433475. Histogram was used temorarily for
+    diagnosing crash causes.
+  </obsolete>
   <owner>scheib@chromium.org</owner>
   <summary>
     Numer of results of parsing WebsiteSettingsHandler::last_setting_ success or
@@ -5814,10 +5862,25 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="DataReductionProxy.HistoricalDataUsageLoadTime"
+    units="milliseconds">
+  <owner>kundaji@chromium.org</owner>
+  <summary>
+    Time taken to load historical data usage from Level DB into memory. This UMA
+    is reported each time the method to load historical data usage is called,
+    which happens when user views data usage history.
+  </summary>
+</histogram>
+
 <histogram name="DataReductionProxy.LevelDBOpenStatus"
     enum="DataReductionProxyStoreStatus">
   <owner>kundaji@chromium.org</owner>
   <summary>Status of calling Open() on Data Reduction Proxy LevelDB.</summary>
+</histogram>
+
+<histogram name="DataReductionProxy.LevelDBSize" units="KB">
+  <owner>kundaji@chromium.org</owner>
+  <summary>Size of Data Reduction Proxy LevelDB measured at startup.</summary>
 </histogram>
 
 <histogram name="DataReductionProxy.LoFi.ImplicitOptOutAction"
@@ -6121,6 +6184,25 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     The total amount of data use of Chrome for user traffic. This traffic has
     content::ResourceRequestInfo attached to its request. If the OS is not
     Android all the requests are considered foreground.
+  </summary>
+</histogram>
+
+<histogram name="DefaultBrowser.AsyncSetAsDefault.Duration"
+    units="milliseconds">
+  <owner>pmonette@chromium.org</owner>
+  <summary>
+    How long it took to set Chrome as the default browser asynchronously in
+    Windows 10+. The duration is recorded only on Success, Failure, Abandoned
+    and Retry result codes.
+  </summary>
+</histogram>
+
+<histogram name="DefaultBrowser.AsyncSetAsDefault.Result"
+    enum="DefaultBrowserAsyncAttemptResult">
+  <owner>pmonette@chromium.org</owner>
+  <summary>
+    The count of how many times users were successfully able to set Chrome as
+    the default browser asynchronously in Windows 10+.
   </summary>
 </histogram>
 
@@ -19344,6 +19426,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="MobileStartup.MainIntentAction" enum="MobileStartingAction">
+  <owner>mariakhomenko@chromium.org</owner>
+  <summary>
+    Android: Records the first action the user does within 10s of starting
+    Chrome. Recorded in DocumentActivity and ChromeTabbedActivity only when the
+    starting intent is of type MAIN.
+  </summary>
+</histogram>
+
 <histogram name="MobileStartup.MobileMultiWindowInstances">
   <owner>dtrainor@chromium.org</owner>
   <summary>
@@ -19367,6 +19458,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     A multiwindow session is any period of time that Chrome was not used in full
     screen mode but together with some other application that is visible at the
     same time. This is only supported in a few Android models.
+  </summary>
+</histogram>
+
+<histogram name="MobileStartup.NonMainIntentAction" enum="MobileStartingAction">
+  <owner>mariakhomenko@chromium.org</owner>
+  <summary>
+    Android: Records the first action the user does within 10s of starting
+    Chrome. Recorded in DocumentActivity and ChromeTabbedActivity only when the
+    starting intent is not of type MAIN, e.g. VIEW, etc.
   </summary>
 </histogram>
 
@@ -22634,6 +22734,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Each bucket is the number of sessions that encountered a given FTP server
     type. Each session reports a given server type at most once.
+  </summary>
+</histogram>
+
+<histogram name="Net.Http2SSLCipherSuite" enum="SSLCipherSuite">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    The SSL/TLS cipher suite that was negotiated, recorded for each successful
+    HTTP/2 connection.
   </summary>
 </histogram>
 
@@ -26741,7 +26849,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Deprecated 8/2015.
   </obsolete>
-  <owner>pneubeck@chromium.org</owner>
+  <owner>cschuet@chromium.org</owner>
   <summary>
     Chrome OS metric counting the number of network configurations that
     contained a NSS nickname identifying a CA certificate, which triggered the
@@ -29017,6 +29125,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="OfflinePages.DeletePage.FreeSpaceMB" units="MB">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    The amount of free space available, in megabytes, on the user's device when
+    the page is being deleted.
+  </summary>
+</histogram>
+
+<histogram name="OfflinePages.DeletePage.FreeSpacePercentage" units="%">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    The percentage of free space available on the user's device when the page is
+    being deleted.
+  </summary>
+</histogram>
+
 <histogram name="OfflinePages.DeletePageResult"
     enum="OfflinePagesDeletePageResult">
   <owner>jianli@chromium.org</owner>
@@ -29047,6 +29171,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Number of saved pages restored from the offline pages metadata store when it
     is logged.
+  </summary>
+</histogram>
+
+<histogram name="OfflinePages.SavePage.FreeSpaceMB" units="MB">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    The amount of free space available, in megabytes, on the user's device when
+    the page is being saved.
+  </summary>
+</histogram>
+
+<histogram name="OfflinePages.SavePage.FreeSpacePercentage" units="%">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    The percentage of free space available on the user's device when the page is
+    being saved.
   </summary>
 </histogram>
 
@@ -29945,6 +30085,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Measures the time from navigation timing's navigation start to the time the
     first layout is performed, for main frame documents.
+  </summary>
+</histogram>
+
+<histogram name="PageLoad.Timing2.NavigationToFirstText" units="milliseconds">
+  <owner>ksakamoto@chromium.org</owner>
+  <summary>
+    Measures the time from navigation timing's navigation start to the time the
+    first non-blank text is painted, for main frame documents.
   </summary>
 </histogram>
 
@@ -37056,6 +37204,33 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     to the viewport size.  This is collected once per commit from WebKit to the
     compositor.
   </summary>
+</histogram>
+
+<histogram name="RendererScheduler.UserModel.GestureDuration"
+    units="milliseconds">
+  <owner>alexclarke@chromium.org</owner>
+  <summary>Duration of gestures (scrolls and pinches).</summary>
+</histogram>
+
+<histogram name="RendererScheduler.UserModel.GesturePredictedCorrectly"
+    units="GesturePredictionResult">
+  <owner>alexclarke@chromium.org</owner>
+  <summary>Whether a user gesture was predicted correctly.</summary>
+</histogram>
+
+<histogram name="RendererScheduler.UserModel.GestureStartTimeSinceModelReset"
+    units="milliseconds">
+  <owner>alexclarke@chromium.org</owner>
+  <summary>
+    Time between when the UserModel was last reset (which happens on navigation)
+    and a gesture starting.
+  </summary>
+</histogram>
+
+<histogram name="RendererScheduler.UserModel.TimeBetweenGestures"
+    units="milliseconds">
+  <owner>alexclarke@chromium.org</owner>
+  <summary>Time between subsequent gestures (scrolls and pinches).</summary>
 </histogram>
 
 <histogram name="RendererSyncIPC.ElapsedTime" units="milliseconds">
@@ -46068,6 +46243,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Tab.Discarding" enum="TabDiscardingEvents">
+  <obsolete>
+    Deprecated 10/2015, not needed anymore.
+  </obsolete>
   <owner>georgesak@chromium.org</owner>
   <summary>
     Metric to track counts of actions related to tab discarding. Namely, we get
@@ -46078,6 +46256,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Tab.Discarding.DiscardCount" units="Discards">
+  <obsolete>
+    Deprecated 10/2015, and replaced by TabManager.Discarding.DiscardCount.
+  </obsolete>
   <owner>georgesak@chromium.org</owner>
   <summary>
     Metric to track the number of discards tabs have gone through. Each time a
@@ -46296,6 +46477,34 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="TabManager.Discarding.DiscardCount" units="Discards">
+  <owner>georgesak@chromium.org</owner>
+  <summary>
+    Cumulative number of tabs discarded due to low memory conditions, recorded
+    once per tab discard event.  For example, a user who had 3 tabs discarded
+    records a count in the 1 bin, 2 bin and 3 bin.  Thus each bin N is the
+    number of sessions where users experienced N or more tab discard events.
+  </summary>
+</histogram>
+
+<histogram name="TabManager.Discarding.DiscardToReloadTime" units="ms">
+  <owner>georgesak@chromium.org</owner>
+  <summary>
+    Elapsed time between a tab getting discarded to eventually being reloaded by
+    the user.
+  </summary>
+</histogram>
+
+<histogram name="TabManager.Discarding.ReloadCount" units="Reloads">
+  <owner>georgesak@chromium.org</owner>
+  <summary>
+    Cumulative number of discarded tabs that have been reloaded by the user,
+    recorded once per tab discard event. For example, a user who had 3 tabs
+    reloaded records a count in the 1 bin, 2 bin and 3 bin. Thus each bin N is
+    the number of sessions where users experienced N or more tab reload events.
+  </summary>
+</histogram>
+
 <histogram name="Tabs.CountAtResume" units="tabs">
   <owner>lliabraa@chromium.org</owner>
   <summary>
@@ -46310,6 +46519,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Tabs.Discard.DiscardCount">
+  <obsolete>
+    Deprecated 10/2015, and replaced by TabManager.Discarding.DiscardCount.
+  </obsolete>
   <owner>jamescook@chromium.org</owner>
   <summary>
     Cumulative number of tabs discarded due to low memory conditions, recorded
@@ -46419,6 +46631,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Tabs.Discard.ReloadCount">
+  <obsolete>
+    Deprecated 10/2015, and replaced by TabManager.Discarding.ReloadCount.
+  </obsolete>
   <owner>jamescook@chromium.org</owner>
   <summary>
     Cumulative number of times a tab was reloaded because it was discarded and
@@ -50008,6 +50223,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Count the number of WebSockets that accepted permessage-deflate extension
     for each context take over mode. Used by the old Blink-based WebSocket
     implementation.
+  </summary>
+</histogram>
+
+<histogram name="WebCore.WebSocket.ReceiveType" enum="WebSocketReceiveType">
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
+  <summary>
+    Count the number of messages for each message type and set binary type.
   </summary>
 </histogram>
 
@@ -54783,6 +55007,31 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="4" label="kImageWebP"/>
   <int value="5" label="kImageICO"/>
   <int value="6" label="kImageBMP"/>
+</enum>
+
+<enum name="DefaultBrowserAsyncAttemptResult" type="int">
+  <int value="0" label="Success">No errors encountered.</int>
+  <int value="1" label="Already default">
+    Chrome was already the default web client. This counts as a successful
+    attempt.
+  </int>
+  <int value="2" label="Failure">
+    Chrome was not set as the default web client.
+  </int>
+  <int value="3" label="Abandoned">
+    The attempt was abandoned because the observer was destroyed.
+  </int>
+  <int value="4" label="Launch failure">
+    Failed to launch the process to set Chrome as the default web client
+    asynchronously.
+  </int>
+  <int value="5" label="Other worker">
+    Another worker is already in progress to make Chrome the default web client.
+  </int>
+  <int value="6" label="Retry">
+    The user initiated another attempt while the asynchronous operation was
+    already in progress.
+  </int>
 </enum>
 
 <enum name="DefaultBrowserState" type="int">
@@ -61220,6 +61469,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="20" label="Window resized double tap"/>
 </enum>
 
+<enum name="GesturePredictionResult" type="int">
+  <int value="0" label="Gesture occured and was predicted"/>
+  <int value="1" label="Gesture occured but was not predicted"/>
+  <int value="2" label="Gesture predicted but didn't occur"/>
+</enum>
+
 <enum name="GetPerfDataOutcome" type="int">
   <int value="0" label="Success.">
     Perf data was collected, parsed and attached to the UMA protobuf
@@ -63248,6 +63503,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </enum>
 
 <enum name="LastSettingParsed" type="int">
+  <obsolete>
+    Deprecated 2015-10-05 in Issue 433475. Histogram was used temorarily for
+    diagnosing crash causes.
+  </obsolete>
   <int value="0" label="Update Empty"/>
   <int value="1" label="Update Parsed"/>
   <int value="2" label="Update Invalid"/>
@@ -63701,6 +63960,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1619757314" label="touch-scrolling-mode"/>
   <int value="-1614912400" label="enable-link-disambiguation-popup"/>
   <int value="-1605567628" label="disable-overlay-scrollbar"/>
+  <int value="-1599538279" label="enable-md-policy-page"/>
   <int value="-1596559650" label="max-tiles-for-interest-area"/>
   <int value="-1571841513" label="enable-devtools-experiments"/>
   <int value="-1553477903" label="ash-disable-text-filtering-in-overview-mode"/>
@@ -63805,6 +64065,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-749048160" label="enable-panels"/>
   <int value="-744159181" label="disable-spdy-proxy-dev-auth-origin"/>
   <int value="-743103250" label="enable-linkable-ephemeral-apps"/>
+  <int value="-716953514" label="disable-password-separated-signin-flow"/>
   <int value="-711890895" label="enable-website-settings-manager"/>
   <int value="-699767107" label="enable-sync-app-list"/>
   <int value="-697751423" label="disable-quickoffice-component-app"/>
@@ -64114,6 +64375,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1862207743" label="enable-android-spellchecker"/>
   <int value="1865799183" label="javascript-harmony"/>
   <int value="1891210939" label="enable-blink-features"/>
+  <int value="1892201400" label="enable-password-separated-signin-flow"/>
   <int value="1896456311" label="enable-password-save-in-page-navigation"/>
   <int value="1900529524" label="disable-touch-drag-drop"/>
   <int value="1906942630" label="enable-easy-unlock"/>
@@ -65288,6 +65550,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Shutdown in foreground; no log; with memory warning"/>
   <int value="4" label="Shutdown in foreground; with log; with memory warning"/>
   <int value="5" label="First launch after upgrade"/>
+</enum>
+
+<enum name="MobileStartingAction" type="int">
+  <int value="0" label="No activity"/>
+  <int value="1" label="Open new tab"/>
+  <int value="2" label="Focus omnibox"/>
+  <int value="3" label="Open bookmarks"/>
+  <int value="4" label="Open recents"/>
+  <int value="5" label="Open history"/>
+  <int value="6" label="Open tab switcher"/>
 </enum>
 
 <enum name="ModuleIndex" type="int">
@@ -69623,6 +69895,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Cast Generic Media Player"/>
   <int value="1" label="Cast YouTube Player"/>
   <int value="2" label="Non-Cast YouTube Player"/>
+</enum>
+
+<enum name="RemotePlaybackUrlResolveResult" type="int">
+  <int value="0" label="Successfully Resolved"/>
+  <int value="1" label="Malformed or empty Url"/>
+  <int value="2" label="No CORS header when required"/>
+  <int value="3" label="CORS header incompatible with Chromecast"/>
 </enum>
 
 <enum name="RendererType" type="int">
@@ -74083,6 +74362,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Take over"/>
 </enum>
 
+<enum name="WebSocketReceiveType" type="int">
+  <int value="0" label="String"/>
+  <int value="1" label="ArrayBuffer"/>
+  <int value="2" label="Blob"/>
+</enum>
+
 <enum name="WebSocketSendType" type="int">
   <int value="0" label="String"/>
   <int value="1" label="ArrayBuffer"/>
@@ -74475,6 +74760,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="AsyncSlowStart_on" label="Async Slow Start on"/>
   <affected-histogram name="Net.Transaction_Connected_New"/>
   <affected-histogram name="Renderer4.StartToFinish"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="AttemptResultCode">
+  <suffix name="Success"/>
+  <suffix name="Failure"/>
+  <suffix name="Abandoned"/>
+  <suffix name="Retry"/>
+  <affected-histogram name="DefaultBrowser.AsyncSetAsDefault.Duration"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="AutofillDataAvailability" separator=".">
@@ -77795,6 +78088,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram
       name="PageLoad.Timing2.NavigationToDOMContentLoadedEventFired"/>
   <affected-histogram name="PageLoad.Timing2.NavigationToFirstLayout"/>
+  <affected-histogram name="PageLoad.Timing2.NavigationToFirstText"/>
   <affected-histogram name="PageLoad.Timing2.NavigationToLoadEventFired"/>
 </histogram_suffixes>
 

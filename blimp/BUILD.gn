@@ -11,6 +11,10 @@ group("blimp") {
   if (is_android) {
     deps += [ "//blimp/client:blimp_apk" ]
   }
+
+  if (is_linux) {
+    deps += [ "//blimp/engine:blimp_engine" ]
+  }
 }
 
 group("blimp_tests") {

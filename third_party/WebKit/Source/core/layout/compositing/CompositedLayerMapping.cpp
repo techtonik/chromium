@@ -1871,10 +1871,7 @@ bool CompositedLayerMapping::isDirectlyCompositedImage() const
         if (!image->isBitmapImage())
             return false;
 
-        // FIXME: We should be able to handle bitmap images using direct compositing
-        // no matter what image-orientation value. See crbug.com/502267
-        if (imageLayoutObject->style()->respectImageOrientation() != RespectImageOrientation)
-            return true;
+        return true;
     }
 
     return false;
@@ -1907,7 +1904,7 @@ void CompositedLayerMapping::updateImageContents()
         return;
 
     // This is a no-op if the layer doesn't have an inner layer for the image.
-    m_graphicsLayer->setContentsToImage(image);
+    m_graphicsLayer->setContentsToImage(image, imageLayoutObject->shouldRespectImageOrientation());
 
     m_graphicsLayer->setFilterQuality(layoutObject()->style()->imageRendering() == ImageRenderingPixelated ? kNone_SkFilterQuality : kLow_SkFilterQuality);
 
@@ -2044,6 +2041,7 @@ struct SetContentsNeedsDisplayInRectFunctor {
 // r is in the coordinate space of the layer's layout object
 void CompositedLayerMapping::setContentsNeedDisplayInRect(const LayoutRect& r, PaintInvalidationReason invalidationReason)
 {
+    ASSERT(!RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled());
     // FIXME: need to split out paint invalidations for the background.
     // FIXME: need to distinguish invalidations for different layers (e.g. the main layer and scrolling layer). crbug.com/416535.
     SetContentsNeedsDisplayInRectFunctor functor = {
@@ -2146,18 +2144,12 @@ void CompositedLayerMapping::doPaintTask(const GraphicsLayerPaintInfo& paintInfo
         dirtyRect.intersect(paintInfo.localClipRectForSquashedLayer);
         {
             ASSERT(context->displayItemList());
-            if (!context->displayItemList()->displayItemConstructionIsDisabled())
-                context->displayItemList()->createAndAppend<ClipDisplayItem>(*this, DisplayItem::ClipLayerOverflowControls, dirtyRect);
+            context->displayItemList()->createAndAppend<ClipDisplayItem>(*this, DisplayItem::ClipLayerOverflowControls, dirtyRect);
         }
         PaintLayerPainter(*paintInfo.paintLayer).paintLayer(context, paintingInfo, paintLayerFlags);
         {
             ASSERT(context->displayItemList());
-            if (!context->displayItemList()->displayItemConstructionIsDisabled()) {
-                if (context->displayItemList()->lastDisplayItemIsNoopBegin())
-                    context->displayItemList()->removeLastDisplayItem();
-                else
-                    context->displayItemList()->createAndAppend<EndClipDisplayItem>(*this, DisplayItem::clipTypeToEndClipType(DisplayItem::ClipLayerOverflowControls));
-            }
+            context->displayItemList()->endItem<EndClipDisplayItem>(*this, DisplayItem::clipTypeToEndClipType(DisplayItem::ClipLayerOverflowControls));
         }
     }
 }
@@ -2255,6 +2247,11 @@ void CompositedLayerMapping::verifyNotPainting()
 void CompositedLayerMapping::notifyAnimationStarted(const GraphicsLayer*, double monotonicTime, int group)
 {
     layoutObject()->node()->document().compositorPendingAnimations().notifyCompositorAnimationStarted(monotonicTime, group);
+}
+
+void CompositedLayerMapping::notifyTextPainted()
+{
+    layoutObject()->node()->document().markFirstTextPaint();
 }
 
 IntRect CompositedLayerMapping::pixelSnappedCompositedBounds() const
