@@ -216,7 +216,7 @@ class Fakes {
             FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
 
             // TODO(scheib): Add more control over how many services are created and
-            // their properties.
+            // their properties. http://crbug.com/541400
             if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
                 fakeDevice.mGatt.mServices.clear();
                 fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));

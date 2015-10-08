@@ -437,7 +437,7 @@ TEST_F(BluetoothTest, SimulateGattServicesDiscovered) {
   EXPECT_EQ(1, gatt_discovery_attempts_);
 
   // TODO(scheib): Add more control over how many services are created and
-  // their properties.
+  // their properties. http://crbug.com/541400
   SimulateGattServicesDiscovered(device);
   EXPECT_EQ(2u, device->GetGattServices().size());
 }
