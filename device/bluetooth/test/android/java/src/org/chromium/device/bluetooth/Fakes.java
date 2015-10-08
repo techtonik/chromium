@@ -217,9 +217,11 @@ class Fakes {
 
             // TODO(scheib): Add more control over how many services are created and
             // their properties.
-            fakeDevice.mGatt.mServices.clear();
-            fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
-            fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(1));
+            if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
+                fakeDevice.mGatt.mServices.clear();
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(1));
+            }
 
             fakeDevice.mGattCallback.onServicesDiscovered(status);
         }

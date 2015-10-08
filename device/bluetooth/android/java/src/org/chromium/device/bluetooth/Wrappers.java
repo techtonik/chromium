@@ -270,7 +270,7 @@ class Wrappers {
             mGatt.discoverServices();
         }
 
-        List<BluetoothGattServiceWrapper> getServices() {
+        public List<BluetoothGattServiceWrapper> getServices() {
             List<BluetoothGattService> services = mGatt.getServices();
             ArrayList<BluetoothGattServiceWrapper> servicesWrapped =
                     new ArrayList<BluetoothGattServiceWrapper>(services.size());
