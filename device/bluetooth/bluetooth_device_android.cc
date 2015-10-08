@@ -7,7 +7,9 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
+#include "base/strings/stringprintf.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
+#include "device/bluetooth/bluetooth_remote_gatt_service_android.h"
 #include "jni/ChromeBluetoothDevice_jni.h"
 
 using base::android::AttachCurrentThread;
@@ -230,18 +232,19 @@ void BluetoothDeviceAndroid::CreateGattRemoteService(
     ) {
   VLOG(1) << __FUNCTION__;  // scheib remove ,<<<<<<<<<<<<<<<<<<
 
-  std::string instanceIdString = StringPrintf(instanceId);
+  std::string instanceIdString = base::StringPrintf("%d", instanceId);
   if (gatt_services_.contains(instanceIdString))
     return;  // Already know about this service.
 
   BluetoothRemoteGattServiceAndroid* service =
       BluetoothRemoteGattServiceAndroid::Create(
-          adapter_, this, bluetooth_gatt_service_wrapper, instanceId);
-  DCHECK(service->object_path() == object_path);
-  DCHECK(service->GetUUID().IsValid());
+          GetAdapter(), this, bluetooth_gatt_service_wrapper, instanceIdString);
 
-  gatt_services_.set(instanceId, service);
-  adapter()->NotifyGattServiceAdded(service);
+  gatt_services_.set(instanceIdString,
+                     make_scoped_ptr<BluetoothGattService>(service));
+
+  FOR_EACH_OBSERVER(BluetoothAdapter::Observer, GetAdapter()->GetObservers(),
+                    GattServiceAdded(adapter_, this, service));
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)

@@ -4,10 +4,9 @@
 
 #include "device/bluetooth/bluetooth_remote_gatt_service_android.h"
 
-#include "base/strings/stringprintf.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "device/bluetooth/bluetooth_device_android.h"
-#include "jni/ChromeBluetoothRemoteGattService_jni.h"
+//TODO(scheib) #include "jni/ChromeBluetoothRemoteGattService_jni.h"
 
 namespace device {
 
@@ -20,21 +19,22 @@ BluetoothRemoteGattServiceAndroid* BluetoothRemoteGattServiceAndroid::Create(
   BluetoothRemoteGattServiceAndroid* service =
       new BluetoothRemoteGattServiceAndroid(adapter, device, instanceId);
 
-  service->j_device_.Reset(Java_ChromeBluetoothRemoteGattService_create(
-      AttachCurrentThread(), reinterpret_cast<intptr_t>(service),
-      bluetooth_remote_gatt_service_wrapper));
+  //TODO
+//service->j_device_.Reset(Java_ChromeBluetoothRemoteGattService_create(
+//    AttachCurrentThread(), reinterpret_cast<intptr_t>(service),
+//    bluetooth_remote_gatt_service_wrapper));
 
   return service;
 }
 
-// static
-bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
-  return RegisterNativesImpl(
-      env);  // Generated in ChromeBluetoothRemoteGattService_jni.h
-}
+//// static
+//bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
+//  return RegisterNativesImpl(
+//      env);  // Generated in ChromeBluetoothRemoteGattService_jni.h
+//}
 
 std::string BluetoothRemoteGattServiceAndroid::GetIdentifier() const {
-  return instanceIdAsString_;
+  return instanceId_;
 }
 
 device::BluetoothUUID BluetoothRemoteGattServiceAndroid::GetUUID() const {
@@ -101,7 +101,7 @@ BluetoothRemoteGattServiceAndroid::BluetoothRemoteGattServiceAndroid(
     BluetoothAdapterAndroid* adapter,
     BluetoothDeviceAndroid* device,
     std::string instanceId)
-    : adapter_(adapter), device_(device), instanceIdAsString_(instanceId) {}
+    : adapter_(adapter), device_(device), instanceId_(instanceId) {}
 
 BluetoothRemoteGattServiceAndroid::~BluetoothRemoteGattServiceAndroid() {}
 

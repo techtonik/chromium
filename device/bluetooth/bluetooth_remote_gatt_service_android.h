@@ -9,14 +9,12 @@
 #include <string>
 #include <vector>
 
+#include "base/android/jni_android.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
-#include "base/observer_list.h"
-#include "dbus/object_path.h"
+//#include "base/observer_list.h"
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "device/bluetooth/bluetooth_uuid.h"
-#include "device/bluetooth/dbus/bluetooth_gatt_characteristic_client.h"
-#include "device/bluetooth/dbus/bluetooth_gatt_service_client.h"
 
 namespace device {
 
@@ -25,8 +23,6 @@ class BluetoothGattCharacteristic;
 
 class BluetoothAdapterAndroid;
 class BluetoothDeviceAndroid;
-class BluetoothRemoteGattCharacteristicAndroid;
-class BluetoothRemoteGattDescriptorAndroid;
 
 // The BluetoothRemoteGattServiceAndroid class implements BluetootGattService
 // for remote GATT services on Android.
@@ -41,15 +37,15 @@ class BluetoothRemoteGattServiceAndroid : public device::BluetoothGattService {
   //
   // TODO(scheib): Return a scoped_ptr<>, but then device will need to handle
   // this correctly. http://crbug.com/506416
-  static BluetoothDeviceAndroid* Create(
+  static BluetoothRemoteGattServiceAndroid* Create(
       BluetoothAdapterAndroid* adapter,
       BluetoothDeviceAndroid* device,
       jobject bluetooth_remote_gatt_service_wrapper,  // Java Type:
       // BluetoothRemoteGattServiceWrapper
-      int32_t instanceId);
+      std::string instanceId);
 
-  // Register C++ methods exposed to Java using JNI.
-  static bool RegisterJNI(JNIEnv* env);
+//// Register C++ methods exposed to Java using JNI.
+//static bool RegisterJNI(JNIEnv* env);
 
   // device::BluetoothGattService overrides.
   std::string GetIdentifier() const override;
@@ -76,8 +72,11 @@ class BluetoothRemoteGattServiceAndroid : public device::BluetoothGattService {
 
   BluetoothRemoteGattServiceAndroid(BluetoothAdapterAndroid* adapter,
                                     BluetoothDeviceAndroid* device,
-                                    int32_t instanceId);
+                                    std::string instanceId);
   ~BluetoothRemoteGattServiceAndroid() override;
+
+  // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
+  //TODO: base::android::ScopedJavaGlobalRef<jobject> j_device_;
 
   // The adapter associated with this service. It's ok to store a raw pointer
   // here since |adapter_| indirectly owns this instance.
@@ -88,7 +87,7 @@ class BluetoothRemoteGattServiceAndroid : public device::BluetoothGattService {
   BluetoothDeviceAndroid* device_;
 
   // Instance ID, cached from Android object.
-  std::string instanceIdAsString_;
+  std::string instanceId_;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothRemoteGattServiceAndroid);
 };

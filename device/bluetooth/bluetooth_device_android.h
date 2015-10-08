@@ -8,10 +8,9 @@
 #include "base/android/jni_android.h"
 #include "base/memory/weak_ptr.h"
 #include "device/bluetooth/bluetooth_device.h"
+#include "device/bluetooth/bluetooth_adapter_android.h"
 
 namespace device {
-
-class BluetoothAdapterAndroid;
 
 // BluetoothDeviceAndroid along with the Java class
 // org.chromium.device.bluetooth.ChromeBluetoothDevice implement
@@ -38,6 +37,11 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
 
   // Returns the associated ChromeBluetoothDevice Java object.
   base::android::ScopedJavaLocalRef<jobject> GetJavaObject();
+
+  // Get owning BluetoothAdapter cast to BluetoothAdapterAndroid.
+  BluetoothAdapterAndroid* GetAdapter() {
+    return static_cast<BluetoothAdapterAndroid*>(adapter_);
+  }
 
   // Updates cached copy of advertised UUIDs discovered during a scan.
   // Returns true if new UUIDs differed from cached values.

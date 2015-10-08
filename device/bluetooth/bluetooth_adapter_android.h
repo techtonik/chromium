@@ -82,6 +82,12 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
       const CreateAdvertisementCallback& callback,
       const CreateAdvertisementErrorCallback& error_callback) override;
 
+  // Returns BluetoothAdapter Observers for platform specific classes to use
+  // to send event notifications.
+  base::ObserverList<device::BluetoothAdapter::Observer>& GetObservers() {
+    return observers_;
+  }
+
   // Handles a scan error event by invalidating all discovery sessions.
   void OnScanFailed(JNIEnv* env, jobject caller);
 

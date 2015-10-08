@@ -287,7 +287,7 @@ class Fakes {
 
         @Override
         public int getInstanceId() {
-            return instanceId;
+            return mInstanceId;
         }
     }
 
