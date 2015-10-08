@@ -187,6 +187,7 @@ class Fakes {
         final FakeBluetoothAdapter mAdapter;
         private String mAddress;
         private String mName;
+        private final FakeBluetoothGatt mGatt;
         private Wrappers.BluetoothGattCallbackWrapper mGattCallback;
 
         public FakeBluetoothDevice(FakeBluetoothAdapter adapter, String address, String name) {
@@ -194,6 +195,7 @@ class Fakes {
             mAdapter = adapter;
             mAddress = address;
             mName = name;
+            mGatt = new FakeBluetoothGatt(this);
         }
 
         // Create a call to onConnectionStateChange on the |chrome_device| using parameters
@@ -212,6 +214,13 @@ class Fakes {
         @CalledByNative("FakeBluetoothDevice")
         private static void servicesDiscovered(ChromeBluetoothDevice chromeDevice, int status) {
             FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
+
+            // TODO(scheib): Add more control over how many services are created and
+            // their properties.
+            fakeDevice.mGatt.mServices.clear();
+            fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
+            fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(1));
+
             fakeDevice.mGattCallback.onServicesDiscovered(status);
         }
 
@@ -228,7 +237,7 @@ class Fakes {
             }
             nativeOnFakeBluetoothDeviceConnectGattCalled(mAdapter.mNativeBluetoothTestAndroid);
             mGattCallback = callback;
-            return new FakeBluetoothGatt(this);
+            return mGatt;
         }
 
         @Override
@@ -257,10 +266,12 @@ class Fakes {
      */
     static class FakeBluetoothGatt extends Wrappers.BluetoothGattWrapper {
         final FakeBluetoothDevice mDevice;
+        final ArrayList<Wrappers.BluetoothGattServiceWrapper> mServices;
 
         public FakeBluetoothGatt(FakeBluetoothDevice device) {
             super(null);
             mDevice = device;
+            mServices = new ArrayList<Wrappers.BluetoothGattServiceWrapper>();
         }
 
         @Override
@@ -271,6 +282,11 @@ class Fakes {
         @Override
         public void discoverServices() {
             nativeOnFakeBluetoothGattDiscoverServices(mDevice.mAdapter.mNativeBluetoothTestAndroid);
+        }
+
+        @Override
+        public List<Wrappers.BluetoothGattServiceWrapper> getServices() {
+            return mServices;
         }
     }
 
