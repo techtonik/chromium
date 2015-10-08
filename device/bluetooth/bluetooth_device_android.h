@@ -7,8 +7,8 @@
 
 #include "base/android/jni_android.h"
 #include "base/memory/weak_ptr.h"
-#include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
+#include "device/bluetooth/bluetooth_device.h"
 
 namespace device {
 

@@ -10,9 +10,6 @@
 #include <vector>
 
 #include "base/android/jni_android.h"
-#include "base/memory/ref_counted.h"
-#include "base/memory/weak_ptr.h"
-//#include "base/observer_list.h"
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "device/bluetooth/bluetooth_uuid.h"
 
