@@ -6,6 +6,7 @@
 
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "device/bluetooth/bluetooth_device_android.h"
+//TODO(scheib) #include "jni/ChromeBluetoothRemoteGattService_jni.h"
 
 namespace device {
 
@@ -18,8 +19,19 @@ BluetoothRemoteGattServiceAndroid* BluetoothRemoteGattServiceAndroid::Create(
   BluetoothRemoteGattServiceAndroid* service =
       new BluetoothRemoteGattServiceAndroid(adapter, device, instanceId);
 
+  //TODO
+//service->j_device_.Reset(Java_ChromeBluetoothRemoteGattService_create(
+//    AttachCurrentThread(), reinterpret_cast<intptr_t>(service),
+//    bluetooth_remote_gatt_service_wrapper));
+
   return service;
 }
+
+//// static
+//bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
+//  return RegisterNativesImpl(
+//      env);  // Generated in ChromeBluetoothRemoteGattService_jni.h
+//}
 
 std::string BluetoothRemoteGattServiceAndroid::GetIdentifier() const {
   return instanceId_;
