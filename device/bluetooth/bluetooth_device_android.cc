@@ -231,19 +231,17 @@ void BluetoothDeviceAndroid::CreateGattRemoteService(
   VLOG(1) << __FUNCTION__;  // scheib remove ,<<<<<<<<<<<<<<<<<<
 
   std::string instanceIdString = StringPrintf(instanceId);
-  GattServiceMap::iterator it = gatt_services_.find(instanceIdString);
-  if (it != gatt_services_.end())
-    return; // Already know about this service.
+  if (gatt_services_.contains(instanceIdString))
+    return;  // Already know about this service.
 
-  gatt_services_.insert( ...
+  BluetoothRemoteGattServiceAndroid* service =
+      BluetoothRemoteGattServiceAndroid::Create(
+          adapter_, this, bluetooth_gatt_service_wrapper, instanceId);
+  DCHECK(service->object_path() == object_path);
+  DCHECK(service->GetUUID().IsValid());
 
-  BluetoothRemoteGattServiceAndroid* service = BluetoothRemoteGattServiceAndroid::Create(adapter_, this, bluetooth_gatt_service_wrapper, instanceId);
-  gatt_services_[service->GetIdentifier()] = service;
-  // DCHECK(service->object_path() == object_path);
-  // DCHECK(service->GetUUID().IsValid());
-  //
-  // DCHECK(adapter_);
-  // adapter()->NotifyGattServiceAdded(service);
+  gatt_services_.set(instanceId, service);
+  adapter()->NotifyGattServiceAdded(service);
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)

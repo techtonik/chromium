@@ -101,12 +101,8 @@ BluetoothRemoteGattServiceAndroid::BluetoothRemoteGattServiceAndroid(
     BluetoothAdapterAndroid* adapter,
     BluetoothDeviceAndroid* device,
     std::string instanceId)
-    : adapter_(adapter),
-      device_(device),
-      instanceIdAsString_(instanceId) {
-}
+    : adapter_(adapter), device_(device), instanceIdAsString_(instanceId) {}
 
-BluetoothRemoteGattServiceAndroid::~BluetoothRemoteGattServiceAndroid() {
-}
+BluetoothRemoteGattServiceAndroid::~BluetoothRemoteGattServiceAndroid() {}
 
 }  // namespace device
