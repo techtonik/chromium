@@ -163,7 +163,6 @@ final class ChromeBluetoothDevice {
                     if (mNativeBluetoothDeviceAndroid != 0) {
                         for (Wrappers.BluetoothGattServiceWrapper service :
                                 mBluetoothGatt.getServices()) {
-                            Log.i(TAG, "Service");
                             nativeCreateGattRemoteService(mNativeBluetoothDeviceAndroid,
                                     service.getInstanceId(), service);
                         }

@@ -94,8 +94,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
                                int32_t status,
                                bool connected);
 
-  // Creates or updates device with advertised UUID information when a device is
-  // discovered during a scan.
+  // Creates Bluetooth GATT service objects and adds them to
+  // BluetoothDevice::gatt_services_ if they are not already there.
   void CreateGattRemoteService(
       JNIEnv* env,
       jobject caller,

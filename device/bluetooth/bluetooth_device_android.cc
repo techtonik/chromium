@@ -230,11 +230,10 @@ void BluetoothDeviceAndroid::CreateGattRemoteService(
     jobject bluetooth_gatt_service_wrapper  // Java Type:
                                             // BluetoothGattServiceWrapper
     ) {
-  VLOG(1) << __FUNCTION__;  // scheib remove ,<<<<<<<<<<<<<<<<<<
-
   std::string instanceIdString = base::StringPrintf("%d", instanceId);
+
   if (gatt_services_.contains(instanceIdString))
-    return;  // Already know about this service.
+    return;
 
   BluetoothRemoteGattServiceAndroid* service =
       BluetoothRemoteGattServiceAndroid::Create(
