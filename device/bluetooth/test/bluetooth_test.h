@@ -84,7 +84,9 @@ class BluetoothTestBase : public testing::Test {
   // Simulates GattConnection disconnecting.
   virtual void SimulateGattDisconnection(BluetoothDevice* device) {}
 
-  // Simulates success of discovering services .
+  // Simulates success of discovering services. Two services are created.
+  // TODO(scheib): Add more control over how many services are created and
+  // their properties. http://crbug.com/541400
   virtual void SimulateGattServicesDiscovered(BluetoothDevice* device) {}
 
   // Simulates failure to discover services.

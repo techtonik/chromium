@@ -82,8 +82,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
       const CreateAdvertisementCallback& callback,
       const CreateAdvertisementErrorCallback& error_callback) override;
 
-  // Returns BluetoothAdapter Observers for platform specific classes to use
-  // to send event notifications.
+  // Returns BluetoothAdapter Observers for use by Android platform
+  // implementation classes to send event notifications. Intentionally not
+  // exposed on the public base class BluetoothAdapter as it is an
+  // implementation detail.
   base::ObserverList<device::BluetoothAdapter::Observer>& GetObservers() {
     return observers_;
   }
