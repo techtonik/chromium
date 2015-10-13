@@ -26,6 +26,7 @@
 
 #include "core/CoreExport.h"
 #include "core/HTMLNames.h"
+#include "core/dom/DOMSettableTokenList.h"
 #include "core/dom/DOMURLUtils.h"
 #include "core/dom/Document.h"
 #include "core/html/HTMLElement.h"
@@ -56,8 +57,9 @@ enum {
 //     RelationUp          = 0x00020000,
 };
 
-class CORE_EXPORT HTMLAnchorElement : public HTMLElement, public DOMURLUtils {
+class CORE_EXPORT HTMLAnchorElement : public HTMLElement, public DOMURLUtils, public DOMSettableTokenListObserver {
     DEFINE_WRAPPERTYPEINFO();
+    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(HTMLAnchorElement);
 public:
     static PassRefPtrWillBeRawPtr<HTMLAnchorElement> create(Document&);
 
@@ -86,6 +88,10 @@ public:
 
     void sendPings(const KURL& destinationURL) const;
 
+    DOMSettableTokenList* ping();
+
+    DECLARE_VIRTUAL_TRACE();
+
 protected:
     HTMLAnchorElement(const QualifiedName&, Document&);
 
@@ -111,9 +117,13 @@ private:
     InsertionNotificationRequest insertedInto(ContainerNode*) override;
     void handleClick(Event*);
 
+    // DOMSettableTokenListObserver
+    void valueChanged() override;
+
     uint32_t m_linkRelations;
     mutable LinkHash m_cachedVisitedLinkHash;
     bool m_wasFocusedByMouse;
+    RefPtrWillBeMember<DOMSettableTokenList> m_ping;
 };
 
 inline LinkHash HTMLAnchorElement::visitedLinkHash() const

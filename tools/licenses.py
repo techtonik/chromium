@@ -125,7 +125,7 @@ SPECIAL_CASES = {
     },
     os.path.join('sdch', 'open-vcdiff'): {
         "Name": "open-vcdiff",
-        "URL": "https://github.com.com/google/open-vcdiff",
+        "URL": "https://github.com/google/open-vcdiff",
         "License": "Apache 2.0, MIT, GPL v2 and custom licenses",
         "License Android Compatible": "yes",
     },
@@ -158,11 +158,6 @@ SPECIAL_CASES = {
         "URL": "http://code.google.com/p/linux-syscall-support/",
         "License": "BSD",
         "License File": "/LICENSE",
-    },
-    os.path.join('third_party', 'ots'): {
-        "Name": "OTS (OpenType Sanitizer)",
-        "URL": "http://code.google.com/p/ots/",
-        "License": "BSD",
     },
     os.path.join('third_party', 'pdfium'): {
         "Name": "PDFium",

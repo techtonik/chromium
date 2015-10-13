@@ -230,9 +230,11 @@ struct LayoutGrid::GridSizingData {
     WTF_MAKE_NONCOPYABLE(GridSizingData);
     STACK_ALLOCATED();
 public:
-    GridSizingData(size_t gridColumnCount, size_t gridRowCount)
+    GridSizingData(size_t gridColumnCount, size_t gridRowCount, const LayoutUnit& freeSpaceForColumns, const LayoutUnit& freeSpaceForRows)
         : columnTracks(gridColumnCount)
         , rowTracks(gridRowCount)
+        , freeSpaceForColumns(freeSpaceForColumns)
+        , freeSpaceForRows(freeSpaceForRows)
     {
     }
 
@@ -244,6 +246,12 @@ public:
     Vector<GridTrack*> filteredTracks;
     Vector<GridItemWithSpan> itemsSortedByIncreasingSpan;
     Vector<GridTrack*> growBeyondGrowthLimitsTracks;
+
+    LayoutUnit& freeSpaceForDirection(GridTrackSizingDirection direction) { return direction == ForColumns ? freeSpaceForColumns : freeSpaceForRows; }
+
+private:
+    LayoutUnit freeSpaceForColumns;
+    LayoutUnit freeSpaceForRows;
 };
 
 struct GridItemsSpanGroupRange {
@@ -363,9 +371,8 @@ void LayoutGrid::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, Layo
 {
     const_cast<LayoutGrid*>(this)->placeItemsOnGrid();
 
-    GridSizingData sizingData(gridColumnCount(), gridRowCount());
-    LayoutUnit availableLogicalSpace = 0;
-    const_cast<LayoutGrid*>(this)->computeUsedBreadthOfGridTracks(ForColumns, sizingData, availableLogicalSpace);
+    GridSizingData sizingData(gridColumnCount(), gridRowCount(), 0, 0);
+    const_cast<LayoutGrid*>(this)->computeUsedBreadthOfGridTracks(ForColumns, sizingData);
 
     for (const auto& column : sizingData.columnTracks) {
         const LayoutUnit& minTrackBreadth = column.baseSize();
@@ -394,13 +401,15 @@ static inline double normalizedFlexFraction(const GridTrack& track, double flexF
     return track.baseSize() / std::max<double>(1, flexFactor);
 }
 
-void LayoutGrid::computeUsedBreadthOfGridTracks(GridTrackSizingDirection direction, GridSizingData& sizingData, LayoutUnit& freeSpace)
+void LayoutGrid::computeUsedBreadthOfGridTracks(GridTrackSizingDirection direction, GridSizingData& sizingData)
 {
+    LayoutUnit& freeSpace = sizingData.freeSpaceForDirection(direction);
     const LayoutUnit initialFreeSpace = freeSpace;
     Vector<GridTrack>& tracks = (direction == ForColumns) ? sizingData.columnTracks : sizingData.rowTracks;
     Vector<size_t> flexibleSizedTracksIndex;
     sizingData.contentSizedTracksIndex.shrink(0);
 
+    const LayoutUnit maxSize = direction == ForColumns ? contentLogicalWidth() : std::max(LayoutUnit(), computeContentLogicalHeight(MainOrPreferredSize, style()->logicalHeight(), -1));
     // 1. Initialize per Grid track variables.
     for (size_t i = 0; i < tracks.size(); ++i) {
         GridTrack& track = tracks[i];
@@ -408,8 +417,8 @@ void LayoutGrid::computeUsedBreadthOfGridTracks(GridTrackSizingDirection directi
         const GridLength& minTrackBreadth = trackSize.minTrackBreadth();
         const GridLength& maxTrackBreadth = trackSize.maxTrackBreadth();
 
-        track.setBaseSize(computeUsedBreadthOfMinLength(direction, minTrackBreadth));
-        track.setGrowthLimit(computeUsedBreadthOfMaxLength(direction, maxTrackBreadth, track.baseSize()));
+        track.setBaseSize(computeUsedBreadthOfMinLength(minTrackBreadth, maxSize));
+        track.setGrowthLimit(computeUsedBreadthOfMaxLength(maxTrackBreadth, track.baseSize(), maxSize));
         track.setInfinitelyGrowable(false);
 
         if (trackSize.isContentSized())
@@ -487,40 +496,30 @@ void LayoutGrid::computeUsedBreadthOfGridTracks(GridTrackSizingDirection directi
     // FIXME: Should ASSERT flexible tracks exhaust the freeSpace ? (see issue 739613002).
 }
 
-LayoutUnit LayoutGrid::computeUsedBreadthOfMinLength(GridTrackSizingDirection direction, const GridLength& gridLength) const
+LayoutUnit LayoutGrid::computeUsedBreadthOfMinLength(const GridLength& gridLength, LayoutUnit maxSize) const
 {
     if (gridLength.isFlex())
         return 0;
 
     const Length& trackLength = gridLength.length();
     if (trackLength.isSpecified())
-        return computeUsedBreadthOfSpecifiedLength(direction, trackLength);
+        return valueForLength(trackLength, maxSize);
 
     ASSERT(trackLength.isMinContent() || trackLength.isAuto() || trackLength.isMaxContent());
     return 0;
 }
 
-LayoutUnit LayoutGrid::computeUsedBreadthOfMaxLength(GridTrackSizingDirection direction, const GridLength& gridLength, LayoutUnit usedBreadth) const
+LayoutUnit LayoutGrid::computeUsedBreadthOfMaxLength(const GridLength& gridLength, LayoutUnit usedBreadth, LayoutUnit maxSize) const
 {
     if (gridLength.isFlex())
         return usedBreadth;
 
     const Length& trackLength = gridLength.length();
-    if (trackLength.isSpecified()) {
-        LayoutUnit computedBreadth = computeUsedBreadthOfSpecifiedLength(direction, trackLength);
-        ASSERT(computedBreadth != infinity);
-        return computedBreadth;
-    }
+    if (trackLength.isSpecified())
+        return valueForLength(trackLength, maxSize);
 
     ASSERT(trackLength.isMinContent() || trackLength.isAuto() || trackLength.isMaxContent());
     return infinity;
-}
-
-LayoutUnit LayoutGrid::computeUsedBreadthOfSpecifiedLength(GridTrackSizingDirection direction, const Length& trackLength) const
-{
-    ASSERT(trackLength.isSpecified());
-    // FIXME: The -1 here should be replaced by whatever the intrinsic height of the grid is.
-    return valueForLength(trackLength, direction == ForColumns ? contentLogicalWidth() : std::max(LayoutUnit(), computeContentLogicalHeight(MainOrPreferredSize, style()->logicalHeight(), -1)));
 }
 
 double LayoutGrid::computeFlexFactorUnitSize(const Vector<GridTrack>& tracks, GridTrackSizingDirection direction, double flexFactorSum, LayoutUnit& leftOverSpace, const Vector<size_t, 8>& flexibleTracksIndexes, PassOwnPtr<TrackIndexSet> tracksToTreatAsInflexible) const
@@ -1019,10 +1018,11 @@ void LayoutGrid::distributeSpaceToTracks(Vector<GridTrack*>& tracks, const Vecto
 #if ENABLE(ASSERT)
 bool LayoutGrid::tracksAreWiderThanMinTrackBreadth(GridTrackSizingDirection direction, const Vector<GridTrack>& tracks)
 {
+    const LayoutUnit maxSize = direction == ForColumns ? contentLogicalWidth() : std::max(LayoutUnit(), computeContentLogicalHeight(MainOrPreferredSize, style()->logicalHeight(), -1));
     for (size_t i = 0; i < tracks.size(); ++i) {
         GridTrackSize trackSize = gridTrackSize(direction, i);
         const GridLength& minTrackBreadth = trackSize.minTrackBreadth();
-        if (computeUsedBreadthOfMinLength(direction, minTrackBreadth) > tracks[i].baseSize())
+        if (computeUsedBreadthOfMinLength(minTrackBreadth, maxSize) > tracks[i].baseSize())
             return false;
     }
     return true;
@@ -1275,8 +1275,9 @@ void LayoutGrid::dirtyGrid()
     m_gridIsDirty = true;
 }
 
-void LayoutGrid::applyStretchAlignmentToTracksIfNeeded(GridTrackSizingDirection direction, GridSizingData& sizingData, LayoutUnit availableSpace)
+void LayoutGrid::applyStretchAlignmentToTracksIfNeeded(GridTrackSizingDirection direction, GridSizingData& sizingData)
 {
+    LayoutUnit& availableSpace = sizingData.freeSpaceForDirection(direction);
     if (availableSpace <= 0
         || (direction == ForColumns && styleRef().justifyContentDistribution() != ContentDistributionStretch)
         || (direction == ForRows && styleRef().alignContentDistribution() != ContentDistributionStretch))
@@ -1303,6 +1304,7 @@ void LayoutGrid::applyStretchAlignmentToTracksIfNeeded(GridTrackSizingDirection 
         LayoutUnit baseSize = track->baseSize() + sizeToIncrease;
         track->setBaseSize(baseSize);
     }
+    availableSpace = 0;
 }
 
 void LayoutGrid::layoutGridItems()
@@ -1316,16 +1318,16 @@ void LayoutGrid::layoutGridItems()
     availableSpaceForColumns -= guttersSize(ForColumns, gridColumnCount());
     availableSpaceForRows -= guttersSize(ForRows, gridRowCount());
 
-    GridSizingData sizingData(gridColumnCount(), gridRowCount());
-    computeUsedBreadthOfGridTracks(ForColumns, sizingData, availableSpaceForColumns);
+    GridSizingData sizingData(gridColumnCount(), gridRowCount(), availableSpaceForColumns, availableSpaceForRows);
+    computeUsedBreadthOfGridTracks(ForColumns, sizingData);
     ASSERT(tracksAreWiderThanMinTrackBreadth(ForColumns, sizingData.columnTracks));
-    computeUsedBreadthOfGridTracks(ForRows, sizingData, availableSpaceForRows);
+    computeUsedBreadthOfGridTracks(ForRows, sizingData);
     ASSERT(tracksAreWiderThanMinTrackBreadth(ForRows, sizingData.rowTracks));
 
-    applyStretchAlignmentToTracksIfNeeded(ForColumns, sizingData, availableSpaceForColumns);
-    applyStretchAlignmentToTracksIfNeeded(ForRows, sizingData, availableSpaceForRows);
+    applyStretchAlignmentToTracksIfNeeded(ForColumns, sizingData);
+    applyStretchAlignmentToTracksIfNeeded(ForRows, sizingData);
 
-    populateGridPositions(sizingData, availableSpaceForColumns, availableSpaceForRows);
+    populateGridPositions(sizingData);
     m_gridItemsOverflowingGridArea.resize(0);
 
     for (LayoutBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
@@ -1518,7 +1520,7 @@ LayoutUnit LayoutGrid::gridAreaBreadthForChildIncludingAlignmentOffsets(const La
     return finalTrackPosition - initialTrackPosition + tracks[span.resolvedFinalPosition.toInt()].baseSize();
 }
 
-void LayoutGrid::populateGridPositions(GridSizingData& sizingData, LayoutUnit availableSpaceForColumns, LayoutUnit availableSpaceForRows)
+void LayoutGrid::populateGridPositions(GridSizingData& sizingData)
 {
     // Since we add alignment offsets and track gutters, grid lines are not always adjacent. Hence we will have to
     // assume from now on that we just store positions of the initial grid lines of each track,
@@ -1530,7 +1532,7 @@ void LayoutGrid::populateGridPositions(GridSizingData& sizingData, LayoutUnit av
     unsigned numberOfLines = numberOfTracks + 1;
     unsigned lastLine = numberOfLines - 1;
     unsigned nextToLastLine = numberOfLines - 2;
-    ContentAlignmentData offset = computeContentPositionAndDistributionOffset(ForColumns, availableSpaceForColumns, numberOfTracks);
+    ContentAlignmentData offset = computeContentPositionAndDistributionOffset(ForColumns, sizingData.freeSpaceForDirection(ForColumns), numberOfTracks);
     LayoutUnit trackGap = guttersSize(ForColumns, 2);
     m_columnPositions.resize(numberOfLines);
     m_columnPositions[0] = borderAndPaddingStart() + offset.positionOffset;
@@ -1542,7 +1544,7 @@ void LayoutGrid::populateGridPositions(GridSizingData& sizingData, LayoutUnit av
     numberOfLines = numberOfTracks + 1;
     lastLine = numberOfLines - 1;
     nextToLastLine = numberOfLines - 2;
-    offset = computeContentPositionAndDistributionOffset(ForRows, availableSpaceForRows, numberOfTracks);
+    offset = computeContentPositionAndDistributionOffset(ForRows, sizingData.freeSpaceForDirection(ForRows), numberOfTracks);
     trackGap = guttersSize(ForRows, 2);
     m_rowPositions.resize(numberOfLines);
     m_rowPositions[0] = borderAndPaddingBefore() + offset.positionOffset;
@@ -1930,7 +1932,7 @@ static inline LayoutUnit offsetToEndEdge(bool isLeftToRight, LayoutUnit availabl
 }
 
 
-static ContentAlignmentData contentDistributionOffset(LayoutUnit availableFreeSpace, ContentPosition& fallbackPosition, ContentDistributionType distribution, unsigned numberOfGridTracks)
+static ContentAlignmentData contentDistributionOffset(const LayoutUnit& availableFreeSpace, ContentPosition& fallbackPosition, ContentDistributionType distribution, unsigned numberOfGridTracks)
 {
     if (distribution != ContentDistributionDefault && fallbackPosition == ContentPositionAuto)
         fallbackPosition = resolveContentDistributionFallback(distribution);
@@ -1962,7 +1964,7 @@ static ContentAlignmentData contentDistributionOffset(LayoutUnit availableFreeSp
     return {};
 }
 
-ContentAlignmentData LayoutGrid::computeContentPositionAndDistributionOffset(GridTrackSizingDirection direction, LayoutUnit availableFreeSpace, unsigned numberOfGridTracks) const
+ContentAlignmentData LayoutGrid::computeContentPositionAndDistributionOffset(GridTrackSizingDirection direction, const LayoutUnit& availableFreeSpace, unsigned numberOfGridTracks) const
 {
     bool isRowAxis = direction == ForColumns;
     ContentPosition position = isRowAxis ? styleRef().justifyContentPosition() : styleRef().alignContentPosition();

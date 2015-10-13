@@ -1,0 +1,141 @@
+#!/bin/bash
+# Copyright 2014 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+#
+# Download the newest version of Closure Compiler, build it and put into Chrome
+# source tree. Also update externs/chrome_extensions.js.
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly TEMP_DIR=$(mktemp -d)
+
+readonly COMPILER_PATH="${SCRIPT_DIR}/compiler/compiler.jar"
+readonly EXTERNS_PATH="${SCRIPT_DIR}/externs/chrome_extensions.js"
+
+readonly README="${SCRIPT_DIR}/README.chromium"
+
+cleanup() {
+  rm -rf "${TEMP_DIR}"
+}
+
+get_compiler_version() {
+  java -jar "${1}" --version | grep ^Version: | cut -d' ' -f2
+}
+
+get_externs_sha1() {
+  sha1sum "${EXTERNS_PATH}" | cut -d' ' -f1
+}
+
+trap cleanup SIGINT SIGHUP SIGTERM
+
+old_head=$(egrep -o '^Revision: [0-9a-f]{5,40}$' "${README}" | cut -d' ' -f2)
+old_compiler_version=$(get_compiler_version ${COMPILER_PATH})
+old_externs_sha1=$(get_externs_sha1)
+
+cd "${TEMP_DIR}"
+
+echo "Cloning Closure Compiler repo"
+git clone --depth 1 https://github.com/google/closure-compiler.git
+
+cd closure-compiler
+
+new_head=$(git rev-parse HEAD)
+
+if [[ "${new_head}" != "${old_head}" ]]; then
+  head_range=$(cat <<EOT
+Change log:
+https://github.com/google/closure-compiler/compare/${old_head}...${new_head}
+EOT
+)
+fi
+
+echo "Building Closure Compiler"
+ant jar
+
+if [[ "$?" -ne 0 ]]; then
+  echo "Failed to build jar, copying nothing" >&2
+  cleanup
+  exit 1
+fi
+
+new_compiler_version=$(get_compiler_version "build/compiler.jar")
+
+if [[ "${new_compiler_version}" != "${old_compiler_version}" ]]; then
+  cp build/compiler.jar "${COMPILER_PATH}"
+
+  echo "Compiler version changed; re-building runner.jar"
+  "${SCRIPT_DIR}/runner/build_runner_jar.py"
+  if [[ "$?" -ne 0 ]]; then
+    echo "Failed to build runner.jar, roll unsuccessful"
+    cleanup
+    exit 1
+  fi
+
+  jar_range="compiler.jar: ${old_compiler_version} -> ${new_compiler_version}"
+fi
+
+(cat <<EOT && cat contrib/externs/chrome_extensions.js) > "${EXTERNS_PATH}"
+//    SSSSSSSSSSSSSSS TTTTTTTTTTTTTTTTTTTTTTT     OOOOOOOOO     PPPPPPPPPPPPPPPPP
+//  SS:::::::::::::::ST:::::::::::::::::::::T   OO:::::::::OO   P::::::::::::::::P
+// S:::::SSSSSS::::::ST:::::::::::::::::::::T OO:::::::::::::OO P::::::PPPPPP:::::P
+// S:::::S     SSSSSSST:::::TT:::::::TT:::::TO:::::::OOO:::::::OPP:::::P     P:::::P
+// S:::::S            TTTTTT  T:::::T  TTTTTTO::::::O   O::::::O  P::::P     P:::::P
+// S:::::S                    T:::::T        O:::::O     O:::::O  P::::P     P:::::P
+//  S::::SSSS                                                     P::::PPPPPP:::::P
+//   SS::::::SSSSS       This file is generated. To update it,    P:::::::::::::PP
+//     SSS::::::::SS          run roll_compiler_version.          P::::PPPPPPPPP
+//        SSSSSS::::S                                             P::::P
+//             S:::::S        T:::::T        O:::::O     O:::::O  P::::P
+//             S:::::S        T:::::T        O::::::O   O::::::O  P::::P
+// SSSSSSS     S:::::S      TT:::::::TT      O:::::::OOO:::::::OPP::::::PP
+// S::::::SSSSSS:::::S      T:::::::::T       OO:::::::::::::OO P::::::::P
+// S:::::::::::::::SS       T:::::::::T         OO:::::::::OO   P::::::::P
+//  SSSSSSSSSSSSSSS         TTTTTTTTTTT           OOOOOOOOO     PPPPPPPPPP
+EOT
+
+new_externs_sha1=$(get_externs_sha1)
+
+if [[ "${new_externs_sha1}" != "${old_externs_sha1}" ]]; then
+  externs_range="chrome_extensions.js: ${old_externs_sha1} -> ${new_externs_sha1}"
+fi
+
+echo
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+echo "@"
+echo "@  ROLL RESULTS:"
+echo "@"
+echo "@  closure-compiler.git HEAD:"
+echo "@    Old: ${old_head}"
+echo "@    New: ${new_head}"
+echo "@"
+echo "@  Compiler version:"
+echo "@    Old: ${old_compiler_version}"
+echo "@    New: ${new_compiler_version}"
+echo "@"
+echo "@  Externs SHA1:"
+echo "@    Old: ${old_externs_sha1}"
+echo "@    New: ${new_externs_sha1}"
+echo "@"
+echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+echo
+
+# I assume HEAD is constantly changing, but it may not necessarily affect
+# either the jar or the externs. Only roll when it matters to us.
+if [[ -z "${jar_range}" ]] && [[ -z "${externs_range}" ]]; then
+  echo "Nothing to update"
+else
+  sed -i "s/^Revision: ${old_head}$/Revision: ${new_head}/" "${README}"
+
+  echo "git commit -a -m 'Roll closure compiler"
+  echo
+  if [[ ! -z "${head_range}" ]]; then echo "${head_range}"; echo; fi
+  if [[ ! -z "${jar_range}" ]]; then echo "${jar_range}"; fi
+  if [[ ! -z "${externs_range}" ]]; then echo "${externs_range}"; fi
+  echo
+  echo "TBR="
+  echo "BUG='"
+  echo
+  echo "git cl upload"
+fi
+
+cleanup

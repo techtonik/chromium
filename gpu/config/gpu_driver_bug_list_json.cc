@@ -19,7 +19,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
 {
   "name": "gpu driver bug list",
   // Please update the version number whenever you change this file.
-  "version": "8.26",
+  "version": "8.29",
   "entries": [
     {
       "id": 1,
@@ -405,10 +405,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
     },
     {
       "id": 33,
-      "description": "Share group-related crashes and poor context switching perf on Galaxy Nexus",
-      "os": {
-        "type": "android"
-      },
+      "description": "Share group-related crashes and poor context switching perf on Imagination drivers",
       "gl_vendor": "Imagination.*",
       "features": [
         "use_virtualized_gl_contexts"
@@ -1270,10 +1267,11 @@ LONG_STRING_CONST(
     },
     {
       "id": 109,
-      "description": "MakeCurrent is slow on Linux",
+      "description": "MakeCurrent is slow on Linux with NVIDIA drivers",
       "os": {
         "type": "linux"
       },
+      "gl_vendor": "NVIDIA.*",
       "features": [
         "use_virtualized_gl_contexts"
       ]
@@ -1433,11 +1431,14 @@ LONG_STRING_CONST(
       "id": 123,
       "cr_bugs": [344330],
       "description": "NVIDIA drivers before 337 lack features in NV_path_rendering and related extensions to implement driver level path rendering.",
+      "vendor_id": "0x10de",
+      "os": {
+        "type": "linux"
+      },
       "driver_version": {
         "op": "<",
         "value": "337"
       },
-      "vendor_id": "0x10de",
       "features": [
         "disable_gl_path_rendering"
       ]
@@ -1552,6 +1553,18 @@ LONG_STRING_CONST(
       "multi_gpu_category": "active",
       "features": [
         "disable_msaa_on_non_webgl_contexts"
+      ]
+    },
+    {
+      "id": 133,
+      "description": "CHROMIUM_copy_texture with 1MB copy per flush to avoid unwanted cache growth on Adreno",
+      "cr_bugs": [542478],
+      "os": {
+        "type": "android"
+      },
+      "gl_renderer": "Adreno.*",
+      "features": [
+        "max_copy_texture_chromium_size_1048576"
       ]
     }
   ]

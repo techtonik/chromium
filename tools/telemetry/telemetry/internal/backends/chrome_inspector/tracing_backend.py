@@ -3,9 +3,9 @@
 # found in the LICENSE file.
 
 import json
-import logging
 import socket
 import time
+import traceback
 
 from telemetry import decorators
 from telemetry.internal.backends.chrome_inspector import inspector_websocket
@@ -152,10 +152,15 @@ class TracingBackend(object):
     try:
       response = self._inspector_websocket.SyncRequest(request, timeout)
     except websocket.WebSocketTimeoutException:
-      raise TracingTimeoutException
+      raise TracingTimeoutException(
+          'Exception raised while sending a Tracing.requestMemoryDump '
+          'request:\n' + traceback.format_exc())
     except (socket.error, websocket.WebSocketException,
             inspector_websocket.WebSocketDisconnected):
-      raise TracingUnrecoverableException
+      raise TracingUnrecoverableException(
+          'Exception raised while sending a Tracing.requestMemoryDump '
+          'request:\n' + traceback.format_exc())
+
 
     if ('error' in response or
         'result' not in response or
@@ -167,45 +172,6 @@ class TracingBackend(object):
 
     result = response['result']
     return result['dumpGuid'] if result['success'] else None
-
-  def SetMemoryPressureNotificationsSuppressed(self, suppressed, timeout=30):
-    """Enable/disable suppressing memory pressure notifications.
-
-    Args:
-      suppressed: If true, memory pressure notifications will be suppressed.
-      timeout: The timeout in seconds.
-
-    Raises:
-      TracingTimeoutException: If more than |timeout| seconds has passed
-      since the last time any data is received.
-      TracingUnrecoverableException: If there is a websocket error.
-      TracingUnexpectedResponseException: If the response contains an error
-      or does not contain the expected result.
-    """
-    request = {
-      'method': 'Memory.setPressureNotificationsSuppressed',
-      'params': {
-        'suppressed': suppressed
-      }
-    }
-    try:
-      response = self._inspector_websocket.SyncRequest(request, timeout)
-    except websocket.WebSocketTimeoutException:
-      raise TracingTimeoutException
-    except (socket.error, websocket.WebSocketException,
-            inspector_websocket.WebSocketDisconnected):
-      raise TracingUnrecoverableException
-
-    if 'error' in response:
-      code = response['error']['code']
-      if code == inspector_websocket.InspectorWebsocket.METHOD_NOT_FOUND_CODE:
-        logging.warning('Memory.setPressureNotificationsSuppressed DevTools '
-                        'method not supported by the browser')
-      else:
-        raise TracingUnexpectedResponseException(
-            'Inspector returned unexpected response for '
-            'Memory.setPressureNotificationsSuppressed:\n' +
-            json.dumps(response, indent=2))
 
   def _CollectTracingData(self, timeout):
     """Collects tracing data. Assumes that Tracing.end has already been sent.
@@ -227,7 +193,9 @@ class TracingBackend(object):
       except websocket.WebSocketTimeoutException:
         pass
       except (socket.error, websocket.WebSocketException):
-        raise TracingUnrecoverableException
+        raise TracingUnrecoverableException(
+            'Exception raised while collecting tracing data:\n' +
+                traceback.format_exc())
 
       if self._has_received_all_tracing_data:
         break

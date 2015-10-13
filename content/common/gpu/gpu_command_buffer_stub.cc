@@ -24,8 +24,8 @@
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "gpu/command_buffer/common/constants.h"
-#include "gpu/command_buffer/common/gles2_cmd_utils.h"
 #include "gpu/command_buffer/common/mailbox.h"
+#include "gpu/command_buffer/common/sync_token.h"
 #include "gpu/command_buffer/service/gl_context_virtual.h"
 #include "gpu/command_buffer/service/gl_state_restorer_impl.h"
 #include "gpu/command_buffer/service/image_factory.h"
@@ -76,11 +76,9 @@ class GpuCommandBufferMemoryTracker : public gpu::gles2::MemoryTracker {
         share_group_tracing_guid_(share_group_tracing_guid) {}
 
   void TrackMemoryAllocatedChange(
-      size_t old_size,
-      size_t new_size,
-      gpu::gles2::MemoryTracker::Pool pool) override {
+      size_t old_size, size_t new_size) override {
     tracking_group_->TrackMemoryAllocatedChange(
-        old_size, new_size, pool);
+        old_size, new_size);
   }
 
   bool EnsureGPUMemoryAvailable(size_t size_needed) override {
@@ -175,6 +173,7 @@ uint64_t GetCommandBufferID(int channel_id, int32 route_id) {
 
 GpuCommandBufferStub::GpuCommandBufferStub(
     GpuChannel* channel,
+    gpu::SyncPointManager* sync_point_manager,
     base::SingleThreadTaskRunner* task_runner,
     GpuCommandBufferStub* share_group,
     const gfx::GLSurfaceHandle& handle,
@@ -192,6 +191,7 @@ GpuCommandBufferStub::GpuCommandBufferStub(
     GpuWatchdog* watchdog,
     const GURL& active_url)
     : channel_(channel),
+      sync_point_manager_(sync_point_manager),
       task_runner_(task_runner),
       initialized_(false),
       handle_(handle),
@@ -529,14 +529,11 @@ void GpuCommandBufferStub::OnInitialize(
   GpuChannelManager* manager = channel_->gpu_channel_manager();
   DCHECK(manager);
 
-  gpu::SyncPointManager* sync_point_manager = manager->sync_point_manager();
-  DCHECK(sync_point_manager);
-
   decoder_.reset(::gpu::gles2::GLES2Decoder::Create(context_group_.get()));
   scheduler_.reset(new gpu::GpuScheduler(command_buffer_.get(),
                                          decoder_.get(),
                                          decoder_.get()));
-  sync_point_client_ = sync_point_manager->CreateSyncPointClient(
+  sync_point_client_ = sync_point_manager_->CreateSyncPointClient(
       channel_->GetSyncPointOrderData(), gpu::CommandBufferNamespace::GPU_IO,
       command_buffer_id_);
 
@@ -940,13 +937,12 @@ void GpuCommandBufferStub::OnRetireSyncPoint(uint32 sync_point) {
     // We can simply use the global sync point number as the release count with
     // 0 for the command buffer ID (under normal circumstances 0 is invalid so
     // will not be used) until the old sync points are replaced.
-    gpu::gles2::SyncToken sync_token = {gpu::CommandBufferNamespace::GPU_IO, 0,
-                                        sync_point};
+    gpu::SyncToken sync_token(gpu::CommandBufferNamespace::GPU_IO, 0,
+                              sync_point);
     mailbox_manager->PushTextureUpdates(sync_token);
   }
 
-  GpuChannelManager* manager = channel_->gpu_channel_manager();
-  manager->sync_point_manager()->RetireSyncPoint(sync_point);
+  sync_point_manager_->RetireSyncPoint(sync_point);
 }
 
 bool GpuCommandBufferStub::OnWaitSyncPoint(uint32 sync_point) {
@@ -954,8 +950,7 @@ bool GpuCommandBufferStub::OnWaitSyncPoint(uint32 sync_point) {
   DCHECK(scheduler_->scheduled());
   if (!sync_point)
     return true;
-  GpuChannelManager* manager = channel_->gpu_channel_manager();
-  if (manager->sync_point_manager()->IsSyncPointRetired(sync_point)) {
+  if (sync_point_manager_->IsSyncPointRetired(sync_point)) {
     // Old sync points are global and do not have a command buffer ID,
     // We can simply use the global sync point number as the release count with
     // 0 for the command buffer ID (under normal circumstances 0 is invalid so
@@ -969,7 +964,7 @@ bool GpuCommandBufferStub::OnWaitSyncPoint(uint32 sync_point) {
 
   scheduler_->SetScheduled(false);
   waiting_for_sync_point_ = true;
-  manager->sync_point_manager()->AddSyncPointCallback(
+  sync_point_manager_->AddSyncPointCallback(
       sync_point,
       base::Bind(&RunOnThread, task_runner_,
                  base::Bind(&GpuCommandBufferStub::OnWaitSyncPointCompleted,
@@ -998,15 +993,13 @@ void GpuCommandBufferStub::PullTextureUpdates(
   gpu::gles2::MailboxManager* mailbox_manager =
       context_group_->mailbox_manager();
   if (mailbox_manager->UsesSync() && MakeCurrent()) {
-    gpu::gles2::SyncToken sync_token = {namespace_id, command_buffer_id,
-                                        release};
+    gpu::SyncToken sync_token(namespace_id, command_buffer_id, release);
     mailbox_manager->PullTextureUpdates(sync_token);
   }
 }
 
 void GpuCommandBufferStub::OnSignalSyncPoint(uint32 sync_point, uint32 id) {
-  GpuChannelManager* manager = channel_->gpu_channel_manager();
-  manager->sync_point_manager()->AddSyncPointCallback(
+  sync_point_manager_->AddSyncPointCallback(
       sync_point,
       base::Bind(&RunOnThread, task_runner_,
                  base::Bind(&GpuCommandBufferStub::OnSignalSyncPointAck,
@@ -1045,8 +1038,8 @@ void GpuCommandBufferStub::OnFenceSyncRelease(uint64_t release) {
   gpu::gles2::MailboxManager* mailbox_manager =
       context_group_->mailbox_manager();
   if (mailbox_manager->UsesSync() && MakeCurrent()) {
-    gpu::gles2::SyncToken sync_token = {gpu::CommandBufferNamespace::GPU_IO,
-                                        command_buffer_id_, release};
+    gpu::SyncToken sync_token(gpu::CommandBufferNamespace::GPU_IO,
+                              command_buffer_id_, release);
     mailbox_manager->PushTextureUpdates(sync_token);
   }
 
@@ -1060,15 +1053,9 @@ bool GpuCommandBufferStub::OnWaitFenceSync(
   DCHECK(!waiting_for_sync_point_);
   DCHECK(scheduler_->scheduled());
 
-  GpuChannelManager* manager = channel_->gpu_channel_manager();
-  DCHECK(manager);
-
-  gpu::SyncPointManager* sync_point_manager = manager->sync_point_manager();
-  DCHECK(sync_point_manager);
-
   scoped_refptr<gpu::SyncPointClientState> release_state =
-      sync_point_manager->GetSyncPointClientState(namespace_id,
-                                                  command_buffer_id);
+      sync_point_manager_->GetSyncPointClientState(namespace_id,
+                                                   command_buffer_id);
 
   if (!release_state)
     return true;

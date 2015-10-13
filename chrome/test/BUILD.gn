@@ -257,13 +257,14 @@ source_set("test_support_ui") {
 group("telemetry_binary_deps") {
   data_deps = []
 
+  data = [
+    "//tools/perf/chrome_telemetry_build/",
+  ]
+
   if (is_win) {
     data_deps += [ "//content/shell:crash_service" ]
+    data += [ "//components/crash/content/tools/generate_breakpad_symbols.py" ]
   }
-
-  data = [
-    "//tools/perf/core/binary_dependencies.json",
-  ]
 }
 
 if (!is_android) {
@@ -313,6 +314,7 @@ if (!is_android) {
     if (is_linux || is_win) {
       data += [
         "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/chrome_material_100_percent.pak",
         "$root_out_dir/locales/en-US.pak",
         "$root_out_dir/locales/fr.pak",
       ]
@@ -640,6 +642,61 @@ if (!is_android) {
 
   # TODO(GYP): Delete this after we've converted everything to GN.
   # The _run targets exist only for compatibility w/ GYP.
+  group("telemetry_perf_unittests_run") {
+    testonly = true
+    deps = [
+      ":telemetry_perf_unittests",
+    ]
+  }
+
+  group("telemetry_chrome_deps") {
+    data_deps = [
+      # TODO(kbr): this used to be "//chrome". Had to change this to
+      # chrome_initial temporarily to work around crbug.com/536192.
+      "//chrome:chrome_initial",
+      "//tools/telemetry:bitmaptools",
+    ]
+
+    if (is_linux) {
+      data_deps += [ "//tools/xdisplaycheck" ]
+    }
+  }
+
+  group("telemetry_perf_unittests") {
+    deps = [
+      "//tools/telemetry:telemetry_test_support",
+      ":telemetry_chrome_deps",
+      ":telemetry_binary_deps",
+    ]
+
+    data = [
+      "//tools/perf/",
+
+      # Field trial config
+      "//tools/variations/",
+
+      # For isolate contract.
+      "//testing/scripts/common.py",
+      "//testing/xvfb.py",
+      "//testing/scripts/run_telemetry_as_googletest.py",
+    ]
+
+    if (is_win && (symbol_level == 1 || symbol_level == 2)) {
+      # TODO(GYP): These should be provided automatically through data_deps.
+      data += [ "$root_out_dir/chrome.exe.pdb" ]
+      if (is_component_build) {
+        data += [
+          "$root_out_dir/base.dll.pdb",
+          "$root_out_dir/blink_platform.dll.pdb",
+          "$root_out_dir/blink_web.dll.pdb",
+          "$root_out_dir/content.dll.pdb",
+        ]
+      }
+    }
+  }
+
+  # TODO(GYP): Delete this after we've converted everything to GN.
+  # The _run targets exist only for compatibility w/ GYP.
   group("telemetry_gpu_test_run") {
     testonly = true
     deps = [
@@ -651,12 +708,7 @@ if (!is_android) {
     deps = [
       "//tools/telemetry:telemetry_test_support",
       ":telemetry_binary_deps",
-    ]
-    data_deps = [
-      # TODO(kbr): this used to be "//chrome". Had to change this to
-      # chrome_initial temporarily to work around crbug.com/536192.
-      "//chrome:chrome_initial",
-      "//tools/telemetry:bitmaptools",
+      ":telemetry_chrome_deps",
     ]
 
     data = [
@@ -665,7 +717,6 @@ if (!is_android) {
 
       # For GpuProcess.video
       "//content/test/data/media/bear.ogv",
-      "//third_party/catapult/",
 
       # For webgl_conformance
       "//third_party/webgl/",
@@ -709,15 +760,9 @@ if (!is_android) {
       # For webgl_conformance_expectations_unittest
       "//third_party/webgl/src/sdk/tests/",
 
-      # Generic telemetry deps
-      "//third_party/catapult/",
-      "//build/android/devil/",
-      "//build/android/pylib/",
-      "//build/util/",
-
       # From telemetry_gpu_unittests.isolate
-      "//third_party/typ/",
       "//testing/scripts/common.py",
+      "//testing/xvfb.py",
       "//testing/scripts/run_telemetry_as_googletest.py",
     ]
   }
@@ -782,6 +827,7 @@ if (!is_android) {
       "$root_out_dir/pyproto/",
       "$root_out_dir/browser_tests.pak",
       "$root_out_dir/chrome_100_percent.pak",
+      "$root_out_dir/chrome_material_100_percent.pak",
       "$root_out_dir/locales/",
       "$root_out_dir/remoting/unittests/",
       "$root_out_dir/resources.pak",
@@ -1050,11 +1096,8 @@ if (!is_android) {
       ]
     }
     if (enable_media_router) {
-      sources += rebase_path(
-              chrome_tests_gypi_values.chrome_browser_tests_media_router_sources,
-              ".",
-              "//chrome")
-      deps += [ "//chrome/browser/media/router:test_support" ]
+      sources += [ "../browser/ui/webui/media_router/media_router_dialog_controller_impl_browsertest.cc" ]
+      deps += [ "//chrome/test/media_router:media_router_browsertests" ]
     }
     if (is_win) {
       deps += [
@@ -1153,6 +1196,7 @@ if (!is_android) {
       sources -= [
         "../browser/policy/cloud/component_cloud_policy_browsertest.cc",
         "../browser/prefs/pref_hash_browsertest.cc",
+        "../common/spellcheck_common_unittest.cc",
         "../renderer/spellchecker/spellcheck_provider_hunspell_unittest.cc",
         "../renderer/spellchecker/spellcheck_unittest.cc",
       ]
@@ -1261,6 +1305,7 @@ if (!is_android) {
     if (is_linux || is_win) {
       data += [
         "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/chrome_material_100_percent.pak",
         "$root_out_dir/locales/en-US.pak",
       ]
     }
@@ -1486,6 +1531,9 @@ if (!is_android) {
         "$root_out_dir/locales/en-US.pak",
       ]
     }
+    if (is_linux || is_win) {
+      data += [ "$root_out_dir/chrome_material_100_percent.pak" ]
+    }
 
     defines = []
 
@@ -1579,9 +1627,9 @@ if (!is_android) {
               "//chrome")
       sources -= [ "../browser/download/download_request_infobar_delegate_unittest.cc" ]
     }
+
     if (is_ios || is_chromeos) {
-      sources -=
-          [ "../browser/metrics/signin_status_metrics_provider_unittest.cc" ]
+      sources -= [ "../browser/signin/chrome_signin_status_metrics_provider_delegate_unittest.cc" ]
     }
     if (enable_background) {
       sources += rebase_path(

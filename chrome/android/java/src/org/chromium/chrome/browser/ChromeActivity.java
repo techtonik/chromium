@@ -553,7 +553,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
      * @param color The color that the status bar should be set to.
      */
     protected void setStatusBarColor(Tab tab, int color) {
-        int statusBarColor = (tab != null && tab.getDefaultThemeColor() == color)
+        int statusBarColor = (tab != null && tab.isDefaultThemeColor())
                 ? Color.BLACK : ColorUtils.getDarkenedColorForStatusBar(color);
         ApiCompatibilityUtils.setStatusBarColor(getWindow(), statusBarColor);
     }
@@ -683,6 +683,11 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
             });
         }
         if (mCompositorViewHolder != null) mCompositorViewHolder.onStart();
+
+        // Explicitly call checkAccessibility() so things are initialized correctly when Chrome has
+        // been re-started after closing due to the last tab being closed when homepage is enabled.
+        // See crbug.com/541546.
+        checkAccessibility();
     }
 
     @Override

@@ -292,7 +292,18 @@ void GraphicsLayer::setOffsetDoubleFromLayoutObject(const DoubleSize& offset, Sh
         setNeedsDisplay();
 }
 
-void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
+void GraphicsLayer::paintIfNeeded(GraphicsContext& context)
+{
+    ASSERT(RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled());
+    if (!m_client)
+        return;
+    if (firstPaintInvalidationTrackingEnabled())
+        m_debugInfo.clearAnnotatedInvalidateRects();
+    incrementPaintCount();
+    m_client->paintContentsIfNeeded(this, context, m_paintingPhase);
+}
+
+void GraphicsLayer::paint(GraphicsContext& context, const IntRect& clip)
 {
     if (!m_client)
         return;
@@ -1054,14 +1065,18 @@ void GraphicsLayer::setContentsRect(const IntRect& rect)
 void GraphicsLayer::setContentsToImage(Image* image, RespectImageOrientationEnum respectImageOrientation)
 {
     RefPtr<SkImage> skImage = image ? image->imageForCurrentFrame() : nullptr;
+
+    if (image && skImage && image->isBitmapImage()) {
+        if (respectImageOrientation == RespectImageOrientation) {
+            ImageOrientation imageOrientation = toBitmapImage(image)->currentFrameOrientation();
+            skImage = DragImage::resizeAndOrientImage(skImage.release(), imageOrientation);
+        }
+    }
+
     if (image && skImage) {
         if (!m_imageLayer) {
             m_imageLayer = adoptPtr(Platform::current()->compositorSupport()->createImageLayer());
             registerContentsLayer(m_imageLayer->layer());
-        }
-        if (respectImageOrientation == RespectImageOrientation && image->isBitmapImage()) {
-            ImageOrientation imageOrientation = toBitmapImage(image)->currentFrameOrientation();
-            skImage = DragImage::resizeAndOrientImage(skImage.release(), imageOrientation);
         }
         m_imageLayer->setImage(skImage.get());
         m_imageLayer->layer()->setOpaque(image->currentFrameKnownToBeOpaque());
@@ -1164,12 +1179,6 @@ void GraphicsLayer::setScrollableArea(ScrollableArea* scrollableArea, bool isVie
     else
         m_layer->layer()->setScrollClient(this);
 }
-
-void GraphicsLayer::paint(GraphicsContext& context, const IntRect& clip)
-{
-    paintGraphicsLayerContents(context, clip);
-}
-
 
 void GraphicsLayer::notifyAnimationStarted(double monotonicTime, int group)
 {

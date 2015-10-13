@@ -2489,7 +2489,7 @@ void EventHandler::updateGestureHoverActiveState(const HitTestRequest& request, 
 {
     ASSERT(m_frame == m_frame->localFrameRoot());
 
-    WillBeHeapVector<LocalFrame*> newHoverFrameChain;
+    WillBeHeapVector<RawPtrWillBeMember<LocalFrame>> newHoverFrameChain;
     LocalFrame* newHoverFrameInDocument = innerElement ? innerElement->document().frame() : nullptr;
     // Insert the ancestors of the frame having the new hovered node to the frame chain
     // The frame chain doesn't include the main frame to avoid the redundant work that cleans the hover state.
@@ -2549,7 +2549,7 @@ void EventHandler::updateGestureTargetNodeForMouseEvent(const GestureEventWithHi
     // - Dispatch mouseover/mouseenter events of the entered frames into the inside.
 
     // Insert the ancestors of the frame having the new target node to the entered frame chain
-    WillBeHeapVector<LocalFrame*> enteredFrameChain;
+    WillBeHeapVector<RawPtrWillBeMember<LocalFrame>> enteredFrameChain;
     LocalFrame* enteredFrameInDocument = targetedEvent.hitTestResult().innerNodeFrame();
     while (enteredFrameInDocument) {
         enteredFrameChain.append(enteredFrameInDocument);
@@ -2559,7 +2559,7 @@ void EventHandler::updateGestureTargetNodeForMouseEvent(const GestureEventWithHi
 
     size_t indexEnteredFrameChain = enteredFrameChain.size();
     LocalFrame* exitedFrameInDocument = m_frame;
-    WillBeHeapVector<LocalFrame*> exitedFrameChain;
+    WillBeHeapVector<RawPtrWillBeMember<LocalFrame>> exitedFrameChain;
     // Insert the frame from the disagreement between last frames and entered frames
     while (exitedFrameInDocument) {
         Node* lastNodeUnderTap = exitedFrameInDocument->eventHandler().m_nodeUnderMouse.get();
@@ -3537,34 +3537,17 @@ static const AtomicString& pointerEventNameForTouchPointState(PlatformTouchPoint
     }
 }
 
-PointerIdManager::PointerType pointerTypeForWebPointPointerType(WebPointerProperties::PointerType type)
-{
-    // TODO(e_hakkinen): Simplify this by changing PointerIdManager to use
-    // WebPointerProperties::PointerType instead of defining its own enum.
-    switch (type) {
-    case WebPointerProperties::PointerTypeUnknown:
-        return PointerIdManager::PointerTypeUnknown;
-    case WebPointerProperties::PointerTypeTouch:
-        return PointerIdManager::PointerTypeTouch;
-    case WebPointerProperties::PointerTypePen:
-        return PointerIdManager::PointerTypePen;
-    case WebPointerProperties::PointerTypeMouse:
-        return PointerIdManager::PointerTypeMouse;
-    }
-    ASSERT_NOT_REACHED();
-    return PointerIdManager::PointerTypeUnknown;
-}
-
+// TODO(mustaq): Move to WebPointerProperties?
 static const char* pointerTypeNameForWebPointPointerType(WebPointerProperties::PointerType type)
 {
     switch (type) {
-    case WebPointerProperties::PointerTypeUnknown:
+    case WebPointerProperties::PointerType::Unknown:
         return "";
-    case WebPointerProperties::PointerTypeTouch:
+    case WebPointerProperties::PointerType::Touch:
         return "touch";
-    case WebPointerProperties::PointerTypePen:
+    case WebPointerProperties::PointerType::Pen:
         return "pen";
-    case WebPointerProperties::PointerTypeMouse:
+    case WebPointerProperties::PointerType::Mouse:
         return "mouse";
     }
     ASSERT_NOT_REACHED();
@@ -3601,7 +3584,7 @@ void EventHandler::dispatchPointerEventsForTouchEvent(const PlatformTouchEvent& 
 
         bool pointerReleasedOrCancelled = pointState == PlatformTouchPoint::TouchReleased
             || pointState == PlatformTouchPoint::TouchCancelled;
-        const PointerIdManager::PointerType pointerType = pointerTypeForWebPointPointerType(point.pointerProperties().pointerType);
+        const WebPointerProperties::PointerType pointerType = point.pointerProperties().pointerType;
         const String& pointerTypeStr = pointerTypeNameForWebPointPointerType(point.pointerProperties().pointerType);
 
         if (pointState == PlatformTouchPoint::TouchPressed)
@@ -3666,7 +3649,7 @@ void EventHandler::sendPointerCancels(WillBeHeapVector<TouchInfo>& touchInfos)
             EventTypeNames::pointercancel, pointerEventInit);
         touchInfo.touchTarget->dispatchEvent(pointerEvent.get());
 
-        m_pointerIdManager.remove(PointerIdManager::PointerTypeTouch, pointerId);
+        m_pointerIdManager.remove(WebPointerProperties::PointerType::Touch, pointerId);
     }
 }
 

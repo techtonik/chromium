@@ -67,8 +67,6 @@ import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.WebsiteSettingsPopup;
 import org.chromium.chrome.browser.WindowDelegate;
 import org.chromium.chrome.browser.appmenu.AppMenuButtonHelper;
-import org.chromium.chrome.browser.dom_distiller.DomDistillerServiceFactory;
-import org.chromium.chrome.browser.dom_distiller.DomDistillerTabUtils;
 import org.chromium.chrome.browser.ntp.NativePageFactory;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.ntp.NewTabPage.FakeboxDelegate;
@@ -84,7 +82,6 @@ import org.chromium.chrome.browser.preferences.privacy.PrivacyPreferencesManager
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlService;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
-import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.ActionModeController;
 import org.chromium.chrome.browser.toolbar.ActionModeController.ActionBarDelegate;
@@ -96,8 +93,6 @@ import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.KeyNavigationUtil;
 import org.chromium.chrome.browser.util.ViewUtils;
 import org.chromium.chrome.browser.widget.TintedImageButton;
-import org.chromium.components.dom_distiller.core.DomDistillerService;
-import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.browser.accessibility.BrowserAccessibilityManager;
 import org.chromium.content_public.browser.LoadUrlParams;
@@ -918,6 +913,21 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     @Override
+    public void revertChanges() {
+        if (!mUrlHasFocus) {
+            setUrlToPageUrl();
+        } else {
+            Tab tab = mToolbarDataProvider.getTab();
+            if (NativePageFactory.isNativePageUrl(tab.getUrl(), tab.isIncognito())) {
+                mUrlBar.setUrl("", null);
+            } else {
+                mUrlBar.setUrl(
+                        mToolbarDataProvider.getText(), mToolbarDataProvider.getTab().getUrl());
+            }
+        }
+    }
+
+    @Override
     public long getFirstUrlBarFocusTime() {
         return mUrlBar.getFirstFocusTime();
     }
@@ -1297,14 +1307,6 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         findViewById(R.id.location_bar_icon).setVisibility(showContainer ? VISIBLE : GONE);
     }
 
-    private boolean isStoredArticle(String url) {
-        DomDistillerService domDistillerService =
-                DomDistillerServiceFactory.getForProfile(Profile.getLastUsedProfile());
-        String entryIdFromUrl = DomDistillerUrlUtils.getValueForKeyInUrl(url, "entry_id");
-        if (TextUtils.isEmpty(entryIdFromUrl)) return false;
-        return domDistillerService.hasEntry(entryIdFromUrl);
-    }
-
     /**
      * Updates the layout params for the location bar start aligned views.
      */
@@ -1668,9 +1670,9 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     /**
-     * Performs a search query on the current {@link ChromeTab}.  This calls
+     * Performs a search query on the current {@link Tab}.  This calls
      * {@link TemplateUrlService#getUrlForSearchQuery(String)} to get a url based on {@code query}
-     * and loads that url in the current {@link ChromeTab}.
+     * and loads that url in the current {@link Tab}.
      * @param query The {@link String} that represents the text query that should be searched for.
      */
     @VisibleForTesting
@@ -1960,33 +1962,21 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
 
         boolean showingQuery = false;
         String displayText = mToolbarDataProvider.getText();
-        int securityLevel = getSecurityLevel();
-        if (securityLevel != ConnectionSecurityLevel.SECURITY_ERROR
-                && !TextUtils.isEmpty(displayText) && mToolbarDataProvider.wouldReplaceURL()) {
-            url = displayText.trim();
-            showingQuery = true;
-            mQueryInTheOmnibox = true;
+        if (!TextUtils.isEmpty(displayText) && mToolbarDataProvider.wouldReplaceURL()) {
+            if (getSecurityLevel() == ConnectionSecurityLevel.SECURITY_ERROR) {
+                assert false : "Search terms should not be shown for https error pages.";
+                displayText = url;
+            } else {
+                url = displayText.trim();
+                showingQuery = true;
+                mQueryInTheOmnibox = true;
+            }
         }
         String path = null;
         if (!showingQuery && FeatureUtilities.isDocumentMode(getContext())) {
             Pair<String, String> urlText = splitPathFromUrlDisplayText(displayText);
             displayText = urlText.first;
             path = urlText.second;
-        }
-
-        if (DomDistillerUrlUtils.isDistilledPage(url)) {
-            if (isStoredArticle(url)) {
-                DomDistillerService domDistillerService =
-                        DomDistillerServiceFactory.getForProfile(profile);
-                String originalUrl = domDistillerService.getUrlForEntry(
-                        DomDistillerUrlUtils.getValueForKeyInUrl(url, "entry_id"));
-                displayText =
-                        DomDistillerTabUtils.getFormattedUrlFromOriginalDistillerUrl(originalUrl);
-            } else if (DomDistillerUrlUtils.getOriginalUrlFromDistillerUrl(url) != null) {
-                String originalUrl = DomDistillerUrlUtils.getOriginalUrlFromDistillerUrl(url);
-                displayText =
-                        DomDistillerTabUtils.getFormattedUrlFromOriginalDistillerUrl(originalUrl);
-            }
         }
 
         if (setUrlBarText(displayText, path, url)) {
@@ -2087,12 +2077,12 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     /**
-     * @return The ChromeTab currently showing.
+     * @return The Tab currently showing.
      */
     @Override
-    public ChromeTab getCurrentTab() {
+    public Tab getCurrentTab() {
         if (mToolbarDataProvider == null) return null;
-        return ChromeTab.fromTab(mToolbarDataProvider.getTab());
+        return mToolbarDataProvider.getTab();
     }
 
     private ContentViewCore getContentViewCore() {

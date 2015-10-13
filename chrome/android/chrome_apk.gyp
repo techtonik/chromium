@@ -213,6 +213,7 @@
       'dependencies': [
         'chrome_android_paks_copy',
         'chrome_public_template_resources',
+        'libchrome_public',
         '../chrome.gyp:chrome_java',
       ],
       'includes': [ 'chrome_apk.gypi' ],
@@ -251,6 +252,7 @@
       'dependencies': [
         'chrome_android_paks_copy',
         'chrome_sync_shell_template_resources',
+        'libchrome_sync_shell',
         '../chrome.gyp:chrome_java',
         # This exists here because com.google.protobuf.nano is needed in tests,
         # but that code is stripped out via proguard. Adding this deps adds
@@ -380,6 +382,27 @@
         '../../build/android/test_runner.gypi',
       ],
     },
+  ],
+  'conditions': [
+    ['test_isolation_mode != "noop"',
+      {
+        'targets': [
+          {
+            'target_name': 'chrome_public_test_apk_run',
+            'type': 'none',
+            'dependencies': [
+              'chrome_public_test_apk',
+            ],
+            'includes': [
+              '../../build/isolate.gypi',
+            ],
+            'sources': [
+              'chrome_public_test_apk.isolate',
+            ],
+          },
+        ]
+      }
+    ],
   ],
 }
 

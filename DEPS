@@ -39,11 +39,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and whatever else without interference from each other.
-  'skia_revision': '9011bcf36e7ef9d6e7dab7f6e04c47c18972fbeb',
+  'skia_revision': '9ae8fe1c601ecb7fef9962f9eb1adf11032378e4',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '7ecf5c4f4f02297c5698bc65044718435fed1395',
+  'v8_revision': '71eca258d023950722fb90250f46dc7f38691864',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -59,7 +59,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': '35902e725aa6cc83a317c3b6fdd1926b81b8e44b',
+  'pdfium_revision': '3acb1ef909a22368507ed13817c4988c818e3aee',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -87,7 +87,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling NaCl
   # and whatever else without interference from each other.
-  'nacl_revision': '719fce7fa0c1f11cf05d5c20cdfa6648e8a35611',
+  'nacl_revision': 'f84c2ab61585743268db990ee54d097426c309f0',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling dEQP
   # and whatever else without interference from each other.
@@ -127,7 +127,7 @@ deps = {
    Var('chromium_git') + '/external/colorama.git' + '@' + '799604a1041e9b3bc5d2789ecbd7e8db2e18e6b8',
 
   'src/third_party/crashpad/crashpad':
-   Var('chromium_git') + '/crashpad/crashpad.git' + '@' + 'cd85c9f700f7efda7ffa36e0017806a2263f4d08',
+   Var('chromium_git') + '/crashpad/crashpad.git' + '@' + 'fd40ebbc7252f07fe86d233c17796e0d428f2020',
 
   'src/third_party/icu':
    Var('chromium_git') + '/chromium/deps/icu.git' + '@' + '94e4b770ce2f6065d4261d29c32683a6099b9d93',
@@ -148,7 +148,7 @@ deps = {
     Var('chromium_git') + '/external/snappy.git' + '@' + '762bb32f0c9d2f31ba4958c7c0933d22e80c20bf',
 
   'src/tools/grit':
-    Var('chromium_git') + '/external/grit-i18n.git' + '@' + 'f6d8c4ca636a187f4e3e38f41f650040c4e189cb', # from svn revision 199
+    Var('chromium_git') + '/external/grit-i18n.git' + '@' + '4983981a20ff2f1c68a91994cff1eded5b2c494d', # from svn revision 200
 
   'src/tools/gyp':
     Var('chromium_git') + '/external/gyp.git' + '@' + '01528c7244837168a1c80f06ff60fa5a9793c824',
@@ -181,19 +181,19 @@ deps = {
     Var('chromium_git') + '/external/bidichecker/lib.git' + '@' + '97f2aa645b74c28c57eca56992235c79850fa9e0',
 
   'src/third_party/webgl/src':
-   Var('chromium_git') + '/external/khronosgroup/webgl.git' + '@' + '397fdf9245912ce37a01611b7a0ad02cd80de89f',
+   Var('chromium_git') + '/external/khronosgroup/webgl.git' + '@' + '421bc6095d1065bb6057e33fbab737b35d39930d',
 
   'src/third_party/webdriver/pylib':
     Var('chromium_git') + '/external/selenium/py.git' + '@' + '5fd78261a75fe08d27ca4835fb6c5ce4b42275bd',
 
   'src/third_party/libvpx_new/source/libvpx':
-   Var('chromium_git') + '/webm/libvpx.git' + '@' +  'ce3f4ade670cf02e05998f4ca50e08736802f5e7',
+   Var('chromium_git') + '/webm/libvpx.git' + '@' +  '66bf68697591047c46543ecdb72da61e1d3dd62a',
 
   'src/third_party/ffmpeg':
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '525a71ab8ee3b61da48138f7e1c406989d2879fc',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'cb124eec069bd28f486bde5f95b5603e2b823219', # commit position 10196
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '49460575f3cf8e99012eea942d46369d249d37f0', # commit position 10255
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -217,7 +217,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'dd1d405d54622392d726dacf0b36b454c189c1f2', # commit position 10197
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '8b3854ad414184f379b3f3ca7d1754dc506ce6f9', # commit position 10255
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -226,7 +226,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/open-source-parsers/jsoncpp.git' + '@' + 'f572e8e42e22cfcf5ab0aea26574f408943edfa4', # from svn 248
 
   'src/third_party/libyuv':
-    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + 'd039ad6e9b49ce61afcb22968eb0d3771f019abc', # from version 1495
+    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + '41c6cc7eb9f0208321ae0f9134a26a34bd31af37', # from version 1507+
 
   'src/third_party/smhasher/src':
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',

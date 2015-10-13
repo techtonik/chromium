@@ -97,6 +97,7 @@
       'webapp/base/js/identity_unittest.js',
       'webapp/base/js/ipc_unittest.js',
       'webapp/base/js/l10n_unittest.js',
+      'webapp/base/js/network_connectivity_detector_unittest.js',
       'webapp/base/js/platform_unittest.js',
       'webapp/base/js/protocol_extension_manager_unittest.js',
       'webapp/base/js/session_logger_unittest.js',
@@ -182,7 +183,6 @@
       'webapp/base/js/credentials_provider.js',
       'webapp/base/js/experiments.js',
       'webapp/base/js/host_desktop.js',
-      'webapp/base/js/smart_reconnector.js',
       'webapp/base/js/telemetry_event_writer.js',
       'webapp/base/js/xmpp_error_cache.js',
     ],
@@ -198,6 +198,7 @@
       'webapp/base/js/protocol_extension_manager.js',
       'webapp/base/js/protocol_extension.js',
       'webapp/base/js/error.js',
+      'webapp/base/js/network_connectivity_detector.js',
       'webapp/base/js/plugin_settings.js',
       'webapp/base/js/suspend_detector.js',
       'webapp/base/js/typecheck.js',
@@ -213,10 +214,7 @@
     # Logging and stats JavaScript files.
     'remoting_webapp_shared_js_logging_files': [
       'webapp/base/js/chromoting_event.js',
-      'webapp/base/js/logger.js',
       'webapp/base/js/format_iq.js',
-      'webapp/base/js/log_to_server.js',
-      'webapp/base/js/server_log_entry.js',
       'webapp/base/js/session_logger.js',
       'webapp/base/js/stats_accumulator.js',
     ],
@@ -276,7 +274,6 @@
     # Files for controlling the local machine as a host.
     # Includes both it2me and me2me files.
     'remoting_webapp_js_host_control_files': [
-      'webapp/crd/js/buffered_signal_strategy.js',
       'webapp/crd/js/host_controller.js',
       'webapp/crd/js/host_daemon_facade.js',
       'webapp/crd/js/host_screen.js',
@@ -291,7 +288,6 @@
     # Files for controlling the local it2me host.
     # Included by public_session.html.
     'remoting_webapp_js_it2me_host_control_files': [
-      'webapp/crd/js/buffered_signal_strategy.js',
       'webapp/crd/js/host_screen.js',
       'webapp/crd/js/host_session.js',
       'webapp/crd/js/host_install_dialog.js',

@@ -46,7 +46,9 @@ namespace {
 
 enum UserMode { USER_MODE_NORMAL, USER_MODE_INCOGNITO };
 
-ACTION(QuitMainMessageLoop) { base::MessageLoop::current()->Quit(); }
+ACTION(QuitMainMessageLoop) {
+  base::MessageLoop::current()->QuitWhenIdle();
+}
 
 class PersonalDataLoadedObserverMock : public PersonalDataManagerObserver {
  public:
@@ -3438,6 +3440,55 @@ TEST_F(PersonalDataManagerTest, GetProfileSuggestions_RankByMru) {
   EXPECT_EQ(suggestions[0].value, base::ASCIIToUTF16("Marion2_1"));
   EXPECT_EQ(suggestions[1].value, base::ASCIIToUTF16("Marion1_2"));
   EXPECT_EQ(suggestions[2].value, base::ASCIIToUTF16("Marion3_3"));
+}
+
+// Tests that a profile with all the same info as the reference profile except
+// that the state is the abbreviation instead of the full form gets merged with
+// the reference profile and that the state of the profile is overwritten.
+TEST_F(PersonalDataManagerTest, SaveImportedProfile_StateFullToAbbreviation) {
+  SetupReferenceProfile();
+
+  // Set the state of the reference profile to its full form.
+  const std::vector<AutofillProfile*>& profiles = personal_data_->GetProfiles();
+  profiles.front()->SetRawInfo(ADDRESS_HOME_STATE,
+                               base::UTF8ToUTF16("California"));
+
+  AutofillProfile profile2(base::GenerateGUID(), "https://www.example.com");
+  test::SetProfileInfo(&profile2, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox", "123 Zoo St", "unit 5",
+                       "Hollywood", "CA", "91601", "US", "12345678910");
+
+  personal_data_->SaveImportedProfile(profile2);
+
+  const std::vector<AutofillProfile*>& profiles2 =
+      personal_data_->GetProfiles();
+  ASSERT_EQ(1U, profiles2.size());
+
+  // Make sure that the new state format is saved.
+  ASSERT_EQ(base::UTF8ToUTF16("CA"),
+            profiles2.front()->GetRawInfo(ADDRESS_HOME_STATE));
+}
+
+// Tests that a profile with all the same info as the reference profile except
+// that the state is the full form instead of the abbreviation gets merged with
+// the reference profile and that the state of the profile is overwritten.
+TEST_F(PersonalDataManagerTest, SaveImportedProfile_StateAbbreviationToFull) {
+  SetupReferenceProfile();
+
+  AutofillProfile profile2(base::GenerateGUID(), "https://www.example.com");
+  test::SetProfileInfo(&profile2, "Marion", "Mitchell", "Morrison",
+                       "johnwayne@me.xyz", "Fox", "123 Zoo St", "unit 5",
+                       "Hollywood", "California", "91601", "US", "12345678910");
+
+  personal_data_->SaveImportedProfile(profile2);
+
+  const std::vector<AutofillProfile*>& profiles2 =
+      personal_data_->GetProfiles();
+  ASSERT_EQ(1U, profiles2.size());
+
+  // Make sure that the new state format is saved.
+  ASSERT_EQ(base::UTF8ToUTF16("California"),
+            profiles2.front()->GetRawInfo(ADDRESS_HOME_STATE));
 }
 
 }  // namespace autofill

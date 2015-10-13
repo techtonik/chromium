@@ -36,10 +36,12 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         bug=478572)
     self.Fail('deqp/data/gles2/shaders/scoping.html',
         bug=478572)
-    self.Fail('conformance/misc/expando-loss.html',
-        bug=485634)
-    self.Fail('conformance/buffers/buffer-data-array-buffer.html',
-        bug=535077)
+    self.Fail('conformance/extensions/ext-sRGB.html',
+        bug=540900)
+    self.Fail('conformance/extensions/oes-standard-derivatives.html',
+        bug=5400916)
+    self.Fail('conformance/extensions/ext-frag-depth.html',
+        bug=5400916)
 
     # Win failures
     self.Fail('conformance/glsl/bugs/' +
@@ -82,6 +84,10 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Skip('conformance/extensions/oes-texture-half-float-with-canvas.html',
         ['win', 'd3d9'], bug=896) # angle bug ID
 
+    # WIN / D3D9 / Intel failures
+    self.Fail('conformance/ogles/GL/cos/cos_001_to_006.html',
+        ['win', 'intel', 'd3d9'], bug=540538)
+
     # Win / OpenGL failures
     self.Fail('conformance/context/'+
         'context-attributes-alpha-depth-stencil-antialias.html',
@@ -96,7 +102,7 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     # Win / OpenGL / AMD failures
     self.Skip('conformance/glsl/misc/shader-struct-scope.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
-    self.Fail('conformance/glsl/misc/shaders-with-invariance.html',
+    self.Skip('conformance/glsl/misc/shaders-with-invariance.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID
     self.Fail('conformance/glsl/misc/struct-nesting-of-variable-names.html',
         ['win', 'amd', 'opengl'], bug=1007) # angle bug ID

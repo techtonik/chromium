@@ -42,8 +42,9 @@ class QuicChromiumClientSession;
 class QuicConnectionHelper;
 class QuicCryptoClientStreamFactory;
 class QuicRandom;
-class QuicServerInfoFactory;
 class QuicServerId;
+class QuicServerInfo;
+class QuicServerInfoFactory;
 class QuicStreamFactory;
 class SocketPerformanceWatcherFactory;
 class TransportSecurityState;
@@ -138,6 +139,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
       int threshold_public_resets_post_handshake,
       int socket_receive_buffer_size,
       bool delay_tcp_race,
+      bool store_server_configs_in_properties,
       const QuicTagVector& connection_options);
   ~QuicStreamFactory() override;
 
@@ -231,14 +233,11 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   bool enable_port_selection() const { return enable_port_selection_; }
 
   bool has_quic_server_info_factory() {
-    return quic_server_info_factory_ != NULL;
+    return !quic_server_info_factory_.get();
   }
 
   void set_quic_server_info_factory(
-      QuicServerInfoFactory* quic_server_info_factory) {
-    DCHECK(!quic_server_info_factory_);
-    quic_server_info_factory_ = quic_server_info_factory;
-  }
+      QuicServerInfoFactory* quic_server_info_factory);
 
   bool enable_connection_racing() const { return enable_connection_racing_; }
   void set_enable_connection_racing(bool enable_connection_racing) {
@@ -248,6 +247,10 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   int socket_receive_buffer_size() const { return socket_receive_buffer_size_; }
 
   bool delay_tcp_race() const { return delay_tcp_race_; }
+
+  bool store_server_configs_in_properties() const {
+    return store_server_configs_in_properties_;
+  }
 
  private:
   class Job;
@@ -329,8 +332,9 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
       const scoped_ptr<QuicServerInfo>& server_info);
 
   // Initialize |quic_supported_servers_at_startup_| with the list of servers
-  // that supported QUIC at start up.
-  void InitializeQuicSupportedServersAtStartup();
+  // that supported QUIC at start up and also initialize in-memory cache of
+  // QuicServerInfo objects from HttpServerProperties.
+  void MaybeInitialize();
 
   void ProcessGoingAwaySession(QuicChromiumClientSession* session,
                                const QuicServerId& server_id,
@@ -344,7 +348,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   ClientSocketFactory* client_socket_factory_;
   base::WeakPtr<HttpServerProperties> http_server_properties_;
   TransportSecurityState* transport_security_state_;
-  QuicServerInfoFactory* quic_server_info_factory_;
+  scoped_ptr<QuicServerInfoFactory> quic_server_info_factory_;
   QuicCryptoClientStreamFactory* quic_crypto_client_stream_factory_;
   QuicRandom* random_generator_;
   scoped_ptr<QuicClock> clock_;
@@ -449,6 +453,9 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   int yield_after_packets_;
   QuicTime::Delta yield_after_duration_;
 
+  // Set if server configs are to be stored in HttpServerProperties.
+  bool store_server_configs_in_properties_;
+
   // Each profile will (probably) have a unique port_seed_ value.  This value
   // is used to help seed a pseudo-random number generator (PortSuggester) so
   // that we consistently (within this profile) suggest the same ephemeral
@@ -460,7 +467,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   // Local address of socket that was created in CreateSession.
   IPEndPoint local_address_;
   bool check_persisted_supports_quic_;
-  bool quic_supported_servers_at_startup_initialzied_;
+  bool has_initialized_data_;
   std::set<HostPortPair> quic_supported_servers_at_startup_;
 
   NetworkConnection network_connection_;

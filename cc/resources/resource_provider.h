@@ -119,27 +119,23 @@ class CC_EXPORT ResourceProvider
 
   // Creates a resource of the default resource type.
   ResourceId CreateResource(const gfx::Size& size,
-                            GLint wrap_mode,
                             TextureHint hint,
                             ResourceFormat format);
 
-  // Creates a resource which is tagged as being managed for GPU memory
-  // accounting purposes.
+  // Creates a resource for a particular texture target (the distinction between
+  // texture targets has no effect in software mode).
   ResourceId CreateManagedResource(const gfx::Size& size,
                                    GLenum target,
-                                   GLint wrap_mode,
                                    TextureHint hint,
                                    ResourceFormat format);
 
   // You can also explicitly create a specific resource type.
   ResourceId CreateGLTexture(const gfx::Size& size,
                              GLenum target,
-                             GLenum texture_pool,
-                             GLint wrap_mode,
                              TextureHint hint,
                              ResourceFormat format);
 
-  ResourceId CreateBitmap(const gfx::Size& size, GLint wrap_mode);
+  ResourceId CreateBitmap(const gfx::Size& size);
   // Wraps an IOSurface into a GL resource.
   ResourceId CreateResourceFromIOSurface(const gfx::Size& size,
                                          unsigned io_surface_id);
@@ -280,7 +276,6 @@ class CC_EXPORT ResourceProvider
       DCHECK(valid());
       return &sk_bitmap_;
     }
-    GLint wrap_mode() const { return wrap_mode_; }
 
     bool valid() const { return !!sk_bitmap_.getPixels(); }
 
@@ -288,7 +283,6 @@ class CC_EXPORT ResourceProvider
     ResourceProvider* resource_provider_;
     ResourceId resource_id_;
     SkBitmap sk_bitmap_;
-    GLint wrap_mode_;
 
     DISALLOW_COPY_AND_ASSIGN(ScopedReadLockSoftware);
   };
@@ -422,6 +416,9 @@ class CC_EXPORT ResourceProvider
   // Indicates if we can currently lock this resource for write.
   bool CanLockForWrite(ResourceId id);
 
+  // Indicates if this resource may be used for a hardware overlay plane.
+  bool IsOverlayCandidate(ResourceId id);
+
   void WaitSyncPointIfNeeded(ResourceId id);
 
   static GLint GetActiveTextureUnit(gpu::gles2::GLES2Interface* gl);
@@ -458,21 +455,17 @@ class CC_EXPORT ResourceProvider
              Origin origin,
              GLenum target,
              GLenum filter,
-             GLenum texture_pool,
-             GLint wrap_mode,
              TextureHint hint,
              ResourceFormat format);
     Resource(uint8_t* pixels,
              SharedBitmap* bitmap,
              const gfx::Size& size,
              Origin origin,
-             GLenum filter,
-             GLint wrap_mode);
+             GLenum filter);
     Resource(const SharedBitmapId& bitmap_id,
              const gfx::Size& size,
              Origin origin,
-             GLenum filter,
-             GLint wrap_mode);
+             GLenum filter);
 
     int child_id;
     unsigned gl_id;
@@ -495,6 +488,7 @@ class CC_EXPORT ResourceProvider
     bool allocated : 1;
     bool read_lock_fences_enabled : 1;
     bool has_shared_bitmap_id : 1;
+    bool is_overlay_candidate : 1;
     scoped_refptr<Fence> read_lock_fence;
     gfx::Size size;
     Origin origin;
@@ -504,8 +498,6 @@ class CC_EXPORT ResourceProvider
     GLenum filter;
     unsigned image_id;
     unsigned bound_image_id;
-    GLenum texture_pool;
-    GLint wrap_mode;
     TextureHint hint;
     ResourceType type;
     ResourceFormat format;

@@ -68,6 +68,7 @@ _PERMISSIONS_BLACKLIST = [
     'android.permission.ACCESS_NETWORK_STATE',
     'android.permission.BLUETOOTH',
     'android.permission.BLUETOOTH_ADMIN',
+    'android.permission.DOWNLOAD_WITHOUT_NOTIFICATION',
     'android.permission.INTERNET',
     'android.permission.MANAGE_ACCOUNTS',
     'android.permission.MODIFY_AUDIO_SETTINGS',
@@ -526,14 +527,14 @@ class DeviceUtils(object):
 
   @decorators.WithTimeoutAndRetriesFromInstance(
       min_default_timeout=INSTALL_DEFAULT_TIMEOUT)
-  def Install(self, apk_path, reinstall=False, permissions=None, timeout=None,
+  def Install(self, apk, reinstall=False, permissions=None, timeout=None,
               retries=None):
     """Install an APK.
 
     Noop if an identical APK is already installed.
 
     Args:
-      apk_path: A string containing the path to the APK to install.
+      apk: An ApkHelper instance or string containing the path to the APK.
       permissions: Set of permissions to set. If not set, finds permissions with
           apk helper. To set no permissions, pass [].
       reinstall: A boolean indicating if we should keep any existing app data.
@@ -545,7 +546,7 @@ class DeviceUtils(object):
       CommandTimeoutError if the installation times out.
       DeviceUnreachableError on missing device.
     """
-    self._InstallInternal(apk_path, None, reinstall=reinstall,
+    self._InstallInternal(apk, None, reinstall=reinstall,
                           permissions=permissions)
 
   @decorators.WithTimeoutAndRetriesFromInstance(
@@ -558,7 +559,8 @@ class DeviceUtils(object):
     Noop if all of the APK splits are already installed.
 
     Args:
-      base_apk: A string of the path to the base APK.
+      base_apk: An ApkHelper instance or string containing the path to the base
+          APK.
       split_apks: A list of strings of paths of all of the APK splits.
       reinstall: A boolean indicating if we should keep any existing app data.
       allow_cached_props: Whether to use cached values for device properties.
@@ -582,14 +584,16 @@ class DeviceUtils(object):
     if split_apks:
       self._CheckSdkLevel(version_codes.LOLLIPOP)
 
-    all_apks = [base_apk]
+    base_apk = apk_helper.ToHelper(base_apk)
+
+    all_apks = [base_apk.path]
     if split_apks:
       all_apks += split_select.SelectSplits(
-        self, base_apk, split_apks, allow_cached_props=allow_cached_props)
+        self, base_apk.path, split_apks, allow_cached_props=allow_cached_props)
       if len(all_apks) == 1:
         logging.warning('split-select did not select any from %s', split_apks)
 
-    package_name = apk_helper.GetPackageName(base_apk)
+    package_name = base_apk.GetPackageName()
     device_apk_paths = self._GetApplicationPathsInternal(package_name)
 
     apks_to_install = None
@@ -624,7 +628,11 @@ class DeviceUtils(object):
         self.adb.InstallMultiple(
             apks_to_install, partial=partial, reinstall=reinstall)
       else:
-        self.adb.Install(base_apk, reinstall=reinstall)
+        self.adb.Install(base_apk.path, reinstall=reinstall)
+      if (permissions is None
+          and self.build_version_sdk >= version_codes.MARSHMALLOW):
+        permissions = base_apk.GetPermissions()
+      self.GrantPermissions(package_name, permissions)
       # Upon success, we know the device checksums, but not their paths.
       if host_checksums is not None:
         self._cache['package_apk_checksums'][package_name] = host_checksums
@@ -632,11 +640,6 @@ class DeviceUtils(object):
       # Running adb install terminates running instances of the app, so to be
       # consistent, we explicitly terminate it when skipping the install.
       self.ForceStop(package_name)
-
-    if (permissions is None
-        and self.build_version_sdk >= version_codes.MARSHMALLOW):
-      permissions = apk_helper.ApkHelper(base_apk).GetPermissions()
-    self.GrantPermissions(package_name, permissions)
 
   @decorators.WithTimeoutAndRetriesFromInstance()
   def Uninstall(self, package_name, keep_data=False, timeout=None,
@@ -1139,9 +1142,8 @@ class DeviceUtils(object):
 
         sums = md5sum.CalculateDeviceMd5Sums(specific_device_paths, self)
 
-        if self._enable_device_files_cache:
-          cache_entry = [ignore_other_files, sums]
-          self._cache['device_path_checksums'][device_path] = cache_entry
+        cache_entry = [ignore_other_files, sums]
+        self._cache['device_path_checksums'][device_path] = cache_entry
         return dict(sums)
 
       host_checksums, device_checksums = reraiser_thread.RunAsync((
@@ -1173,8 +1175,6 @@ class DeviceUtils(object):
       to_delete = device_checksums.keys()
 
     def cache_commit_func():
-      if not self._enable_device_files_cache:
-        return
       new_sums = {posixpath.join(device_path, path[len(host_path) + 1:]): val
                   for path, val in host_checksums.iteritems()}
       cache_entry = [ignore_other_files, new_sums]

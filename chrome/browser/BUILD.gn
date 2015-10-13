@@ -112,6 +112,7 @@ source_set("browser") {
     "//components/content_settings/core/common",
     "//components/crx_file",
     "//components/data_reduction_proxy/core/browser",
+    "//components/data_usage/core",
     "//components/data_use_measurement/core",
     "//components/device_event_log",
     "//components/domain_reliability",
@@ -132,6 +133,7 @@ source_set("browser") {
     "//components/metrics:net",
     "//components/metrics:profiler",
     "//components/metrics/proto:proto",
+    "//components/metrics:ui",
     "//components/mime_util",
     "//components/navigation_metrics",
     "//components/network_time",
@@ -155,7 +157,9 @@ source_set("browser") {
     "//components/startup_metric_utils",
     "//components/strings",
     "//components/suggestions",
+    "//components/sync_bookmarks",
     "//components/sync_driver",
+    "//components/sync_sessions",
     "//components/tracing:startup_tracing",
     "//components/translate/core/browser",
     "//components/translate/core/common",
@@ -290,6 +294,7 @@ source_set("browser") {
       "//components/password_manager/sync/browser",
       "//components/plugins/common",
       "//components/proxy_config",
+      "//components/resources",
       "//components/safe_json",
       "//components/sessions",
       "//components/storage_monitor",
@@ -529,17 +534,10 @@ source_set("browser") {
     deps += [ "//chrome/browser/chromeos" ]
   }
 
-  if (is_ios) {
-    sources -= [
-      "metrics/signin_status_metrics_provider_base.cc",
-      "metrics/signin_status_metrics_provider_base.h",
-    ]
-  }
-
   if (is_chromeos || is_ios) {
     sources -= [
-      "metrics/signin_status_metrics_provider.cc",
-      "metrics/signin_status_metrics_provider.h",
+      "signin/chrome_signin_status_metrics_provider_delegate.cc",
+      "signin/chrome_signin_status_metrics_provider_delegate.h",
     ]
   }
 
@@ -565,6 +563,7 @@ source_set("browser") {
       "//ui/aura",
       "//ui/compositor",
       "//ui/keyboard",
+      "//ui/keyboard:keyboard_with_content",
     ]
   }
   if (ui_compositor_image_transport) {
@@ -1039,8 +1038,6 @@ source_set("test_support") {
     "signin/fake_signin_manager_builder.h",
     "ssl/ssl_client_auth_requestor_mock.cc",
     "ssl/ssl_client_auth_requestor_mock.h",
-    "sync/profile_sync_components_factory_mock.cc",
-    "sync/profile_sync_components_factory_mock.h",
     "sync/profile_sync_service_mock.cc",
     "sync/profile_sync_service_mock.h",
   ]

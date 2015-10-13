@@ -92,6 +92,14 @@
         ],
       },
     }],
+    ['OS=="linux" or OS=="win"', {
+      'variables': {
+        'files': [
+          '<(PRODUCT_DIR)/chrome_material_100_percent.pak',
+          '<(PRODUCT_DIR)/chrome_100_percent.pak',
+        ],
+      },
+    }],
     ['disable_nacl==0 and (OS=="linux" or OS=="mac" or OS=="win")', {
       'variables': {
         'files': [
@@ -241,6 +249,7 @@
           '../ui/file_manager/integration_tests/',
           '../ui/webui/resources/js/',
           '../third_party/analytics/',
+          '../third_party/polymer/v1_0/components-chromium/polymer/',
           '../chrome/browser/resources/chromeos/wallpaper_manager/',
           '<(PRODUCT_DIR)/chromevox_test_data/',
           '<(PRODUCT_DIR)/content_shell.pak',

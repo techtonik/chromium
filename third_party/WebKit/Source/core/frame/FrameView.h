@@ -226,11 +226,15 @@ public:
 
     // Run all needed lifecycle stages. After calling this method, all frames will be in the lifecycle state PaintInvalidationClean.
     // TODO(pdr): Update callers to pass in the interest rect.
-    void updateAllLifecyclePhases(const LayoutRect& interestRect = LayoutRect::infiniteRect());
+    void updateAllLifecyclePhases(const LayoutRect* interestRect = nullptr);
 
     // Computes the style, layout and compositing lifecycle stages if needed. After calling this method, all frames wil lbe in a lifecycle
     // state >= CompositingClean, and scrolling has been updated.
     void updateLifecycleToCompositingCleanPlusScrolling();
+
+    // Computes only the style and layout lifecycle stages.
+    // After calling this method, all frames will be in a lifecycle state >= LayoutClean.
+    void updateLifecycleToLayoutClean();
 
     bool invalidateViewportConstrainedObjects();
 
@@ -601,17 +605,18 @@ private:
     void setScrollOffset(const DoublePoint&, ScrollType) override;
 
     enum LifeCycleUpdateOption {
-        AllPhases,
+        OnlyUpToLayoutClean,
         OnlyUpToCompositingCleanPlusScrolling,
+        AllPhases,
     };
 
-    void updateLifecyclePhasesInternal(LifeCycleUpdateOption, const LayoutRect& interestRect = LayoutRect::infiniteRect());
+    void updateLifecyclePhasesInternal(LifeCycleUpdateOption, const LayoutRect* interestRect);
     void invalidateTreeIfNeededRecursive();
     void scrollContentsIfNeededRecursive();
     void updateStyleAndLayoutIfNeededRecursive();
     void updatePaintProperties();
-    void synchronizedPaint(const LayoutRect& interestRect);
-    void synchronizedPaintRecursively(GraphicsLayer*, const LayoutRect& interestRect);
+    void synchronizedPaint(const LayoutRect* interestRect);
+    void synchronizedPaintRecursively(GraphicsLayer*, const LayoutRect* interestRect);
     void compositeForSlimmingPaintV2();
 
     void reset();
@@ -834,7 +839,7 @@ inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)
     if (m_isVisuallyNonEmpty)
         return;
     m_visuallyNonEmptyCharacterCount += count;
-    // Use a threshold value to prevent very small amounts of visible content from triggering didFirstVisuallyNonEmptyLayout.
+    // Use a threshold value to prevent very small amounts of visible content from triggering didMeaningfulLayout.
     // The first few hundred characters rarely contain the interesting content of the page.
     static const unsigned visualCharacterThreshold = 200;
     if (m_visuallyNonEmptyCharacterCount > visualCharacterThreshold)
@@ -846,7 +851,7 @@ inline void FrameView::incrementVisuallyNonEmptyPixelCount(const IntSize& size)
     if (m_isVisuallyNonEmpty)
         return;
     m_visuallyNonEmptyPixelCount += size.width() * size.height();
-    // Use a threshold value to prevent very small amounts of visible content from triggering didFirstVisuallyNonEmptyLayout
+    // Use a threshold value to prevent very small amounts of visible content from triggering didMeaningfulLayout.
     static const unsigned visualPixelThreshold = 32 * 32;
     if (m_visuallyNonEmptyPixelCount > visualPixelThreshold)
         setIsVisuallyNonEmpty();

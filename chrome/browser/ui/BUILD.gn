@@ -18,6 +18,11 @@ source_set("ui") {
   defines = []
   libs = []
 
+  if (is_clang) {
+    # TODO(thakis): Remove this once http://crbug.com/383820 is figured out
+    cflags = [ "-Wno-nonnull" ]
+  }
+
   configs += [
     "//build/config:precompiled_headers",
     "//build/config/compiler:wexit_time_destructors",
@@ -94,6 +99,7 @@ source_set("ui") {
       "//chrome/installer/util",
       "//components/autofill/content/browser:risk_proto",
       "//components/bubble:bubble",
+      "//components/crash/core/browser",
       "//components/net_log",
       "//components/page_load_metrics/browser",
       "//components/power",
@@ -262,6 +268,7 @@ source_set("ui") {
       "//ash/resources",
       "//ui/aura",
       "//ui/keyboard",
+      "//ui/keyboard:keyboard_with_content",
       "//ui/keyboard:resources",
       "//ui/wm",
     ]

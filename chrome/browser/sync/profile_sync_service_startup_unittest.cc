@@ -13,7 +13,6 @@
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/chrome_sync_client.h"
 #include "chrome/browser/sync/glue/sync_backend_host_mock.h"
-#include "chrome/browser/sync/profile_sync_components_factory_mock.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/sync/profile_sync_test_util.h"
@@ -26,9 +25,11 @@
 #include "components/signin/core/browser/fake_profile_oauth2_token_service.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager.h"
+#include "components/signin/core/common/signin_pref_names.h"
 #include "components/sync_driver/data_type_manager.h"
 #include "components/sync_driver/data_type_manager_mock.h"
 #include "components/sync_driver/pref_names.h"
+#include "components/sync_driver/sync_api_component_factory_mock.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "components/syncable_prefs/pref_service_syncable.h"
 #include "content/public/test/test_browser_thread_bundle.h"
@@ -130,7 +131,7 @@ class ProfileSyncServiceStartupTest : public testing::Test {
     Profile* profile = static_cast<Profile*>(browser_context);
     scoped_ptr<browser_sync::ChromeSyncClient> sync_client(
         new browser_sync::ChromeSyncClient(
-            profile, make_scoped_ptr(new ProfileSyncComponentsFactoryMock())));
+            profile, make_scoped_ptr(new SyncApiComponentFactoryMock())));
     return make_scoped_ptr(new TestProfileSyncServiceNoBackup(
         sync_client.Pass(), profile,
         make_scoped_ptr(new SigninManagerWrapper(
@@ -150,8 +151,8 @@ class ProfileSyncServiceStartupTest : public testing::Test {
         ->UpdateCredentials(account_id, "oauth2_login_token");
   }
 
-  ProfileSyncComponentsFactoryMock* GetSyncApiComponentFactoryMock() {
-    return static_cast<ProfileSyncComponentsFactoryMock*>(
+  SyncApiComponentFactoryMock* GetSyncApiComponentFactoryMock() {
+    return static_cast<SyncApiComponentFactoryMock*>(
         sync_->GetSyncClient()->GetSyncApiComponentFactory());
   }
 
@@ -236,7 +237,7 @@ class ProfileSyncServiceStartupCrosTest : public ProfileSyncServiceStartupTest {
     EXPECT_TRUE(signin->IsAuthenticated());
     scoped_ptr<browser_sync::ChromeSyncClient> sync_client(
         new browser_sync::ChromeSyncClient(
-            profile, make_scoped_ptr(new ProfileSyncComponentsFactoryMock())));
+            profile, make_scoped_ptr(new SyncApiComponentFactoryMock())));
     return make_scoped_ptr(new TestProfileSyncServiceNoBackup(
         sync_client.Pass(), profile,
         make_scoped_ptr(new SigninManagerWrapper(signin)), oauth2_token_service,

@@ -370,8 +370,6 @@ void VisualViewport::setupScrollbar(WebScrollbar::Orientation orientation)
         ScrollbarOrientation webcoreOrientation = isHorizontal ? HorizontalScrollbar : VerticalScrollbar;
         webScrollbarLayer = coordinator->createSolidColorScrollbarLayer(webcoreOrientation, thumbThickness, scrollbarMargin, false);
 
-        webScrollbarLayer->setClipLayer(m_innerViewportContainerLayer->platformLayer());
-
         // The compositor will control the scrollbar's visibility. Set to invisible by defualt
         // so scrollbars don't show up in layout tests.
         webScrollbarLayer->layer()->setOpacity(0);
@@ -413,9 +411,6 @@ void VisualViewport::registerLayersWithTreeView(WebLayerTreeView* layerTreeView)
         m_pageScaleLayer->platformLayer(),
         m_innerViewportScrollLayer->platformLayer(),
         scrollLayer);
-
-    // TODO(aelias): Remove this call after this setting is deleted.
-    layerTreeView->setHidePinchScrollbarsNearMinScale(false);
 }
 
 bool VisualViewport::visualViewportSuppliesScrollbars() const
@@ -580,6 +575,10 @@ GraphicsLayer* VisualViewport::layerForVerticalScrollbar() const
 }
 
 void VisualViewport::paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect& inClip) const
+{
+}
+
+void VisualViewport::paintContentsIfNeeded(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase) const
 {
 }
 

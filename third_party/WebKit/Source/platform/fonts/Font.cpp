@@ -25,10 +25,12 @@
 #include "config.h"
 #include "platform/fonts/Font.h"
 
+#include "platform/LayoutTestSupport.h"
 #include "platform/LayoutUnit.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/fonts/Character.h"
 #include "platform/fonts/FontCache.h"
+#include "platform/fonts/FontFallbackIterator.h"
 #include "platform/fonts/FontFallbackList.h"
 #include "platform/fonts/GlyphBuffer.h"
 #include "platform/fonts/GlyphPageTreeNode.h"
@@ -310,8 +312,10 @@ int Font::offsetForPosition(const TextRun& run, float x, bool includePartialGlyp
 
 CodePath Font::codePath(const TextRunPaintInfo& runInfo) const
 {
-    if (RuntimeEnabledFeatures::alwaysUseComplexTextEnabled())
+    if (RuntimeEnabledFeatures::alwaysUseComplexTextEnabled()
+        || LayoutTestSupport::alwaysUseComplexTextForTest()) {
         return ComplexPath;
+    }
 
     const TextRun& run = runInfo.run;
 
@@ -407,6 +411,11 @@ static inline GlyphData glyphDataForNonCJKCharacterWithGlyphOrientation(UChar32 
         }
     }
     return data;
+}
+
+PassRefPtr<FontFallbackIterator> Font::createFontFallbackIterator() const
+{
+    return FontFallbackIterator::create(m_fontDescription, m_fontFallbackList);
 }
 
 GlyphData Font::glyphDataForCharacter(UChar32& c, bool mirror, bool normalizeSpace, FontDataVariant variant) const

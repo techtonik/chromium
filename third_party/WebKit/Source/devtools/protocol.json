@@ -3782,7 +3782,7 @@
                     { "name": "expression", "type": "string", "description": "Expression to compile." },
                     { "name": "sourceURL", "type": "string", "description": "Source url to be set for the script." },
                     { "name": "persistScript", "type": "boolean", "description": "Specifies whether the compiled script should be persisted." },
-                    { "name": "executionContextId", "$ref": "Runtime.ExecutionContextId", "optional": true, "description": "Specifies in which isolated context to perform script run. Each content script lives in an isolated context and this parameter may be used to specify one of those contexts. If the parameter is omitted or 0 the evaluation will be performed in the context of the inspected page." }
+                    { "name": "executionContextId", "$ref": "Runtime.ExecutionContextId", "description": "Specifies in which isolated context to perform script run. Each content script lives in an isolated context and this parameter is used to specify one of those contexts." }
                 ],
                 "returns": [
                     { "name": "scriptId", "$ref": "ScriptId", "optional": true, "description": "Id of the script." },
@@ -3795,7 +3795,7 @@
                 "hidden": true,
                 "parameters": [
                     { "name": "scriptId", "$ref": "ScriptId", "description": "Id of the script to run." },
-                    { "name": "executionContextId", "$ref": "Runtime.ExecutionContextId", "optional": true, "description": "Specifies in which isolated context to perform script run. Each content script lives in an isolated context and this parameter may be used to specify one of those contexts. If the parameter is omitted or 0 the evaluation will be performed in the context of the inspected page." },
+                    { "name": "executionContextId", "$ref": "Runtime.ExecutionContextId", "description": "Specifies in which isolated context to perform script run. Each content script lives in an isolated context and this parameter is used to specify one of those contexts." },
                     { "name": "objectGroup", "type": "string", "optional": true, "description": "Symbolic group name that can be used to release multiple objects." },
                     { "name": "doNotPauseOnExceptionsAndMuteConsole", "type": "boolean", "optional": true, "description": "Specifies whether script run should stop on exceptions and mute console. Overrides setPauseOnException state." }
                 ],
@@ -4982,62 +4982,6 @@
         ]
     },
     {
-        "domain": "Power",
-        "hidden": true,
-        "types": [
-            {
-                "id": "PowerEvent",
-                "type": "object",
-                "properties": [
-                    { "name": "type", "type": "string", "description": "Power Event Type." },
-                    { "name": "timestamp", "type": "number", "description": "Power Event Time, in milliseconds." },
-                    { "name": "value", "type": "number", "description": "Power Event Value." }
-                ],
-            "description": "PowerEvent item"
-            }
-        ],
-        "commands": [
-            {
-                "name": "start",
-                "description": "Start power events collection.",
-                "parameters": [],
-                "handlers": ["browser", "frontend"]
-            },
-            {
-                "name": "end",
-                "description": "Stop power events collection.",
-                "parameters": [],
-                "handlers": ["browser", "frontend"]
-            },
-            {
-                "name": "canProfilePower",
-                "description": "Tells whether power profiling is supported.",
-                "returns": [
-                  { "name": "result", "type": "boolean", "description": "True if power profiling is supported." }
-                ],
-                "hidden": true,
-                "handlers": ["browser", "frontend"]
-            },
-            {
-                "name": "getAccuracyLevel",
-                "description": "Describes the accuracy level of the data provider.",
-                "returns": [
-                    { "name": "result", "type": "string", "enum": ["high", "moderate", "low"] }
-                ],
-                "handlers": ["browser", "frontend"]
-            }
-        ],
-        "events": [
-            {
-                "name": "dataAvailable",
-                "parameters": [
-                    {"name": "value", "type": "array", "items": { "$ref": "PowerEvent" }, "description": "List of power events." }
-                ],
-                "handlers": ["browser", "frontend"]
-            }
-        ]
-    },
-    {
         "domain": "Animation",
         "hidden": true,
         "types": [
@@ -5186,23 +5130,29 @@
             {
                 "id": "AXValueType",
                 "type": "string",
-                "enum": [ "boolean", "tristate", "booleanOrUndefined", "idref", "idrefList", "integer", "number", "string", "token", "tokenList", "domRelation", "role", "internalRole" ],
+                "enum": [ "boolean", "tristate", "booleanOrUndefined", "idref", "idrefList", "integer", "node", "nodeList", "number", "string", "computedString", "token", "tokenList", "domRelation", "role", "internalRole", "valueUndefined" ],
                 "description": "Enum of possible property types."
             },
             {
-                "id": "AXPropertySourceType",
+                "id": "AXValueSourceType",
                 "type": "string",
-                "enum": [ "attribute", "implicit", "style" ],
+                "enum": [ "attribute", "implicit", "style", "contents", "placeholder", "relatedElement" ],
                 "description": "Enum of possible property sources."
             },
+            { "id": "AXValueNativeSourceType",
+              "type": "string",
+              "enum": [ "figcaption", "label", "labelfor", "labelwrapped", "tablecaption", "other" ],
+              "description": "Enum of possible native property sources (as a subtype of a particular AXValueSourceType)."
+            },
             {
-                "id": "AXPropertySource",
+                "id": "AXValueSource",
                 "type": "object",
                 "properties": [
-                    { "name": "name", "type": "string", "description": "The name/label of this source." },
-                    { "name": "sourceType", "$ref": "AXPropertySourceType", "description": "What type of source this is." },
-                    { "name": "value", "type": "any", "description": "The value of this property source." },
-                    { "name": "type", "$ref": "AXValueType", "description": "What type the value should be interpreted as." },
+                    { "name": "type", "$ref": "AXValueSourceType", "description": "What type of source this is." },
+                    { "name": "value", "$ref": "AXValue", "description": "The value of this property source.", "optional": true },
+                    { "name": "attribute", "type": "string", "description": "The attribute, if any.", "optional": true },
+                    { "name": "superseded", "type": "boolean", "description": "Whether this source is superseded by a higher priority source.", "optional": true },
+                    { "name": "nativeSource", "$ref": "AXValueNativeSourceType", "description": "The native markup source for this value, e.g. a <label> element.", "optional": true },
                     { "name": "invalid", "type": "boolean", "description": "Whether the value for this property is invalid.", "optional": true },
                     { "name": "invalidReason", "type": "string", "description": "Reason for the value being invalid, if it is.", "optional": true }
                 ],
@@ -5212,8 +5162,9 @@
                 "id": "AXRelatedNode",
                 "type": "object",
                 "properties": [
+                    { "name": "backendNodeId", "$ref": "DOM.BackendNodeId", "description": "The BackendNodeId of the related node." },
                     { "name": "idref", "type": "string", "description": "The IDRef value provided, if any.", "optional": true },
-                    { "name": "backendNodeId", "$ref": "DOM.BackendNodeId", "description": "The BackendNodeId of the related node." }
+                    { "name": "text", "type": "string", "description": "The text alternative of this node in the current context.", "optional": true }
                 ]
             },
             {
@@ -5233,7 +5184,7 @@
                     { "name": "value", "type": "any", "description": "The computed value of this property.", "optional": true },
                     { "name": "relatedNodeValue", "$ref": "AXRelatedNode", "description": "The related node value, if any.", "optional": true },
                     { "name": "relatedNodeArrayValue", "type": "array", "items": { "$ref": "AXRelatedNode" }, "description": "Multiple relted nodes, if applicable.", "optional": true },
-                    { "name": "sources", "type": "array", "items": { "$ref": "AXPropertySource" }, "description": "The sources which contributed to the computation of this property.", "optional": true }
+                    { "name": "sources", "type": "array", "items": { "$ref": "AXValueSource" }, "description": "The sources which contributed to the computation of this property.", "optional": true }
                 ],
                 "description": "A single computed AX property."
             },

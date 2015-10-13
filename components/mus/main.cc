@@ -8,5 +8,6 @@
 
 MojoResult MojoMain(MojoHandle shell_handle) {
   mojo::ApplicationRunner runner(new mus::MandolineUIServicesApp);
+  runner.set_message_loop_type(base::MessageLoop::TYPE_UI);
   return runner.Run(shell_handle);
 }

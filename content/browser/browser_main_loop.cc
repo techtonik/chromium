@@ -60,7 +60,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
 #include "content/public/common/result_codes.h"
-#include "crypto/nss_util.h"
 #include "device/battery/battery_status_service.h"
 #include "media/audio/audio_manager.h"
 #include "media/base/media.h"
@@ -71,6 +70,7 @@
 #include "net/ssl/ssl_config_service.h"
 #include "ipc/mojo/scoped_ipc_support.h"
 #include "skia/ext/skia_memory_dump_provider.h"
+#include "sql/sql_memory_dump_provider.h"
 #include "ui/base/clipboard/clipboard.h"
 
 #if defined(USE_AURA) || (defined(OS_MACOSX) && !defined(OS_IOS))
@@ -459,10 +459,10 @@ void BrowserMainLoop::EarlyInitialization() {
   // definitely harmless, so retained as a reminder of this
   // requirement for gconf.
   g_type_init();
-#endif
+#endif  // !GLIB_CHECK_VERSION(2, 35, 0)
 
   SetUpGLibLogHandler();
-#endif
+#endif  // defined(USE_GLIB)
 
   if (parts_)
     parts_->PreEarlyInitialization();
@@ -471,7 +471,13 @@ void BrowserMainLoop::EarlyInitialization() {
   // We use quite a few file descriptors for our IPC, and the default limit on
   // the Mac is low (256), so bump it up.
   base::SetFdLimit(1024);
-#endif
+#elif defined(OS_LINUX)
+  // Same for Linux. The default various per distro, but it is 1024 on Fedora.
+  // Low soft limits combined with liberal use of file descriptors means power
+  // users can easily hit this limit with many open tabs. Bump up the limit to
+  // an arbitrarily high number. See https://crbug.com/539567
+  base::SetFdLimit(8192);
+#endif  // default(OS_MACOSX)
 
 #if defined(OS_WIN)
   net::EnsureWinsockInit();
@@ -661,6 +667,8 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
       HostSharedBitmapManager::current());
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       skia::SkiaMemoryDumpProvider::GetInstance());
+  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+      sql::SqlMemoryDumpProvider::GetInstance());
 
 #if defined(TCMALLOC_TRACE_MEMORY_SUPPORTED)
   trace_memory_controller_.reset(new base::trace_event::TraceMemoryController(
@@ -905,7 +913,9 @@ int BrowserMainLoop::PreMainMessageLoopRun() {
 }
 
 void BrowserMainLoop::RunMainMessageLoopParts() {
-  TRACE_EVENT_BEGIN_ETW("BrowserMain:MESSAGE_LOOP", 0, "");
+  // Don't use the TRACE_EVENT0 macro because the tracing infrastructure doesn't
+  // expect synchronous events around the main loop of a thread.
+  TRACE_EVENT_ASYNC_BEGIN0("toplevel", "BrowserMain:MESSAGE_LOOP", this);
 
   bool ran_main_loop = false;
   if (parts_)
@@ -914,7 +924,7 @@ void BrowserMainLoop::RunMainMessageLoopParts() {
   if (!ran_main_loop)
     MainMessageLoopRun();
 
-  TRACE_EVENT_END_ETW("BrowserMain:MESSAGE_LOOP", 0, "");
+  TRACE_EVENT_ASYNC_END0("toplevel", "BrowserMain:MESSAGE_LOOP", this);
 }
 
 void BrowserMainLoop::ShutdownThreadsAndCleanUp() {

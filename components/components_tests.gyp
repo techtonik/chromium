@@ -150,6 +150,9 @@
       'data_reduction_proxy/core/common/data_reduction_proxy_headers_unittest.cc',
       'data_reduction_proxy/core/common/data_reduction_proxy_params_unittest.cc',
     ],
+    'data_usage_unittest_sources': [
+      'data_usage/core/data_use_aggregator_unittest.cc',
+    ],
     'device_event_log_unittest_sources': [
       'device_event_log/device_event_log_impl_unittest.cc',
     ],
@@ -248,6 +251,7 @@
     ],
     'gcm_driver_crypto_unittest_sources': [
       'gcm_driver/crypto/encryption_header_parsers_unittest.cc',
+      'gcm_driver/crypto/gcm_encryption_provider_unittest.cc',
       'gcm_driver/crypto/gcm_key_store_unittest.cc',
       'gcm_driver/crypto/gcm_message_cryptographer_unittest.cc',
     ],
@@ -329,7 +333,6 @@
       'metrics/call_stack_profile_metrics_provider_unittest.cc',
       'metrics/daily_event_unittest.cc',
       'metrics/drive_metrics_provider_unittest.cc',
-      'metrics/gpu/gpu_metrics_provider_unittest.cc',
       'metrics/histogram_encoder_unittest.cc',
       'metrics/machine_id_provider_win_unittest.cc',
       'metrics/metrics_hashes_unittest.cc',
@@ -343,6 +346,7 @@
       'metrics/profiler/profiler_metrics_provider_unittest.cc',
       'metrics/profiler/tracking_synchronizer_unittest.cc',
       'metrics/stability_metrics_helper_unittest.cc',
+      'metrics/ui/screen_info_metrics_provider_unittest.cc',
     ],
     'mime_util_unittest_sources': [
       'mime_util/mime_util_unittest.cc',
@@ -512,7 +516,6 @@
       'proximity_auth/ble/bluetooth_low_energy_connection_finder_unittest.cc',
       'proximity_auth/ble/bluetooth_low_energy_connection_unittest.cc',
       'proximity_auth/ble/bluetooth_low_energy_device_whitelist_unittest.cc',
-      'proximity_auth/ble/proximity_auth_ble_system_unittest.cc',
       'proximity_auth/bluetooth_connection_finder_unittest.cc',
       'proximity_auth/bluetooth_connection_unittest.cc',
       'proximity_auth/bluetooth_throttler_impl_unittest.cc',
@@ -589,6 +592,7 @@
       'scheduler/renderer/task_cost_estimator_unittest.cc',
       'scheduler/renderer/user_model_unittest.cc',
       'scheduler/renderer/webthread_impl_for_renderer_scheduler_unittest.cc',
+      'scheduler/renderer/web_frame_host_scheduler_impl_unittest.cc',
     ],
     'search_unittest_sources': [
       'search/search_android_unittest.cc',
@@ -621,6 +625,7 @@
       'signin/core/browser/gaia_cookie_manager_service_unittest.cc',
       'signin/core/browser/refresh_token_annotation_request_unittest.cc',
       'signin/core/browser/signin_error_controller_unittest.cc',
+      'signin/core/browser/signin_status_metrics_provider_unittest.cc',
       'signin/core/browser/webdata/token_service_table_unittest.cc',
       'signin/ios/browser/account_consistency_service_unittest.mm',
       'signin/ios/browser/profile_oauth2_token_service_ios_delegate_unittest.mm',
@@ -653,9 +658,6 @@
       'sync_driver/model_association_manager_unittest.cc',
       'sync_driver/non_blocking_data_type_controller_unittest.cc',
       'sync_driver/non_ui_data_type_controller_unittest.cc',
-      'sync_driver/revisit/current_tab_matcher_unittest.cc',
-      'sync_driver/revisit/offset_tab_matcher_unittest.cc',
-      'sync_driver/revisit/sessions_page_revisit_observer_unittest.cc',
       'sync_driver/shared_change_processor_unittest.cc',
       'sync_driver/sync_prefs_unittest.cc',
       'sync_driver/sync_stopped_reporter_unittest.cc',
@@ -663,6 +665,11 @@
       'sync_driver/system_encryptor_unittest.cc',
       'sync_driver/tab_node_pool_unittest.cc',
       'sync_driver/ui_data_type_controller_unittest.cc',
+    ],
+    'sync_sessions_unittest_sources': [
+      'sync_sessions/revisit/current_tab_matcher_unittest.cc',
+      'sync_sessions/revisit/offset_tab_matcher_unittest.cc',
+      'sync_sessions/revisit/sessions_page_revisit_observer_unittest.cc',
     ],
     'syncable_prefs_unittest_sources': [
       'syncable_prefs/pref_model_associator_unittest.cc',
@@ -820,6 +827,7 @@
         '<@(crash_unittest_sources)',
         '<@(crx_file_unittest_sources)',
         '<@(data_reduction_proxy_unittest_sources)',
+        '<@(data_usage_unittest_sources)',
         '<@(data_use_measurement_unittest_sources)',
         '<@(device_event_log_unittest_sources)',
         '<@(dom_distiller_unittest_sources)',
@@ -858,6 +866,7 @@
         '<@(signin_unittest_sources)',
         '<@(suggestions_unittest_sources)',
         '<@(sync_driver_unittest_sources)',
+        '<@(sync_sessions_unittest_sources)',
         '<@(syncable_prefs_unittest_sources)',
         '<@(translate_unittest_sources)',
         '<@(undo_unittest_sources)',
@@ -922,6 +931,7 @@
         'components.gyp:data_reduction_proxy_core_browser',
         'components.gyp:data_reduction_proxy_core_common',
         'components.gyp:data_reduction_proxy_test_support',
+        'components.gyp:data_usage_core',
         'components.gyp:data_use_measurement_core',
         'components.gyp:device_event_log_component',
         'components.gyp:dom_distiller_core',
@@ -951,6 +961,7 @@
         'components.gyp:metrics',
         'components.gyp:metrics_net',
         'components.gyp:metrics_test_support',
+        'components.gyp:metrics_ui',
         'components.gyp:net_log',
         'components.gyp:network_time',
         'components.gyp:offline_pages',
@@ -978,6 +989,7 @@
         'components.gyp:signin_core_browser_test_support',
         'components.gyp:suggestions',
         'components.gyp:sync_driver_test_support',
+        'components.gyp:sync_sessions',
         'components.gyp:syncable_prefs_test_support',
         'components.gyp:translate_core_browser',
         'components.gyp:translate_core_common',
@@ -1307,6 +1319,7 @@
             '<@(ownership_unittest_sources)',
           ],
           'sources!': [
+            'signin/core/browser/signin_status_metrics_provider_unittest.cc',
             'storage_monitor/storage_monitor_linux_unittest.cc',
           ],
           'dependencies': [
@@ -1528,6 +1541,27 @@
           },
           'includes': [ '../build/host_jar.gypi' ],
          },
+      ],
+      'conditions': [
+        ['test_isolation_mode != "noop"',
+          {
+            'targets': [
+              {
+                'target_name': 'components_unittests_apk_run',
+                'type': 'none',
+                'dependencies': [
+                  'components_unittests_apk',
+                ],
+                'includes': [
+                  '../build/isolate.gypi',
+                ],
+                'sources': [
+                  'components_unittests_apk.isolate',
+                ],
+              },
+            ],
+          },
+        ],
       ],
     }],
     ['OS != "ios"', {

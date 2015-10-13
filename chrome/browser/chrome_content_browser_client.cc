@@ -137,6 +137,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_descriptors.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/common/sandbox_type.h"
 #include "content/public/common/service_registry.h"
 #include "content/public/common/url_utils.h"
@@ -1380,13 +1381,14 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
                                  arraysize(kIpcFuzzerSwitches));
 #endif
 
-#if defined(OS_CHROMEOS)
-  static const char* const kChromeOSSwitches[] = {
+  static const char* const kDinosaurEasterEggSwitches[] = {
     switches::kDisableDinosaurEasterEgg,
   };
-  command_line->CopySwitchesFrom(browser_command_line, kChromeOSSwitches,
-                                 arraysize(kChromeOSSwitches));
+  command_line->CopySwitchesFrom(browser_command_line,
+                                 kDinosaurEasterEggSwitches,
+                                 arraysize(kDinosaurEasterEggSwitches));
 
+#if defined(OS_CHROMEOS)
   // On Chrome OS need to pass primary user homedir (in multi-profiles session).
   base::FilePath homedir;
   PathService::Get(base::DIR_HOME, &homedir);
@@ -1589,7 +1591,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kEnableNaClNonSfiMode,
       switches::kEnablePNaClSubzero,
       switches::kNaClDangerousNoSandboxNonSfi,
-      switches::kUseNaClHelperNonSfi,
 #endif
       switches::kPpapiFlashPath,
       switches::kPpapiFlashVersion,

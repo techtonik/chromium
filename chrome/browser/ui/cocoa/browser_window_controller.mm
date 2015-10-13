@@ -421,6 +421,8 @@ using content::WebContents;
             extensions::ExtensionKeybindingRegistry::ALL_EXTENSIONS,
             windowShim_.get()));
 
+    blockLayoutSubviews_ = NO;
+
     // We are done initializing now.
     initializing_ = NO;
   }
@@ -691,6 +693,10 @@ using content::WebContents;
 
 // Called when we have been unminimized.
 - (void)windowDidDeminiaturize:(NSNotification *)notification {
+  // Make sure the window's show_state (which is now ui::SHOW_STATE_NORMAL)
+  // gets saved.
+  [self saveWindowPositionIfNeeded];
+
   // Let the selected RenderWidgetHostView know, so that it can tell plugins.
   if (WebContents* contents = [self webContents]) {
     if (RenderWidgetHostView* rwhv = contents->GetRenderWidgetHostView())
@@ -1966,7 +1972,13 @@ willAnimateFromState:(BookmarkBar::State)oldState
 
 - (void)enterWebContentFullscreenForURL:(const GURL&)url
                              bubbleType:(ExclusiveAccessBubbleType)bubbleType {
-  [self enterImmersiveFullscreen];
+  // HTML5 Fullscreen should only use AppKit fullscreen in 10.10+.
+  if (chrome::mac::SupportsSystemFullscreen() &&
+      base::mac::IsOSYosemiteOrLater())
+    [self enterAppKitFullscreen];
+  else
+    [self enterImmersiveFullscreen];
+
   if (!url.is_empty())
     [self updateFullscreenExitBubbleURL:url bubbleType:bubbleType];
 }

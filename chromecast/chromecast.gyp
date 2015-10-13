@@ -28,6 +28,18 @@
         'defines': ['DISABLE_DISPLAY'],
       }],
     ],
+    'target_conditions': [
+      ['_type=="executable"', {
+        'ldflags': [
+          # Allow  OEMs to override default libraries that are shipped with
+          # cast receiver package by installed OEM-specific libraries in
+          # /oem_cast_shlib.
+          '-Wl,-rpath=/oem_cast_shlib',
+          # Some shlibs are built in same directory of executables.
+          '-Wl,-rpath=\$$ORIGIN',
+        ],
+      }],
+    ],
   },
   'targets': [
     # Public API target for OEM partners to replace shlibs.
@@ -87,6 +99,9 @@
         'base/chromecast_config_android.h',
         'base/chromecast_switches.cc',
         'base/chromecast_switches.h',
+        'base/device_capabilities.h',
+        'base/device_capabilities_impl.cc',
+        'base/device_capabilities_impl.h',
         'base/error_codes.cc',
         'base/error_codes.h',
         'base/metrics/cast_histograms.h',
@@ -323,6 +338,10 @@
         '../components/components.gyp:metrics_gpu',
         '../components/components.gyp:metrics_net',
         '../components/components.gyp:metrics_profiler',
+
+        # TODO(gfhuang): Eliminate this dependency if ScreenInfoMetricsProvider
+        # isn't needed. crbug.com/541577
+        '../components/components.gyp:metrics_ui',
         '../content/content.gyp:content',
         '../content/content.gyp:content_app_both',
         '../skia/skia.gyp:skia',
@@ -739,16 +758,6 @@
           ],
           'sources': [
             'app/cast_main.cc',
-          ],
-          'ldflags': [
-            # Allow  OEMs to override default libraries that are shipped with
-            # cast receiver package by installed OEM-specific libraries in
-            # /oem_cast_shlib.
-            '-Wl,-rpath=/oem_cast_shlib',
-            # TODO(dougsteed): remove when Chromecast moves to boringssl.
-            # Allow the cast shell to find the NSS module in the same
-            # directory.
-            '-Wl,-rpath=\$$ORIGIN'
           ],
         },
       ],  # end of targets

@@ -72,6 +72,7 @@
 #include "core/page/Page.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/paint/FilterEffectBuilder.h"
+#include "core/paint/ObjectPaintProperties.h"
 #include "platform/LengthFunctions.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/TraceEvent.h"
@@ -1084,9 +1085,9 @@ LayoutRect PaintLayer::transparencyClipBox(const PaintLayer* layer, const PaintL
     return clipRect;
 }
 
-LayoutRect PaintLayer::paintingExtent(const PaintLayer* rootLayer, const LayoutRect& paintDirtyRect, const LayoutSize& subPixelAccumulation, GlobalPaintFlags globalPaintFlags)
+LayoutRect PaintLayer::paintingExtent(const PaintLayer* rootLayer, const LayoutSize& subPixelAccumulation, GlobalPaintFlags globalPaintFlags)
 {
-    return intersection(transparencyClipBox(this, rootLayer, PaintingTransparencyClipBox, RootOfTransparencyClipBox, subPixelAccumulation, globalPaintFlags), paintDirtyRect);
+    return transparencyClipBox(this, rootLayer, PaintingTransparencyClipBox, RootOfTransparencyClipBox, subPixelAccumulation, globalPaintFlags);
 }
 
 void* PaintLayer::operator new(size_t sz)
@@ -2712,6 +2713,22 @@ void PaintLayer::markAncestorChainForNeedsRepaint()
             break;
         layer = container;
     }
+}
+
+ObjectPaintProperties& PaintLayer::mutablePaintProperties()
+{
+    ASSERT(RuntimeEnabledFeatures::slimmingPaintV2Enabled());
+    ASSERT(layoutObject()->document().lifecycle().state() == DocumentLifecycle::InUpdatePaintProperties);
+    if (!m_paintProperties)
+        m_paintProperties = ObjectPaintProperties::create();
+    return *m_paintProperties;
+}
+
+const ObjectPaintProperties* PaintLayer::paintProperties() const
+{
+    ASSERT(RuntimeEnabledFeatures::slimmingPaintV2Enabled());
+    ASSERT(layoutObject()->document().lifecycle().state() == DocumentLifecycle::InPaint);
+    return m_paintProperties.get();
 }
 
 DisableCompositingQueryAsserts::DisableCompositingQueryAsserts()

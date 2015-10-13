@@ -27,7 +27,12 @@ public class EnhancedBookmarkPage implements NativePage, EnhancedBookmarkStateCh
     private final Tab mTab;
     private final String mTitle;
     private final int mBackgroundColor;
+    private final int mThemeColor;
     private EnhancedBookmarkManager mManager;
+
+    // For temporary debugging purposes.
+    // TODO(newt): delete this once http://crbug.com/540537 is fixed.
+    private Exception mDestroyStackTrace;
 
     /**
      * Create a new instance of an enhanced bookmark page.
@@ -48,6 +53,8 @@ public class EnhancedBookmarkPage implements NativePage, EnhancedBookmarkStateCh
                 ? R.string.offline_pages_saved_pages : R.string.bookmarks);
         mBackgroundColor = ApiCompatibilityUtils.getColor(activity.getResources(),
                 R.color.default_primary_color);
+        mThemeColor = ApiCompatibilityUtils.getColor(
+                activity.getResources(), R.color.default_primary_color);
 
         mManager = new EnhancedBookmarkManager(mActivity);
         Resources res = mActivity.getResources();
@@ -88,12 +95,24 @@ public class EnhancedBookmarkPage implements NativePage, EnhancedBookmarkStateCh
     }
 
     @Override
+    public int getThemeColor() {
+        return mThemeColor;
+    }
+
+    @Override
     public void updateForUrl(String url) {
         mManager.updateForUrl(url);
     }
 
     @Override
     public void destroy() {
+        if (mDestroyStackTrace != null) {
+            throw new RuntimeException("EnhancedBookmarksPage was destroyed twice",
+                    mDestroyStackTrace);
+        } else {
+            mDestroyStackTrace = new RuntimeException(
+                    "Stack trace for first call to EnhancedBookmarksPage.destroy()");
+        }
         mManager.destroy();
         mManager = null;
     }

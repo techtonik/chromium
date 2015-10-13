@@ -135,11 +135,12 @@ class Tab : public gfx::AnimationDelegate,
   static int leading_width_for_drag() { return 16; }
 
   // Returns the minimum possible size of a single unselected Tab.
-  static gfx::Size GetMinimumUnselectedSize();
+  static gfx::Size GetMinimumInactiveSize();
+
   // Returns the minimum possible size of a selected Tab. Selected tabs must
   // always show a close button and have a larger minimum size than unselected
   // tabs.
-  static gfx::Size GetMinimumSelectedSize();
+  static gfx::Size GetMinimumActiveSize();
   // Returns the preferred size of a single Tab, assuming space is
   // available.
   static gfx::Size GetStandardSize();
@@ -275,14 +276,9 @@ class Tab : public gfx::AnimationDelegate,
   // animation.
   void SetFaviconHidingOffset(int offset);
 
-  void DisplayCrashedFavicon();
-  void ResetCrashedFavicon();
-
-  void StopCrashAnimation();
-  void StartCrashAnimation();
-
-  // Returns true if the crash animation is currently running.
-  bool IsPerformingCrashAnimation() const;
+  void set_should_display_crashed_favicon() {
+    should_display_crashed_favicon_ = true;
+  }
 
   // Recalculates the correct |button_color_| and resets the title, media
   // indicator, and close button colors if necessary.  This should be called any
@@ -292,11 +288,8 @@ class Tab : public gfx::AnimationDelegate,
   // Schedules repaint task for icon.
   void ScheduleIconPaint();
 
-  // Returns a |path| containing the region that matches the bitmap display of
-  // this tab, for input event hit testing.  Set |include_top_shadow| to include
-  // the mostly-transparent shadow pixels above the top edge of the tab in the
-  // path.
-  void GetHitTestMaskHelper(bool include_top_shadow, gfx::Path* path) const;
+  // Returns the rect that can be used for content inside the tab borders.
+  gfx::Rect GetInteriorBounds() const;
 
   // Returns the rectangle for the light bar in immersive mode.
   gfx::Rect GetImmersiveBarRect() const;

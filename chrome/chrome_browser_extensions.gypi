@@ -514,8 +514,8 @@
       'browser/extensions/api/system_indicator/system_indicator_manager_factory.h',
       'browser/extensions/api/system_private/system_private_api.cc',
       'browser/extensions/api/system_private/system_private_api.h',
-      'browser/extensions/api/tab_capture/offscreen_presentation.cc',
-      'browser/extensions/api/tab_capture/offscreen_presentation.h',
+      'browser/extensions/api/tab_capture/offscreen_tab.cc',
+      'browser/extensions/api/tab_capture/offscreen_tab.h',
       'browser/extensions/api/tab_capture/tab_capture_api.cc',
       'browser/extensions/api/tab_capture/tab_capture_api.h',
       'browser/extensions/api/tab_capture/tab_capture_registry.cc',
@@ -1041,6 +1041,7 @@
         ['use_aura==1', {
           'dependencies': [
             '../ui/keyboard/keyboard.gyp:keyboard',
+            '../ui/keyboard/keyboard.gyp:keyboard_with_content',
             '../ui/keyboard/keyboard.gyp:keyboard_resources',
           ],
         }],
