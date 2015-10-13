@@ -38,8 +38,7 @@ namespace blink {
 
 class CORE_EXPORT InspectorDebuggerAgent
     : public InspectorBaseAgent<InspectorDebuggerAgent, InspectorFrontend::Debugger>
-    , public InspectorBackendDispatcher::DebuggerCommandHandler
-    , public V8DebuggerAgent::Client {
+    , public InspectorBackendDispatcher::DebuggerCommandHandler {
 public:
     ~InspectorDebuggerAgent() override;
     DECLARE_VIRTUAL_TRACE();
@@ -69,8 +68,8 @@ public:
     void getCollectionEntries(ErrorString*, const String& inObjectId, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::CollectionEntry>>& outEntries) override;
     void setPauseOnExceptions(ErrorString*, const String& inState) override;
     void evaluateOnCallFrame(ErrorString*, const String& inCallFrameId, const String& inExpression, const String* inObjectGroup, const bool* inIncludeCommandLineAPI, const bool* inDoNotPauseOnExceptionsAndMuteConsole, const bool* inReturnByValue, const bool* inGeneratePreview, RefPtr<TypeBuilder::Runtime::RemoteObject>& outResult, TypeBuilder::OptOutput<bool>* optOutWasThrown, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails) override;
-    void compileScript(ErrorString*, const String& inExpression, const String& inSourceURL, bool inPersistScript, const int* inExecutionContextId, TypeBuilder::OptOutput<TypeBuilder::Debugger::ScriptId>* optOutScriptId, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails) override;
-    void runScript(ErrorString*, const String& inScriptId, const int* inExecutionContextId, const String* inObjectGroup, const bool* inDoNotPauseOnExceptionsAndMuteConsole, RefPtr<TypeBuilder::Runtime::RemoteObject>& outResult, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails) override;
+    void compileScript(ErrorString*, const String& inExpression, const String& inSourceURL, bool inPersistScript, int inExecutionContextId, TypeBuilder::OptOutput<TypeBuilder::Debugger::ScriptId>* optOutScriptId, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails) override;
+    void runScript(ErrorString*, const String& inScriptId, int inExecutionContextId, const String* inObjectGroup, const bool* inDoNotPauseOnExceptionsAndMuteConsole, RefPtr<TypeBuilder::Runtime::RemoteObject>& outResult, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails) override;
     void setVariableValue(ErrorString*, int inScopeNumber, const String& inVariableName, const RefPtr<JSONObject>& inNewValue, const String* inCallFrameId, const String* inFunctionObjectId) override;
     void getStepInPositions(ErrorString*, const String& inCallFrameId, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::Location>>& optOutStepInPositions) override;
     void getBacktrace(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Debugger::CallFrame>>& outCallFrames, RefPtr<TypeBuilder::Debugger::StackTrace>& optOutAsyncStackTrace) override;
@@ -82,10 +81,6 @@ public:
     void flushAsyncOperationEvents(ErrorString*) override;
     void setAsyncOperationBreakpoint(ErrorString*, int inOperationId) override;
     void removeAsyncOperationBreakpoint(ErrorString*, int inOperationId) override;
-
-    // V8DebuggerAgent::Client implementation.
-    void asyncCallTrackingStateChanged(bool tracking) override;
-    void resetAsyncOperations() override;
 
     // Called by InspectorInstrumentation.
     bool isPaused();
@@ -110,6 +105,9 @@ protected:
 
     OwnPtr<V8DebuggerAgent> m_v8DebuggerAgent;
     OwnPtrWillBeMember<AsyncCallTracker> m_asyncCallTracker;
+
+private:
+    void setTrackingAsyncCalls(bool);
 };
 
 } // namespace blink

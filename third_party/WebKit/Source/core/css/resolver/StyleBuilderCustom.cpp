@@ -162,9 +162,9 @@ void StyleBuilderFunctions::applyValueCSSPropertyColor(StyleResolverState& state
     }
 
     if (state.applyPropertyToRegularStyle())
-        state.style()->setColor(StyleBuilderConverter::convertColor(state, value));
+        state.style()->setColor(StyleBuilderConverter::convertColor(state, *value));
     if (state.applyPropertyToVisitedLinkStyle())
-        state.style()->setVisitedLinkColor(StyleBuilderConverter::convertColor(state, value, true));
+        state.style()->setVisitedLinkColor(StyleBuilderConverter::convertColor(state, *value, true));
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyCursor(StyleResolverState& state)
@@ -212,7 +212,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyGlyphOrientationVertical(StyleR
     if (value->isPrimitiveValue() && toCSSPrimitiveValue(value)->getValueID() == CSSValueAuto)
         state.style()->accessSVGStyle().setGlyphOrientationVertical(GO_AUTO);
     else
-        state.style()->accessSVGStyle().setGlyphOrientationVertical(StyleBuilderConverter::convertGlyphOrientation(state, value));
+        state.style()->accessSVGStyle().setGlyphOrientationVertical(StyleBuilderConverter::convertGlyphOrientation(state, *value));
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyGridTemplateAreas(StyleResolverState& state)
@@ -671,12 +671,11 @@ void StyleBuilderFunctions::applyValueCSSPropertyWillChange(StyleResolverState& 
     Vector<CSSPropertyID> willChangeProperties;
 
     for (auto& willChangeValue : toCSSValueList(*value)) {
-        CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(willChangeValue.get());
-        if (primitiveValue->isPropertyID())
-            willChangeProperties.append(primitiveValue->getPropertyID());
-        else if (primitiveValue->getValueID() == CSSValueContents)
+        if (willChangeValue->isCustomIdentValue())
+            willChangeProperties.append(toCSSCustomIdentValue(*willChangeValue).valueAsPropertyID());
+        else if (toCSSPrimitiveValue(*willChangeValue).getValueID() == CSSValueContents)
             willChangeContents = true;
-        else if (primitiveValue->getValueID() == CSSValueScrollPosition)
+        else if (toCSSPrimitiveValue(*willChangeValue).getValueID() == CSSValueScrollPosition)
             willChangeScrollPosition = true;
         else
             ASSERT_NOT_REACHED();
@@ -803,6 +802,11 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitAppRegion(StyleResolverSt
     state.document().setHasAnnotatedRegions(true);
 }
 
+void StyleBuilderFunctions::applyValueCSSPropertyWritingMode(StyleResolverState& state, CSSValue* value)
+{
+    state.setWritingMode(*toCSSPrimitiveValue(value));
+}
+
 void StyleBuilderFunctions::applyValueCSSPropertyWebkitWritingMode(StyleResolverState& state, CSSValue* value)
 {
     state.setWritingMode(*toCSSPrimitiveValue(value));
@@ -834,7 +838,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyBaselineShift(StyleResolverStat
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     if (!primitiveValue->isValueID()) {
         svgStyle.setBaselineShift(BS_LENGTH);
-        svgStyle.setBaselineShiftValue(StyleBuilderConverter::convertLength(state, primitiveValue));
+        svgStyle.setBaselineShiftValue(StyleBuilderConverter::convertLength(state, *primitiveValue));
         return;
     }
     switch (primitiveValue->getValueID()) {

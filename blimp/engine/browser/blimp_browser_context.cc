@@ -10,6 +10,7 @@
 #include "base/nix/xdg_util.h"
 #include "base/path_service.h"
 #include "blimp/engine/browser/blimp_permission_manager.h"
+#include "content/public/browser/background_sync_controller.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
@@ -164,6 +165,11 @@ content::PermissionManager* BlimpBrowserContext::GetPermissionManager() {
   if (!permission_manager_)
     permission_manager_.reset(new BlimpPermissionManager());
   return permission_manager_.get();
+}
+
+content::BackgroundSyncController*
+BlimpBrowserContext::GetBackgroundSyncController() {
+  return nullptr;
 }
 
 }  // namespace engine

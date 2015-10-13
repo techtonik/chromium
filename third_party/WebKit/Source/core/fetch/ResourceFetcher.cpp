@@ -57,6 +57,23 @@ using blink::WebURLRequest;
 
 namespace blink {
 
+namespace {
+
+// Events for UMA. Do not reorder or delete. Add new events at the end, but
+// before SriResourceIntegrityMismatchEventCount.
+enum SriResourceIntegrityMismatchEvent {
+    CheckingForIntegrityMismatch = 0,
+    RefetchDueToIntegrityMismatch = 1,
+    SriResourceIntegrityMismatchEventCount
+};
+
+}
+
+static void RecordSriResourceIntegrityMismatchEvent(SriResourceIntegrityMismatchEvent event)
+{
+    Platform::current()->histogramEnumeration("sri.resource_integrity_mismatch_event", event, SriResourceIntegrityMismatchEventCount);
+}
+
 static ResourceLoadPriority typeToPriority(Resource::Type type)
 {
     switch (type) {
@@ -86,7 +103,7 @@ static ResourceLoadPriority typeToPriority(Resource::Type type)
     return ResourceLoadPriorityUnresolved;
 }
 
-ResourceLoadPriority ResourceFetcher::loadPriority(Resource::Type type, const FetchRequest& request)
+ResourceLoadPriority ResourceFetcher::loadPriority(Resource::Type type, const FetchRequest& request, ResourcePriority::VisibilityStatus visibility)
 {
     // TODO(yoav): Change it here so that priority can be changed even after it was resolved.
     if (request.priority() != ResourceLoadPriorityUnresolved)
@@ -96,7 +113,7 @@ ResourceLoadPriority ResourceFetcher::loadPriority(Resource::Type type, const Fe
     if (request.options().synchronousPolicy == RequestSynchronously)
         return ResourceLoadPriorityHighest;
 
-    return context().modifyPriorityForExperiments(typeToPriority(type), type, request);
+    return context().modifyPriorityForExperiments(typeToPriority(type), type, request, visibility);
 }
 
 static void populateResourceTiming(ResourceTimingInfo* info, Resource* resource, bool clearLoadTimings)
@@ -308,7 +325,7 @@ void ResourceFetcher::preCacheData(const FetchRequest& request, const ResourceFa
 
 ResourcePtr<Resource> ResourceFetcher::requestResource(FetchRequest& request, const ResourceFactory& factory, const SubstituteData& substituteData)
 {
-    ASSERT(request.options().synchronousPolicy == RequestAsynchronously || factory.type() == Resource::Raw);
+    ASSERT(request.options().synchronousPolicy == RequestAsynchronously || factory.type() == Resource::Raw || factory.type() == Resource::XSLStyleSheet);
 
     context().upgradeInsecureRequest(request);
     context().addClientHintsIfNecessary(request);
@@ -380,16 +397,14 @@ ResourcePtr<Resource> ResourceFetcher::requestResource(FetchRequest& request, co
         resource->setIdentifier(createUniqueIdentifier());
 
     if (!request.forPreload() || policy != Use) {
-        ResourceLoadPriority priority = loadPriority(factory.type(), request);
+        ResourceLoadPriority priority = loadPriority(factory.type(), request, ResourcePriority::NotVisible);
         // When issuing another request for a resource that is already in-flight make
         // sure to not demote the priority of the in-flight request. If the new request
         // isn't at the same priority as the in-flight request, only allow promotions.
         // This can happen when a visible image's priority is increased and then another
         // reference to the image is parsed (which would be at a lower priority).
-        if (priority > resource->resourceRequest().priority()) {
-            resource->mutableResourceRequest().setPriority(priority);
+        if (priority > resource->resourceRequest().priority())
             resource->didChangePriority(priority, 0);
-        }
     }
 
     if (resourceNeedsLoad(resource.get(), request, policy)) {
@@ -539,6 +554,29 @@ ResourceFetcher::RevalidationPolicy ResourceFetcher::determineRevalidationPolicy
 
     if (!existingResource)
         return Load;
+
+    // Checks if the resource has an explicit policy about integrity metadata.
+    // Currently only applies to ScriptResources.
+    //
+    // This is necessary because ScriptResource objects do not keep the raw
+    // data around after the source is accessed once, so if the resource is
+    // accessed from the MemoryCache for a second time, there is no way to redo
+    // an integrity check.
+    //
+    // Thus, Blink implements a scheme where it caches the integrity
+    // information for a ScriptResource after the first time it is checked, and
+    // if there is another request for that resource, with the same integrity
+    // metadata, Blink skips the integrity calculation. However, if the
+    // integrity metadata is a mismatch, the MemoryCache must be skipped here,
+    // and a new request for the resource must be made to get the raw data.
+    // This is expected to be an uncommon case, however, as it implies two
+    // same-origin requests to the same resource, but with different integrity
+    // metadata.
+    RecordSriResourceIntegrityMismatchEvent(CheckingForIntegrityMismatch);
+    if (existingResource->mustRefetchDueToIntegrityMetadata(fetchRequest)) {
+        RecordSriResourceIntegrityMismatchEvent(RefetchDueToIntegrityMismatch);
+        return Reload;
+    }
 
     // Service Worker's CORS fallback message must not be cached.
     if (existingResource->response().wasFallbackRequiredByServiceWorker())
@@ -868,12 +906,6 @@ void ResourceFetcher::didFinishLoading(Resource* resource, double finishTime, in
     context().dispatchDidFinishLoading(resource->identifier(), finishTime, encodedDataLength);
 }
 
-void ResourceFetcher::didChangeLoadingPriority(const Resource* resource, ResourceLoadPriority loadPriority, int intraPriorityValue)
-{
-    TRACE_EVENT_ASYNC_STEP_INTO1("blink.net", "Resource", resource, "ChangePriority", "priority", loadPriority);
-    context().dispatchDidChangeResourcePriority(resource->identifier(), loadPriority, intraPriorityValue);
-}
-
 void ResourceFetcher::didFailLoading(const Resource* resource, const ResourceError& error)
 {
     TRACE_EVENT_ASYNC_END0("blink.net", "Resource", resource);
@@ -1009,6 +1041,28 @@ bool ResourceFetcher::canAccessRedirect(Resource* resource, ResourceRequest& new
     if (resource->type() == Resource::Image && shouldDeferImageLoad(newRequest.url()))
         return false;
     return true;
+}
+
+void ResourceFetcher::updateAllImageResourcePriorities()
+{
+    if (!m_loaders)
+        return;
+
+    TRACE_EVENT0("blink", "ResourceLoadPriorityOptimizer::updateAllImageResourcePriorities");
+    for (const auto& loader : m_loaders->hashSet()) {
+        Resource* resource = loader->cachedResource();
+        if (!resource->isImage())
+            continue;
+
+        ResourcePriority resourcePriority = resource->priorityFromClients();
+        ResourceLoadPriority resourceLoadPriority = loadPriority(Resource::Image, FetchRequest(resource->resourceRequest(), FetchInitiatorInfo()), resourcePriority.visibility);
+        if (resourceLoadPriority == resource->resourceRequest().priority())
+            continue;
+
+        resource->didChangePriority(resourceLoadPriority, resourcePriority.intraPriorityValue);
+        TRACE_EVENT_ASYNC_STEP_INTO1("blink.net", "Resource", resource, "ChangePriority", "priority", resourceLoadPriority);
+        context().dispatchDidChangeResourcePriority(resource->identifier(), resourceLoadPriority, resourcePriority.intraPriorityValue);
+    }
 }
 
 #if PRELOAD_DEBUG

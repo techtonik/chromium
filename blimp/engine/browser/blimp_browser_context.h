@@ -51,6 +51,7 @@ class BlimpBrowserContext : public content::BrowserContext {
   content::PushMessagingService* GetPushMessagingService() override;
   content::SSLHostStateDelegate* GetSSLHostStateDelegate() override;
   content::PermissionManager* GetPermissionManager() override;
+  content::BackgroundSyncController* GetBackgroundSyncController() override;
 
   // The content of |protocol_handlers| is swapped into the returned instance.
   // Caller should take a reference to the returned instance via scoped_refptr.

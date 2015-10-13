@@ -30,35 +30,21 @@ QUnit.module('Me2Me Telemetry Integration', {
 /**
  * @param {remoting.Me2MeTestDriver} testDriver
  * @param {Object} baseEvent
+ * @param {Array<remoting.ChromotingEvent.SessionState>} sequence
  */
-var expectSucceeded = function(testDriver, baseEvent) {
-  var ChromotingEvent = remoting.ChromotingEvent;
-  var sequence = [{
-    session_state: ChromotingEvent.SessionState.STARTED,
-  },{
-    session_state: ChromotingEvent.SessionState.SIGNALING,
-    previous_session_state: ChromotingEvent.SessionState.STARTED
-  },{
-    session_state: ChromotingEvent.SessionState.CREATING_PLUGIN,
-    previous_session_state: ChromotingEvent.SessionState.SIGNALING
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTING,
-    previous_session_state: ChromotingEvent.SessionState.CREATING_PLUGIN
-  },{
-    session_state: ChromotingEvent.SessionState.AUTHENTICATED,
-    previous_session_state: ChromotingEvent.SessionState.CONNECTING
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTED,
-    previous_session_state: ChromotingEvent.SessionState.AUTHENTICATED
-  },{
-    session_state: ChromotingEvent.SessionState.CLOSED,
-    previous_session_state: ChromotingEvent.SessionState.CONNECTED
-  }];
-
-  var expectedEvents = sequence.map(function(/** Object */ sequenceValue) {
-    var event = /** @type {Object} */ (base.deepCopy(baseEvent));
-    base.mix(event, sequenceValue);
-    return event;
+var expectSequence = function(testDriver, baseEvent, sequence) {
+  var expectedEvents = sequence.map(
+    /**
+     * @param {remoting.ChromotingEvent.SessionState} state
+     * @param {number} i
+     */
+    function(state, i) {
+      var event = /** @type {Object} */ (base.deepCopy(baseEvent));
+      event.session_state = state;
+      if (i > 0) {
+        event.previous_session_state = sequence[i -1];
+      }
+      return event;
   });
   testDriver.expectEvents(expectedEvents);
 };
@@ -67,30 +53,32 @@ var expectSucceeded = function(testDriver, baseEvent) {
  * @param {remoting.Me2MeTestDriver} testDriver
  * @param {Object} baseEvent
  */
+var expectSucceeded = function(testDriver, baseEvent) {
+  var ChromotingEvent = remoting.ChromotingEvent;
+  expectSequence(testDriver, baseEvent, [
+    ChromotingEvent.SessionState.STARTED,
+    ChromotingEvent.SessionState.SIGNALING,
+    ChromotingEvent.SessionState.CREATING_PLUGIN,
+    ChromotingEvent.SessionState.CONNECTING,
+    ChromotingEvent.SessionState.AUTHENTICATED,
+    ChromotingEvent.SessionState.CONNECTED,
+    ChromotingEvent.SessionState.CLOSED
+  ]);
+};
+
+/**
+ * @param {remoting.Me2MeTestDriver} testDriver
+ * @param {Object} baseEvent
+ */
 var expectCanceled = function(testDriver, baseEvent) {
   var ChromotingEvent = remoting.ChromotingEvent;
-  var sequence = [{
-    session_state: ChromotingEvent.SessionState.STARTED,
-  },{
-    session_state: ChromotingEvent.SessionState.SIGNALING,
-    previous_session_state: ChromotingEvent.SessionState.STARTED
-  },{
-    session_state: ChromotingEvent.SessionState.CREATING_PLUGIN,
-    previous_session_state: ChromotingEvent.SessionState.SIGNALING
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTING,
-    previous_session_state: ChromotingEvent.SessionState.CREATING_PLUGIN
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTION_CANCELED,
-    previous_session_state: ChromotingEvent.SessionState.CONNECTING
-  }];
-
-  var expectedEvents = sequence.map(function(/** Object */ sequenceValue) {
-    var event = /** @type {Object} */ (base.deepCopy(baseEvent));
-    base.mix(event, sequenceValue);
-    return event;
-  });
-  testDriver.expectEvents(expectedEvents);
+  expectSequence(testDriver, baseEvent, [
+    ChromotingEvent.SessionState.STARTED,
+    ChromotingEvent.SessionState.SIGNALING,
+    ChromotingEvent.SessionState.CREATING_PLUGIN,
+    ChromotingEvent.SessionState.CONNECTING,
+    ChromotingEvent.SessionState.CONNECTION_CANCELED
+  ]);
 };
 
 /**
@@ -100,29 +88,18 @@ var expectCanceled = function(testDriver, baseEvent) {
  */
 var expectFailed = function(testDriver, baseEvent, error) {
   var ChromotingEvent = remoting.ChromotingEvent;
-  var sequence = [{
-    session_state: ChromotingEvent.SessionState.STARTED,
-  },{
-    session_state: ChromotingEvent.SessionState.SIGNALING,
-    previous_session_state: ChromotingEvent.SessionState.STARTED
-  },{
-    session_state: ChromotingEvent.SessionState.CREATING_PLUGIN,
-    previous_session_state: ChromotingEvent.SessionState.SIGNALING
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTING,
-    previous_session_state: ChromotingEvent.SessionState.CREATING_PLUGIN
-  },{
-    session_state: ChromotingEvent.SessionState.CONNECTION_FAILED,
-    previous_session_state: ChromotingEvent.SessionState.CONNECTING,
-    connection_error: error
-  }];
+  expectSequence(testDriver, baseEvent, [
+    ChromotingEvent.SessionState.STARTED,
+    ChromotingEvent.SessionState.SIGNALING,
+    ChromotingEvent.SessionState.CREATING_PLUGIN,
+    ChromotingEvent.SessionState.CONNECTING,
+  ]);
 
-  var expectedEvents = sequence.map(function(/** Object */ sequenceValue) {
-    var event = /** @type {Object} */ (base.deepCopy(baseEvent));
-    base.mix(event, sequenceValue);
-    return event;
-  });
-  testDriver.expectEvents(expectedEvents);
+  var failedEvent = /** @type {Object} */ (base.deepCopy(baseEvent));
+  failedEvent.session_state = ChromotingEvent.SessionState.CONNECTION_FAILED;
+  failedEvent.previous_session_state = ChromotingEvent.SessionState.CONNECTING;
+  failedEvent.connection_error = error;
+  testDriver.expectEvents([failedEvent]);
 };
 
 QUnit.test('Connection succeeded', function() {
@@ -307,7 +284,7 @@ QUnit.test('HOST_OFFLINE - JID refresh succeeded', function() {
           remoting.ClientSession.ConnectionError.HOST_IS_OFFLINE);
     } else if (count == 2) {
       plugin.mock$useDefaultBehavior(
-          remoting.MockClientPlugin.AuthMethod.PIN);
+          remoting.ChromotingEvent.AuthMethod.PIN);
     }
   }
 
@@ -376,6 +353,158 @@ QUnit.test('HOST_OFFLINE - Reconnect failed', function() {
   testDriver.mockConnection().pluginFactory().mock$setPluginStatusChanged(
       onStatusChanged);
   return testDriver.startTest();
+});
+
+
+QUnit.test('Connection dropped - Auto Reconnect', function() {
+  var EntryPoint = remoting.ChromotingEvent.SessionEntryPoint;
+  expectSequence(testDriver, {
+    session_entry_point: EntryPoint.CONNECT_BUTTON,
+    role: remoting.ChromotingEvent.Role.CLIENT,
+    mode: remoting.ChromotingEvent.Mode.ME2ME,
+  }, [
+    remoting.ChromotingEvent.SessionState.STARTED,
+    remoting.ChromotingEvent.SessionState.SIGNALING,
+    remoting.ChromotingEvent.SessionState.CREATING_PLUGIN,
+    remoting.ChromotingEvent.SessionState.CONNECTING,
+    remoting.ChromotingEvent.SessionState.AUTHENTICATED,
+    remoting.ChromotingEvent.SessionState.CONNECTED,
+    remoting.ChromotingEvent.SessionState.CONNECTION_DROPPED,
+  ]);
+
+  expectSucceeded(testDriver, {
+    session_entry_point: EntryPoint.AUTO_RECONNECT_ON_CONNECTION_DROPPED,
+    role: remoting.ChromotingEvent.Role.CLIENT,
+    mode: remoting.ChromotingEvent.Mode.ME2ME,
+  });
+
+  var count = 0;
+
+  /**
+   * @param {remoting.MockClientPlugin} plugin
+   * @param {remoting.ClientSession.State} state
+   */
+  function onStatusChanged(plugin, state) {
+    if (state == remoting.ClientSession.State.CONNECTED) {
+      count++;
+      if (count == 1) {
+        // On first CONNECTED, fake network failure.
+        plugin.mock$setConnectionStatus(
+            remoting.ClientSession.State.FAILED,
+            remoting.ClientSession.ConnectionError.NETWORK_FAILURE);
+      } else if (count == 2) {
+        // On second CONNECTED, disconnect and finish the test.
+        testDriver.me2meActivity().stop();
+        testDriver.endTest();
+      }
+    }
+  }
+
+  testDriver.mockConnection().pluginFactory().mock$setPluginStatusChanged(
+      onStatusChanged);
+
+  return testDriver.startTest();
+});
+
+
+/**
+ * @param {remoting.Me2MeTestDriver} testDriver
+ * @param {remoting.ChromotingEvent.AuthMethod} authMethod
+ * @param {boolean} connected
+ * @return {Promise}
+ */
+function createAuthMethodTest(testDriver, authMethod, connected) {
+  var ChromotingEvent = remoting.ChromotingEvent;
+  var baseEvent = {
+    session_entry_point: ChromotingEvent.SessionEntryPoint.CONNECT_BUTTON,
+    role: ChromotingEvent.Role.CLIENT,
+    mode: ChromotingEvent.Mode.ME2ME,
+  };
+
+  expectSequence(
+      testDriver, baseEvent, [
+        ChromotingEvent.SessionState.STARTED,
+        ChromotingEvent.SessionState.SIGNALING,
+        ChromotingEvent.SessionState.CREATING_PLUGIN,
+        ChromotingEvent.SessionState.CONNECTING,
+      ]);
+
+  var copy = /** @type{Object} */ (base.deepCopy(baseEvent));
+  copy.auth_method = authMethod;
+  if (connected) {
+    expectSequence(
+        testDriver, copy, [
+          ChromotingEvent.SessionState.AUTHENTICATED,
+          ChromotingEvent.SessionState.CONNECTED,
+          ChromotingEvent.SessionState.CLOSED
+        ]);
+  } else {
+    testDriver.expectEvents([{
+        session_entry_point: ChromotingEvent.SessionEntryPoint.CONNECT_BUTTON,
+        role: ChromotingEvent.Role.CLIENT,
+        mode: ChromotingEvent.Mode.ME2ME,
+        auth_method: authMethod,
+        session_state: ChromotingEvent.SessionState.CONNECTION_FAILED,
+        connection_error: ChromotingEvent.ConnectionError.INVALID_ACCESS_CODE,
+    }]);
+  }
+
+  /**
+   * @param {remoting.MockClientPlugin} plugin
+   * @param {remoting.ClientSession.State} state
+   */
+  function onStatusChanged(plugin, state) {
+    if (state == remoting.ClientSession.State.CONNECTED  ||
+        state == remoting.ClientSession.State.FAILED) {
+      testDriver.me2meActivity().stop();
+      testDriver.endTest();
+    }
+  }
+  function onPluginCreated(/** remoting.MockClientPlugin */ plugin) {
+    if (connected) {
+      plugin.mock$useDefaultBehavior(authMethod);
+    } else {
+      plugin.mock$returnErrorOnConnect(
+          remoting.ClientSession.ConnectionError.SESSION_REJECTED, authMethod);
+    }
+  }
+
+  testDriver.mockConnection().pluginFactory().mock$setPluginCreated(
+      onPluginCreated);
+  testDriver.mockConnection().pluginFactory().mock$setPluginStatusChanged(
+      onStatusChanged);
+
+  return testDriver.startTest();
+}
+
+QUnit.test('Auth method - THIRD_PARTY (connected)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.THIRD_PARTY, true);
+});
+
+QUnit.test('Auth method - PINLESS (connected)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.PINLESS, true);
+});
+
+QUnit.test('Auth method - PIN (connected)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.PIN, true);
+});
+
+QUnit.test('Auth method - THIRD_PARTY (failed)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.THIRD_PARTY, false);
+});
+
+QUnit.test('Auth method - PINLESS (failed)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.PINLESS, false);
+});
+
+QUnit.test('Auth method - PIN (failed)', function() {
+  return createAuthMethodTest(
+      testDriver, remoting.ChromotingEvent.AuthMethod.PIN, false);
 });
 
 })();

@@ -39,7 +39,6 @@
 #include "core/editing/RenderedPosition.h"
 #include "core/editing/markers/DocumentMarkerController.h"
 #include "core/fetch/ResourceFetcher.h"
-#include "core/fetch/ResourceLoadPriorityOptimizer.h"
 #include "core/frame/FrameHost.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/Settings.h"
@@ -838,7 +837,7 @@ void FrameView::performLayout(bool inSubtreeLayout)
         layoutFromRootObject(*layoutView());
     }
 
-    ResourceLoadPriorityOptimizer::resourceLoadPriorityOptimizer()->updateAllImageResourcePriorities();
+    m_frame->document()->fetcher()->updateAllImageResourcePriorities();
 
     lifecycle().advanceTo(DocumentLifecycle::AfterPerformLayout);
 
@@ -1526,9 +1525,8 @@ void FrameView::scrollPositionChanged()
 
 void FrameView::didScrollTimerFired(Timer<FrameView>*)
 {
-    if (m_frame->document() && m_frame->document()->layoutView()) {
-        ResourceLoadPriorityOptimizer::resourceLoadPriorityOptimizer()->updateAllImageResourcePriorities();
-    }
+    if (m_frame->document() && m_frame->document()->layoutView())
+        m_frame->document()->fetcher()->updateAllImageResourcePriorities();
 }
 
 void FrameView::updateLayersAndCompositingAfterScrollIfNeeded()
@@ -2382,7 +2380,7 @@ void FrameView::updateWidgetPositionsIfNeeded()
     updateWidgetPositions();
 }
 
-void FrameView::updateAllLifecyclePhases(const LayoutRect& interestRect)
+void FrameView::updateAllLifecyclePhases(const LayoutRect* interestRect)
 {
     frame().localFrameRoot()->view()->updateLifecyclePhasesInternal(AllPhases, interestRect);
 }
@@ -2390,10 +2388,15 @@ void FrameView::updateAllLifecyclePhases(const LayoutRect& interestRect)
 // TODO(chrishtr): add a scrolling update lifecycle phase.
 void FrameView::updateLifecycleToCompositingCleanPlusScrolling()
 {
-    frame().localFrameRoot()->view()->updateLifecyclePhasesInternal(OnlyUpToCompositingCleanPlusScrolling);
+    frame().localFrameRoot()->view()->updateLifecyclePhasesInternal(OnlyUpToCompositingCleanPlusScrolling, nullptr);
 }
 
-void FrameView::updateLifecyclePhasesInternal(LifeCycleUpdateOption phases, const LayoutRect& interestRect)
+void FrameView::updateLifecycleToLayoutClean()
+{
+    frame().localFrameRoot()->view()->updateLifecyclePhasesInternal(OnlyUpToLayoutClean, nullptr);
+}
+
+void FrameView::updateLifecyclePhasesInternal(LifeCycleUpdateOption phases, const LayoutRect* interestRect)
 {
     // This must be called from the root frame, since it recurses down, not up.
     // Otherwise the lifecycles of the frames might be out of sync.
@@ -2403,6 +2406,10 @@ void FrameView::updateLifecyclePhasesInternal(LifeCycleUpdateOption phases, cons
     RefPtrWillBeRawPtr<FrameView> protector(this);
 
     updateStyleAndLayoutIfNeededRecursive();
+    ASSERT(lifecycle().state() >= DocumentLifecycle::LayoutClean);
+
+    if (phases == OnlyUpToLayoutClean)
+        return;
 
     if (LayoutView* view = layoutView()) {
         TRACE_EVENT1("devtools.timeline", "UpdateLayerTree", "data", InspectorUpdateLayerTreeEvent::data(m_frame.get()));
@@ -2451,7 +2458,7 @@ void FrameView::updatePaintProperties()
     lifecycle().advanceTo(DocumentLifecycle::UpdatePaintPropertiesClean);
 }
 
-void FrameView::synchronizedPaint(const LayoutRect& interestRect)
+void FrameView::synchronizedPaint(const LayoutRect* interestRect)
 {
     ASSERT(RuntimeEnabledFeatures::slimmingPaintSynchronizedPaintingEnabled());
     ASSERT(frame() == page()->mainFrame() || (!frame().tree().parent()->isLocalFrame()));
@@ -2469,13 +2476,20 @@ void FrameView::synchronizedPaint(const LayoutRect& interestRect)
     lifecycle().advanceTo(DocumentLifecycle::PaintClean);
 }
 
-void FrameView::synchronizedPaintRecursively(GraphicsLayer* graphicsLayer, const LayoutRect& interestRect)
+void FrameView::synchronizedPaintRecursively(GraphicsLayer* graphicsLayer, const LayoutRect* interestRect)
 {
-    if (graphicsLayer->needsDisplay()) {
-        // TODO(chrishtr): implement interest rects.
-        GraphicsContext context(graphicsLayer->displayItemList());
-        graphicsLayer->paint(context, roundedIntRect(interestRect));
+    GraphicsContext context(graphicsLayer->displayItemList());
 
+    // TODO(chrishtr): fix unit tests to not inject one-off interest rects.
+    if (interestRect) {
+        if (graphicsLayer->needsDisplay()) {
+            graphicsLayer->paint(context, roundedIntRect(*interestRect));
+
+            if (!RuntimeEnabledFeatures::slimmingPaintV2Enabled())
+                graphicsLayer->commitIfNeeded();
+        }
+    } else {
+        graphicsLayer->paintIfNeeded(context);
         if (!RuntimeEnabledFeatures::slimmingPaintV2Enabled())
             graphicsLayer->commitIfNeeded();
     }
@@ -2569,6 +2583,9 @@ void FrameView::updateStyleAndLayoutIfNeededRecursive()
 #endif
 
     updateWidgetPositionsIfNeeded();
+
+    if (lifecycle().state() < DocumentLifecycle::LayoutClean)
+        lifecycle().advanceTo(DocumentLifecycle::LayoutClean);
 }
 
 void FrameView::invalidateTreeIfNeededRecursive()

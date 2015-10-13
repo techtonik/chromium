@@ -11,7 +11,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/prefs/pref_change_registrar.h"
 #include "base/task/cancelable_task_tracker.h"
-#include "chrome/browser/sync/glue/non_frontend_data_type_controller.h"
+#include "components/sync_driver/non_frontend_data_type_controller.h"
 #include "components/sync_driver/sync_api_component_factory.h"
 
 namespace history {
@@ -25,7 +25,8 @@ class ControlTask;
 // A class that manages the startup and shutdown of typed_url sync.
 class TypedUrlDataTypeController : public NonFrontendDataTypeController {
  public:
-  explicit TypedUrlDataTypeController(sync_driver::SyncClient* sync_client);
+  explicit TypedUrlDataTypeController(const base::Closure& error_callback,
+                                      sync_driver::SyncClient* sync_client);
 
   // NonFrontendDataTypeController implementation
   syncer::ModelType type() const override;

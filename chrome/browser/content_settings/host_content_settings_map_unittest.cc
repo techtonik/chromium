@@ -13,7 +13,6 @@
 #include "chrome/browser/content_settings/cookie_settings_factory.h"
 #include "chrome/browser/content_settings/host_content_settings_map_factory.h"
 #include "chrome/browser/content_settings/mock_settings_observer.h"
-#include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/content_settings/core/browser/content_settings_details.h"
@@ -21,6 +20,7 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/browser/website_settings_info.h"
 #include "components/content_settings/core/browser/website_settings_registry.h"
+#include "components/content_settings/core/common/pref_names.h"
 #include "components/syncable_prefs/testing_pref_service_syncable.h"
 #include "content/public/test/test_browser_thread.h"
 #include "net/base/static_cookie_policy.h"
@@ -958,42 +958,11 @@ TEST_F(HostContentSettingsMapTest, GetContentSetting) {
                 embedder, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
 }
 
-TEST_F(HostContentSettingsMapTest, IsSettingAllowedForType) {
-  TestingProfile profile;
-  PrefService* prefs = profile.GetPrefs();
-
-  EXPECT_TRUE(HostContentSettingsMap::IsSettingAllowedForType(
-                  prefs, CONTENT_SETTING_ASK,
-                  CONTENT_SETTINGS_TYPE_FULLSCREEN));
-
-  // The mediastream setting is deprecated.
-  EXPECT_FALSE(HostContentSettingsMap::IsSettingAllowedForType(
-                   prefs, CONTENT_SETTING_ALLOW,
-                   CONTENT_SETTINGS_TYPE_MEDIASTREAM));
-  EXPECT_FALSE(HostContentSettingsMap::IsSettingAllowedForType(
-                   prefs, CONTENT_SETTING_ASK,
-                   CONTENT_SETTINGS_TYPE_MEDIASTREAM));
-  EXPECT_FALSE(HostContentSettingsMap::IsSettingAllowedForType(
-                   prefs, CONTENT_SETTING_BLOCK,
-                   CONTENT_SETTINGS_TYPE_MEDIASTREAM));
-
-  // We support the ALLOW value for media permission exceptions,
-  // but not as the default setting.
-  EXPECT_TRUE(HostContentSettingsMap::IsSettingAllowedForType(
-                  prefs, CONTENT_SETTING_ALLOW,
-                  CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC));
-  EXPECT_TRUE(HostContentSettingsMap::IsSettingAllowedForType(
-                  prefs, CONTENT_SETTING_ALLOW,
-                  CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA));
+TEST_F(HostContentSettingsMapTest, IsDefaultSettingAllowedForType) {
   EXPECT_FALSE(HostContentSettingsMap::IsDefaultSettingAllowedForType(
-                   prefs, CONTENT_SETTING_ALLOW,
-                   CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC));
+      CONTENT_SETTING_ALLOW, CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC));
   EXPECT_FALSE(HostContentSettingsMap::IsDefaultSettingAllowedForType(
-                   prefs, CONTENT_SETTING_ALLOW,
-                   CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA));
-
-  // TODO(msramek): Add more checks for setting type - setting pairs where
-  // it is not obvious whether or not they are allowed.
+      CONTENT_SETTING_ALLOW, CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA));
 }
 
 TEST_F(HostContentSettingsMapTest, AddContentSettingsObserver) {

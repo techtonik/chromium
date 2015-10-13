@@ -27,7 +27,6 @@
       'trace_event/process_memory_dump.h',
       'trace_event/process_memory_maps.cc',
       'trace_event/process_memory_maps.h',
-      'trace_event/process_memory_maps_dump_provider.cc',
       'trace_event/process_memory_maps_dump_provider.h',
       'trace_event/process_memory_totals.cc',
       'trace_event/process_memory_totals.h',
@@ -54,8 +53,6 @@
       'trace_event/trace_event_synthetic_delay.h',
       'trace_event/trace_event_system_stats_monitor.cc',
       'trace_event/trace_event_system_stats_monitor.h',
-      'trace_event/trace_event_win.cc',
-      'trace_event/trace_event_win.h',
       'trace_event/trace_log.cc',
       'trace_event/trace_log.h',
       'trace_event/trace_log_constants.cc',
@@ -64,14 +61,6 @@
       'trace_event/winheap_dump_provider_win.cc',
       'trace_event/winheap_dump_provider_win.h',
     ],
-    'conditions': [
-      ['OS == "linux" or OS == "android"', {
-          'trace_event_sources': [
-            'trace_event/malloc_dump_provider.cc',
-            'trace_event/malloc_dump_provider.h',
-          ],
-      }],
-    ],
     'trace_event_test_sources' : [
       'trace_event/java_heap_dump_provider_android_unittest.cc',
       'trace_event/memory_allocator_dump_unittest.cc',
@@ -79,7 +68,6 @@
       'trace_event/memory_profiler_allocation_context_unittest.cc',
       'trace_event/memory_profiler_allocation_register_unittest.cc',
       'trace_event/process_memory_dump_unittest.cc',
-      'trace_event/process_memory_maps_dump_provider_unittest.cc',
       'trace_event/process_memory_totals_dump_provider_unittest.cc',
       'trace_event/trace_config_memory_test_util.h',
       'trace_event/trace_config_unittest.cc',
@@ -88,8 +76,19 @@
       'trace_event/trace_event_synthetic_delay_unittest.cc',
       'trace_event/trace_event_system_stats_monitor_unittest.cc',
       'trace_event/trace_event_unittest.cc',
-      'trace_event/trace_event_win_unittest.cc',
       'trace_event/winheap_dump_provider_win_unittest.cc',
+    ],
+    'conditions': [
+      ['OS == "linux" or OS == "android"', {
+          'trace_event_sources': [
+            'trace_event/malloc_dump_provider.cc',
+            'trace_event/malloc_dump_provider.h',
+            'trace_event/process_memory_maps_dump_provider.cc',
+          ],
+          'trace_event_test_sources' : [
+            'trace_event/process_memory_maps_dump_provider_unittest.cc',
+          ],
+      }],
     ],
   },
 }

@@ -44,12 +44,13 @@ CommandBufferDriver::~CommandBufferDriver() {
 }
 
 void CommandBufferDriver::Initialize(
-    mojo::CommandBufferSyncClientPtr sync_client,
-    mojo::CommandBufferLostContextObserverPtr loss_observer,
+    mojo::InterfacePtrInfo<mojo::CommandBufferSyncClient> sync_client,
+    mojo::InterfacePtrInfo<mojo::CommandBufferLostContextObserver>
+        loss_observer,
     mojo::ScopedSharedBufferHandle shared_state,
     mojo::Array<int32_t> attribs) {
-  sync_client_ = sync_client.Pass();
-  loss_observer_ = loss_observer.Pass();
+  sync_client_ = mojo::MakeProxy(sync_client.Pass());
+  loss_observer_ = mojo::MakeProxy(loss_observer.Pass());
   bool success = DoInitialize(shared_state.Pass(), attribs.Pass());
   mojo::GpuCapabilitiesPtr capabilities =
       success ? mojo::GpuCapabilities::From(decoder_->GetCapabilities())
@@ -233,11 +234,6 @@ void CommandBufferDriver::CreateImage(int32_t id,
     return;
   }
 
-  gfx::GpuMemoryBufferHandle gfx_handle;
-  // TODO(jam): create mojo enum for this and converter
-  gfx_handle.type = static_cast<gfx::GpuMemoryBufferType>(type);
-  gfx_handle.id = gfx::GpuMemoryBufferId(id);
-
   MojoPlatformHandle platform_handle;
   MojoResult extract_result = MojoExtractPlatformHandle(
       memory_handle.release().value(), &platform_handle);
@@ -246,17 +242,17 @@ void CommandBufferDriver::CreateImage(int32_t id,
     return;
   }
 
+  base::SharedMemoryHandle handle;
 #if defined(OS_WIN)
-  gfx_handle.handle =
-      base::SharedMemoryHandle(platform_handle, base::GetCurrentProcId());
+  handle = base::SharedMemoryHandle(platform_handle, base::GetCurrentProcId());
 #else
-  gfx_handle.handle = base::FileDescriptor(platform_handle, false);
+  handle = base::FileDescriptor(platform_handle, false);
 #endif
 
   scoped_refptr<gfx::GLImageSharedMemory> image =
       new gfx::GLImageSharedMemory(gfx_size, internal_format);
   // TODO(jam): also need a mojo enum for this enum
-  if (!image->Initialize(gfx_handle, gpu_format)) {
+  if (!image->Initialize(handle, gfx::GpuMemoryBufferId(id), gpu_format)) {
     NOTREACHED();
     return;
   }

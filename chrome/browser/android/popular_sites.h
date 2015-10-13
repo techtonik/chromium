@@ -8,15 +8,12 @@
 #include <vector>
 
 #include "base/callback.h"
+#include "base/files/file_path.h"
 #include "base/macros.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
 #include "url/gurl.h"
-
-namespace base {
-class FilePath;
-}
 
 namespace net {
 class URLRequestContextGetter;
@@ -34,12 +31,14 @@ class PopularSites {
     Site(const base::string16& title,
          const GURL& url,
          const GURL& favicon_url,
+         const GURL& large_icon_url,
          const GURL& thumbnail_url);
     ~Site();
 
     base::string16 title;
     GURL url;
     GURL favicon_url;
+    GURL large_icon_url;
     GURL thumbnail_url;
   };
 
@@ -71,15 +70,25 @@ class PopularSites {
   const std::vector<Site>& sites() const { return sites_; }
 
  private:
+  // Fetch the popular sites at the given URL. |force_download| should be true
+  // if any previously downloaded site list should be overwritten.
   void FetchPopularSites(const GURL& url,
-                         net::URLRequestContextGetter* request_context,
+                         Profile* profile,
                          bool force_download);
-  void OnDownloadDone(const base::FilePath& path, bool success);
+  void OnDownloadDone(Profile* profile, bool success);
+
+  // Fetch the default popular site list. This method will always overwrite
+  // a previously downloaded site list.
+  void FetchFallbackSites(Profile* profile);
+  void OnDownloadFallbackDone(bool success);
+
+  void ParseSiteList(const base::FilePath& path);
   void OnJsonParsed(scoped_ptr<std::vector<Site>> sites);
 
   FinishedCallback callback_;
   scoped_ptr<FileDownloader> downloader_;
   std::vector<Site> sites_;
+  base::FilePath popular_sites_local_path_;
 
   base::WeakPtrFactory<PopularSites> weak_ptr_factory_;
 

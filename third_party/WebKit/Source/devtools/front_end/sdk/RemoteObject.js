@@ -537,6 +537,12 @@ WebInspector.RemoteObjectImpl.prototype = {
          */
         function eventListeners(fulfill, reject)
         {
+            if (!this.target().isPage()) {
+                // TODO(kozyatinskiy): figure out how this should work for |window| when there is no DOMDebugger.
+                fulfill([]);
+                return;
+            }
+
             if (!this._objectId) {
                 reject(null);
                 return;
@@ -551,7 +557,8 @@ WebInspector.RemoteObjectImpl.prototype = {
              * @param {!WebInspector.CallFunctionResult} result
              * @this {WebInspector.RemoteObject}
              */
-            function storeRemoveFunction(result) {
+            function storeRemoveFunction(result)
+            {
                 if (!result.wasThrown && result.object)
                     removeFunction = result.object;
                 this.target().domdebuggerAgent().getEventListeners(this._objectId, mycallback.bind(this));
@@ -1096,9 +1103,10 @@ WebInspector.ScopeRef = function(number, callFrameId, functionId)
  * @param {boolean=} writable
  * @param {boolean=} isOwn
  * @param {boolean=} wasThrown
+ * @param {boolean=} synthetic
  * @param {?WebInspector.RemoteObject=} symbol
  */
-WebInspector.RemoteObjectProperty = function(name, value, enumerable, writable, isOwn, wasThrown, symbol)
+WebInspector.RemoteObjectProperty = function(name, value, enumerable, writable, isOwn, wasThrown, symbol, synthetic)
 {
     this.name = name;
     if (value !== null)
@@ -1109,6 +1117,7 @@ WebInspector.RemoteObjectProperty = function(name, value, enumerable, writable, 
     this.wasThrown = !!wasThrown;
     if (symbol)
         this.symbol = symbol;
+    this.synthetic = !!synthetic;
 }
 
 WebInspector.RemoteObjectProperty.prototype = {

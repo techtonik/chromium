@@ -1515,6 +1515,16 @@
     # Compile d8 for the host toolset.
     'v8_toolset_for_d8': 'host',
 
+    # V8 extras
+    # Adding V8 extras files requires API owners review
+    # Be sure to synchronize with build/module_args/v8.gni
+
+    'v8_extra_library_files': [
+    ],
+    'v8_experimental_extra_library_files': [
+      '../third_party/WebKit/Source/core/streams/ByteLengthQueuingStrategy.js',
+    ],
+
     # Use brlapi from brltty for braille display support.
     'use_brlapi%': 0,
 
@@ -3108,9 +3118,6 @@
       ['chromium_code==0', {
         'variables': {
           'clang_warning_flags': [
-            # TODO(thakis): Move this suppression into individual third-party
-            # libraries as required. http://crbug.com/505316.
-            '-Wno-unused-function',
             # Lots of third-party libraries have unused variables. Instead of
             # suppressing them individually, we just blanket suppress them here.
             '-Wno-unused-variable',
@@ -5773,7 +5780,10 @@
                   '-Qunused-arguments',  # http://crbug.com/504658
                   '-Wno-microsoft-enum-value',  # http://crbug.com/505296
                   '-Wno-unknown-pragmas',  # http://crbug.com/505314
-                  '-Wno-unused-value',  # http://crbug.com/505318
+                  # Disable unused-value (crbug.com/505318) except
+                  # -Wunused-result.
+                  '-Wno-unused-value',
+                  '-Wunused-result',
                 ],
               },
             }],

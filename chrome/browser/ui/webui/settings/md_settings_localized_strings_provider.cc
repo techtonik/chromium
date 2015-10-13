@@ -12,6 +12,8 @@
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/google_chrome_strings.h"
 #include "chrome/grit/locale_settings.h"
+#include "chrome/grit/settings_chromium_strings.h"
+#include "chrome/grit/settings_google_chrome_strings.h"
 #include "chrome/grit/settings_strings.h"
 #include "content/public/browser/web_ui_data_source.h"
 #include "grit/components_strings.h"
@@ -189,6 +191,23 @@ void AddClearBrowsingDataStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString("clearDataEverything",
                                   IDS_SETTINGS_CLEAR_DATA_EVERYTHING);
 }
+
+#if !defined(OS_CHROMEOS)
+void AddDefaultBrowserStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString(
+      "defaultBrowser", IDS_SETTINGS_DEFAULT_BROWSER);
+  html_source->AddLocalizedString(
+      "defaultBrowserDefault", IDS_SETTINGS_DEFAULT_BROWSER_DEFAULT);
+  html_source->AddLocalizedString(
+      "defaultBrowserNotDefault", IDS_SETTINGS_DEFAULT_BROWSER_NOT_DEFAULT);
+  html_source->AddLocalizedString(
+      "defaultBrowserMakeDefault", IDS_SETTINGS_DEFAULT_BROWSER_MAKE_DEFAULT);
+  html_source->AddLocalizedString(
+      "defaultBrowserUnknown", IDS_SETTINGS_DEFAULT_BROWSER_UNKNOWN);
+  html_source->AddLocalizedString(
+      "defaultBrowserSecondary", IDS_SETTINGS_DEFAULT_BROWSER_SECONDARY);
+}
+#endif
 
 void AddDownloadsStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
@@ -532,6 +551,38 @@ void AddUsersStrings(content::WebUIDataSource* html_source) {
                                   IDS_SETTINGS_USERS_ADD_USERS_LABEL);
 }
 
+void AddWebContentStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString("webContent", IDS_SETTINGS_WEB_CONTENT);
+  html_source->AddLocalizedString("pageZoom", IDS_SETTINGS_PAGE_ZOOM_LABEL);
+  html_source->AddLocalizedString("fontSize", IDS_SETTINGS_FONT_SIZE_LABEL);
+  html_source->AddLocalizedString("verySmall", IDS_SETTINGS_VERY_SMALL_FONT);
+  html_source->AddLocalizedString("small", IDS_SETTINGS_SMALL_FONT);
+  html_source->AddLocalizedString("medium", IDS_SETTINGS_MEDIUM_FONT);
+  html_source->AddLocalizedString("large", IDS_SETTINGS_LARGE_FONT);
+  html_source->AddLocalizedString("veryLarge", IDS_SETTINGS_VERY_LARGE_FONT);
+  html_source->AddLocalizedString("custom", IDS_SETTINGS_CUSTOM);
+  html_source->AddLocalizedString("customizeFonts",
+                                  IDS_SETTINGS_CUSTOMIZE_FONTS);
+  html_source->AddLocalizedString("fontsAndEncoding",
+                                  IDS_SETTINGS_FONTS_AND_ENCODING);
+  html_source->AddLocalizedString("standardFont",
+                                  IDS_SETTINGS_STANDARD_FONT_LABEL);
+  html_source->AddLocalizedString("serifFont", IDS_SETTINGS_SERIF_FONT_LABEL);
+  html_source->AddLocalizedString("sansSerifFont",
+                                  IDS_SETTINGS_SANS_SERIF_FONT_LABEL);
+  html_source->AddLocalizedString("fixedWidthFont",
+                                  IDS_SETTINGS_FIXED_WIDTH_FONT_LABEL);
+  html_source->AddLocalizedString("minimumFont",
+                                  IDS_SETTINGS_MINIMUM_FONT_SIZE_LABEL);
+  html_source->AddLocalizedString("encoding", IDS_SETTINGS_ENCODING_LABEL);
+  html_source->AddLocalizedString("tiny", IDS_SETTINGS_TINY_FONT_SIZE);
+  html_source->AddLocalizedString("huge", IDS_SETTINGS_HUGE_FONT_SIZE);
+  html_source->AddLocalizedString("loremIpsum", IDS_SETTINGS_LOREM_IPSUM);
+  html_source->AddLocalizedString("loading", IDS_SETTINGS_LOADING);
+  html_source->AddLocalizedString("advancedFontSettings",
+                                  IDS_SETTINGS_ADVANCED_FONT_SETTINGS);
+}
+
 }  // namespace
 
 namespace settings {
@@ -547,6 +598,9 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
   AddAppearanceStrings(html_source);
   AddCertificateManagerStrings(html_source);
   AddClearBrowsingDataStrings(html_source);
+#if !defined(OS_CHROMEOS)
+  AddDefaultBrowserStrings(html_source);
+#endif
   AddDateTimeStrings(html_source);
   AddDownloadsStrings(html_source);
 #if defined(OS_CHROMEOS)
@@ -566,6 +620,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source,
   AddSiteSettingsStrings(html_source);
   AddSyncStrings(html_source);
   AddUsersStrings(html_source);
+  AddWebContentStrings(html_source);
 
   policy_indicator::AddLocalizedStrings(html_source);
 

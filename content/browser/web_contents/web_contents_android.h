@@ -19,6 +19,7 @@
 
 namespace content {
 
+class SynchronousCompositorClient;
 class WebContents;
 
 // Android wrapper around WebContents that provides safer passage from java and
@@ -66,6 +67,7 @@ class CONTENT_EXPORT WebContentsAndroid
   void ShowInterstitialPage(
       JNIEnv* env, jobject obj, jstring jurl, jlong delegate_ptr);
   jboolean IsShowingInterstitialPage(JNIEnv* env, jobject obj);
+  jboolean FocusLocationBarByDefault(JNIEnv* env, jobject obj);
   jboolean IsRenderWidgetHostViewReady(JNIEnv* env, jobject obj);
   void ExitFullscreen(JNIEnv* env, jobject obj);
   void UpdateTopControlsState(
@@ -119,12 +121,20 @@ class CONTENT_EXPORT WebContentsAndroid
   base::android::ScopedJavaLocalRef<jstring> GetEncoding(JNIEnv* env,
                                                          jobject obj) const;
 
+  void set_synchronous_compositor_client(SynchronousCompositorClient* client) {
+    synchronous_compositor_client_ = client;
+  }
+  SynchronousCompositorClient* synchronous_compositor_client() const {
+    return synchronous_compositor_client_;
+  }
+
  private:
   RenderWidgetHostViewAndroid* GetRenderWidgetHostViewAndroid();
 
   WebContents* web_contents_;
   NavigationControllerAndroid navigation_controller_;
   base::android::ScopedJavaGlobalRef<jobject> obj_;
+  SynchronousCompositorClient* synchronous_compositor_client_;
 
   base::WeakPtrFactory<WebContentsAndroid> weak_factory_;
 

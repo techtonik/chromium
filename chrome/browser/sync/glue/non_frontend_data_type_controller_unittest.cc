@@ -14,15 +14,14 @@
 #include "base/test/test_timeouts.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/tracked_objects.h"
-#include "chrome/browser/sync/glue/non_frontend_data_type_controller.h"
-#include "chrome/browser/sync/glue/non_frontend_data_type_controller_mock.h"
-#include "chrome/browser/sync/profile_sync_components_factory_mock.h"
-#include "chrome/browser/sync/profile_sync_service_mock.h"
-#include "chrome/test/base/profile_mock.h"
 #include "components/sync_driver/change_processor_mock.h"
 #include "components/sync_driver/data_type_controller_mock.h"
 #include "components/sync_driver/fake_sync_client.h"
+#include "components/sync_driver/fake_sync_service.h"
 #include "components/sync_driver/model_associator_mock.h"
+#include "components/sync_driver/non_frontend_data_type_controller.h"
+#include "components/sync_driver/non_frontend_data_type_controller_mock.h"
+#include "components/sync_driver/sync_api_component_factory_mock.h"
 #include "content/public/test/test_browser_thread.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "sync/internal_api/public/engine/model_safe_worker.h"
@@ -113,7 +112,6 @@ class SyncNonFrontendDataTypeControllerTest
   SyncNonFrontendDataTypeControllerTest()
       : sync_driver::FakeSyncClient(&profile_sync_factory_),
         thread_bundle_(content::TestBrowserThreadBundle::REAL_DB_THREAD),
-        service_(&profile_),
         model_associator_(NULL),
         change_processor_(NULL) {}
 
@@ -206,9 +204,8 @@ class SyncNonFrontendDataTypeControllerTest
   content::TestBrowserThreadBundle thread_bundle_;
   scoped_refptr<NonFrontendDataTypeControllerFake> non_frontend_dtc_;
   scoped_refptr<NonFrontendDataTypeControllerMock> dtc_mock_;
-  ProfileMock profile_;
-  ProfileSyncServiceMock service_;
-  ProfileSyncComponentsFactoryMock profile_sync_factory_;
+  sync_driver::FakeSyncService service_;
+  SyncApiComponentFactoryMock profile_sync_factory_;
   ModelAssociatorMock* model_associator_;
   ChangeProcessorMock* change_processor_;
   StartCallbackMock start_callback_;

@@ -66,6 +66,7 @@ class FilterOperations;
 class HitTestRequest;
 class HitTestResult;
 class HitTestingTransformState;
+class ObjectPaintProperties;
 class PaintLayerCompositor;
 class CompositedLayerMapping;
 class ComputedStyle;
@@ -89,21 +90,58 @@ private:
 };
 
 // PaintLayer is an old object that handles lots of unrelated operations.
-// We want it to die at some point and be replaced by more focused objects.
-// Removing a lot of unneeded complexity. Complex painting operations (opacity,
-// clipping, filters, reflections, ...), hardware acceleration (through
-// PaintLayerCompositor), scrolling (through PaintLayerScrollableArea) along
-// with some optimizations are all handled by PaintLayer.
 //
-// The class is central to painting and hit-testing: it implements the painting
-// order through PaintLayerStackingNode and handle lots of complex graphics
-// operations LayoutObjects don't handle (e.g. 'filter' and 'opacity').
+// We want it to die at some point and be replaced by more focused objects,
+// which would remove (or at least compartimentalize) a lot of complexity.
+// See the STATUS OF PAINTLAYER section below.
+//
+// The class is central to painting and hit-testing. That's because it handles
+// a lot of tasks (we included ones done by associated satellite objects for
+// historical reasons):
+// - Complex painting operations (opacity, clipping, filters, reflections, ...).
+// - hardware acceleration (through PaintLayerCompositor).
+// - scrolling (through PaintLayerScrollableArea).
+// - some performance optimizations.
 //
 // The compositing code is also based on PaintLayer. The entry to it is the
 // PaintLayerCompositor, which fills |m_compositedLayerMapping| for hardware
 // accelerated layers.
 //
 // TODO(jchaffraix): Expand the documentation about hardware acceleration.
+//
+//
+// ***** SELF-PAINTING LAYER *****
+// One important concept about PaintLayer is "self-painting"
+// (m_isSelfPaintingLayer).
+// PaintLayer started as the implementation of a stacking context. This meant
+// that we had to use PaintLayer's painting order (the code is now in
+// PaintLayerPainter and PaintLayerStackingNode) instead of the LayoutObject's
+// children order. Over the years, as more operations were handled by
+// PaintLayer, some LayoutObjects that were not stacking context needed to have
+// a PaintLayer for bookkeeping reasons. One such example is the overflow hidden
+// case that wanted hardware acceleration and thus had to allocate a PaintLayer
+// to get it. However overflow hidden is something LayoutObject can paint
+// without a PaintLayer, which includes a lot of painting overhead. Thus the
+// self-painting flag was introduced. The flag is a band-aid solution done for
+// performance reason only. It just brush over the underlying problem, which is
+// that its design doesn't match the system's requirements anymore.
+//
+//
+// ***** STATUS OF PAINTLAYER *****
+// We would like to remove this class in the future. The reasons for the removal
+// are:
+// - it has been a dumping ground for features for too long.
+// - it is the wrong level of abstraction, bearing no correspondence to any CSS
+//   concept.
+//
+// Its features need to be migrated to helper objects. This was started with the
+// introduction of satellite objects: PaintLayer*. Those helper objects then
+// need to be moved to the appropriate LayoutObject class, probably to a rare
+// data field to avoid growing all the LayoutObjects.
+//
+// A good example of this is PaintLayerScrollableArea, which can only happen
+// be instanciated for LayoutBoxes. With the current design, it's hard to know
+// that by reading the code.
 class CORE_EXPORT PaintLayer {
     WTF_MAKE_NONCOPYABLE(PaintLayer);
 public:
@@ -536,7 +574,7 @@ public:
         ASSERT(!m_hasSelfPaintingLayerDescendantDirty);
         return m_hasSelfPaintingLayerDescendant;
     }
-    LayoutRect paintingExtent(const PaintLayer* rootLayer, const LayoutRect& paintDirtyRect, const LayoutSize& subPixelAccumulation, GlobalPaintFlags);
+    LayoutRect paintingExtent(const PaintLayer* rootLayer, const LayoutSize& subPixelAccumulation, GlobalPaintFlags);
     void appendSingleFragmentIgnoringPagination(PaintLayerFragments&, const PaintLayer* rootLayer, const LayoutRect& dirtyRect, ClipRectsCacheSlot, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize, ShouldRespectOverflowClip = RespectOverflowClip, const LayoutPoint* offsetFromRoot = 0, const LayoutSize& subPixelAccumulation = LayoutSize());
     void collectFragments(PaintLayerFragments&, const PaintLayer* rootLayer, const LayoutRect& dirtyRect,
         ClipRectsCacheSlot, OverlayScrollbarSizeRelevancy inOverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize,
@@ -567,6 +605,12 @@ public:
 
     // For subsequence display items.
     DisplayItemClient displayItemClient() const { return toDisplayItemClient(this); }
+
+    // Paint properties encode the hierarchical transform, clip, scroll, and
+    // effect information used for painting. Properties should only be changed
+    // during UpdatePaintProperties, and should only be used during Paint.
+    ObjectPaintProperties& mutablePaintProperties();
+    const ObjectPaintProperties* paintProperties() const;
 
 private:
     // Bounding box in the coordinates of this layer.
@@ -751,6 +795,11 @@ private:
     PaintLayerClipper m_clipper; // FIXME: Lazily allocate?
     OwnPtr<PaintLayerStackingNode> m_stackingNode;
     OwnPtr<PaintLayerReflectionInfo> m_reflectionInfo;
+
+    // Lazily-allocated paint properties for m_layoutObject, stored here to
+    // reduce memory usage as PaintLayers are created for all paint property
+    // layout objects.
+    OwnPtr<ObjectPaintProperties> m_paintProperties;
 
     LayoutSize m_subpixelAccumulation; // The accumulated subpixel offset of a composited layer's composited bounds compared to absolute coordinates.
 

@@ -57,8 +57,7 @@ class TransportSecurityState;
 
 // This class holds session objects used by HttpNetworkTransaction objects.
 class NET_EXPORT HttpNetworkSession
-    : public base::RefCounted<HttpNetworkSession>,
-      NON_EXPORTED_BASE(public base::NonThreadSafe) {
+    : NON_EXPORTED_BASE(public base::NonThreadSafe) {
  public:
   struct NET_EXPORT Params {
     Params();
@@ -119,6 +118,7 @@ class NET_EXPORT HttpNetworkSession
     float quic_packet_loss_threshold;
     int quic_socket_receive_buffer_size;
     bool quic_delay_tcp_race;
+    bool quic_store_server_configs_in_properties;
     HostPortPair origin_to_force_quic_on;
     QuicClock* quic_clock;  // Will be owned by QuicStreamFactory.
     QuicRandom* quic_random;
@@ -141,6 +141,7 @@ class NET_EXPORT HttpNetworkSession
   };
 
   explicit HttpNetworkSession(const Params& params);
+  ~HttpNetworkSession();
 
   HttpAuthCache* http_auth_cache() { return &http_auth_cache_; }
   SSLClientAuthCache* ssl_client_auth_cache() {
@@ -213,10 +214,7 @@ class NET_EXPORT HttpNetworkSession
   bool HasSpdyExclusion(HostPortPair host_port_pair) const;
 
  private:
-  friend class base::RefCounted<HttpNetworkSession>;
   friend class HttpNetworkSessionPeer;
-
-  ~HttpNetworkSession();
 
   ClientSocketPoolManager* GetSocketPoolManager(SocketPoolType pool_type);
 

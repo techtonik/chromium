@@ -55,6 +55,18 @@ InspectorTest.evaluateInPageWithTimeout = function(code)
     InspectorTest.evaluateInPage("setTimeout(unescape('" + escape(code) + "'), 1)");
 }
 
+InspectorTest.evaluateFunctionInOverlay = function(func, callback)
+{
+    var expression = "testRunner.evaluateInWebInspectorOverlay(\"(\" + " + func + " + \")()\")";
+    var mainContext = InspectorTest.runtimeModel.executionContexts()[0];
+    mainContext.evaluate(expression, "", false, false, true, false, wrapCallback);
+
+    function wrapCallback(val, err, result)
+    {
+        callback(result.value)
+    }
+}
+
 var lastEvalId = 0;
 var pendingEvalRequests = {};
 
@@ -343,6 +355,57 @@ InspectorTest.dumpDataGridIntoString = function(dataGrid)
         output.push(line);
     }
     return output.join("\n");
+}
+
+InspectorTest.dumpObjectPropertyTreeElement = function(treeElement)
+{
+    var expandedSubstring = treeElement.expanded ? "[expanded]" : "[collapsed]";
+    InspectorTest.addResult(expandedSubstring + " " + treeElement.listItemElement.deepTextContent());
+
+    for (var i = 0; i < treeElement.childCount(); ++i) {
+        var property = treeElement.childAt(i).property;
+        var key = property.name;
+        var value = property.value._description;
+        InspectorTest.addResult("    " + key + ": " + value);
+    }
+}
+
+InspectorTest.expandAndDumpEventListeners = function(eventListenersView, updateCallback, callback)
+{
+    InspectorTest.addSniffer(WebInspector.EventListenersView.prototype, "_eventListenersArrivedForTest", listenersArrived);
+
+    if (updateCallback)
+        updateCallback();
+
+    function listenersArrived()
+    {
+        var listenerTypes = eventListenersView._treeOutline.rootElement().children();
+        for (var i = 0; i < listenerTypes.length; ++i) {
+            listenerTypes[i].expand();
+            var listenerItems = listenerTypes[i].children();
+            for (var j = 0; j < listenerItems.length; ++j)
+                listenerItems[j].expand();
+        }
+        InspectorTest.runAfterPendingDispatches(objectsExpanded);
+    }
+
+    function objectsExpanded()
+    {
+        var listenerTypes = eventListenersView._treeOutline.rootElement().children();
+        for (var i = 0; i < listenerTypes.length; ++i) {
+            if (!listenerTypes[i].children().length)
+                continue;
+            var eventType = listenerTypes[i]._title;
+            InspectorTest.addResult("");
+            InspectorTest.addResult("======== " + eventType + " ========");
+            var listenerItems = listenerTypes[i].children();
+            for (var j = 0; j < listenerItems.length; ++j) {
+                InspectorTest.addResult("== " + listenerItems[j].eventListener().listenerType());
+                InspectorTest.dumpObjectPropertyTreeElement(listenerItems[j]);
+            }
+        }
+        callback();
+    }
 }
 
 InspectorTest.assertGreaterOrEqual = function(a, b, message)
@@ -961,6 +1024,7 @@ function runTest(enableWatchDogWhileDebugging)
 
         // 2. Show initial panel based on test path.
         var initialPanelByFolder = {
+            "animation": "elements",
             "audits": "audits",
             "console": "console",
             "elements": "elements",

@@ -279,7 +279,6 @@ protected:
     void dirtyForLayoutFromPercentageHeightDescendants(SubtreeLayoutScope&);
 
     void layout() override;
-    bool updateImageLoadingPriorities() final;
 
     enum PositionedLayoutBehavior {
         DefaultLayout,
@@ -312,7 +311,12 @@ protected:
 
     int firstLineBoxBaseline() const override;
     int inlineBlockBaseline(LineDirectionMode) const override;
-    int lastLineBoxBaseline(LineDirectionMode) const;
+
+    // This function disables the 'overflow' check in inlineBlockBaseline.
+    // For 'inline-block', CSS says that the baseline is the bottom margin edge
+    // if 'overflow' is not visible. But some descendant classes want to ignore
+    // this condition.
+    virtual bool shouldIgnoreOverflowPropertyForInlineBlockBaseline() const { return false; }
 
     void updateHitTestResult(HitTestResult&, const LayoutPoint&) override;
 
@@ -446,8 +450,10 @@ protected:
 
     bool createsNewFormattingContext() const;
 
-    // A page break is required at some offset due to space shortage in the current fragmentainer.
-    void setPageBreak(LayoutUnit offset, LayoutUnit spaceShortage);
+    // Paginated content inside this block was laid out.
+    // |logicalTopOffsetAfterPagination| is the logical top offset of the child content after
+    // applying any forced or unforced break, if needed.
+    void paginatedContentWasLaidOut(LayoutUnit logicalTopOffsetAfterPagination);
 
     // Update minimum page height required to avoid fragmentation where it shouldn't occur (inside
     // unbreakable content, between orphans and widows, etc.). This will be used as a hint to the

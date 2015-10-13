@@ -8,7 +8,12 @@ import("//build/config/sanitizers/sanitizers.gni")
 # shared_libraries. Unconditionally depend upon this target as it is empty if
 # |is_asan|, |is_lsan|, |is_tsan|, |is_msan| and |use_custom_libcxx| are false.
 group("deps") {
-  if (is_asan || is_lsan || is_tsan || is_msan || is_ubsan) {
+  if (use_libfuzzer) {
+    is_asan = true
+    use_custom_libcxx = true
+  }
+
+  if (using_sanitizer) {
     public_configs = [ ":sanitizer_options_link_helper" ]
     deps = [
       ":options_sources",
@@ -39,6 +44,9 @@ config("sanitizer_options_link_helper") {
   }
   if (is_ubsan) {
     ldflags += [ "-fsanitize=undefined" ]
+  }
+  if (is_ubsan_vptr) {
+    ldflags += [ "-fsanitize=vptr" ]
   }
 }
 
@@ -151,6 +159,14 @@ config("default_sanitizer_flags") {
         # by PBQP regallocator. May increase compile time.
         "-mllvm",
         "-pbqp-coalescing",
+      ]
+    }
+    if (is_ubsan_vptr) {
+      ubsan_vptr_blacklist_path =
+          rebase_path("//tools/ubsan/vptr_blacklist.txt", root_build_dir)
+      cflags += [
+        "-fsanitize=vptr",
+        "-fsanitize-blacklist=$ubsan_vptr_blacklist_path",
       ]
     }
     if (is_cfi && !is_nacl) {

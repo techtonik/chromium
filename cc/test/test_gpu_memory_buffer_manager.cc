@@ -44,7 +44,7 @@ class GpuMemoryBufferImpl : public gfx::GpuMemoryBuffer {
     shared_memory_->Unmap();
     mapped_ = false;
   }
-  bool IsMapped() const override { return mapped_; }
+  gfx::Size GetSize() const override { return size_; }
   gfx::BufferFormat GetFormat() const override { return format_; }
   void GetStride(int* stride) const override {
     int num_planes =
@@ -92,6 +92,15 @@ TestGpuMemoryBufferManager::AllocateGpuMemoryBuffer(const gfx::Size& size,
     return nullptr;
   return make_scoped_ptr<gfx::GpuMemoryBuffer>(
       new GpuMemoryBufferImpl(size, format, shared_memory.Pass()));
+}
+
+scoped_ptr<gfx::GpuMemoryBuffer>
+TestGpuMemoryBufferManager::CreateGpuMemoryBufferFromHandle(
+    const gfx::GpuMemoryBufferHandle& handle,
+    const gfx::Size& size,
+    gfx::BufferFormat format) {
+  NOTREACHED();
+  return nullptr;
 }
 
 gfx::GpuMemoryBuffer*

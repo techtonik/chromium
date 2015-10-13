@@ -160,6 +160,11 @@ const VisibleSelection& FrameSelection::selection() const
     return visibleSelection<EditingStrategy>();
 }
 
+const VisibleSelectionInComposedTree& FrameSelection::selectionInComposedTree() const
+{
+    return visibleSelection<EditingInComposedTreeStrategy>();
+}
+
 void FrameSelection::moveTo(const VisiblePosition &pos, EUserTriggered userTriggered, CursorAlignOnScroll align)
 {
     SetSelectionOptions options = CloseTyping | ClearTypingStyle | userTriggered;
@@ -1161,14 +1166,13 @@ LayoutRect FrameSelection::bounds() const
 
 LayoutRect FrameSelection::unclippedBounds() const
 {
-    m_frame->document()->updateLayoutTreeIfNeeded();
-
     FrameView* view = m_frame->view();
     LayoutView* layoutView = m_frame->contentLayoutObject();
 
     if (!view || !layoutView)
         return LayoutRect();
 
+    view->updateLifecycleToLayoutClean();
     return LayoutRect(layoutView->selectionBounds());
 }
 

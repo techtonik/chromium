@@ -44,8 +44,8 @@ class SpdyAltSvcWireFormatPeer {
   }
   static bool ParseProbability(StringPiece::const_iterator c,
                                StringPiece::const_iterator end,
-                               double* p) {
-    return SpdyAltSvcWireFormat::ParseProbability(c, end, p);
+                               double* probability) {
+    return SpdyAltSvcWireFormat::ParseProbability(c, end, probability);
   }
 };
 
@@ -72,7 +72,6 @@ void FuzzHeaderFieldValue(
   if (i & 1 << 1) {
     header_field_value->append(" ");
   }
-  expected_altsvc->max_age = 86400;
   if (i & 3 << 2) {
     expected_altsvc->max_age = 1111;
     header_field_value->append(";");
@@ -87,21 +86,21 @@ void FuzzHeaderFieldValue(
   if (i & 1 << 4) {
     header_field_value->append("; J=s");
   }
-  expected_altsvc->p = 1.0;
   if (i & 1 << 5) {
-    expected_altsvc->p = 0.33;
+    expected_altsvc->probability = 0.33;
     header_field_value->append("; P=.33");
   }
   if (i & 1 << 6) {
-    expected_altsvc->p = 0.0;
-    header_field_value->append("; p=0");
+    expected_altsvc->probability = 0.0;
+    expected_altsvc->version = 24;
+    header_field_value->append("; p=0;v=24");
   }
   if (i & 1 << 7) {
     expected_altsvc->max_age = 999999999;
     header_field_value->append("; Ma=999999999");
   }
   if (i & 1 << 8) {
-    expected_altsvc->p = 0.0;
+    expected_altsvc->probability = 0.0;
     header_field_value->append("; P=0.");
   }
   if (i & 1 << 9) {
@@ -132,14 +131,16 @@ void FuzzAlternativeService(int i,
     expected_header_field_value->append("foo\\\"bar\\\\baz");
   }
   expected_header_field_value->append(":42\"");
-  altsvc->max_age = 86400;
   if (i & 1 << 1) {
+    altsvc->version = 24;
+    expected_header_field_value->append("; v=24");
+  }
+  if (i & 1 << 2) {
     altsvc->max_age = 1111;
     expected_header_field_value->append("; ma=1111");
   }
-  altsvc->p = 1.0;
-  if (i & 1 << 2) {
-    altsvc->p = 0.33;
+  if (i & 1 << 3) {
+    altsvc->probability = 0.33;
     expected_header_field_value->append("; p=0.33");
   }
 }
@@ -148,9 +149,25 @@ class SpdyAltSvcWireFormatTest : public ::testing::Test {};
 
 // Tests of public API.
 
-TEST(SpdyAltSvcWireFormatTest, ParseEmptyHeaderFieldValue) {
+TEST(SpdyAltSvcWireFormatTest, DefaultValues) {
+  SpdyAltSvcWireFormat::AlternativeService altsvc;
+  EXPECT_EQ("", altsvc.protocol_id);
+  EXPECT_EQ("", altsvc.host);
+  EXPECT_EQ(0u, altsvc.port);
+  EXPECT_EQ(0u, altsvc.version);
+  EXPECT_EQ(86400u, altsvc.max_age);
+  EXPECT_DOUBLE_EQ(1.0, altsvc.probability);
+}
+
+TEST(SpdyAltSvcWireFormatTest, ParseInvalidEmptyHeaderFieldValue) {
   SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
-  ASSERT_TRUE(SpdyAltSvcWireFormat::ParseHeaderFieldValue("", &altsvc_vector));
+  ASSERT_FALSE(SpdyAltSvcWireFormat::ParseHeaderFieldValue("", &altsvc_vector));
+}
+
+TEST(SpdyAltSvcWireFormatTest, ParseHeaderFieldValueClear) {
+  SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
+  ASSERT_TRUE(
+      SpdyAltSvcWireFormat::ParseHeaderFieldValue("clear", &altsvc_vector));
   EXPECT_EQ(0u, altsvc_vector.size());
 }
 
@@ -169,8 +186,9 @@ TEST(SpdyAltSvcWireFormatTest, ParseHeaderFieldValue) {
     EXPECT_EQ(expected_altsvc.protocol_id, altsvc_vector[0].protocol_id);
     EXPECT_EQ(expected_altsvc.host, altsvc_vector[0].host);
     EXPECT_EQ(expected_altsvc.port, altsvc_vector[0].port);
+    EXPECT_EQ(expected_altsvc.version, altsvc_vector[0].version);
     EXPECT_EQ(expected_altsvc.max_age, altsvc_vector[0].max_age);
-    EXPECT_DOUBLE_EQ(expected_altsvc.p, altsvc_vector[0].p);
+    EXPECT_DOUBLE_EQ(expected_altsvc.probability, altsvc_vector[0].probability);
   }
 }
 
@@ -199,21 +217,24 @@ TEST(SpdyAltSvcWireFormatTest, ParseHeaderFieldValueMultiple) {
                 altsvc_vector[j].protocol_id);
       EXPECT_EQ(expected_altsvc_vector[j].host, altsvc_vector[j].host);
       EXPECT_EQ(expected_altsvc_vector[j].port, altsvc_vector[j].port);
+      EXPECT_EQ(expected_altsvc_vector[j].version, altsvc_vector[j].version);
       EXPECT_EQ(expected_altsvc_vector[j].max_age, altsvc_vector[j].max_age);
-      EXPECT_DOUBLE_EQ(expected_altsvc_vector[j].p, altsvc_vector[j].p);
+      EXPECT_DOUBLE_EQ(expected_altsvc_vector[j].probability,
+                       altsvc_vector[j].probability);
     }
   }
 }
 
 TEST(SpdyAltSvcWireFormatTest, SerializeEmptyHeaderFieldValue) {
   SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
-  EXPECT_EQ("", SpdyAltSvcWireFormat::SerializeHeaderFieldValue(altsvc_vector));
+  EXPECT_EQ("clear",
+            SpdyAltSvcWireFormat::SerializeHeaderFieldValue(altsvc_vector));
 }
 
 // Test SerializeHeaderFieldValue() with and without hostname and each
 // parameter.  Single alternative service at a time.
 TEST(SpdyAltSvcWireFormatTest, SerializeHeaderFieldValue) {
-  for (int i = 0; i < 1 << 3; ++i) {
+  for (int i = 0; i < 1 << 4; ++i) {
     SpdyAltSvcWireFormat::AlternativeService altsvc;
     std::string expected_header_field_value;
     FuzzAlternativeService(i, &altsvc, &expected_header_field_value);
@@ -229,7 +250,7 @@ TEST(SpdyAltSvcWireFormatTest, SerializeHeaderFieldValue) {
 TEST(SpdyAltSvcWireFormatTest, SerializeHeaderFieldValueMultiple) {
   SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
   std::string expected_header_field_value;
-  for (int i = 0; i < 1 << 3; ++i) {
+  for (int i = 0; i < 1 << 4; ++i) {
     SpdyAltSvcWireFormat::AlternativeService altsvc;
     FuzzAlternativeService(i, &altsvc, &expected_header_field_value);
     altsvc_vector.push_back(altsvc);
@@ -248,7 +269,8 @@ TEST(SpdyAltSvcWireFormatTest, ParseHeaderFieldValueInvalid) {
       "a=\"c:42foo\"", "a=\"b:42\"bar", "a=\"b:42\" ; m",
       "a=\"b:42\" ; min-age", "a=\"b:42\" ; ma", "a=\"b:42\" ; ma=",
       "a=\"b:42\" ; ma=ma", "a=\"b:42\" ; ma=123bar", "a=\"b:42\" ; p=-2",
-      "a=\"b:42\" ; p=..", "a=\"b:42\" ; p=1.05"};
+      "a=\"b:42\" ; p=..", "a=\"b:42\" ; p=1.05",
+      "a=\"b:42\" ; v=-3", "a=\"b:42\" ; v=1.2"};
   for (const char* invalid_field_value : invalid_field_value_array) {
     EXPECT_FALSE(SpdyAltSvcWireFormat::ParseHeaderFieldValue(
         invalid_field_value, &altsvc_vector))

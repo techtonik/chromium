@@ -13,15 +13,10 @@
 
 .cast-mode-icon,
 .sink-icon {
-  -webkit-padding-end: 16px;
-  -webkit-padding-start: 20px;
+  -webkit-padding-end: 12px;
+  -webkit-padding-start: 16px;
   height: 16px;
   width: 16px;
-}
-
-#cast-mode-list {
-  padding-bottom: 8px;
-  padding-top: 8px;
 }
 
 #close-button::shadow #icon {
@@ -43,13 +38,14 @@
 
 #device-missing {
   align-items: center;
+  background-color: white;
   display: flex;
-  height: 150px;
+  height: 120px;
   justify-content: center;
 }
 
 #device-missing a {
-  color: rgb(33, 150, 243);
+  color: rgba(33, 150, 243, 0.87);
   text-decoration: none;
 }
 
@@ -85,12 +81,16 @@ paper-item:hover {
 
 paper-menu {
   -webkit-user-select: none;
-  color: rgb(0, 0, 0);
-  padding: 0;
+  color: rgba(0, 0, 0, 0.87);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: 12px;
+  padding-top: 4px;
 }
 
 .route {
   color: rgb(150, 150, 150);
+  padding-top: 8px;
 }
 
 #searching-devices-spinner {
@@ -99,10 +99,10 @@ paper-menu {
 }
 
 #share-screen-text {
-  -webkit-padding-start: 20px;
+  -webkit-padding-start: 16px;
   color: rgb(150, 150, 150);
-  padding-bottom: 8px;
-  padding-top: 8px;
+  padding-bottom: 4px;
+  padding-top: 12px;
 }
 
 .sink-content {
@@ -113,11 +113,10 @@ paper-menu {
 
 #sink-list {
   max-height: 200px;
-  overflow-x: hidden;
-  overflow-y: auto;
 }
 
 .sink-text {
+  -webkit-padding-end: 26px;
   line-height: normal;
   overflow: hidden;
   text-overflow: ellipsis;

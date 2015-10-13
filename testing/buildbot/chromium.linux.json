@@ -388,12 +388,6 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
-        "test": "gl_unittests"
-      },
-      {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "gn_unittests"
       },
       {
@@ -626,7 +620,6 @@
       "extensions_unittests",
       "gcm_unit_tests",
       "gfx_unittests",
-      "gl_unittests",
       "gn_unittests",
       "google_apis_unittests",
       "gpu_unittests",
@@ -806,9 +799,6 @@
           "can_use_on_swarming_builders": true
         },
         "test": "gfx_unittests"
-      },
-      {
-        "test": "gl_unittests"
       },
       {
         "swarming": {
@@ -1019,6 +1009,10 @@
       {
         "isolate_name": "telemetry_gpu_unittests",
         "name": "telemetry_gpu_unittests"
+      },
+      {
+        "isolate_name": "telemetry_perf_unittests",
+        "name": "telemetry_perf_unittests"
       }
     ],
     "scripts": [
@@ -1037,10 +1031,6 @@
       {
         "name": "telemetry_unittests",
         "script": "telemetry_unittests.py"
-      },
-      {
-        "name": "telemetry_perf_unittests",
-        "script": "telemetry_perf_unittests.py"
       },
       {
         "name": "nacl_integration",
@@ -1193,9 +1183,6 @@
           "can_use_on_swarming_builders": true
         },
         "test": "gfx_unittests"
-      },
-      {
-        "test": "gl_unittests"
       },
       {
         "swarming": {
@@ -1386,16 +1373,16 @@
       {
         "isolate_name": "telemetry_gpu_unittests",
         "name": "telemetry_gpu_unittests"
+      },
+      {
+        "isolate_name": "telemetry_perf_unittests",
+        "name": "telemetry_perf_unittests"
       }
     ],
     "scripts": [
       {
         "name": "telemetry_unittests",
         "script": "telemetry_unittests.py"
-      },
-      {
-        "name": "telemetry_perf_unittests",
-        "script": "telemetry_perf_unittests.py"
       },
       {
         "name": "nacl_integration",
@@ -1540,9 +1527,6 @@
           "can_use_on_swarming_builders": true
         },
         "test": "gfx_unittests"
-      },
-      {
-        "test": "gl_unittests"
       },
       {
         "swarming": {

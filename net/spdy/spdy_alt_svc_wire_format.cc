@@ -34,11 +34,34 @@ bool ParsePositiveIntegerImpl(StringPiece::const_iterator c,
 
 }  // namespace
 
+SpdyAltSvcWireFormat::AlternativeService::AlternativeService() {}
+
+SpdyAltSvcWireFormat::AlternativeService::AlternativeService(
+    const std::string& protocol_id,
+    const std::string& host,
+    uint16 port,
+    uint16 version,
+    uint32 max_age,
+    double probability)
+    : protocol_id(protocol_id),
+      host(host),
+      port(port),
+      version(version),
+      max_age(max_age),
+      probability(probability) {}
+
 // static
 bool SpdyAltSvcWireFormat::ParseHeaderFieldValue(
     StringPiece value,
     AlternativeServiceVector* altsvc_vector) {
+  // Empty value is invalid according to the specification.
+  if (value.empty()) {
+    return false;
+  }
   altsvc_vector->clear();
+  if (value == StringPiece("clear")) {
+    return true;
+  }
   StringPiece::const_iterator c = value.begin();
   while (c != value.end()) {
     // Parse protocol-id.
@@ -82,8 +105,9 @@ bool SpdyAltSvcWireFormat::ParseHeaderFieldValue(
     }
     ++c;
     // Parse parameters.
+    uint16 version = 0;
     uint32 max_age = 86400;
-    double p = 1.0;
+    double probability = 1.0;
     StringPiece::const_iterator parameters_end = std::find(c, value.end(), ',');
     while (c != parameters_end) {
       SkipWhiteSpace(&c, parameters_end);
@@ -114,18 +138,22 @@ bool SpdyAltSvcWireFormat::ParseHeaderFieldValue(
       if (c == parameter_value_begin) {
         return false;
       }
-      if (parameter_name.compare("ma") == 0) {
+      if (parameter_name.compare("v") == 0) {
+        if (!ParsePositiveInteger16(parameter_value_begin, c, &version)) {
+          return false;
+        }
+      } else if (parameter_name.compare("ma") == 0) {
         if (!ParsePositiveInteger32(parameter_value_begin, c, &max_age)) {
           return false;
         }
       } else if (parameter_name.compare("p") == 0) {
-        if (!ParseProbability(parameter_value_begin, c, &p)) {
+        if (!ParseProbability(parameter_value_begin, c, &probability)) {
           return false;
         }
       }
     }
-    altsvc_vector->push_back(
-        AlternativeService(protocol_id, host, port, max_age, p));
+    altsvc_vector->push_back(AlternativeService(protocol_id, host, port,
+                                                version, max_age, probability));
     for (; c != value.end() && (*c == ' ' || *c == '\t' || *c == ','); ++c) {
     }
   }
@@ -135,6 +163,9 @@ bool SpdyAltSvcWireFormat::ParseHeaderFieldValue(
 // static
 std::string SpdyAltSvcWireFormat::SerializeHeaderFieldValue(
     const AlternativeServiceVector& altsvc_vector) {
+  if (altsvc_vector.empty()) {
+    return std::string("clear");
+  }
   const char kNibbleToHex[] = "0123456789ABCDEF";
   std::string value;
   for (const AlternativeService& altsvc : altsvc_vector) {
@@ -182,11 +213,14 @@ std::string SpdyAltSvcWireFormat::SerializeHeaderFieldValue(
       value.push_back(c);
     }
     base::StringAppendF(&value, ":%d\"", altsvc.port);
+    if (altsvc.version != 0) {
+      base::StringAppendF(&value, "; v=%d", altsvc.version);
+    }
     if (altsvc.max_age != 86400) {
       base::StringAppendF(&value, "; ma=%d", altsvc.max_age);
     }
-    if (altsvc.p != 1.0) {
-      base::StringAppendF(&value, "; p=%.2f", altsvc.p);
+    if (altsvc.probability != 1.0) {
+      base::StringAppendF(&value, "; p=%.2f", altsvc.probability);
     }
   }
   return value;
@@ -281,7 +315,7 @@ bool SpdyAltSvcWireFormat::ParsePositiveInteger32(
 // static
 bool SpdyAltSvcWireFormat::ParseProbability(StringPiece::const_iterator c,
                                             StringPiece::const_iterator end,
-                                            double* p) {
+                                            double* probability) {
   // "" is invalid.
   if (c == end) {
     return false;
@@ -291,10 +325,10 @@ bool SpdyAltSvcWireFormat::ParseProbability(StringPiece::const_iterator c,
     return false;
   }
   if (*c == '1') {
-    *p = 1.0;
+    *probability = 1.0;
     ++c;
   } else {
-    *p = 0.0;
+    *probability = 0.0;
     if (*c == '0') {
       ++c;
     }
@@ -309,10 +343,10 @@ bool SpdyAltSvcWireFormat::ParseProbability(StringPiece::const_iterator c,
   ++c;
   double place_value = 0.1;
   for (; c != end && isdigit(*c); ++c) {
-    *p += place_value * (*c - '0');
+    *probability += place_value * (*c - '0');
     place_value *= 0.1;
   }
-  return (c == end && *p <= 1.0);
+  return (c == end && *probability <= 1.0);
 }
 
 }  // namespace net

@@ -152,7 +152,7 @@ bool ConvertDrawQuad(const QuadPtr& input,
       texture_quad->SetAll(
           sqs, input->rect.To<gfx::Rect>(), input->opaque_rect.To<gfx::Rect>(),
           input->visible_rect.To<gfx::Rect>(), input->needs_blending,
-          texture_quad_state->resource_id, gfx::Size(), false,
+          texture_quad_state->resource_id, gfx::Size(),
           texture_quad_state->premultiplied_alpha,
           texture_quad_state->uv_top_left.To<gfx::PointF>(),
           texture_quad_state->uv_bottom_right.To<gfx::PointF>(),
@@ -514,7 +514,6 @@ TypeConverter<TransferableResourcePtr, cc::TransferableResource>::Convert(
   transferable->filter = input.filter;
   transferable->size = Size::From(input.size);
   transferable->mailbox_holder = MailboxHolder::From(input.mailbox_holder);
-  transferable->is_repeated = input.is_repeated;
   transferable->is_software = input.is_software;
   return transferable.Pass();
 }
@@ -529,7 +528,6 @@ TypeConverter<cc::TransferableResource, TransferableResourcePtr>::Convert(
   transferable.filter = input->filter;
   transferable.size = input->size.To<gfx::Size>();
   transferable.mailbox_holder = input->mailbox_holder.To<gpu::MailboxHolder>();
-  transferable.is_repeated = input->is_repeated;
   transferable.is_software = input->is_software;
   return transferable;
 }

@@ -29,7 +29,7 @@
         ],
       },
       'conditions': [
-        ['OS == "win"', {
+        ['OS == "win" or OS == "mac"', {
           'dependencies': [
             '../crypto/crypto.gyp:crypto',
           ],
@@ -52,6 +52,7 @@
         '..'
       ],
       'sources': [
+        'attachment_broker_mac_unittest.cc',
         'attachment_broker_privileged_mac_unittest.cc',
         'attachment_broker_privileged_win_unittest.cc',
         'attachment_broker_unprivileged_win_unittest.cc',
@@ -155,6 +156,8 @@
         'ipc_test_channel_listener.h',
         'ipc_test_sink.cc',
         'ipc_test_sink.h',
+        'test_util_mac.cc',
+        'test_util_mac.h',
       ],
     },
   ],

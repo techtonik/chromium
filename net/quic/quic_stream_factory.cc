@@ -27,6 +27,7 @@
 #include "net/http/http_server_properties.h"
 #include "net/quic/crypto/channel_id_chromium.h"
 #include "net/quic/crypto/proof_verifier_chromium.h"
+#include "net/quic/crypto/properties_based_quic_server_info.h"
 #include "net/quic/crypto/quic_random.h"
 #include "net/quic/crypto/quic_server_info.h"
 #include "net/quic/port_suggester.h"
@@ -595,13 +596,13 @@ QuicStreamFactory::QuicStreamFactory(
     int threshold_timeouts_with_open_streams,
     int socket_receive_buffer_size,
     bool delay_tcp_race,
+    bool store_server_configs_in_properties,
     const QuicTagVector& connection_options)
     : require_confirmation_(true),
       host_resolver_(host_resolver),
       client_socket_factory_(client_socket_factory),
       http_server_properties_(http_server_properties),
       transport_security_state_(transport_security_state),
-      quic_server_info_factory_(nullptr),
       quic_crypto_client_stream_factory_(quic_crypto_client_stream_factory),
       random_generator_(random_generator),
       clock_(clock),
@@ -635,12 +636,14 @@ QuicStreamFactory::QuicStreamFactory(
       yield_after_packets_(kQuicYieldAfterPacketsRead),
       yield_after_duration_(QuicTime::Delta::FromMilliseconds(
           kQuicYieldAfterDurationMilliseconds)),
+      store_server_configs_in_properties_(store_server_configs_in_properties),
       port_seed_(random_generator_->RandUint64()),
       check_persisted_supports_quic_(true),
-      quic_supported_servers_at_startup_initialzied_(false),
+      has_initialized_data_(false),
       task_runner_(nullptr),
       weak_factory_(this) {
   DCHECK(transport_security_state_);
+  DCHECK(http_server_properties_);
   crypto_config_.set_user_agent_id(user_agent_id);
   crypto_config_.AddCanonicalSuffix(".c.youtube.com");
   crypto_config_.AddCanonicalSuffix(".googlevideo.com");
@@ -666,6 +669,13 @@ QuicStreamFactory::QuicStreamFactory(
     crypto_config_.PreferAesGcm();
   if (!IsEcdsaSupported())
     crypto_config_.DisableEcdsa();
+  // When disk cache is used to store the server configs, HttpCache code calls
+  // |set_quic_server_info_factory| if |quic_server_info_factory_| wasn't
+  // created.
+  if (store_server_configs_in_properties_) {
+    quic_server_info_factory_.reset(
+        new PropertiesBasedQuicServerInfoFactory(http_server_properties_));
+  }
 }
 
 QuicStreamFactory::~QuicStreamFactory() {
@@ -683,7 +693,7 @@ QuicStreamFactory::~QuicStreamFactory() {
 
 void QuicStreamFactory::set_require_confirmation(bool require_confirmation) {
   require_confirmation_ = require_confirmation;
-  if (http_server_properties_ && (!(local_address_ == IPEndPoint()))) {
+  if (!(local_address_ == IPEndPoint())) {
     http_server_properties_->SetSupportsQuic(!require_confirmation,
                                              local_address_.address());
   }
@@ -700,6 +710,11 @@ base::TimeDelta QuicStreamFactory::GetTimeDelayForWaitingJob(
   if (!srtt)
     srtt = kDefaultRTT;
   return base::TimeDelta::FromMicroseconds(srtt);
+}
+
+void QuicStreamFactory::set_quic_server_info_factory(
+    QuicServerInfoFactory* quic_server_info_factory) {
+  quic_server_info_factory_.reset(quic_server_info_factory);
 }
 
 int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
@@ -732,17 +747,14 @@ int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
     task_runner_ = base::ThreadTaskRunnerHandle::Get().get();
 
   QuicServerInfo* quic_server_info = nullptr;
-  if (quic_server_info_factory_) {
+  if (quic_server_info_factory_.get()) {
     bool load_from_disk_cache = !disable_disk_cache_;
-    if (http_server_properties_) {
-      if (!quic_supported_servers_at_startup_initialzied_)
-        InitializeQuicSupportedServersAtStartup();
-      if (!ContainsKey(quic_supported_servers_at_startup_,
-                       server_id.host_port_pair())) {
-        // If there is no entry for QUIC, consider that as a new server and
-        // don't wait for Cache thread to load the data for that server.
-        load_from_disk_cache = false;
-      }
+    MaybeInitialize();
+    if (!ContainsKey(quic_supported_servers_at_startup_,
+                     server_id.host_port_pair())) {
+      // If there is no entry for QUIC, consider that as a new server and
+      // don't wait for Cache thread to load the data for that server.
+      load_from_disk_cache = false;
     }
     if (load_from_disk_cache && CryptoConfigCacheIsEmpty(server_id)) {
       quic_server_info = quic_server_info_factory_->GetForServer(server_id);
@@ -932,12 +944,10 @@ bool QuicStreamFactory::OnHandshakeConfirmed(QuicChromiumClientSession* session,
     return false;
   }
 
-  if (http_server_properties_) {
-    // We mark it as recently broken, which means that 0-RTT will be disabled
-    // but we'll still race.
-    http_server_properties_->MarkAlternativeServiceRecentlyBroken(
-        AlternativeService(QUIC, session->server_id().host(), port));
-  }
+  // We mark it as recently broken, which means that 0-RTT will be disabled
+  // but we'll still race.
+  http_server_properties_->MarkAlternativeServiceRecentlyBroken(
+      AlternativeService(QUIC, session->server_id().host(), port));
 
   bool was_quic_disabled = IsQuicDisabled(port);
   ++number_of_lossy_connections_[port];
@@ -1238,7 +1248,7 @@ int QuicStreamFactory::CreateSession(const QuicServerId& server_id,
   }
 
   socket->GetLocalAddress(&local_address_);
-  if (check_persisted_supports_quic_ && http_server_properties_) {
+  if (check_persisted_supports_quic_) {
     check_persisted_supports_quic_ = false;
     IPAddressNumber last_address;
     if (http_server_properties_->GetSupportsQuic(&last_address) &&
@@ -1274,7 +1284,7 @@ int QuicStreamFactory::CreateSession(const QuicServerId& server_id,
     config.SetInitialRoundTripTimeUsToSend(static_cast<uint32>(srtt));
   config.SetBytesForConnectionIdToSend(0);
 
-  if (quic_server_info_factory_ && !server_info) {
+  if (quic_server_info_factory_.get() && !server_info) {
     // Start the disk cache loading so that we can persist the newer QUIC server
     // information and/or inform the disk cache that we have reused
     // |server_info|.
@@ -1328,8 +1338,6 @@ void QuicStreamFactory::ActivateSession(const QuicServerId& server_id,
 
 int64 QuicStreamFactory::GetServerNetworkStatsSmoothedRttInMicroseconds(
     const QuicServerId& server_id) const {
-  if (!http_server_properties_)
-    return 0;
   const ServerNetworkStats* stats =
       http_server_properties_->GetServerNetworkStats(
           server_id.host_port_pair());
@@ -1340,8 +1348,6 @@ int64 QuicStreamFactory::GetServerNetworkStatsSmoothedRttInMicroseconds(
 
 bool QuicStreamFactory::WasQuicRecentlyBroken(
     const QuicServerId& server_id) const {
-  if (!http_server_properties_)
-    return false;
   const AlternativeService alternative_service(QUIC,
                                                server_id.host_port_pair());
   return http_server_properties_->WasAlternativeServiceRecentlyBroken(
@@ -1368,17 +1374,13 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
   if (!cached->IsEmpty())
     return;
 
-  if (http_server_properties_) {
-    DCHECK(quic_supported_servers_at_startup_initialzied_);
-    // TODO(rtenneti): Delete the following histogram after collecting stats.
-    // If the AlternativeServiceMap contained an entry for this host, check if
-    // the disk cache contained an entry for it.
-    if (ContainsKey(quic_supported_servers_at_startup_,
-                    server_id.host_port_pair())) {
-      UMA_HISTOGRAM_BOOLEAN(
-          "Net.QuicServerInfo.ExpectConfigMissingFromDiskCache",
-          server_info->state().server_config.empty());
-    }
+  // TODO(rtenneti): Delete the following histogram after collecting stats.
+  // If the AlternativeServiceMap contained an entry for this host, check if
+  // the disk cache contained an entry for it.
+  if (ContainsKey(quic_supported_servers_at_startup_,
+                  server_id.host_port_pair())) {
+    UMA_HISTOGRAM_BOOLEAN("Net.QuicServerInfo.ExpectConfigMissingFromDiskCache",
+                          server_info->state().server_config.empty());
   }
 
   if (!cached->Initialize(server_info->state().server_config,
@@ -1394,10 +1396,15 @@ void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
   }
 }
 
-void QuicStreamFactory::InitializeQuicSupportedServersAtStartup() {
-  DCHECK(http_server_properties_);
-  DCHECK(!quic_supported_servers_at_startup_initialzied_);
-  quic_supported_servers_at_startup_initialzied_ = true;
+void QuicStreamFactory::MaybeInitialize() {
+  // We don't initialize data from HttpServerProperties in the constructor
+  // because HttpServerProperties has not yet initialized. We're guaranteed
+  // HttpServerProperties has been initialized by the first time a request is
+  // made.
+  if (has_initialized_data_)
+    return;
+
+  has_initialized_data_ = true;
   for (const std::pair<const HostPortPair, AlternativeServiceInfoVector>&
            key_value : http_server_properties_->alternative_service_map()) {
     for (const AlternativeServiceInfo& alternative_service_info :
@@ -1406,6 +1413,22 @@ void QuicStreamFactory::InitializeQuicSupportedServersAtStartup() {
         quic_supported_servers_at_startup_.insert(key_value.first);
         break;
       }
+    }
+  }
+
+  if (!store_server_configs_in_properties_)
+    return;
+  // Create a temporary QuicServerInfo object to deserialize and to populate the
+  // in-memory crypto server config cache.
+  scoped_ptr<QuicServerInfo> server_info;
+  CompletionCallback callback;
+  for (const auto& key_value :
+       http_server_properties_->quic_server_info_map()) {
+    const QuicServerId& server_id = key_value.first;
+    server_info.reset(quic_server_info_factory_->GetForServer(server_id));
+    if (server_info->WaitForDataReady(callback) == OK) {
+      DVLOG(1) << "Initialized server config for: " << server_id.ToString();
+      InitializeCachedStateInCryptoConfig(server_id, server_info);
     }
   }
 }

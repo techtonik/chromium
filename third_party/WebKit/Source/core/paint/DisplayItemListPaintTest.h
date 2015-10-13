@@ -61,12 +61,12 @@ protected:
     }
 
     // Expose some document lifecycle steps for checking new display items before commiting.
-    void updateLifecyclePhasesToPaintClean(const LayoutRect& interestRect = LayoutRect::infiniteRect())
+    void updateLifecyclePhasesToPaintClean(const LayoutRect& interestRect = LayoutRect(LayoutRect::infiniteIntRect()))
     {
-        document().view()->updateLifecyclePhasesInternal(FrameView::OnlyUpToCompositingCleanPlusScrolling);
+        document().view()->updateLifecyclePhasesInternal(FrameView::OnlyUpToCompositingCleanPlusScrolling, nullptr);
         document().view()->invalidateTreeIfNeededRecursive();
         document().view()->updatePaintProperties();
-        document().view()->synchronizedPaint(interestRect);
+        document().view()->synchronizedPaint(&interestRect);
     }
     void compositeForSlimmingPaintV2() { document().view()->compositeForSlimmingPaintV2(); }
 
@@ -93,7 +93,7 @@ class TestDisplayItem final : public DisplayItem {
 public:
     TestDisplayItem(const DisplayItemClientWrapper& client, Type type) : DisplayItem(client, type, sizeof(*this)) { }
 
-    void replay(GraphicsContext&) final { ASSERT_NOT_REACHED(); }
+    void replay(GraphicsContext&) const final { ASSERT_NOT_REACHED(); }
     void appendToWebDisplayItemList(WebDisplayItemList*) const final { ASSERT_NOT_REACHED(); }
 };
 

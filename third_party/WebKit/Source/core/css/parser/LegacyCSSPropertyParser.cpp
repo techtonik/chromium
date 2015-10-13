@@ -83,15 +83,7 @@ void CSSPropertyParser::addProperty(CSSPropertyID propId, PassRefPtrWillBeRawPtr
     if (m_currentShorthand) {
         Vector<StylePropertyShorthand, 4> shorthands;
         getMatchingShorthandsForLonghand(propId, &shorthands);
-        // Viewport descriptors have width and height as shorthands, but it doesn't
-        // make sense for CSSProperties.in to consider them as such. The shorthand
-        // index is only used by the inspector and doesn't affect viewport
-        // descriptors.
-        if (shorthands.isEmpty())
-            ASSERT(m_currentShorthand == CSSPropertyWidth || m_currentShorthand == CSSPropertyHeight);
-        else
-            setFromShorthand = true;
-
+        setFromShorthand = true;
         if (shorthands.size() > 1)
             shorthandIndex = indexOfShorthandForLonghand(m_currentShorthand, shorthands);
     }
@@ -439,10 +431,6 @@ bool CSSPropertyParser::parseValue(CSSPropertyID unresolvedProperty, bool import
     Units unitless = FUnknown;
 
     switch (propId) {
-    case CSSPropertySize: // <length>{1,2} | auto | [ <page-size> || [ portrait | landscape] ]
-        parsedValue = parseSize();
-        break;
-
     case CSSPropertyContent:              // [ <string> | <uri> | <counter> | attr(X) | open-quote |
         // close-quote | no-open-quote | no-close-quote ]+ | inherit
         parsedValue = parseContent();
@@ -672,10 +660,6 @@ bool CSSPropertyParser::parseValue(CSSPropertyID unresolvedProperty, bool import
             validPrimitive = validUnit(value, FLength | FNonNeg | unitless);
         break;
 
-    case CSSPropertyTextIndent:
-        parsedValue = parseTextIndent();
-        break;
-
     case CSSPropertyPaddingTop:          //// <padding-width> | inherit
     case CSSPropertyPaddingRight:        //   Which is defined as
     case CSSPropertyPaddingBottom:       //   <length> | <percentage>
@@ -756,19 +740,6 @@ bool CSSPropertyParser::parseValue(CSSPropertyID unresolvedProperty, bool import
             addProperty(propId, cssValuePool().createValue(value->fValue, CSSPrimitiveValue::UnitType::Integer), important);
             return true;
         }
-        break;
-
-    case CSSPropertyCounterIncrement:
-        if (id == CSSValueNone)
-            validPrimitive = true;
-        else
-            parsedValue = parseCounter(1);
-        break;
-    case CSSPropertyCounterReset:
-        if (id == CSSValueNone)
-            validPrimitive = true;
-        else
-            parsedValue = parseCounter(0);
         break;
 
     case CSSPropertyTextDecoration:
@@ -1376,6 +1347,10 @@ bool CSSPropertyParser::parseValue(CSSPropertyID unresolvedProperty, bool import
     case CSSPropertyWebkitBorderHorizontalSpacing:
     case CSSPropertyWebkitBorderVerticalSpacing:
     case CSSPropertyBorderSpacing:
+    case CSSPropertyCounterIncrement:
+    case CSSPropertyCounterReset:
+    case CSSPropertySize:
+    case CSSPropertyTextIndent:
         validPrimitive = false;
         break;
 
@@ -1917,72 +1892,6 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseScrollSnapCoordinate()
     }
 
     return parsePositionList(m_valueList);
-}
-
-// <length>{1,2} | auto | [ <page-size> || [ portrait | landscape] ]
-PassRefPtrWillBeRawPtr<CSSValueList> CSSPropertyParser::parseSize()
-{
-    CSSParserValue* value = m_valueList->current();
-    ASSERT(value);
-
-    RefPtrWillBeRawPtr<CSSValueList> parsedValues = CSSValueList::createSpaceSeparated();
-
-    // First parameter.
-    SizeParameterType paramType = parseSizeParameter(parsedValues.get(), value, None);
-    if (paramType == None)
-        return nullptr;
-    value = m_valueList->next();
-
-    // Second parameter, if any.
-    if (value) {
-        paramType = parseSizeParameter(parsedValues.get(), value, paramType);
-        if (paramType == None)
-            return nullptr;
-        m_valueList->next();
-    }
-
-    return parsedValues.release();
-}
-
-CSSPropertyParser::SizeParameterType CSSPropertyParser::parseSizeParameter(CSSValueList* parsedValues, CSSParserValue* value, SizeParameterType prevParamType)
-{
-    switch (value->id) {
-    case CSSValueAuto:
-        if (prevParamType == None) {
-            parsedValues->append(cssValuePool().createIdentifierValue(value->id));
-            return Auto;
-        }
-        return None;
-    case CSSValueLandscape:
-    case CSSValuePortrait:
-        if (prevParamType == None || prevParamType == PageSize) {
-            parsedValues->append(cssValuePool().createIdentifierValue(value->id));
-            return Orientation;
-        }
-        return None;
-    case CSSValueA3:
-    case CSSValueA4:
-    case CSSValueA5:
-    case CSSValueB4:
-    case CSSValueB5:
-    case CSSValueLedger:
-    case CSSValueLegal:
-    case CSSValueLetter:
-        if (prevParamType == None || prevParamType == Orientation) {
-            // Normalize to Page Size then Orientation order by prepending for simpler StyleBuilder handling
-            parsedValues->prepend(cssValuePool().createIdentifierValue(value->id));
-            return PageSize;
-        }
-        return None;
-    case 0:
-        if (validUnit(value, FLength | FNonNeg) && (prevParamType == None || prevParamType == Length)) {
-            parsedValues->append(createPrimitiveNumericValue(value));
-            return Length;
-        }
-        return None;
-    default:
-        return None;
-    }
 }
 
 // [ <string> | <uri> | <counter> | attr(X) | open-quote | close-quote | no-open-quote | no-close-quote ]+ | inherit
@@ -5296,34 +5205,6 @@ bool CSSPropertyParser::parseBorderRadius(CSSPropertyID unresolvedProperty, bool
     return true;
 }
 
-PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseCounter(int defaultValue)
-{
-    RefPtrWillBeRawPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
-
-    while (m_valueList->current()) {
-        CSSParserValue* val = m_valueList->current();
-        if (val->m_unit != CSSParserValue::Identifier)
-            return nullptr;
-        RefPtrWillBeRawPtr<CSSCustomIdentValue> counterName = createPrimitiveCustomIdentValue(val);
-        m_valueList->next();
-
-        val = m_valueList->current();
-        int i = defaultValue;
-        if (val && validUnit(val, FInteger)) {
-            i = clampTo<int>(val->fValue);
-            m_valueList->next();
-        }
-
-        list->append(CSSValuePair::create(counterName.release(),
-            cssValuePool().createValue(i, CSSPrimitiveValue::UnitType::Number),
-            CSSValuePair::DropIdenticalValues));
-    }
-
-    if (!list->length())
-        return nullptr;
-    return list.release();
-}
-
 // This should go away once we drop support for -webkit-gradient
 static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> parseDeprecatedGradientPoint(CSSParserValue* a, bool horizontal)
 {
@@ -6481,45 +6362,6 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseTextEmphasisStyle()
     return nullptr;
 }
 
-PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseTextIndent()
-{
-    RefPtrWillBeRawPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-
-    bool hasLengthOrPercentage = false;
-    bool hasEachLine = false;
-    bool hasHanging = false;
-
-    for (CSSParserValue* value = m_valueList->current(); value; value = m_valueList->next()) {
-        // <length> | <percentage> | inherit when RuntimeEnabledFeatures::css3TextEnabled() returns false
-        if (!hasLengthOrPercentage && validUnit(value, FLength | FPercent | FUnitlessQuirk)) {
-            list->append(createPrimitiveNumericValue(value));
-            hasLengthOrPercentage = true;
-            continue;
-        }
-
-        // [ <length> | <percentage> ] && hanging? && each-line? | inherit
-        // when RuntimeEnabledFeatures::css3TextEnabled() returns true
-        if (RuntimeEnabledFeatures::css3TextEnabled()) {
-            if (!hasEachLine && value->id == CSSValueEachLine) {
-                list->append(cssValuePool().createIdentifierValue(CSSValueEachLine));
-                hasEachLine = true;
-                continue;
-            }
-            if (!hasHanging && value->id == CSSValueHanging) {
-                list->append(cssValuePool().createIdentifierValue(CSSValueHanging));
-                hasHanging = true;
-                continue;
-            }
-        }
-        return nullptr;
-    }
-
-    if (!hasLengthOrPercentage)
-        return nullptr;
-
-    return list.release();
-}
-
 bool CSSPropertyParser::parseCalculation(CSSParserValue* value, ValueRange range)
 {
     ASSERT(isCalculation(value));
@@ -6533,87 +6375,6 @@ bool CSSPropertyParser::parseCalculation(CSSParserValue* value, ValueRange range
         return false;
 
     return true;
-}
-
-bool CSSPropertyParser::parseViewportProperty(CSSPropertyID propId, bool important)
-{
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled() || isUASheetBehavior(m_context.mode()));
-
-    CSSParserValue* value = m_valueList->current();
-    if (!value)
-        return false;
-
-    CSSValueID id = value->id;
-    bool validPrimitive = false;
-
-    switch (propId) {
-    case CSSPropertyMinWidth: // auto | extend-to-zoom | <length> | <percentage>
-    case CSSPropertyMaxWidth:
-    case CSSPropertyMinHeight:
-    case CSSPropertyMaxHeight:
-        if (id == CSSValueAuto || id == CSSValueInternalExtendToZoom)
-            validPrimitive = true;
-        else
-            validPrimitive = validUnit(value, FLength | FPercent | FNonNeg);
-        break;
-    case CSSPropertyWidth: // shorthand
-        return parseViewportShorthand(propId, CSSPropertyMinWidth, CSSPropertyMaxWidth, important);
-    case CSSPropertyHeight:
-        return parseViewportShorthand(propId, CSSPropertyMinHeight, CSSPropertyMaxHeight, important);
-    case CSSPropertyMinZoom: // auto | <number> | <percentage>
-    case CSSPropertyMaxZoom:
-    case CSSPropertyZoom:
-        if (id == CSSValueAuto)
-            validPrimitive = true;
-        else
-            validPrimitive = validUnit(value, FNumber | FPercent | FNonNeg);
-        break;
-    case CSSPropertyUserZoom: // zoom | fixed
-        if (id == CSSValueZoom || id == CSSValueFixed)
-            validPrimitive = true;
-        break;
-    case CSSPropertyOrientation: // auto | portrait | landscape
-        if (id == CSSValueAuto || id == CSSValuePortrait || id == CSSValueLandscape)
-            validPrimitive = true;
-    default:
-        break;
-    }
-
-    RefPtrWillBeRawPtr<CSSValue> parsedValue = nullptr;
-    if (validPrimitive) {
-        parsedValue = parseValidPrimitive(id, value);
-        m_valueList->next();
-    }
-
-    if (parsedValue) {
-        if (!m_valueList->current() || inShorthand()) {
-            addProperty(propId, parsedValue.release(), important);
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool CSSPropertyParser::parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important)
-{
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled() || isUASheetBehavior(m_context.mode()));
-    unsigned numValues = m_valueList->size();
-
-    if (numValues > 2)
-        return false;
-
-    ShorthandScope scope(this, propId);
-
-    if (!parseViewportProperty(first, important))
-        return false;
-
-    // If just one value is supplied, the second value
-    // is implicitly initialized with the first value.
-    if (numValues == 1)
-        m_valueList->previous();
-
-    return parseViewportProperty(second, important);
 }
 
 template <typename CharacterType>

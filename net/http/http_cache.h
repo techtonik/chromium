@@ -126,23 +126,26 @@ class NET_EXPORT HttpCache : public HttpTransactionFactory,
   static const int kPrefetchReuseMins = 5;
 
   // The disk cache is initialized lazily (by CreateTransaction) in this case.
-  // The HttpCache takes ownership of the |backend_factory|.
-  HttpCache(const HttpNetworkSession::Params& params,
-            BackendFactory* backend_factory);
-
-  // The disk cache is initialized lazily (by CreateTransaction) in this case.
   // Provide an existing HttpNetworkSession, the cache can construct a
   // network layer with a shared HttpNetworkSession in order for multiple
   // network layers to share information (e.g. authentication data). The
   // HttpCache takes ownership of the |backend_factory|.
-  HttpCache(HttpNetworkSession* session, BackendFactory* backend_factory);
+  //
+  // The HttpCache must be destroyed before the HttpNetworkSession.
+  //
+  // If |set_up_quic_server_info| is true, configures the cache to track
+  // information about servers supporting QUIC.
+  HttpCache(HttpNetworkSession* session,
+            BackendFactory* backend_factory,
+            bool set_up_quic_server_info);
 
   // Initialize the cache from its component parts. The lifetime of the
   // |network_layer| and |backend_factory| are managed by the HttpCache and
   // will be destroyed using |delete| when the HttpCache is destroyed.
   HttpCache(HttpTransactionFactory* network_layer,
             NetLog* net_log,
-            BackendFactory* backend_factory);
+            BackendFactory* backend_factory,
+            bool set_up_quic_server_info);
 
   ~HttpCache() override;
 
@@ -417,8 +420,6 @@ class NET_EXPORT HttpCache : public HttpTransactionFactory,
   bool fail_conditionalization_for_test_;
 
   Mode mode_;
-
-  scoped_ptr<QuicServerInfoFactoryAdaptor> quic_server_info_factory_;
 
   scoped_ptr<HttpTransactionFactory> network_layer_;
 

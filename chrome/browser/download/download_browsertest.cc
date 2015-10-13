@@ -145,7 +145,7 @@ class CreatedObserver : public content::DownloadManager::Observer {
                          content::DownloadItem* item) override {
     DCHECK_EQ(manager_, manager);
     if (waiting_)
-      base::MessageLoopForUI::current()->Quit();
+      base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
   content::DownloadManager* manager_;
@@ -187,10 +187,10 @@ class PercentWaiter : public content::DownloadItem::Observer {
           (item_->PercentComplete() != 100)))) {
       error_ = true;
       if (waiting_)
-        base::MessageLoopForUI::current()->Quit();
+        base::MessageLoopForUI::current()->QuitWhenIdle();
     }
     if (item_->GetState() == DownloadItem::COMPLETE && waiting_)
-      base::MessageLoopForUI::current()->Quit();
+      base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
   void OnDownloadDestroyed(content::DownloadItem* item) override {
@@ -274,7 +274,7 @@ class DownloadsHistoryDataCollector {
       scoped_ptr<std::vector<history::DownloadRow> > entries) {
     result_valid_ = true;
     results_ = entries.Pass();
-    base::MessageLoopForUI::current()->Quit();
+    base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
   Profile* profile_;
@@ -298,7 +298,7 @@ class MockAbortExtensionInstallPrompt : public ExtensionInstallPrompt {
                       const Extension* extension,
                       const ShowDialogCallback& show_dialog_callback) override {
     delegate->InstallUIAbort(true);
-    base::MessageLoopForUI::current()->Quit();
+    base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
   void OnInstallSuccess(const Extension* extension, SkBitmap* icon) override {}
@@ -395,7 +395,7 @@ class HistoryObserver : public DownloadHistory::Observer {
 
     seen_stored_ = true;
     if (waiting_)
-      base::MessageLoopForUI::current()->Quit();
+      base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
   void OnDownloadHistoryDestroyed() override {
@@ -1109,8 +1109,8 @@ class DownloadTest : public InProcessBrowserTest {
   static void EnsureNoPendingDownloadJobsOnIO(bool* result) {
     if (net::URLRequestSlowDownloadJob::NumberOutstandingRequests())
       *result = false;
-    BrowserThread::PostTask(
-        BrowserThread::UI, FROM_HERE, base::MessageLoop::QuitClosure());
+    BrowserThread::PostTask(BrowserThread::UI, FROM_HERE,
+                            base::MessageLoop::QuitWhenIdleClosure());
   }
 
   // Location of the test data.
@@ -1618,6 +1618,47 @@ IN_PROC_BROWSER_TEST_F(DownloadTest, CloseNewTab3) {
   EXPECT_EQ(1, browser()->tab_strip_model()->count());
 
   CheckDownload(browser(), file, file);
+}
+
+// Open a second tab, then download a file in that tab. However, have the
+// download be canceled by having the file picker act like the user canceled
+// the download. The 2nd tab should be closed automatically.
+IN_PROC_BROWSER_TEST_F(DownloadTest, CloseNewTab4) {
+  scoped_ptr<content::DownloadTestObserver> observer(
+        CreateWaiter(browser(), 1));
+  DownloadManager* manager = DownloadManagerForBrowser(browser());
+  EXPECT_EQ(0, manager->InProgressCount());
+  EnableFileChooser(false);
+
+  // Get the download URL
+  GURL slow_download_url(net::URLRequestSlowDownloadJob::kUnknownSizeUrl);
+
+  // Open a new tab for the download
+  content::WebContents* tab =
+        browser()->tab_strip_model()->GetActiveWebContents();
+  content::WebContents* new_tab = content::WebContents::Create(
+        content::WebContents::CreateParams(tab->GetBrowserContext()));
+  ASSERT_TRUE(new_tab);
+  ASSERT_TRUE(new_tab->GetController().IsInitialNavigation());
+  browser()->tab_strip_model()->AppendWebContents(new_tab, true);
+  EXPECT_EQ(2, browser()->tab_strip_model()->count());
+
+  // Download a file in that new tab, having it open a file picker
+  scoped_ptr<DownloadUrlParameters> params(
+      DownloadUrlParameters::FromWebContents(new_tab, slow_download_url));
+  params->set_prompt(true);
+  manager->DownloadUrl(params.Pass());
+  observer->WaitForFinished();
+
+  DownloadManager::DownloadVector items;
+  manager->GetAllDownloads(&items);
+  ASSERT_NE(0u, items.size());
+  DownloadItem* item = items[0];
+  EXPECT_TRUE(item != nullptr);
+
+  // When the download is canceled, the second tab should close.
+  EXPECT_EQ(item->GetState(), DownloadItem::CANCELLED);
+  EXPECT_EQ(1, browser()->tab_strip_model()->count());
 }
 
 // EmbeddedTestServer::HandleRequestCallback function that responds with a
@@ -3553,7 +3594,7 @@ IN_PROC_BROWSER_TEST_F(DownloadTestWithShelf, PRE_DownloadTest_History) {
   HistoryServiceFactory::GetForProfile(browser()->profile(),
                                        ServiceAccessType::IMPLICIT_ACCESS)
       ->FlushForTest(base::Bind(
-          &base::MessageLoop::Quit,
+          &base::MessageLoop::QuitWhenIdle,
           base::Unretained(base::MessageLoop::current()->current())));
   content::RunMessageLoop();
 }

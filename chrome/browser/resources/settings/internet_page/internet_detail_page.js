@@ -4,11 +4,11 @@
 
 /**
  * @fileoverview
- * 'cr-settings-internet-detail' is the settings subpage containing details
+ * 'settings-internet-detail' is the settings subpage containing details
  * for a network.
  *
  * @group Chrome Settings Elements
- * @element cr-settings-internet-detail
+ * @element settings-internet-detail
  */
 (function() {
 'use strict';
@@ -16,7 +16,7 @@
 /** @const */ var CARRIER_VERIZON = 'Verizon Wireless';
 
 Polymer({
-  is: 'cr-settings-internet-detail-page',
+  is: 'settings-internet-detail-page',
 
   properties: {
     /**
@@ -244,8 +244,7 @@ Polymer({
    * @private
    */
   isConnectedState_: function(properties) {
-    return !!properties && properties.ConnectionState ==
-        CrOnc.ConnectionState.CONNECTED;
+    return properties.ConnectionState == CrOnc.ConnectionState.CONNECTED;
   },
 
   /**
@@ -254,7 +253,7 @@ Polymer({
    * @private
    */
   showConnect_: function(properties) {
-    return !!properties && properties.Type != CrOnc.Type.ETHERNET &&
+    return properties.Type != CrOnc.Type.ETHERNET &&
            properties.ConnectionState == CrOnc.ConnectionState.NOT_CONNECTED;
   },
 
@@ -327,39 +326,39 @@ Polymer({
    * @private
    */
   showDisconnect_: function(properties) {
-    return !!properties && properties.Type != CrOnc.Type.ETHERNET &&
+    return properties.Type != CrOnc.Type.ETHERNET &&
            properties.ConnectionState != CrOnc.ConnectionState.NOT_CONNECTED;
   },
 
   /**
-   * Callback when the Connect button is clicked.
+   * Callback when the Connect button is tapped.
    * @private
    */
-  onConnectClicked_: function() {
+  onConnectTap_: function() {
     chrome.networkingPrivate.startConnect(this.guid);
   },
 
   /**
-   * Callback when the Disconnect button is clicked.
+   * Callback when the Disconnect button is tapped.
    * @private
    */
-  onDisconnectClicked_: function() {
+  onDisconnectTap_: function() {
     chrome.networkingPrivate.startDisconnect(this.guid);
   },
 
   /**
-   * Callback when the Activate button is clicked.
+   * Callback when the Activate button is tapped.
    * @private
    */
-  onActivateClicked_: function() {
+  onActivateTap_: function() {
     chrome.networkingPrivate.startActivate(this.guid);
   },
 
   /**
-   * Callback when the View Account button is clicked.
+   * Callback when the View Account button is tapped.
    * @private
    */
-  onViewAccountClicked_: function() {
+  onViewAccountTap_: function() {
     // startActivate() will show the account page for activated networks.
     chrome.networkingPrivate.startActivate(this.guid);
   },
@@ -487,8 +486,7 @@ Polymer({
    * @private
    */
   showShared_: function(properties) {
-    return !!properties && (properties.Source == 'Device' ||
-                            properties.Source == 'DevicePolicy');
+    return properties.Source == 'Device' || properties.Source == 'DevicePolicy';
   },
 
   /**
@@ -497,7 +495,7 @@ Polymer({
    * @private
    */
   showAutoConnect_: function(properties) {
-    return !!properties && properties.Type != CrOnc.Type.ETHERNET &&
+    return properties.Type != CrOnc.Type.ETHERNET &&
            properties.Source != CrOnc.Source.NONE;
   },
 
@@ -509,7 +507,7 @@ Polymer({
   showPreferNetwork_: function(properties) {
     // TODO(stevenjb): Resolve whether or not we want to allow "preferred" for
     // properties.Type == CrOnc.Type.ETHERNET.
-    return !!properties && properties.Source != CrOnc.Source.NONE;
+    return properties.Source != CrOnc.Source.NONE;
   },
 
   /**
@@ -637,7 +635,7 @@ Polymer({
    * @private
    */
   hasNetworkSection_: function(properties) {
-    return !!properties && properties.Type != CrOnc.Type.VPN;
+    return properties.Type != CrOnc.Type.VPN;
   },
 
   /**
@@ -647,7 +645,7 @@ Polymer({
    * @private
    */
   isType_: function(properties, type) {
-    return !!properties && properties.Type == type;
+    return properties.Type == type;
   },
 
   /**

@@ -85,6 +85,17 @@
             'metrics_serialization',
           ],
         }],
+        ['OS == "mac"', {
+          'link_settings': {
+            'libraries': [
+              # The below are all needed for drive_metrics_provider_mac.mm.
+              '$(SDKROOT)/System/Library/Frameworks/CoreFoundation.framework',
+              '$(SDKROOT)/System/Library/Frameworks/DiskArbitration.framework',
+              '$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
+              '$(SDKROOT)/System/Library/Frameworks/IOKit.framework',
+            ],
+          },
+        }],
         ['OS=="win"', {
           'sources!': [
             'metrics/machine_id_provider_stub.cc',
@@ -119,6 +130,23 @@
         'metrics/net/wifi_access_point_info_provider.h',
         'metrics/net/wifi_access_point_info_provider_chromeos.cc',
         'metrics/net/wifi_access_point_info_provider_chromeos.h',
+      ],
+    },
+    {
+      # GN version: //components/metrics:ui
+      'target_name': 'metrics_ui',
+      'type': 'static_library',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../ui/gfx/gfx.gyp:gfx',
+        'metrics',
+      ],
+      'sources': [
+        'metrics/ui/screen_info_metrics_provider.cc',
+        'metrics/ui/screen_info_metrics_provider.h',
       ],
     },
     {
@@ -201,7 +229,6 @@
           'dependencies': [
             '../base/base.gyp:base',
             '../content/content.gyp:content_browser',
-            '../ui/gfx/gfx.gyp:gfx',
             'component_metrics_proto',
             'metrics',
           ],

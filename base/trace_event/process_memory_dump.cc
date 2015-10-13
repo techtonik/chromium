@@ -4,20 +4,71 @@
 
 #include "base/trace_event/process_memory_dump.h"
 
+#include <vector>
+
+#include "base/stl_util.h"
 #include "base/trace_event/process_memory_totals.h"
 #include "base/trace_event/trace_event_argument.h"
+
+#if defined(OS_POSIX)
+#include <sys/mman.h>
+#endif
 
 namespace base {
 namespace trace_event {
 
 namespace {
+
 const char kEdgeTypeOwnership[] = "ownership";
 
 std::string GetSharedGlobalAllocatorDumpName(
     const MemoryAllocatorDumpGuid& guid) {
   return "global/" + guid.ToString();
 }
+
 }  // namespace
+
+#if defined(COUNT_RESIDENT_BYTES_SUPPORTED)
+// static
+size_t ProcessMemoryDump::CountResidentBytes(void* start_address,
+                                             size_t mapped_size) {
+  const size_t page_size = GetPageSize();
+  const uintptr_t start_pointer = reinterpret_cast<uintptr_t>(start_address);
+  DCHECK_EQ(0u, start_pointer % page_size);
+
+  // This function allocates a char vector of size number of pages in the given
+  // mapped_size. To avoid allocating a large array, the memory is split into
+  // chunks. Maximum size of vector allocated, will be
+  // kPageChunkSize / page_size.
+  const size_t kMaxChunkSize = 32 * 1024 * 1024;
+  size_t offset = 0;
+  size_t total_resident_size = 0;
+  while (offset < mapped_size) {
+    void* chunk_start = reinterpret_cast<void*>(start_pointer + offset);
+    const size_t chunk_size = std::min(mapped_size - offset, kMaxChunkSize);
+    const size_t page_count = (chunk_size + page_size - 1) / page_size;
+    size_t resident_page_count = 0;
+
+#if defined(OS_MACOSX) || defined(OS_IOS)
+    std::vector<char> vec(page_count + 1);
+    int res = mincore(chunk_start, chunk_size, vector_as_array(&vec));
+    DCHECK(!res);
+    for (size_t i = 0; i < page_count; i++)
+      resident_page_count += vec[i] & MINCORE_INCORE ? 1 : 0;
+#else   // defined(OS_MACOSX) || defined(OS_IOS)
+    std::vector<unsigned char> vec(page_count + 1);
+    int res = mincore(chunk_start, chunk_size, vector_as_array(&vec));
+    DCHECK(!res);
+    for (size_t i = 0; i < page_count; i++)
+      resident_page_count += vec[i];
+#endif  // defined(OS_MACOSX) || defined(OS_IOS)
+
+    total_resident_size += resident_page_count * page_size;
+    offset += kMaxChunkSize;
+  }
+  return total_resident_size;
+}
+#endif  // defined(COUNT_RESIDENT_BYTES_SUPPORTED)
 
 ProcessMemoryDump::ProcessMemoryDump(
     const scoped_refptr<MemoryDumpSessionState>& session_state)
@@ -59,9 +110,7 @@ MemoryAllocatorDump* ProcessMemoryDump::GetAllocatorDump(
 MemoryAllocatorDump* ProcessMemoryDump::GetOrCreateAllocatorDump(
     const std::string& absolute_name) {
   MemoryAllocatorDump* mad = GetAllocatorDump(absolute_name);
-  if (mad)
-    return mad;
-  return CreateAllocatorDump(absolute_name);
+  return mad ? mad : CreateAllocatorDump(absolute_name);
 }
 
 MemoryAllocatorDump* ProcessMemoryDump::CreateSharedGlobalAllocatorDump(

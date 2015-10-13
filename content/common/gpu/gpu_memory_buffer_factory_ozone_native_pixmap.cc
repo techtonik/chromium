@@ -43,16 +43,16 @@ GpuMemoryBufferFactoryOzoneNativePixmap::CreateGpuMemoryBuffer(
           ->GetSurfaceFactoryOzone()
           ->CreateNativePixmap(surface_handle, size, format, usage);
   if (!pixmap.get()) {
-    LOG(ERROR) << "Failed to create pixmap " << size.width() << "x"
-               << size.height() << " format " << static_cast<int>(format)
-               << ", usage " << static_cast<int>(usage);
+    DLOG(ERROR) << "Failed to create pixmap " << size.width() << "x"
+                << size.height() << " format " << static_cast<int>(format)
+                << ", usage " << static_cast<int>(usage);
     return gfx::GpuMemoryBufferHandle();
   }
 
-  gfx::GpuMemoryBufferHandle handle;
-  handle.type = gfx::OZONE_NATIVE_PIXMAP;
-  handle.id = id;
-  handle.native_pixmap_handle = pixmap->ExportHandle();
+  gfx::GpuMemoryBufferHandle new_handle;
+  new_handle.type = gfx::OZONE_NATIVE_PIXMAP;
+  new_handle.id = id;
+  new_handle.native_pixmap_handle = pixmap->ExportHandle();
 
   {
     base::AutoLock lock(native_pixmaps_lock_);
@@ -61,7 +61,38 @@ GpuMemoryBufferFactoryOzoneNativePixmap::CreateGpuMemoryBuffer(
     native_pixmaps_[key] = pixmap;
   }
 
-  return handle;
+  return new_handle;
+}
+
+gfx::GpuMemoryBufferHandle
+GpuMemoryBufferFactoryOzoneNativePixmap::CreateGpuMemoryBufferFromHandle(
+    const gfx::GpuMemoryBufferHandle& handle,
+    gfx::GpuMemoryBufferId id,
+    const gfx::Size& size,
+    gfx::BufferFormat format,
+    int client_id) {
+  scoped_refptr<ui::NativePixmap> pixmap =
+      ui::OzonePlatform::GetInstance()
+          ->GetSurfaceFactoryOzone()
+          ->CreateNativePixmapFromHandle(handle.native_pixmap_handle);
+  if (!pixmap.get()) {
+    DLOG(ERROR) << "Failed to create pixmap from handle";
+    return gfx::GpuMemoryBufferHandle();
+  }
+
+  gfx::GpuMemoryBufferHandle new_handle;
+  new_handle.type = gfx::OZONE_NATIVE_PIXMAP;
+  new_handle.id = id;
+  new_handle.native_pixmap_handle = pixmap->ExportHandle();
+
+  {
+    base::AutoLock lock(native_pixmaps_lock_);
+    NativePixmapMapKey key(id.id, client_id);
+    DCHECK(native_pixmaps_.find(key) == native_pixmaps_.end());
+    native_pixmaps_[key] = pixmap;
+  }
+
+  return new_handle;
 }
 
 void GpuMemoryBufferFactoryOzoneNativePixmap::DestroyGpuMemoryBuffer(

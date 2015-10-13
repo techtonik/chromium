@@ -437,7 +437,7 @@ LayoutUnit LayoutFlexibleBox::computeMainAxisExtentForChild(const LayoutBox& chi
         // We don't have to check for "auto" here - computeContentLogicalHeight will just return -1 for that case anyway.
         // It's safe to access scrollbarLogicalHeight here because computeNextFlexLine will have already
         // forced layout on the child.
-        return child.computeContentLogicalHeight(sizeType, size, child.logicalHeight() - child.borderAndPaddingLogicalHeight()) + child.scrollbarLogicalHeight();
+        return child.computeContentLogicalHeight(sizeType, size, child.contentLogicalHeight()) + child.scrollbarLogicalHeight();
     }
     return child.computeLogicalWidthUsing(sizeType, size, contentLogicalWidth(), this) - child.borderAndPaddingLogicalWidth();
 }
@@ -1233,7 +1233,7 @@ void LayoutFlexibleBox::layoutAndPlaceChildren(LayoutUnit& crossAxisOffset, cons
     }
 
     if (isColumnFlow())
-        setLogicalHeight(mainAxisOffset + flowAwareBorderEnd() + flowAwarePaddingEnd() + scrollbarLogicalHeight());
+        setLogicalHeight(std::max(logicalHeight(), mainAxisOffset + flowAwareBorderEnd() + flowAwarePaddingEnd() + scrollbarLogicalHeight()));
 
     if (style()->flexDirection() == FlowColumnReverse) {
         // We have to do an extra pass for column-reverse to reposition the flex items since the start depends

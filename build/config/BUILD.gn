@@ -8,7 +8,7 @@ import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/sanitizers/sanitizers.gni")
 import("//build/config/ui.gni")
-import("//build/module_args/v8.gni")
+import("//build_overrides/v8.gni")
 import("//build/toolchain/goma.gni")
 
 declare_args() {
@@ -168,7 +168,7 @@ config("feature_flags") {
   if (is_msan) {
     defines += [ "MEMORY_SANITIZER" ]
   }
-  if (is_ubsan) {
+  if (is_ubsan || is_ubsan_vptr) {
     defines += [ "UNDEFINED_SANITIZER" ]
   }
   if (enable_webrtc) {

@@ -197,6 +197,7 @@ bool WebContentsAndroid::Register(JNIEnv* env) {
 WebContentsAndroid::WebContentsAndroid(WebContents* web_contents)
     : web_contents_(web_contents),
       navigation_controller_(&(web_contents->GetController())),
+      synchronous_compositor_client_(nullptr),
       weak_factory_(this) {
   g_allocated_web_contents_androids.Get().insert(this);
   JNIEnv* env = AttachCurrentThread();
@@ -349,6 +350,11 @@ void WebContentsAndroid::ShowInterstitialPage(
 jboolean WebContentsAndroid::IsShowingInterstitialPage(JNIEnv* env,
                                                         jobject obj) {
   return web_contents_->ShowingInterstitialPage();
+}
+
+jboolean WebContentsAndroid::FocusLocationBarByDefault(JNIEnv* env,
+                                                       jobject obj) {
+  return web_contents_->FocusLocationBarByDefault();
 }
 
 jboolean WebContentsAndroid::IsRenderWidgetHostViewReady(

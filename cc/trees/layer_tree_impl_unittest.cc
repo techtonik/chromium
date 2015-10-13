@@ -1335,74 +1335,6 @@ TEST_F(LayerTreeImplTest,
   EXPECT_FALSE(result_layer);
 }
 
-TEST_F(LayerTreeImplTest, MakeScrollbarsInvisibleNearMinPageScale) {
-  const int kThumbThickness = 10;
-  const int kTrackStart = 0;
-  const bool kIsLeftSideVerticalScrollbar = false;
-  const bool kIsOverlayScrollbar = true;
-
-  LayerTreeImpl* active_tree = host_impl().active_tree();
-  active_tree->set_hide_pinch_scrollbars_near_min_scale(true);
-
-  scoped_ptr<LayerImpl> scroll_layer = LayerImpl::Create(active_tree, 1);
-  scoped_ptr<SolidColorScrollbarLayerImpl> vertical_scrollbar_layer =
-      SolidColorScrollbarLayerImpl::Create(active_tree,
-                                           2,
-                                           VERTICAL,
-                                           kThumbThickness,
-                                           kTrackStart,
-                                           kIsLeftSideVerticalScrollbar,
-                                           kIsOverlayScrollbar);
-  scoped_ptr<SolidColorScrollbarLayerImpl> horizontal_scrollbar_layer =
-      SolidColorScrollbarLayerImpl::Create(active_tree,
-                                           3,
-                                           HORIZONTAL,
-                                           kThumbThickness,
-                                           kTrackStart,
-                                           kIsLeftSideVerticalScrollbar,
-                                           kIsOverlayScrollbar);
-
-  scoped_ptr<LayerImpl> clip_layer = LayerImpl::Create(active_tree, 4);
-  scoped_ptr<LayerImpl> page_scale_layer = LayerImpl::Create(active_tree, 5);
-
-  scroll_layer->SetScrollClipLayer(clip_layer->id());
-
-  LayerImpl* scroll_layer_ptr = scroll_layer.get();
-  LayerImpl* page_scale_layer_ptr = page_scale_layer.get();
-
-  clip_layer->AddChild(page_scale_layer.Pass());
-  page_scale_layer_ptr->AddChild(scroll_layer.Pass());
-
-  vertical_scrollbar_layer->SetScrollLayerAndClipLayerByIds(
-      scroll_layer_ptr->id(),
-      clip_layer->id());
-  horizontal_scrollbar_layer->SetScrollLayerAndClipLayerByIds(
-      scroll_layer_ptr->id(),
-      clip_layer->id());
-
-  active_tree->PushPageScaleFromMainThread(1.0f, 1.0f, 4.0f);
-  active_tree->SetViewportLayersFromIds(
-      Layer::INVALID_ID,  // Overscroll
-      page_scale_layer_ptr->id(),
-      scroll_layer_ptr->id(),
-      Layer::INVALID_ID);  // Outer Scroll
-
-  EXPECT_TRUE(vertical_scrollbar_layer->hide_layer_and_subtree());
-  EXPECT_TRUE(horizontal_scrollbar_layer->hide_layer_and_subtree());
-
-  active_tree->PushPageScaleFromMainThread(1.04f, 1.0f, 4.0f);
-  EXPECT_TRUE(vertical_scrollbar_layer->hide_layer_and_subtree());
-  EXPECT_TRUE(horizontal_scrollbar_layer->hide_layer_and_subtree());
-
-  active_tree->PushPageScaleFromMainThread(1.06f, 1.0f, 4.0f);
-  EXPECT_FALSE(vertical_scrollbar_layer->hide_layer_and_subtree());
-  EXPECT_FALSE(horizontal_scrollbar_layer->hide_layer_and_subtree());
-
-  active_tree->PushPageScaleFromMainThread(1.5f, 1.0f, 4.0f);
-  EXPECT_FALSE(vertical_scrollbar_layer->hide_layer_and_subtree());
-  EXPECT_FALSE(horizontal_scrollbar_layer->hide_layer_and_subtree());
-}
-
 TEST_F(LayerTreeImplTest,
        HitCheckingTouchHandlerRegionsForSinglePositionedLayer) {
   scoped_ptr<LayerImpl> root =
@@ -1498,13 +1430,14 @@ TEST_F(LayerTreeImplTest,
 
   float device_scale_factor = 3.f;
   float page_scale_factor = 5.f;
+  float max_page_scale_factor = 10.f;
   gfx::Size scaled_bounds_for_root = gfx::ScaleToCeiledSize(
       root->bounds(), device_scale_factor * page_scale_factor);
   host_impl().SetViewportSize(scaled_bounds_for_root);
 
   host_impl().active_tree()->SetDeviceScaleFactor(device_scale_factor);
   host_impl().active_tree()->PushPageScaleFromMainThread(
-      page_scale_factor, page_scale_factor, page_scale_factor);
+      page_scale_factor, page_scale_factor, max_page_scale_factor);
   host_impl().active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
   host_impl().active_tree()->SetRootLayer(root.Pass());
   host_impl().active_tree()->SetViewportLayersFromIds(Layer::INVALID_ID, 1, 1,
@@ -1568,6 +1501,31 @@ TEST_F(LayerTreeImplTest,
 
   // Hit checking for a point inside the touch event handler region should
   // return the root layer.
+  test_point = gfx::Point(35, 35);
+  test_point =
+      gfx::ScalePoint(test_point, device_scale_factor * page_scale_factor);
+  result_layer =
+      host_impl().active_tree()->FindLayerThatIsHitByPointInTouchHandlerRegion(
+          test_point);
+  ASSERT_TRUE(result_layer);
+  EXPECT_EQ(12345, result_layer->id());
+
+  test_point = gfx::Point(64, 64);
+  test_point =
+      gfx::ScalePoint(test_point, device_scale_factor * page_scale_factor);
+  result_layer =
+      host_impl().active_tree()->FindLayerThatIsHitByPointInTouchHandlerRegion(
+          test_point);
+  ASSERT_TRUE(result_layer);
+  EXPECT_EQ(12345, result_layer->id());
+
+  // Check update of page scale factor on the active tree when page scale layer
+  // is also the root layer.
+  page_scale_factor *= 1.5f;
+  host_impl().active_tree()->SetPageScaleOnActiveTree(page_scale_factor);
+  EXPECT_EQ(host_impl().active_tree()->root_layer(),
+            host_impl().active_tree()->PageScaleLayer());
+
   test_point = gfx::Point(35, 35);
   test_point =
       gfx::ScalePoint(test_point, device_scale_factor * page_scale_factor);

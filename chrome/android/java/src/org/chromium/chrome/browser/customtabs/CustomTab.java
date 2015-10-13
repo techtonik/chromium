@@ -30,10 +30,10 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationDelegateImpl;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
-import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.InterceptNavigationDelegateImpl;
 import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabContextMenuItemDelegate;
 import org.chromium.chrome.browser.tab.TabIdManager;
 import org.chromium.chrome.browser.tab.TabWebContentsDelegateAndroid;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
@@ -46,7 +46,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * A chrome tab that is only used as a custom tab.
  */
-public class CustomTab extends ChromeTab {
+public class CustomTab extends Tab {
     private static class CustomTabObserver extends EmptyTabObserver {
         private CustomTabsConnection mCustomTabsConnection;
         private IBinder mSession;
@@ -144,14 +144,6 @@ public class CustomTab extends ChromeTab {
 
     private ExternalNavigationHandler mNavigationHandler;
     private CustomTabNavigationDelegate mNavigationDelegate;
-    private TabChromeContextMenuItemDelegate
-            mContextMenuDelegate = new TabChromeContextMenuItemDelegate() {
-                @Override
-                public boolean startDownload(String url, boolean isLink) {
-                    // Behave similarly to ChromeTabChromeContextMenuItemDelegate in ChromeTab.
-                    return !isLink || !shouldInterceptContextMenuDownload(url);
-                }
-            };
 
     private CustomTabObserver mTabObserver;
     private final boolean mEnableUrlBarHiding;
@@ -164,8 +156,8 @@ public class CustomTab extends ChromeTab {
      */
     public CustomTab(ChromeActivity activity, WindowAndroid windowAndroid, IBinder session,
             String url, String referrer, int parentTabId, boolean enableUrlBarHiding) {
-        super(TabIdManager.getInstance().generateValidId(Tab.INVALID_TAB_ID), activity, false,
-                windowAndroid, TabLaunchType.FROM_EXTERNAL_APP, parentTabId, null, null);
+        super(TabIdManager.getInstance().generateValidId(Tab.INVALID_TAB_ID), parentTabId, false,
+                activity, windowAndroid, TabLaunchType.FROM_EXTERNAL_APP, null, null);
         mEnableUrlBarHiding = enableUrlBarHiding;
         CustomTabsConnection customTabsConnection =
                 CustomTabsConnection.getInstance(activity.getApplication());
@@ -233,7 +225,7 @@ public class CustomTab extends ChromeTab {
 
     @Override
     protected ContextMenuPopulator createContextMenuPopulator() {
-        return new ChromeContextMenuPopulator(mContextMenuDelegate) {
+        return new ChromeContextMenuPopulator(new TabContextMenuItemDelegate(this, mActivity)) {
             @Override
             public void buildContextMenu(ContextMenu menu, Context context,
                     ContextMenuParams params) {
