@@ -4,11 +4,7 @@
 
 package org.chromium.device.bluetooth;
 
-import android.annotation.TargetApi;
-import android.bluetooth.BluetoothDevice;
-import android.content.Context;
-import android.os.Build;
-import android.os.ParcelUuid;
+import android.bluetooth.BluetoothGattService;
 
 import org.chromium.base.Log;
 import org.chromium.base.ThreadUtils;
@@ -25,47 +21,45 @@ import java.util.List;
  * device::BluetoothRemoteGattServiceAndroid.
  */
 @JNINamespace("device")
-@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-final class ChromeBluetoothDevice {
+final class BluetoothRemoteGattServiceAndroid {
     private static final String TAG = "Bluetooth";
 
-    private long mNativeBluetoothDeviceAndroid;
+    private long mNativeBluetoothRemoteGattServiceAndroid;
     final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
     private final BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
 
-    private ChromeBluetoothDevice(
-            long nativeBluetoothDeviceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
-        mNativeBluetoothDeviceAndroid = nativeBluetoothDeviceAndroid;
+    private BluetoothRemoteGattServiceAndroid(
+            long nativeBluetoothRemoteGattServiceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
+        mNativeBluetoothRemoteGattServiceAndroid = nativeBluetoothRemoteGattServiceAndroid;
         mDevice = deviceWrapper;
         mBluetoothGattCallbackImpl = new BluetoothGattCallbackImpl();
-        Log.v(TAG, "ChromeBluetoothDevice created.");
+        Log.v(TAG, "BluetoothRemoteGattServiceAndroid created.");
     }
 
     /**
      * Handles C++ object being destroyed.
      */
     @CalledByNative
-    private void onBluetoothDeviceAndroidDestruction() {
-        disconnectGatt();
-        mNativeBluetoothDeviceAndroid = 0;
+    private void onBluetoothRemoteGattServiceAndroidDestruction() {
+        mNativeBluetoothRemoteGattServiceAndroid = 0;
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothDeviceAndroid methods implemented in java:
+    // BluetoothRemoteGattServiceAndroid methods implemented in java:
 
-    // Implements BluetoothDeviceAndroid::Create.
+    // Implements BluetoothRemoteGattServiceAndroid::Create.
     // 'Object' type must be used because inner class Wrappers.BluetoothDeviceWrapper reference is
     // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
     @CalledByNative
-    private static ChromeBluetoothDevice create(
-            long nativeBluetoothDeviceAndroid, Object deviceWrapper) {
-        return new ChromeBluetoothDevice(
-                nativeBluetoothDeviceAndroid, (Wrappers.BluetoothDeviceWrapper) deviceWrapper);
+    private static BluetoothRemoteGattServiceAndroid create(
+            long nativeBluetoothRemoteGattServiceAndroid, Object deviceWrapper) {
+        return new BluetoothRemoteGattServiceAndroid(
+                nativeBluetoothRemoteGattServiceAndroid, (Wrappers.BluetoothDeviceWrapper) deviceWrapper);
     }
 
-    // Implements BluetoothDeviceAndroid::UpdateAdvertisedUUIDs.
+    // Implements BluetoothRemoteGattServiceAndroid::UpdateAdvertisedUUIDs.
     @CalledByNative
     private boolean updateAdvertisedUUIDs(List<ParcelUuid> uuidsFromScan) {
         if ((mUuidsFromScan == null && uuidsFromScan == null)
@@ -76,114 +70,24 @@ final class ChromeBluetoothDevice {
         return true;
     }
 
-    // Implements BluetoothDeviceAndroid::GetBluetoothClass.
+    // Implements BluetoothRemoteGattServiceAndroid::GetBluetoothClass.
     @CalledByNative
     private int getBluetoothClass() {
         return mDevice.getBluetoothClass_getDeviceClass();
     }
 
-    // Implements BluetoothDeviceAndroid::GetAddress.
-    @CalledByNative
-    private String getAddress() {
-        return mDevice.getAddress();
-    }
-
-    // Implements BluetoothDeviceAndroid::IsPaired.
-    @CalledByNative
-    private boolean isPaired() {
-        return mDevice.getBondState() == BluetoothDevice.BOND_BONDED;
-    }
-
-    // Implements BluetoothDeviceAndroid::GetUUIDs.
-    @CalledByNative
-    private String[] getUuids() {
-        int uuidCount = (mUuidsFromScan != null) ? mUuidsFromScan.size() : 0;
-        String[] string_array = new String[uuidCount];
-        for (int i = 0; i < uuidCount; i++) {
-            string_array[i] = mUuidsFromScan.get(i).toString();
-        }
-
-        // TODO(scheib): return merged list of UUIDs from scan results and,
-        // after a device is connected, discoverServices. crbug.com/508648
-
-        return string_array;
-    }
-
-    // Implements BluetoothDeviceAndroid::CreateGattConnectionImpl.
-    @CalledByNative
-    private void createGattConnectionImpl(Context context) {
-        Log.i(TAG, "connectGatt");
-        // autoConnect set to false as under experimentation using autoConnect failed to complete
-        // connections.
-        mBluetoothGatt =
-                mDevice.connectGatt(context, false /* autoConnect */, mBluetoothGattCallbackImpl);
-    }
-
-    // Implements BluetoothDeviceAndroid::DisconnectGatt.
-    @CalledByNative
-    private void disconnectGatt() {
-        Log.i(TAG, "BluetoothGatt.disconnect");
-        if (mBluetoothGatt != null) mBluetoothGatt.disconnect();
-    }
-
-    // Implements BluetoothDeviceAndroid::GetDeviceName.
-    @CalledByNative
-    private String getDeviceName() {
-        return mDevice.getName();
-    }
-
-    // Implements callbacks related to a GATT connection.
-    private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
-        @Override
-        public void onConnectionStateChange(final int status, final int newState) {
-            Log.i(TAG, "onConnectionStateChange status:%d newState:%s", status,
-                    (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED)
-                            ? "Connected"
-                            : "Disconnected");
-            if (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED) {
-                mBluetoothGatt.discoverServices();
-            }
-            ThreadUtils.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (mNativeBluetoothDeviceAndroid != 0) {
-                        nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid, status,
-                                newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);
-                    }
-                }
-            });
-        }
-
-        @Override
-        public void onServicesDiscovered(final int status) {
-            Log.i(TAG, "onServicesDiscovered status:%d==%s", status,
-                    status == android.bluetooth.BluetoothGatt.GATT_SUCCESS ? "OK" : "Error");
-            ThreadUtils.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (mNativeBluetoothDeviceAndroid != 0) {
-                        for (Wrappers.BluetoothGattServiceWrapper service :
-                                mBluetoothGatt.getServices()) {
-                            nativeCreateGattRemoteService(mNativeBluetoothDeviceAndroid,
-                                    service.getInstanceId(), service);
-                        }
-                    }
-                }
-            });
-        }
-    }
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterDevice C++ methods declared for access from java:
 
-    // Binds to BluetoothDeviceAndroid::OnConnectionStateChange.
+    // Binds to BluetoothRemoteGattServiceAndroid::OnConnectionStateChange.
     private native void nativeOnConnectionStateChange(
-            long nativeBluetoothDeviceAndroid, int status, boolean connected);
+            long nativeBluetoothRemoteGattServiceAndroid, int status, boolean connected);
 
-    // Binds to BluetoothDeviceAndroid::CreateGattRemoteService.
+    // Binds to BluetoothRemoteGattServiceAndroid::CreateGattRemoteService.
     // 'Object' type must be used for |bluetoothGattServiceWrapper| because inner class
     // Wrappers.BluetoothGattServiceWrapper reference is not handled by jni_generator.py JavaToJni.
     // http://crbug.com/505554
     private native void nativeCreateGattRemoteService(
-            long nativeBluetoothDeviceAndroid, int instanceId, Object bluetoothGattServiceWrapper);
+            long nativeBluetoothRemoteGattServiceAndroid, int instanceId, Object bluetoothGattServiceWrapper);
 }
