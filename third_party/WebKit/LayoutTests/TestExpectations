@@ -44,6 +44,26 @@ crbug.com/502531 fast/borders/border-antialiasing.html [ ImageOnlyFailure ]
 crbug.com/538697 [ Win7 Debug ] virtual/threaded/printing/webgl-oversized-printing.html [ Crash ]
 crbug.com/538697 [ Win7 Debug ] printing/webgl-oversized-printing.html [ Crash ]
 
+crbug.com/404597 fast/text/basic/015.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text/font-variant-ligatures.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text/font-weight-600.html [ NeedsRebaseline ]
+crbug.com/404597 [ Win Linux Android Lion Mavericks MountainLion Retina SnowLeopard ] fast/text/justify-ideograph-simple.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text/whitespace/002.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text-autosizing/tables/css-table-lots-of-text-many-cells.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text-autosizing/tables/fixed-table-lots-of-text-many-cells.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text-autosizing/tables/lots-of-text-many-cells.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text-autosizing/tables/narrow-percentage-width.html [ NeedsRebaseline ]
+crbug.com/404597 fast/text-autosizing/tables/narrow-specified-width.html [ NeedsRebaseline ]
+
+# Ref-tests that fail due to pixel snapping across element boundaries.
+crbug.com/404597 fast/text/soft-hyphen-min-preferred-width.html [ ImageOnlyFailure ]
+
+# Ref-tests that fail due to character based shaping/fallback.
+crbug.com/404597 fast/text/international/inline-plaintext-is-isolated.html [ ImageOnlyFailure ]
+crbug.com/404597 fast/text/international/bdi-dir-default-to-auto.html [ ImageOnlyFailure ]
+
+crbug.com/542643 fast/text/zero-font-size-2.html [ Pass Crash ]
+
 crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-cross-origin-response-handling.html [ Timeout ]
 crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-redirect-response-handling.html [ Timeout ]
 crbug.com/539226 [ Win7 ] http/tests/xmlhttprequest/open-in-body-onload-sync-to-invalid-preflight-handling.html [ Timeout ]
@@ -63,7 +83,7 @@ crbug.com/492664 imported/csswg-test/css-writing-modes-3/text-combine-upright-va
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/text-combine-upright-value-all-002.html [ ImageOnlyFailure ]
 crbug.com/492664 imported/csswg-test/css-writing-modes-3/text-combine-upright-value-all-003.html [ ImageOnlyFailure ]
 crbug.com/492664 imported/csswg-test/css-transitions-2/transitioncancel-001.html [ Failure ]
-crbug.com/418091 [ SnowLeopard Debug ] fast/text/aat-morx.html [ Failure ]
+crbug.com/418091 [ SnowLeopard ] fast/text/aat-morx.html [ Failure ]
 crbug.com/463358 [ Mac Linux Debug ] svg/hixie/perf/005.xml [ ImageOnlyFailure ]
 crbug.com/463358 [ Mac Linux Debug ] svg/hixie/perf/006.xml [ ImageOnlyFailure ]
 crbug.com/463358 [ Linux Lion Mavericks MountainLion Retina SnowLeopard Debug ] svg/transforms/text-with-pattern-inside-transformed-html.xhtml [ ImageOnlyFailure ]
@@ -88,7 +108,6 @@ crbug.com/522646 http/tests/media/encrypted-media/encrypted-media-encrypted-even
 crbug.com/522647 http/tests/notifications/close-dispatch-asynchronous.html [ Failure Pass ]
 crbug.com/522648 fast/events/touch/compositor-touch-hit-rects-iframes.html [ Crash Failure Pass ]
 crbug.com/522651 [ XP ] http/tests/inspector/extensions-useragent.html [ Crash Pass Timeout ]
-crbug.com/521862 [ Linux Win ] storage/websql/read-transactions-running-concurrently.html [ Failure Pass ]
 crbug.com/521859 http/tests/navigatorconnect/postmessage-from-worker.html [ Pass Timeout ]
 crbug.com/521858 [ Win7 ] http/tests/security/media-element-audio-source-node-same-origin.html [ Failure Pass ]
 crbug.com/521855 transitions/cancel-and-start-new.html [ Failure Pass ]
@@ -235,7 +254,7 @@ crbug.com/352405 virtual/threaded/animations/transition-and-animation-1.html [ P
 
 crbug.com/461179 virtual/spv2/paint/invalidation/invalidate-when-receiving-paint-layer.html [ ImageOnlyFailure ]
 
-crbug.com/524009 inspector/sources/debugger-pause/debugger-pause-in-internal.html [ NeedsManualRebaseline ]
+crbug.com/542541 [ Debug ] fast/events/click-count.html [ Pass Failure ]
 
 # TODO(ojan): These tests aren't flaky. See crbug.com/517144.
 # Release trybots run asserts, but the main waterfall ones don't. So, even
@@ -247,7 +266,8 @@ crbug.com/418091 [ SnowLeopard Debug ] media/track/track-cue-rendering-rtl.html 
 crbug.com/418091 [ SnowLeopard Debug ] inspector/elements/bidi-dom-tree.html [ Pass Crash ]
 crbug.com/449242 [ SnowLeopard Debug ] fast/css/word-spacing-characters-complex-text.html [ Pass Crash ]
 crbug.com/419696 [ Mac Debug ] fast/text/font-linux-normalize.html [ Crash Pass ]
-
+crbug.com/423739 fast/js/string-replace-2.html [ NeedsManualRebaseline ]
+crbug.com/423739 fast/dom/Window/Location/location-override-valueOf.html [ NeedsManualRebaseline ]
 crbug.com/524859 fast/text/complex-text-opacity.html [ NeedsManualRebaseline ]
 # crbug.com/498021 [ Linux ] fast/text/complex-text-opacity.html [ ImageOnlyFailure ]
 # crbug.com/509025 [ Yosemite ] fast/text/complex-text-opacity.html [ Failure ]
@@ -405,9 +425,6 @@ crbug.com/505364 crbug.com/520616 imported/web-platform-tests/shadow-dom/untriag
 
 crbug.com/539623 [ SnowLeopard ] fast/repaint/selection-change-in-iframe-with-relative-parent.html [ Pass Failure ImageOnlyFailure ]
 
-# Temporarily disabled until Chromium side supports meaningful MediaStreamTracks.
-crbug.com/532509 fast/mediarecorder/MediaRecorder-basic-video.html [ Skip ]
-
 crbug.com/387740 imported/web-platform-tests/mediacapture-streams/stream-api/introduction/disabled-audio-silence.html [ Skip ]
 crbug.com/387740 imported/web-platform-tests/mediacapture-streams/stream-api/introduction/disabled-video-black.html [ Skip ]
 crbug.com/387740 imported/web-platform-tests/mediacapture-streams/stream-api/mediastreamtrack/mediastreamtrack-end.html [ Skip ]
@@ -434,6 +451,9 @@ crbug.com/517836 [ Android XP Win7 Mac Linux ] imported/web-platform-tests/scree
 crbug.com/517836 imported/web-platform-tests/screen-orientation/orientation-reading.html [ Failure ]
 crbug.com/517836 imported/web-platform-tests/screen-orientation/onchange-event-subframe.html [ Failure Timeout ]
 crbug.com/517836 imported/web-platform-tests/screen-orientation/onchange-event.html [ Failure Timeout ]
+
+# Will work after we have grapheme-cluser based font selection
+crbug.com/454405 inspector-protocol/layout-fonts/unicode-range-combining-chars-fallback.html [ Failure ]
 
 # New W3C failures (dpranke@ to triage)
 
@@ -642,7 +662,9 @@ crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/row-progression
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/row-progression-009.xht [ ImageOnlyFailure ]
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/text-baseline-006.xht [ ImageOnlyFailure ]
 crbug.com/492664 [ Mac ] imported/csswg-test/css-writing-modes-3/text-baseline-007.xht [ ImageOnlyFailure ]
-crbug.com/492664 imported/csswg-test/css-writing-modes-3/vertical-alignment-026-rl.xht [ ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-vrl-022.xht [ ImageOnlyFailure ]
+crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-vrl-024.xht [ ImageOnlyFailure ]
+crbug.com/492664 imported/csswg-test/css-writing-modes-3/vertical-alignment-vrl-026.xht [ ImageOnlyFailure ]
 
 crbug.com/498845 [ Win ] fast/multicol/vertical-rl/float-content-break.html [ ImageOnlyFailure ]
 
@@ -658,18 +680,6 @@ crbug.com/396775 virtual/prefer_compositing_to_lcd_text/compositing/overflow/ref
 crbug.com/381684 [ Win Android Mac ] fonts/family-fallback-gardiner.html [ Skip ]
 
 crbug.com/467635 fast/dom/HTMLImageElement/image-sizes-meta-viewport.html [ Skip ]
-
-crbug.com/517898 [ SnowLeopard Debug ] fast/text/international/bidi-neutral-run.html [ Crash ]
-
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001b.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001c.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001d.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001i.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001j.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001m.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/text-orientation-script-001n.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-022-rl.xht [ Pass Failure ImageOnlyFailure ]
-crbug.com/539425 [ XP ] imported/csswg-test/css-writing-modes-3/vertical-alignment-024-rl.xht [ Pass Failure ImageOnlyFailure ]
 
 # crbug.com/396823 [ Mac ] fast/multicol/multicol-with-child-renderLayer-for-input.html [ ImageOnlyFailure ]
 
@@ -714,9 +724,6 @@ crbug.com/527152 http/tests/media/media-source/mediasource-duration.html [ Pass 
 crbug.com/517449 [ Android ] css3/images/optimize-contrast-image.html [ ImageOnlyFailure ]
 
 crbug.com/309675 compositing/gestures/gesture-tapHighlight-simple-longPress.html [ ImageOnlyFailure ]
-
-crbug.com/509581 [ Win ] css3/filters/filter-repaint-composited-fallback-crash.html [ ImageOnlyFailure ]
-crbug.com/509581 [ Win ] css3/filters/filter-repaint-composited-fallback.html [ ImageOnlyFailure ]
 
 crbug.com/245556 compositing/transitions/transform-on-large-layer.html [ ImageOnlyFailure ]
 
@@ -857,15 +864,14 @@ crbug.com/466200 svg/custom/repaint-on-constant-size-change.svg [ Failure ]
 
 # Temporary until we start generating Trusty baselines.
 crbug.com/498021 [ Linux ] fast/text/unicode-fallback-font.html [ Failure ]
-crbug.com/498021 [ Linux ] http/tests/misc/xslt-bad-import.html [ Failure ]
 crbug.com/498021 [ Linux ] http/tests/security/contentTypeOptions/nosniff-script-without-content-type-blocked.html [ Failure ]
 crbug.com/498021 [ Linux ] svg/custom/use-on-symbol-inside-pattern.svg [ Failure ]
 crbug.com/498021 [ Linux ] fast/forms/month/month-appearance-l10n.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/ellipsis-stroked.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/emphasis-complex.html [ ImageOnlyFailure ]
-crbug.com/498021 [ Linux ] fast/text/international/danda-space.html [ ImageOnlyFailure ]
+crbug.com/498021 [ Linux ] fast/text/international/danda-space.html [ Failure ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/international/hindi-whitespace.html [ ImageOnlyFailure ]
-crbug.com/498021 [ Linux ] fast/text/international/thai-line-breaks.html [ ImageOnlyFailure ]
+crbug.com/498021 [ Linux ] fast/text/international/thai-line-breaks.html [ Failure ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] fast/text/selection-multiple-runs.html [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] svg/W3C-SVG-1.1/paths-data-03-f.svg [ ImageOnlyFailure ]
 crbug.com/498021 [ Linux ] svg/W3C-SVG-1.1/text-align-08-b.svg [ ImageOnlyFailure ]
@@ -901,15 +907,15 @@ crbug.com/471066 [ SnowLeopard ] fast/text/fake-italic.html [ Failure ImageOnlyF
 
 crbug.com/478109 [ SnowLeopard ] fast/text/bidi-embedding-pop-and-push-same-2.html [ Failure ]
 
-crbug.com/521124 [ Win7 Release ] fast/text/international/vertical-text-glyph-test.html [ Pass ImageOnlyFailure ]
-crbug.com/521124 [ Win7 Release ] fast/text/international/text-combine-image-test.html [ Pass ImageOnlyFailure ]
+crbug.com/521124 [ Win7 ] fast/text/international/vertical-text-glyph-test.html [ Pass ImageOnlyFailure ]
+crbug.com/521124 [ Win7 ] fast/text/international/text-combine-image-test.html [ Pass ImageOnlyFailure ]
 crbug.com/521124 [ Win7 Release ] fast/css/font-weight-1.html [ Pass ImageOnlyFailure ]
 crbug.com/521124 [ Win7 Release ] fast/text/justify-ideograph-vertical.html [ Pass ImageOnlyFailure ]
 crbug.com/521124 [ Win7 Release ] fast/writing-mode/english-lr-text.html [ Pass ImageOnlyFailure ]
-crbug.com/521124 [ Win7 Release ] fast/text/orientation-sideways.html [ Pass ImageOnlyFailure ]
+crbug.com/521124 [ Win7 ] fast/text/orientation-sideways.html [ Pass ImageOnlyFailure ]
 
 crbug.com/419769 [ Debug SnowLeopard ] fast/forms/time-multiple-fields/time-multiple-fields-localization.html [ Crash ]
-crbug.com/419769 [ Debug SnowLeopard ] fast/text/unicode-fallback-font.html [ Crash ]
+crbug.com/419769 [ SnowLeopard ] fast/text/unicode-fallback-font.html [ Crash ]
 
 # Re-check these after the re-baseline for crbug.com/512991
 #crbug.com/485332 [ XP ] virtual/gpu/fast/canvas/canvas-bg-zoom.html [ Failure ]
@@ -936,9 +942,9 @@ crbug.com/474798 virtual/spv2/paint/invalidation/spv2/align-self-change-keeping-
 crbug.com/474798 virtual/spv2/paint/invalidation/spv2/justify-self-change-keeping-geometry-as-text.html [ Failure ]
 
 # Temporarily disabled after chromium change
-crbug.com/492511 [ Mac ] fast/text/atsui-negative-spacing-features.html [ ImageOnlyFailure ]
-crbug.com/492511 [ Mac ] fast/text/atsui-spacing-features.html [ ImageOnlyFailure ]
-crbug.com/492511 [ Mac ] fast/text/international/arabic-justify.html [ ImageOnlyFailure ]
+crbug.com/492511 [ Mac ] fast/text/atsui-negative-spacing-features.html [ Failure ImageOnlyFailure ]
+crbug.com/492511 [ Mac ] fast/text/atsui-spacing-features.html [ Failure ImageOnlyFailure ]
+crbug.com/492511 [ Mac ] fast/text/international/arabic-justify.html [ Failure ImageOnlyFailure ]
 
 # Ref tests that fail due to differences in inline box structure, even though they contain the same text.
 # This happens because inline box layout uses fixed-point measurements, which can cause rounding differences.
@@ -1024,7 +1030,6 @@ crbug.com/509025 [ Yosemite ] fast/text/custom-font-data-crash.html [ Failure ]
 crbug.com/509025 [ Yosemite ] fast/text/custom-font-data-crash2.html [ Failure ]
 crbug.com/509025 [ Yosemite ] fast/text/glyph-reordering.html [ Failure ]
 crbug.com/509025 [ Yosemite ] fast/text/large-text-composed-char.html [ Failure ]
-crbug.com/509025 [ Yosemite ] fast/text/missing-glyph-in-combining-character-sequence.html [ Failure ]
 crbug.com/509025 [ Yosemite ] http/tests/misc/acid2.html [ Failure ]
 crbug.com/509025 [ Yosemite ] http/tests/navigation/navigation-redirect-schedule-crash.html [ Failure ]
 crbug.com/509025 [ Yosemite ] http/tests/security/contentTypeOptions/nosniff-script-without-content-type-blocked.html [ Failure ]
@@ -1038,10 +1043,6 @@ crbug.com/509025 [ Yosemite ] compositing/overflow/do-not-paint-outline-into-com
 crbug.com/509025 [ Yosemite ] compositing/overflow/update-widget-positions-on-nested-frames-and-scrollers.html [ ImageOnlyFailure Failure Timeout ]
 crbug.com/509025 [ Yosemite ] compositing/plugins/composited-plugin.html [ ImageOnlyFailure ]
 crbug.com/509025 [ Yosemite ] compositing/visibility/visibility-image-layers.html [ ImageOnlyFailure ]
-# Uncomment this once rebaseline goes in for crbug.com/505086
-# crbug.com/509025 [ Yosemite ] css3/filters/effect-brightness-clamping-hw.html [ ImageOnlyFailure ]
-# Uncomment this once rebaseline goes in for crbug.com/505086
-# crbug.com/509025 [ Yosemite ] css3/filters/effect-combined-hw.html [ ImageOnlyFailure ]
 crbug.com/509025 [ Yosemite ] fonts/cursive.html [ ImageOnlyFailure ]
 crbug.com/509025 [ Yosemite ] fonts/default.html [ ImageOnlyFailure ]
 crbug.com/509025 [ Yosemite ] fonts/fantasy.html [ ImageOnlyFailure ]
@@ -1129,6 +1130,7 @@ crbug.com/464736 http/tests/xmlhttprequest/ontimeout-event-override-after-failur
 crbug.com/532469 http/tests/security/cross-frame-access-custom.html [ NeedsManualRebaseline ]
 
 # Win10 specific failures that still need triaging.
+crbug.com/521730 [ Win10 ] fast/text/shaping/same-script-different-lang.html [ ImageOnlyFailure Timeout ]
 crbug.com/521730 [ Win10 ] fast/dom/Window/property-access-on-cached-properties-after-frame-navigated.html [ Failure ]
 crbug.com/521730 [ Win10 ] fast/dom/Window/property-access-on-cached-properties-after-frame-removed-and-gced.html [ Failure ]
 crbug.com/521730 [ Win10 ] fast/dom/Window/property-access-on-cached-properties-after-frame-removed.html [ Failure ]
@@ -1159,31 +1161,31 @@ crbug.com/521730 [ Win10 ] css3/flexbox/auto-margins.html [ ImageOnlyFailure Ima
 crbug.com/521730 [ Win10 ] fast/forms/datetimelocal/datetimelocal-appearance-l10n.html [ ImageOnlyFailure Timeout ImageOnlyFailure Timeout ]
 crbug.com/521730 [ Win10 ] fast/forms/month/month-appearance-basic.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/forms/select/popup-menu-appearance-styled.html [ ImageOnlyFailure Timeout ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/hackernews-comments.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/list-item-above-dbcat.html [ ImageOnlyFailure Timeout Timeout Timeout ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/hackernews-comments.html [ Failure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/list-item-above-dbcat.html [ Failure Timeout Timeout Timeout ]
 crbug.com/521730 [ Win10 ] fast/text-autosizing/supercluster-multiple-layout.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/fixed-table-single-cell-lots-of-text.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/nested-tables.html [ ImageOnlyFailure Timeout Timeout Timeout ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/single-percent-width-cell-lots-of-text.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-cell-inflation.html [ ImageOnlyFailure Timeout ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-for-layout.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-with-inline-block.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/wide-percentage-width.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/wide-specified-width.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/atsui-kerning-and-ligatures.html [ ImageOnlyFailure Timeout Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/atsui-multiple-renderers.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/atsui-spacing-features.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/fixed-table-single-cell-lots-of-text.html [ Failure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/nested-tables.html [ Failure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/single-percent-width-cell-lots-of-text.html [ Failure Timeout ImageOnlyFailure ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-cell-inflation.html [ Failure Timeout ImageOnlyFailure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-for-layout.html [ Failure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/table-with-inline-block.html [ Failure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/wide-percentage-width.html [ Failure ImageOnlyFailure ImageOnlyFailure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text-autosizing/tables/wide-specified-width.html [ Failure Timeout ]
+crbug.com/521730 [ Win10 ] virtual/threaded/inspector/tracing/timeline-event-dispatch.html [ Failure ]
+crbug.com/521730 [ Win10 ] fast/text/atsui-kerning-and-ligatures.html [ Failure Timeout Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/atsui-multiple-renderers.html [ Failure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text/atsui-spacing-features.html [ Failure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/basic/009.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/basic/generic-family-changes.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/capitalize-boundaries.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/drawBidiText.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/emoji-web-font.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/basic/generic-family-changes.html [ Failure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/capitalize-boundaries.html [ Failure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text/drawBidiText.html [ Failure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/emoji-web-font.html [ Failure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/firstline/001.html [ ImageOnlyFailure ImageOnlyFailure Timeout Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/firstline/002.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/firstline/002.html [ Failure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/firstline/003.html [ ImageOnlyFailure ImageOnlyFailure Timeout Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/font-stretch.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/font-weight-600.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/format-control.html [ ImageOnlyFailure Timeout Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/font-stretch.html [ Timeout Failure ]
+crbug.com/521730 [ Win10 ] fast/text/format-control.html [ Failure Timeout ]
 crbug.com/521730 [ Win10 ] fast/text/international/alef-connected.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/international/bidi-linebreak-001.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/international/bidi-linebreak-003.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
@@ -1191,15 +1193,14 @@ crbug.com/521730 [ Win10 ] fast/text/international/bidi-word-spacing-rtl.html [ 
 crbug.com/521730 [ Win10 ] fast/text/international/inline-block-with-mixed-direction-words.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/international/kana-voiced-sound-marks.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/international/mixed-directionality-selection.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/international/plane2.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/letter-spacing-negative-opacity.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/international/plane2.html [ Failure ImageOnlyFailure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/letter-spacing-negative-opacity.html [ Failure ImageOnlyFailure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/text/line-breaks-after-white-space.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
 crbug.com/521730 [ Win10 ] fast/text/line-breaks.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/shadow-no-blur.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] fast/text/shaping/same-script-different-lang.html [ ImageOnlyFailure ImageOnlyFailure Timeout Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/stroking-decorations.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
+crbug.com/521730 [ Win10 ] fast/text/shadow-no-blur.html [ Failure Timeout ImageOnlyFailure ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/stroking-decorations.html [ Failure ImageOnlyFailure Timeout ]
 crbug.com/521730 [ Win10 ] fast/text/trailing-white-space-2.html [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
-crbug.com/521730 [ Win10 ] fast/text/whitespace/nbsp-mode-and-linewraps.html [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
+crbug.com/521730 [ Win10 ] fast/text/whitespace/nbsp-mode-and-linewraps.html [ Failure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/writing-mode/table-vertical-child-width.html [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] fast/writing-mode/vertical-font-fallback.html [ ImageOnlyFailure ImageOnlyFailure Timeout Timeout ]
 crbug.com/521730 [ Win10 ] svg/W3C-I18N/text-dirLTR-ubNone.svg [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
@@ -1208,7 +1209,7 @@ crbug.com/521730 [ Win10 ] svg/W3C-I18N/tspan-dirLTR-ubOverride-in-ltr-context.s
 crbug.com/521730 [ Win10 ] svg/W3C-I18N/tspan-dirRTL-ubEmbed-in-default-context.svg [ ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] svg/W3C-I18N/tspan-dirRTL-ubNone-in-ltr-context.svg [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] svg/W3C-SVG-1.1/text-intro-03-b.svg [ ImageOnlyFailure ImageOnlyFailure Timeout ImageOnlyFailure ]
-crbug.com/521730 [ Win10 ] svg/batik/text/verticalText.svg [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
+crbug.com/521730 [ Win10 ] svg/batik/text/verticalText.svg [ Failure ]
 crbug.com/521730 [ Win10 ] svg/carto.net/combobox.svg [ ImageOnlyFailure Timeout ImageOnlyFailure ImageOnlyFailure ]
 crbug.com/521730 [ Win10 ] svg/css/text-gradient-shadow.svg [ ImageOnlyFailure ImageOnlyFailure ImageOnlyFailure Timeout ]
 crbug.com/521730 [ Win10 ] compositing/plugins/invalidate_rect.html [ Crash ]
@@ -1349,39 +1350,39 @@ crbug.com/521764 [ Win10 ] fast/repaint/fixed-element-repaint-after-compositing-
 crbug.com/521764 [ Win10 ] fast/ruby/nested-ruby.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text-autosizing/cluster-inline-block-or-table.html [ Pass Timeout ]
 crbug.com/521764 [ Win10 ] fast/text-autosizing/cluster-inline-grid-flex-box.html [ Pass Timeout ]
-crbug.com/521764 [ Win10 ] fast/text-autosizing/display-type-change.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text-autosizing/display-type-change.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text-autosizing/pseudo-scale-factor.html [ Pass Timeout ]
-crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/css-table-single-cell-lots-of-text.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/nested-table-wrapping.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/single-cell-lots-of-text.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/atsui-negative-spacing-features.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/basic/011.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/basic/013.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/basic/generic-family-reset.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/css-table-single-cell-lots-of-text.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/nested-table-wrapping.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text-autosizing/tables/single-cell-lots-of-text.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/atsui-negative-spacing-features.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/basic/011.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/basic/013.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/basic/generic-family-reset.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/cg-fallback-bolding.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/cg-vs-atsui.html [ ImageOnlyFailure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/decorations-with-text-combine.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/emoticons.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/emphasis-ellipsis-complextext.html [ ImageOnlyFailure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/font-ascent-mac.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/font-stretch-variant.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/font-stretch-variant.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/font-weight.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/002.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/bidi-linebreak-002.html [ ImageOnlyFailure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/danda-space.html [ Failure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/international/hebrew-vowels.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/international/hebrew-vowels.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/khmer-selection.html [ Failure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/international/lang-glyph-cache-separation.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/international/pop-up-button-text-alignment-and-direction.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/international/rtl-white-space-pre-wrap.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/international/lang-glyph-cache-separation.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/international/pop-up-button-text-alignment-and-direction.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/international/rtl-white-space-pre-wrap.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/text-spliced-font.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/international/wrap-CJK-001.html [ Failure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/midword-break-hang.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/midword-break-hang.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/selection-multiple-runs.html [ Failure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/stroking.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/sub-pixel/text-scaling-pixel.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/stroking.html [ Failure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/sub-pixel/text-scaling-pixel.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/text/trailing-white-space.html [ ImageOnlyFailure Timeout ]
-crbug.com/521764 [ Win10 ] fast/text/wide-zero-width-space.html [ ImageOnlyFailure Timeout ]
+crbug.com/521764 [ Win10 ] fast/text/wide-zero-width-space.html [ Failure Timeout ]
 crbug.com/521764 [ Win10 ] fast/tokenizer/001.html [ Pass Timeout ]
 crbug.com/521764 [ Win10 ] fast/writing-mode/fallback-orientation.html [ ImageOnlyFailure Timeout ]
 crbug.com/521764 [ Win10 ] fast/writing-mode/japanese-lr-text.html [ Failure Timeout ]
@@ -1504,13 +1505,6 @@ crbug.com/521764 [ Win10 ] transitions/equivalent-background-image-no-transition
 
 crbug.com/474759 fast/writing-mode/vertical-rl-replaced-selection.html [ ImageOnlyFailure ]
 crbug.com/474759 fast/block/line-layout/selection-highlight-overlap.html [ ImageOnlyFailure ]
-
-# GrGLConvolutionEffect optimization causes blink layout test image differences
-crbug.com/505086 css3/filters/effect-blur-hw.html [ NeedsManualRebaseline ]
-crbug.com/505086 css3/filters/effect-brightness-clamping-hw.html [ NeedsManualRebaseline ]
-crbug.com/505086 css3/filters/effect-combined-hw.html [ NeedsManualRebaseline ]
-crbug.com/505086 css3/filters/effect-reference-zoom-hw.html [ Crash NeedsManualRebaseline ]
-
 crbug.com/502927 [ XP ] paint/frames/frameset-with-stacking-context-and-not-stacking-context-children.html [ Failure ]
 crbug.com/502927 [ XP ] paint/frames/frameset-with-stacking-contexts.html [ Failure ]
 crbug.com/502927 [ XP ] virtual/spv2/paint/frames/frameset-with-stacking-context-and-not-stacking-context-children.html [ Skip ]
@@ -1603,14 +1597,19 @@ crbug.com/531286 virtual/gpu/fast/canvas/yuv-video-on-accelerated-canvas.html [ 
 
 crbug.com/535478 [ Win ] virtual/threaded/inspector/tracing/decode-resize.html [ Slow Pass Failure ]
 
-crbug.com/538522 css3/filters/effect-reference-colorspace-hw.html [ Crash ImageOnlyFailure ]
-
 crbug.com/524646 [ Yosemite ] fast/dom/shadow/shadowdom-for-button.html [ ImageOnlyFailure ]
-
-crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-window.html [ Failure Pass ]
-crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-worker.html [ Failure Pass ]
 
 crbug.com/502267 fast/css/image-orientation/image-orientation-from-image-composited-dynamic.html [ NeedsRebaseline ]
 crbug.com/502267 fast/css/image-orientation/image-orientation-default.html [ NeedsRebaseline ]
 
+crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-window.html [ Failure Pass ]
+crbug.com/538717 [ Win ] http/tests/permissions/chromium/test-request-multiple-worker.html [ Failure Pass ]
+
 crbug.com/499780 fast/css/font_property_normal.html [ NeedsRebaseline ]
+
+crbug.com/541357 [ XP ] svg/text/text-selection-align-06-b.svg [ NeedsRebaseline ]
+crbug.com/541357 [ XP ] svg/W3C-SVG-1.1/text-align-06-b.svg [ NeedsRebaseline ]
+crbug.com/521730 [ XP ] svg/batik/text/verticalText.svg [ NeedsRebaseline ]
+crbug.com/541357 [ XP ] svg/batik/text/verticalTextOnPath.svg [ NeedsRebaseline ]
+
+crbug.com/541601 svg/overflow/overflow-on-outermost-svg-element-in-xhtml-defaults.xhtml [ ImageOnlyFailure ]

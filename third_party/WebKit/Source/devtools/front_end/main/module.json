@@ -266,20 +266,6 @@
             "className": "WebInspector.HandlerRegistry.OpenAnchorLocationSettingUI"
         },
         {
-            "type": "@WebInspector.ToolbarItem.Provider",
-            "className": "WebInspector.RenderingOptions.ButtonProvider",
-            "order": 1,
-            "location": "elements-toolbar",
-            "experiment": "materialDesign"
-        },
-        {
-            "type": "@WebInspector.ToolbarItem.Provider",
-            "separator": "true",
-            "order": 2,
-            "location": "elements-toolbar",
-            "experiment": "materialDesign"
-        },
-        {
             "type": "context-menu-item",
             "location": "mainMenu/navigate",
             "order": 100,
@@ -326,7 +312,6 @@
         "emulation"
     ],
     "scripts": [
-        "HelpScreenUntilReload.js",
         "AdvancedApp.js",
         "FrontendWebSocketAPI.js",
         "RenderingOptions.js",
@@ -339,5 +324,8 @@
         "Tests.js"
     ],
     "resources": [
+        "remoteDebuggingTerminatedScreen.css",
+        "renderingOptions.css",
+        "targetCrashedScreen.css"
     ]
 }

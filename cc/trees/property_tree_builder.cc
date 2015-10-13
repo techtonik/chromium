@@ -43,6 +43,7 @@ struct DataForRecursion {
   bool affected_by_inner_viewport_bounds_delta;
   bool affected_by_outer_viewport_bounds_delta;
   bool should_flatten;
+  bool target_is_clipped;
   const gfx::Transform* device_transform;
   gfx::Vector2dF scroll_compensation_adjustment;
   int sequence_number;
@@ -121,9 +122,15 @@ void AddClipNodeIfNeeded(const DataForRecursion<LayerType>& data_from_ancestor,
       // when computing clip rects or visibility.
       has_unclipped_surface = true;
     }
+    // A surface with unclipped descendants cannot be clipped by its ancestor
+    // clip at draw time since the unclipped descendants aren't affected by the
+    // ancestor clip.
+    data_for_children->target_is_clipped =
+        ancestor_clips_subtree && !layer->num_unclipped_descendants();
   } else {
     // Without a new render surface, layer clipping state from ancestors needs
     // to continue to propagate.
+    data_for_children->target_is_clipped = data_from_ancestor.target_is_clipped;
     layers_are_clipped = ancestor_clips_subtree;
   }
 
@@ -191,13 +198,7 @@ void AddClipNodeIfNeeded(const DataForRecursion<LayerType>& data_from_ancestor,
     }
 
     node.data.resets_clip = has_unclipped_surface || !parent_applies_clip;
-
-    // A surface with unclipped descendants cannot be clipped by its ancestor
-    // clip at draw time since the unclipped descendants aren't affected by the
-    // ancestor clip.
-    node.data.render_surface_is_clipped = layer->has_render_surface() &&
-                                          ancestor_clips_subtree &&
-                                          !layer->num_unclipped_descendants();
+    node.data.target_is_clipped = data_for_children->target_is_clipped;
     node.data.layers_are_clipped = layers_are_clipped;
 
     data_for_children->clip_tree_parent =
@@ -541,7 +542,8 @@ void BuildPropertyTreesTopLevelInternal(
     PropertyTrees* property_trees) {
   if (!property_trees->needs_rebuild) {
     UpdatePageScaleFactorInPropertyTrees(property_trees, page_scale_layer,
-                                         page_scale_factor);
+                                         page_scale_factor, device_scale_factor,
+                                         device_transform);
     return;
   }
 
@@ -565,6 +567,7 @@ void BuildPropertyTreesTopLevelInternal(
   data_for_recursion.affected_by_inner_viewport_bounds_delta = false;
   data_for_recursion.affected_by_outer_viewport_bounds_delta = false;
   data_for_recursion.should_flatten = false;
+  data_for_recursion.target_is_clipped = false;
   data_for_recursion.device_transform = &device_transform;
 
   data_for_recursion.transform_tree->clear();

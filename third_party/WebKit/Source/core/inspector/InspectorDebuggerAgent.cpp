@@ -47,7 +47,7 @@ static const char debuggerEnabled[] = "debuggerEnabled";
 
 InspectorDebuggerAgent::InspectorDebuggerAgent(InjectedScriptManager* injectedScriptManager, V8Debugger* debugger, int contextGroupId)
     : InspectorBaseAgent<InspectorDebuggerAgent, InspectorFrontend::Debugger>("Debugger")
-    , m_v8DebuggerAgent(V8DebuggerAgent::create(injectedScriptManager, debugger, this, contextGroupId))
+    , m_v8DebuggerAgent(V8DebuggerAgent::create(injectedScriptManager, debugger, contextGroupId))
 {
 }
 
@@ -74,6 +74,7 @@ void InspectorDebuggerAgent::enable(ErrorString* errorString)
 
 void InspectorDebuggerAgent::disable(ErrorString* errorString)
 {
+    setTrackingAsyncCalls(false);
     m_state->setBoolean(DebuggerAgentState::debuggerEnabled, false);
     m_instrumentingAgents->setInspectorDebuggerAgent(nullptr);
     m_v8DebuggerAgent->disable(errorString);
@@ -192,12 +193,12 @@ void InspectorDebuggerAgent::evaluateOnCallFrame(ErrorString* errorString, const
     m_v8DebuggerAgent->evaluateOnCallFrame(errorString, inCallFrameId, inExpression, inObjectGroup, inIncludeCommandLineAPI, inDoNotPauseOnExceptionsAndMuteConsole, inReturnByValue, inGeneratePreview, outResult, optOutWasThrown, optOutExceptionDetails);
 }
 
-void InspectorDebuggerAgent::compileScript(ErrorString* errorString, const String& inExpression, const String& inSourceURL, bool inPersistScript, const int* inExecutionContextId, TypeBuilder::OptOutput<TypeBuilder::Debugger::ScriptId>* optOutScriptId, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails)
+void InspectorDebuggerAgent::compileScript(ErrorString* errorString, const String& inExpression, const String& inSourceURL, bool inPersistScript, int inExecutionContextId, TypeBuilder::OptOutput<TypeBuilder::Debugger::ScriptId>* optOutScriptId, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails)
 {
     m_v8DebuggerAgent->compileScript(errorString, inExpression, inSourceURL, inPersistScript, inExecutionContextId, optOutScriptId, optOutExceptionDetails);
 }
 
-void InspectorDebuggerAgent::runScript(ErrorString* errorString, const String& inScriptId, const int* inExecutionContextId, const String* inObjectGroup, const bool* inDoNotPauseOnExceptionsAndMuteConsole, RefPtr<TypeBuilder::Runtime::RemoteObject>& outResult, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails)
+void InspectorDebuggerAgent::runScript(ErrorString* errorString, const String& inScriptId, int inExecutionContextId, const String* inObjectGroup, const bool* inDoNotPauseOnExceptionsAndMuteConsole, RefPtr<TypeBuilder::Runtime::RemoteObject>& outResult, RefPtr<TypeBuilder::Debugger::ExceptionDetails>& optOutExceptionDetails)
 {
     Optional<MuteConsoleScope<InspectorDebuggerAgent>> muteScope;
     if (asBool(inDoNotPauseOnExceptionsAndMuteConsole))
@@ -228,6 +229,7 @@ void InspectorDebuggerAgent::skipStackFrames(ErrorString* errorString, const Str
 void InspectorDebuggerAgent::setAsyncCallStackDepth(ErrorString* errorString, int inMaxDepth)
 {
     m_v8DebuggerAgent->setAsyncCallStackDepth(errorString, inMaxDepth);
+    setTrackingAsyncCalls(m_v8DebuggerAgent->trackingAsyncCalls());
 }
 
 void InspectorDebuggerAgent::enablePromiseTracker(ErrorString* errorString, const bool* inCaptureStacks)
@@ -258,17 +260,6 @@ void InspectorDebuggerAgent::setAsyncOperationBreakpoint(ErrorString* errorStrin
 void InspectorDebuggerAgent::removeAsyncOperationBreakpoint(ErrorString* errorString, int inOperationId)
 {
     m_v8DebuggerAgent->removeAsyncOperationBreakpoint(errorString, inOperationId);
-}
-
-// V8DebuggerAgent::Client implementation.
-void InspectorDebuggerAgent::asyncCallTrackingStateChanged(bool tracking)
-{
-    m_asyncCallTracker->asyncCallTrackingStateChanged(tracking);
-}
-
-void InspectorDebuggerAgent::resetAsyncOperations()
-{
-    m_asyncCallTracker->resetAsyncOperations();
 }
 
 bool InspectorDebuggerAgent::isPaused()
@@ -327,6 +318,14 @@ void InspectorDebuggerAgent::restore()
     m_v8DebuggerAgent->restore();
     ErrorString errorString;
     enable(&errorString);
+    setTrackingAsyncCalls(m_v8DebuggerAgent->trackingAsyncCalls());
+}
+
+void InspectorDebuggerAgent::setTrackingAsyncCalls(bool tracking)
+{
+    m_asyncCallTracker->asyncCallTrackingStateChanged(tracking);
+    if (!tracking)
+        m_asyncCallTracker->resetAsyncOperations();
 }
 
 } // namespace blink

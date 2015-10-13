@@ -43,6 +43,7 @@
 #include "components/tracing/tracing_switches.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/user_metrics.h"
+#include "content/public/common/content_switches.h"
 #include "media/base/media_switches.h"
 #include "media/midi/midi_switches.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -871,7 +872,8 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_MULTILINGUAL_SPELLCHECKER_NAME,
      IDS_FLAGS_ENABLE_MULTILINGUAL_SPELLCHECKER_DESCRIPTION,
      kOsWin | kOsLinux | kOsCrOS,
-     SINGLE_VALUE_TYPE(switches::kEnableMultilingualSpellChecker)},
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableMultilingualSpellChecker,
+                               switches::kDisableMultilingualSpellChecker)},
 #endif
     {"enable-scroll-prediction",
      IDS_FLAGS_ENABLE_SCROLL_PREDICTION_NAME,
@@ -1877,13 +1879,13 @@ const Experiment kExperiments[] = {
      kOsDesktop,
      ENABLE_DISABLE_VALUE_TYPE(switches::kV8PacMojoOutOfProcess,
                                switches::kDisableOutOfProcessPac)},
-#if defined(ENABLE_MEDIA_ROUTER)
+#if defined(ENABLE_MEDIA_ROUTER) && !defined(OS_ANDROID)
     {"enable-media-router",
      IDS_FLAGS_ENABLE_MEDIA_ROUTER_NAME,
      IDS_FLAGS_ENABLE_MEDIA_ROUTER_DESCRIPTION,
-     kOsAll,
+     kOsDesktop,
      SINGLE_VALUE_TYPE(switches::kEnableMediaRouter)},
-#endif  // defined(ENABLE_MEDIA_ROUTER)
+#endif  // defined(ENABLE_MEDIA_ROUTER) && !defined(OS_ANDROID)
 // Since Drive Search is not available when app list is disabled, flag guard
 // enable-drive-search-in-chrome-launcher flag.
 #if defined(ENABLE_APP_LIST)
@@ -2017,12 +2019,6 @@ const Experiment kExperiments[] = {
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableClearBrowsingDataCounters)
     },
-    {"simple-clear-browsing-data-support-string",
-     IDS_FLAGS_SIMPLE_CLEAR_BROWSING_DATA_SUPPORT_STRING_NAME,
-     IDS_FLAGS_SIMPLE_CLEAR_BROWSING_DATA_SUPPORT_STRING_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kSimpleClearBrowsingDataSupportString)
-    },
 #if defined(ENABLE_TASK_MANAGER)
     {"disable-new-task-manager",
      IDS_FLAGS_DISABLE_NEW_TASK_MANAGER_NAME,
@@ -2089,6 +2085,12 @@ const Experiment kExperiments[] = {
       IDS_FLAGS_TRACE_EXPORT_EVENTS_TO_ETW_DESRIPTION,
       kOsWin,
       SINGLE_VALUE_TYPE(switches::kTraceExportEventsToETW)},
+    {"merge-key-char-events",
+     IDS_FLAGS_MERGE_KEY_CHAR_EVENTS_NAME,
+     IDS_FLAGS_MERGE_KEY_CHAR_EVENTS_DESCRIPTION,
+     kOsWin,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableMergeKeyCharEvents,
+                               switches::kDisableMergeKeyCharEvents)},
 #endif  // defined(OS_WIN)
 #if defined(ENABLE_BACKGROUND)
     {"enable-push-api-background-mode",

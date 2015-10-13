@@ -289,9 +289,11 @@
             'front_end/ui/ThrottledWidget.js'
         ],
         'devtools_main_js_files': [
+            'front_end/main/remoteDebuggingTerminatedScreen.css',
+            'front_end/main/renderingOptions.css',
+            'front_end/main/targetCrashedScreen.css',
             'front_end/main/AdvancedApp.js',
             'front_end/main/FrontendWebSocketAPI.js',
-            'front_end/main/HelpScreenUntilReload.js',
             'front_end/main/Main.js',
             'front_end/main/OverlayController.js',
             'front_end/main/RenderingOptions.js',
@@ -787,6 +789,7 @@
             'front_end/Images/responsiveDesign_2x.png',
             'front_end/Images/searchNext.png',
             'front_end/Images/searchPrev.png',
+            'front_end/Images/securityPropertyInfo.svg',
             'front_end/Images/securityPropertyInsecure.svg',
             'front_end/Images/securityPropertySecure.svg',
             'front_end/Images/securityPropertyWarning.svg',

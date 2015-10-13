@@ -175,6 +175,17 @@ GpuMemoryBufferFactoryIOSurface::CreateGpuMemoryBuffer(
   return handle;
 }
 
+gfx::GpuMemoryBufferHandle
+GpuMemoryBufferFactoryIOSurface::CreateGpuMemoryBufferFromHandle(
+    const gfx::GpuMemoryBufferHandle& handle,
+    gfx::GpuMemoryBufferId id,
+    const gfx::Size& size,
+    gfx::BufferFormat format,
+    int client_id) {
+  NOTIMPLEMENTED();
+  return gfx::GpuMemoryBufferHandle();
+}
+
 void GpuMemoryBufferFactoryIOSurface::DestroyGpuMemoryBuffer(
     gfx::GpuMemoryBufferId id,
     int client_id) {
@@ -209,8 +220,8 @@ GpuMemoryBufferFactoryIOSurface::CreateImageForGpuMemoryBuffer(
     return scoped_refptr<gfx::GLImage>();
 
   scoped_refptr<gfx::GLImageIOSurface> image(
-      new gfx::GLImageIOSurface(handle.id, size, internalformat));
-  if (!image->Initialize(it->second.get(), format))
+      new gfx::GLImageIOSurface(size, internalformat));
+  if (!image->Initialize(it->second.get(), handle.id, format))
     return scoped_refptr<gfx::GLImage>();
 
   return image;

@@ -75,6 +75,7 @@
 #include "chrome/installer/util/google_update_settings.h"
 #include "components/component_updater/component_updater_service.h"
 #include "components/gcm_driver/gcm_driver.h"
+#include "components/metrics/metrics_pref_names.h"
 #include "components/metrics/metrics_service.h"
 #include "components/net_log/chrome_net_log.h"
 #include "components/network_time/network_time_tracker.h"
@@ -93,6 +94,7 @@
 #include "content/public/browser/resource_dispatcher_host.h"
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/storage_partition.h"
+#include "content/public/common/content_switches.h"
 #include "extensions/common/constants.h"
 #include "net/socket/client_socket_pool_manager.h"
 #include "net/url_request/url_request_context_getter.h"
@@ -401,7 +403,7 @@ unsigned int BrowserProcessImpl::ReleaseModule() {
         FROM_HERE,
         base::Bind(ChromeBrowserMainPartsMac::DidEndMainMessageLoop));
 #endif
-    base::MessageLoop::current()->Quit();
+    base::MessageLoop::current()->QuitWhenIdle();
   }
   return module_ref_count_;
 }

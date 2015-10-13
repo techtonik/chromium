@@ -956,6 +956,7 @@ LayoutUnit LayoutBox::minPreferredLogicalWidth() const
         SetLayoutNeededForbiddenScope layoutForbiddenScope(const_cast<LayoutBox&>(*this));
 #endif
         const_cast<LayoutBox*>(this)->computePreferredLogicalWidths();
+        ASSERT(!preferredLogicalWidthsDirty());
     }
 
     return m_minPreferredLogicalWidth;
@@ -968,6 +969,7 @@ LayoutUnit LayoutBox::maxPreferredLogicalWidth() const
         SetLayoutNeededForbiddenScope layoutForbiddenScope(const_cast<LayoutBox&>(*this));
 #endif
         const_cast<LayoutBox*>(this)->computePreferredLogicalWidths();
+        ASSERT(!preferredLogicalWidthsDirty());
     }
 
     return m_maxPreferredLogicalWidth;
@@ -1352,6 +1354,31 @@ void LayoutBox::imageChanged(WrappedImagePtr image, const IntRect*)
 
     if (!invalidatePaintOfLayerRectsForImage(image, style()->backgroundLayers(), true))
         invalidatePaintOfLayerRectsForImage(image, style()->maskLayers(), false);
+}
+
+ResourcePriority LayoutBox::computeResourcePriority() const
+{
+    LayoutRect viewBounds = viewRect();
+    LayoutRect objectBounds = LayoutRect(absoluteContentBox());
+
+    // The object bounds might be empty right now, so intersects will fail since it doesn't deal
+    // with empty rects. Use LayoutRect::contains in that case.
+    bool isVisible;
+    if (!objectBounds.isEmpty())
+        isVisible =  viewBounds.intersects(objectBounds);
+    else
+        isVisible = viewBounds.contains(objectBounds);
+
+    LayoutRect screenRect;
+    if (!objectBounds.isEmpty()) {
+        screenRect = viewBounds;
+        screenRect.intersect(objectBounds);
+    }
+
+    int screenArea = 0;
+    if (!screenRect.isEmpty() && isVisible)
+        screenArea = static_cast<uint32_t>(screenRect.width() * screenRect.height());
+    return ResourcePriority(isVisible ? ResourcePriority::Visible : ResourcePriority::NotVisible, screenArea);
 }
 
 bool LayoutBox::invalidatePaintOfLayerRectsForImage(WrappedImagePtr image, const FillLayer& layers, bool drawingBackground)
@@ -1777,6 +1804,46 @@ void LayoutBox::setPaginationStrut(LayoutUnit strut)
     if (!strut && !m_rareData)
         return;
     ensureRareData().m_paginationStrut = strut;
+}
+
+static bool isForcedBreakAllowed(const LayoutBox* child)
+{
+    // We currently only support forced breaks on in-flow block level elements, which is the minimum
+    // requirement according to the spec.
+    if (child->isInline() || child->isFloatingOrOutOfFlowPositioned())
+        return false;
+    const LayoutBlock* curr = child->containingBlock();
+    if (!curr || !curr->isLayoutBlockFlow())
+        return false;
+    const LayoutView* layoutView = child->view();
+    while (curr && curr != layoutView) {
+        if (curr->isLayoutFlowThread())
+            return true;
+        if (curr->isFloatingOrOutOfFlowPositioned())
+            return false;
+        curr = curr->containingBlock();
+    }
+    return true;
+}
+
+bool LayoutBox::hasForcedBreakBefore() const
+{
+    LayoutFlowThread* flowThread = flowThreadContainingBlock();
+    bool checkColumnBreaks = flowThread;
+    bool checkPageBreaks = !checkColumnBreaks && view()->layoutState()->pageLogicalHeight(); // TODO(mstensho): Once columns can print, we have to check this.
+    bool checkBeforeAlways = (checkColumnBreaks && style()->columnBreakBefore() == PBALWAYS)
+        || (checkPageBreaks && style()->pageBreakBefore() == PBALWAYS);
+    return checkBeforeAlways && isForcedBreakAllowed(this);
+}
+
+bool LayoutBox::hasForcedBreakAfter() const
+{
+    LayoutFlowThread* flowThread = flowThreadContainingBlock();
+    bool checkColumnBreaks = flowThread;
+    bool checkPageBreaks = !checkColumnBreaks && view()->layoutState()->pageLogicalHeight(); // TODO(mstensho): Once columns can print, we have to check this.
+    bool checkAfterAlways = (checkColumnBreaks && style()->columnBreakAfter() == PBALWAYS)
+        || (checkPageBreaks && style()->pageBreakAfter() == PBALWAYS);
+    return checkAfterAlways && isForcedBreakAllowed(this);
 }
 
 LayoutRect LayoutBox::clippedOverflowRectForPaintInvalidation(const LayoutBoxModelObject* paintInvalidationContainer, const PaintInvalidationState* paintInvalidationState) const

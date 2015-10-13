@@ -23,9 +23,8 @@ ServiceRegistryImpl::~ServiceRegistryImpl() {
 }
 
 void ServiceRegistryImpl::Bind(
-    mojo::InterfaceRequest<mojo::ServiceProvider> request,
-    int id) {
-  binding_.Bind(request.Pass(), id);
+    mojo::InterfaceRequest<mojo::ServiceProvider> request) {
+  binding_.Bind(request.Pass());
 }
 
 void ServiceRegistryImpl::BindRemoteServiceProvider(
@@ -78,6 +77,13 @@ void ServiceRegistryImpl::ConnectToService(
       service_factories_.find(name);
   if (it == service_factories_.end())
     return;
+
+  // It's possible and effectively unavoidable that under certain conditions
+  // an invalid handle may be received. Don't invoke the factory in that case.
+  if (!client_handle.is_valid()) {
+    DVLOG(2) << "Invalid pipe handle for " << name << " interface request.";
+    return;
+  }
 
   it->second.Run(client_handle.Pass());
 }

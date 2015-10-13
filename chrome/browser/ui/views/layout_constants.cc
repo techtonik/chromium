@@ -8,6 +8,7 @@
 #include "ui/base/resource/material_design/material_design_controller.h"
 
 int GetLayoutConstant(LayoutConstant constant) {
+  const int kFindBarVerticalOffset[] = {1, 6, 6};
   const int kIconLabelViewInternalPadding[] = {3, 2, 2};
   const int kIconLabelViewTrailingPadding[] = {2, 8, 8};
   const int kLocationBarBubbleHorizontalPadding[] = {1, 5, 5};
@@ -15,6 +16,7 @@ int GetLayoutConstant(LayoutConstant constant) {
   const int kLocationBarHeight[] = {0, 28, 32};
   const int kLocationBarHorizontalPadding[] = {3, 6, 6};
   const int kLocationBarVerticalPadding[] = {2, 2, 2};
+  const int kNewTabButtonWidth[] = {34, 34, 34};
   const int kOmniboxDropdownBorderInterior[] = {6, 0, 0};
   const int kOmniboxFontPixelSize[] = {16, 14, 14};
   const int kTabCloseButtonTrailingPaddingOverlap[] = {2, 2, 2};
@@ -22,12 +24,13 @@ int GetLayoutConstant(LayoutConstant constant) {
   const int kTabMaximumTitleWidth[] = {175, 175, 175};
   const int kTabPinnedContentWidth[] = {25, 25, 25};
 #if defined(OS_MACOSX)
+  const int kTabstripNewTabButtonOverlap[] = {8, 8, 8};
   const int kTabstripTabOverlap[] = {19, 19, 19};
 #else
+  const int kTabstripNewTabButtonOverlap[] = {11, 11, 11};
   const int kTabstripTabOverlap[] = {26, 26, 26};
 #endif
   const int kTabstripToolbarOverlap[] = {3, 3, 3};
-  const int kTabstripTopShadowHeight[] = {3, 3, 3};
   const int kToolbarContentShadowHeight[] = {0, 0, 0};
   const int kToolbarContentShadowHeightAsh[] = {2, 0, 0};
   const int kToolbarElementPadding[] = {0, 0, 8};
@@ -36,6 +39,8 @@ int GetLayoutConstant(LayoutConstant constant) {
 
   const int mode = ui::MaterialDesignController::GetMode();
   switch (constant) {
+    case FIND_BAR_TOOLBAR_OVERLAP:
+      return kFindBarVerticalOffset[mode];
     case ICON_LABEL_VIEW_INTERNAL_PADDING:
       return kIconLabelViewInternalPadding[mode];
     case ICON_LABEL_VIEW_TRAILING_PADDING:
@@ -50,16 +55,18 @@ int GetLayoutConstant(LayoutConstant constant) {
       return kLocationBarHorizontalPadding[mode];
     case LOCATION_BAR_VERTICAL_PADDING:
       return kLocationBarVerticalPadding[mode];
+    case NEW_TAB_BUTTON_WIDTH:
+      return kNewTabButtonWidth[mode];
     case OMNIBOX_DROPDOWN_BORDER_INTERIOR:
       return kOmniboxDropdownBorderInterior[mode];
     case OMNIBOX_FONT_PIXEL_SIZE:
       return kOmniboxFontPixelSize[mode];
+    case TABSTRIP_NEW_TAB_BUTTON_OVERLAP:
+      return kTabstripNewTabButtonOverlap[mode];
     case TABSTRIP_TAB_OVERLAP:
       return kTabstripTabOverlap[mode];
     case TABSTRIP_TOOLBAR_OVERLAP:
       return kTabstripToolbarOverlap[mode];
-    case TABSTRIP_TOP_SHADOW_HEIGHT:
-      return kTabstripTopShadowHeight[mode];
     case TAB_CLOSE_BUTTON_TRAILING_PADDING_OVERLAP:
       return kTabCloseButtonTrailingPaddingOverlap[mode];
     case TAB_FAVICON_TITLE_SPACING:
@@ -85,7 +92,7 @@ int GetLayoutConstant(LayoutConstant constant) {
 
 gfx::Insets GetLayoutInsets(LayoutInset inset) {
   const int kAvatarLeftPadding[] = {2, 4, 4};
-  const int kAvatarRightPadding[] = {2, 2, 2};
+  const int kAvatarRightPadding[] = {-6, 4, 4};
   const int kAvatarBottomPadding[] = {2, 4, 4};
   const int kOmniboxDropdownIconPadding[] = {2, 4, 8};
   const int kOmniboxDropdownTextPadding[] = {3, 4, 8};

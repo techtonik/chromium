@@ -63,8 +63,10 @@
 #include "core/svg/SVGRadialGradientElement.h"
 #include "core/svg/SVGRectElement.h"
 #include "core/svg/SVGStopElement.h"
+#include "core/svg/graphics/filters/SVGFilterBuilder.h"
 #include "platform/graphics/DashArray.h"
 #include "platform/graphics/GraphicsTypes.h"
+#include "platform/graphics/filters/SourceGraphic.h"
 
 #include <math.h>
 #include <memory>
@@ -416,7 +418,7 @@ static inline void writeSVGInlineTextBox(TextStream& ts, SVGInlineTextBox* textB
         // FIXME: Remove this hack, once the new text layout engine is completly landed. We want to preserve the old layout test results for now.
         ts << "chunk 1 ";
         ETextAnchor anchor = svgStyle.textAnchor();
-        bool isVerticalText = svgStyle.isVerticalWritingMode();
+        bool isVerticalText = !textLineLayout.style()->isHorizontalWritingMode();
         if (anchor == TA_MIDDLE) {
             ts << "(middle anchor";
             if (isVerticalText)
@@ -511,10 +513,10 @@ void writeSVGResourceContainer(TextStream& ts, const LayoutObject& object, int i
         // Creating a placeholder filter which is passed to the builder.
         FloatRect dummyRect;
         RefPtrWillBeRawPtr<Filter> dummyFilter = Filter::create(dummyRect, dummyRect, 1, Filter::BoundingBox);
-        if (RefPtrWillBeRawPtr<SVGFilterBuilder> builder = filter->buildPrimitives(dummyFilter.get())) {
-            if (FilterEffect* lastEffect = builder->lastEffect())
-                lastEffect->externalRepresentation(ts, indent + 1);
-        }
+        SVGFilterBuilder builder(dummyFilter->sourceGraphic());
+        builder.buildGraph(dummyFilter.get(), toSVGFilterElement(*filter->element()), dummyRect);
+        if (FilterEffect* lastEffect = builder.lastEffect())
+            lastEffect->externalRepresentation(ts, indent + 1);
     } else if (resource->resourceType() == ClipperResourceType) {
         writeNameValuePair(ts, "clipPathUnits", toLayoutSVGResourceClipper(resource)->clipPathUnits());
         ts << "\n";

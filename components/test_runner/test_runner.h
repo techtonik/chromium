@@ -23,6 +23,7 @@ class SkBitmap;
 namespace blink {
 class WebContentSettingsClient;
 class WebFrame;
+class WebMediaStream;
 class WebString;
 class WebView;
 class WebURLResponse;
@@ -499,6 +500,10 @@ class TestRunner : public WebTestRunner,
 
   // Allows layout tests to exec scripts at WebInspector side.
   void EvaluateInWebInspector(int call_id, const std::string& script);
+  // Allows layout tests to evaluate scripts in InspectorOverlay page.
+  // Script may have an output represented as a string, return values of other
+  // types would be ignored.
+  std::string EvaluateInWebInspectorOverlay(const std::string& script);
 
   // Clears all databases.
   void ClearAllDatabases();

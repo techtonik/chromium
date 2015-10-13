@@ -988,10 +988,6 @@ const char kSilentDebuggerExtensionAPI[]    = "silent-debugger-extension-api";
 // one wishes to use Chrome as an ash server.
 const char kSilentLaunch[]                  = "silent-launch";
 
-// Simplifies the support string in the Clear Browsing Data dialog.
-const char kSimpleClearBrowsingDataSupportString[] =
-    "simple-clear-browsing-data-support-string";
-
 // Simulates that elevation is needed to recover upgrade channel.
 const char kSimulateElevatedRecovery[]      = "simulate-elevated-recovery";
 
@@ -1026,6 +1022,10 @@ const char kSpeculativeResourcePrefetchingEnabled[] = "enabled";
 // Enables use of the Android spellchecker.
 const char kEnableAndroidSpellChecker[] = "enable-android-spellchecker";
 #endif
+
+// Disables the multilingual spellchecker.
+const char kDisableMultilingualSpellChecker[] =
+    "disable-multilingual-spellchecker";
 
 // Enables the multilingual spellchecker.
 const char kEnableMultilingualSpellChecker[] =
@@ -1270,6 +1270,12 @@ const char kMetricsClientID[]               = "metrics-client-id";
 // A process type (switches::kProcessType) that relaunches the browser. See
 // chrome/browser/mac/relauncher.h.
 const char kRelauncherProcess[]             = "relauncher";
+
+// When switches::kProcessType is switches::kRelauncherProcess, if this switch
+// is also present, the relauncher process will unmount and eject a mounted disk
+// image and move its disk image file to the trash.  The argument's value must
+// be a BSD device name of the form "diskN" or "diskNsM".
+const char kRelauncherProcessDMGDevice[]    = "dmg-device";
 #endif  // defined(OS_MACOSX)
 
 #if defined(OS_WIN)
@@ -1358,11 +1364,17 @@ bool MdPolicyPageEnabled() {
 
 bool MediaRouterEnabled() {
 #if defined(ENABLE_MEDIA_ROUTER)
+
+#if defined(OS_ANDROID)
+  return true;
+#else
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kEnableMediaRouter);
+#endif  // defined(OS_ANDROID).
+
 #else
   return false;
-#endif
+#endif  // defined(ENABLE_MEDIA_ROUTER)
 }
 
 bool PdfMaterialUIEnabled() {

@@ -411,7 +411,7 @@ static void qcms_transform_data_rgb_out_lut_precache(qcms_transform *transform, 
 	}
 }
 
-static void qcms_transform_data_rgba_out_lut_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length, qcms_format_type output_format)
+void qcms_transform_data_rgba_out_lut_precache(qcms_transform *transform, unsigned char *src, unsigned char *dest, size_t length, qcms_format_type output_format)
 {
 	const int r_out = output_format.r;
 	const int b_out = output_format.b;
@@ -540,8 +540,6 @@ void qcms_transform_data_tetra_clut_rgba(qcms_transform *transform, unsigned cha
 		unsigned char in_b = *src++;
 		unsigned char in_a = *src++;
 
-		float linear_r = in_r/255.0f, linear_g=in_g/255.0f, linear_b = in_b/255.0f;
-
 		int x = transform->floor_cache[in_r];
 		int y = transform->floor_cache[in_g];
 		int z = transform->floor_cache[in_b];
@@ -665,8 +663,6 @@ static void qcms_transform_data_tetra_clut(qcms_transform *transform, unsigned c
 		unsigned char in_r = *src++;
 		unsigned char in_g = *src++;
 		unsigned char in_b = *src++;
-
-		float linear_r = in_r/255.0f, linear_g=in_g/255.0f, linear_b = in_b/255.0f;
 
 		int x = transform->floor_cache[in_r];
 		int y = transform->floor_cache[in_g];

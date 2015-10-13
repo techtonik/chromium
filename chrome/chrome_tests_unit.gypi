@@ -136,8 +136,6 @@
       'browser/metrics/chrome_metrics_service_accessor_unittest.cc',
       'browser/metrics/cloned_install_detector_unittest.cc',
       'browser/metrics/perf/perf_provider_chromeos_unittest.cc',
-      'browser/metrics/signin_status_metrics_provider_chromeos_unittest.cc',
-      'browser/metrics/signin_status_metrics_provider_unittest.cc',
       'browser/metrics/thread_watcher_android_unittest.cc',
       'browser/metrics/thread_watcher_unittest.cc',
       'browser/metrics/time_ticks_experiment_unittest.cc',
@@ -208,8 +206,10 @@
       'browser/shell_integration_win_unittest.cc',
       'browser/signin/account_reconcilor_unittest.cc',
       'browser/signin/chrome_signin_client_unittest.cc',
+      'browser/signin/chrome_signin_status_metrics_provider_delegate_unittest.cc',
       'browser/signin/local_auth_unittest.cc',
       'browser/signin/signin_manager_unittest.cc',
+      'browser/signin/signin_status_metrics_provider_chromeos_unittest.cc',
       'browser/signin/signin_tracker_unittest.cc',
       'browser/signin/test_signin_client_builder.cc',
       'browser/ssl/security_state_model_unittest.cc',
@@ -227,8 +227,6 @@
       'browser/sync/glue/browser_thread_model_worker_unittest.cc',
       'browser/sync/glue/frontend_data_type_controller_unittest.cc',
       'browser/sync/glue/local_device_info_provider_unittest.cc',
-      'browser/sync/glue/non_frontend_data_type_controller_mock.cc',
-      'browser/sync/glue/non_frontend_data_type_controller_mock.h',
       'browser/sync/glue/non_frontend_data_type_controller_unittest.cc',
       'browser/sync/glue/search_engine_data_type_controller_unittest.cc',
       'browser/sync/glue/sync_backend_host_impl_unittest.cc',
@@ -570,6 +568,7 @@
       'browser/spellchecker/spellcheck_service_unittest.cc',
       'browser/spellchecker/spelling_service_client_unittest.cc',
       'browser/spellchecker/word_trimmer_unittest.cc',
+      'common/spellcheck_common_unittest.cc',
       'renderer/spellchecker/custom_dictionary_engine_unittest.cc',
       'renderer/spellchecker/spellcheck_multilingual_unittest.cc',
       'renderer/spellchecker/spellcheck_provider_hunspell_unittest.cc',
@@ -1384,6 +1383,7 @@
       'browser/ui/views/tabs/fake_base_tab_strip_controller.cc',
       'browser/ui/views/tabs/fake_base_tab_strip_controller.h',
       'browser/ui/views/tabs/stacked_tab_strip_layout_unittest.cc',
+      'browser/ui/views/tabs/tab_strip_layout_unittest.cc',
       'browser/ui/views/tabs/tab_strip_unittest.cc',
       'browser/ui/views/tabs/tab_unittest.cc',
       'browser/ui/views/toolbar/reload_button_unittest.cc',
@@ -1539,8 +1539,6 @@
       'browser/ui/omnibox/omnibox_edit_unittest.cc',
       'browser/ui/panels/panel_mouse_watcher_unittest.cc',
       'browser/ui/passwords/manage_passwords_bubble_model_unittest.cc',
-      'browser/ui/passwords/manage_passwords_icon_mock.cc',
-      'browser/ui/passwords/manage_passwords_icon_mock.h',
       'browser/ui/passwords/manage_passwords_view_utils_desktop_unittest.cc',
       'browser/ui/search/instant_page_unittest.cc',
       'browser/ui/search/instant_search_prerenderer_unittest.cc',
@@ -1763,8 +1761,6 @@
         'browser/signin/fake_signin_manager_builder.h',
         'browser/ssl/ssl_client_auth_requestor_mock.cc',
         'browser/ssl/ssl_client_auth_requestor_mock.h',
-        'browser/sync/profile_sync_components_factory_mock.cc',
-        'browser/sync/profile_sync_components_factory_mock.h',
         'browser/sync/profile_sync_service_mock.cc',
         'browser/sync/profile_sync_service_mock.h',
         'browser/ui/browser.h',
@@ -2289,7 +2285,7 @@
         }],
         ['chromeos==1', {
           'sources!': [
-            'browser/metrics/signin_status_metrics_provider_unittest.cc',
+            'browser/signin/chrome_signin_status_metrics_provider_delegate_unittest.cc',
           ],
         }],
         ['enable_background==1', {
@@ -2672,6 +2668,7 @@
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput',
           ],
           'sources!': [
+            'common/spellcheck_common_unittest.cc',
             'renderer/spellchecker/spellcheck_multilingual_unittest.cc',
             'renderer/spellchecker/spellcheck_provider_hunspell_unittest.cc',
             'renderer/spellchecker/spellcheck_unittest.cc',
@@ -2929,19 +2926,38 @@
               'dependencies': [
                 '../v8/tools/gyp/v8.gyp:v8_external_snapshot',
               ],
-              'copies': [
-                {
-                'destination': '<(asset_location)',
-                  'files': [
-                    '<(PRODUCT_DIR)/natives_blob.bin',
-                    '<(PRODUCT_DIR)/snapshot_blob.bin',
-                  ],
-                },
-              ],
+              'variables': {
+                'dest_path': '<(asset_location)',
+                'src_files': [
+                  '<(PRODUCT_DIR)/natives_blob.bin',
+                  '<(PRODUCT_DIR)/snapshot_blob.bin',
+                ],
+                'clear': 1,
+              },
+              'includes': ['../build/android/copy_ex.gypi'],
             }],
           ],
           'includes': [ '../build/apk_test.gypi' ],
         },
+      ],
+      'conditions': [
+        ['test_isolation_mode != "noop"', {
+          'targets': [
+            {
+              'target_name': 'unit_tests_apk_run',
+              'type': 'none',
+              'dependencies': [
+                'unit_tests_apk',
+              ],
+              'includes': [
+                '../build/isolate.gypi',
+              ],
+              'sources': [
+                'unit_tests_apk.isolate',
+              ],
+            },
+          ],
+        }],
       ],
     }],
     ['test_isolation_mode != "noop"', {

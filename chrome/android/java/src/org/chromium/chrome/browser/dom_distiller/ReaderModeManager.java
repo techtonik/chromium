@@ -10,7 +10,6 @@ import android.text.TextUtils;
 
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.CommandLine;
-import org.chromium.base.ObserverList;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
@@ -22,7 +21,6 @@ import org.chromium.chrome.browser.gsa.GSAContextDisplaySelection;
 import org.chromium.chrome.browser.infobar.InfoBar;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.infobar.InfoBarContainer.InfoBarContainerObserver;
-import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tab.EmptyTabObserver;
 import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.components.dom_distiller.content.DistillablePageUtils;
@@ -68,11 +66,6 @@ public class ReaderModeManager extends EmptyTabObserver
     public static final int STARTED = 2;
 
     /**
-     * JavaScript that can be executed to tell whether or not a page can be viewed in reader mode.
-     */
-    private static final String sIsReadableJs = DomDistillerUrlUtils.getIsDistillableJs();
-
-    /**
      * The url of the last page visited if the last page was reader mode page.  Otherwise null.
      */
     private String mReaderModePageUrl;
@@ -93,33 +86,16 @@ public class ReaderModeManager extends EmptyTabObserver
 
     private final ReaderModePanel mReaderModePanel;
 
-    private final ObserverList<ReaderModeManagerObserver> mObservers;
-
     private final int mHeaderBackgroundColor;
 
     public ReaderModeManager(Tab tab, Context context) {
         mTab = tab;
         mTab.addObserver(this);
-        mObservers = new ObserverList<ReaderModeManagerObserver>();
         mReaderModePanel = isEnabled(context) ? new ReaderModePanel(this) : null;
         mHeaderBackgroundColor = context != null
                 ? ApiCompatibilityUtils.getColor(
                         context.getResources(), R.color.reader_mode_header_bg)
                 : 0;
-    }
-
-    /**
-     * Adds an observer to be notified about changes to the reader mode status.
-     */
-    public void addObserver(ReaderModeManagerObserver observer) {
-        mObservers.addObserver(observer);
-    }
-
-    /**
-     * Removes an observer from receiving updates about the reader mode status changes.
-     */
-    public void removeObserver(ReaderModeManagerObserver observer) {
-        mObservers.removeObserver(observer);
     }
 
     // EmptyTabObserver:
@@ -151,7 +127,7 @@ public class ReaderModeManager extends EmptyTabObserver
             if (DomDistillerUrlUtils.isDistilledPage(tab.getUrl())) {
                 mReaderModeStatus = STARTED;
                 mReaderModePageUrl = tab.getUrl();
-                sendReaderModeStatusChangedNotification();
+                if (mReaderModePanel != null) mReaderModePanel.updateBottomButtonBar();
             }
         }
         ContextualSearchManager contextualSearchManager = getContextualSearchManager(tab);
@@ -247,8 +223,7 @@ public class ReaderModeManager extends EmptyTabObserver
     }
 
     private ReaderModeActivityDelegate getReaderModeActivityDelegate() {
-        if (!(mTab instanceof ChromeTab)) return null;
-        return ((ChromeTab) mTab).getReaderModeActivityDelegate();
+        return mTab.getReaderModeActivityDelegate();
     }
 
     private WebContentsObserver createWebContentsObserver(WebContents webContents) {
@@ -275,7 +250,7 @@ public class ReaderModeManager extends EmptyTabObserver
                 if (!isMainFrame) return;
                 if (DomDistillerUrlUtils.isDistilledPage(validatedUrl)) {
                     mReaderModeStatus = STARTED;
-                    sendReaderModeStatusChangedNotification();
+                    if (mReaderModePanel != null) mReaderModePanel.updateBottomButtonBar();
                     mReaderModePageUrl = validatedUrl;
                 }
             }
@@ -299,7 +274,7 @@ public class ReaderModeManager extends EmptyTabObserver
                     // For ADABOOST_MODEL, it is unlikely to get valid info at this event.
                 }
                 mReaderModePageUrl = null;
-                sendReaderModeStatusChangedNotification();
+                if (mReaderModePanel != null) mReaderModePanel.updateBottomButtonBar();
             }
         };
     }
@@ -324,16 +299,9 @@ public class ReaderModeManager extends EmptyTabObserver
                             RecordHistogram.recordBooleanHistogram(
                                     "DomDistiller.PageDistillable", mReaderModeStatus == POSSIBLE);
                         }
-                        sendReaderModeStatusChangedNotification();
+                        if (mReaderModePanel != null) mReaderModePanel.updateBottomButtonBar();
                     }
                 });
-    }
-
-    private void sendReaderModeStatusChangedNotification() {
-        for (ReaderModeManagerObserver observer : mObservers) {
-            observer.onReaderModeStatusChanged(mReaderModeStatus);
-        }
-        if (mReaderModePanel != null) mReaderModePanel.updateBottomButtonBar();
     }
 
     private ContextualSearchManager getContextualSearchManager(Tab tab) {

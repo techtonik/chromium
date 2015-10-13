@@ -974,8 +974,8 @@ WebInspector.NetworkLogView.prototype = {
         for (var i = 0; i < nodesToInsert.length; ++i) {
             var node = nodesToInsert[i];
             var request = node.request();
-            node.refresh();
             dataGrid.insertChild(node);
+            node.refresh();
             node[WebInspector.NetworkLogView._isMatchingSearchQuerySymbol] = this._matchRequest(request);
         }
 
@@ -1360,7 +1360,7 @@ WebInspector.NetworkLogView.prototype = {
         contextMenu.appendItem(WebInspector.UIString.capitalize("Clear ^browser ^cookies"), this._clearBrowserCookies.bind(this));
 
         var blockedSetting = WebInspector.moduleSetting("blockedURLs");
-        if (request) {
+        if (request && Runtime.experiments.isEnabled("requestBlocking")) {  // Disabled until ready.
             contextMenu.appendSeparator();
 
             var urlWithoutScheme = request.parsedURL.urlWithoutScheme();

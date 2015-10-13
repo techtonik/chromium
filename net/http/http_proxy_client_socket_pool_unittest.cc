@@ -287,7 +287,7 @@ class HttpProxyClientSocketPoolTest
     ssl_data_->SetNextProto(GetParam().protocol);
   }
 
-  HttpNetworkSession* CreateNetworkSession() {
+  scoped_ptr<HttpNetworkSession> CreateNetworkSession() {
     return SpdySessionDependencies::SpdyCreateSession(&session_deps_);
   }
 
@@ -303,7 +303,7 @@ class HttpProxyClientSocketPoolTest
   scoped_ptr<CertVerifier> cert_verifier_;
   SSLClientSocketPool ssl_socket_pool_;
 
-  const scoped_refptr<HttpNetworkSession> session_;
+  const scoped_ptr<HttpNetworkSession> session_;
 
  protected:
   SpdyTestUtil spdy_util_;
@@ -339,9 +339,7 @@ TEST_P(HttpProxyClientSocketPoolTest, NoTunnel) {
   EXPECT_EQ(OK, rv);
   EXPECT_TRUE(handle_.is_initialized());
   ASSERT_TRUE(handle_.socket());
-  HttpProxyClientSocket* tunnel_socket =
-          static_cast<HttpProxyClientSocket*>(handle_.socket());
-  EXPECT_TRUE(tunnel_socket->IsConnected());
+  EXPECT_TRUE(handle_.socket()->IsConnected());
   EXPECT_FALSE(proxy_delegate->on_before_tunnel_request_called());
   EXPECT_FALSE(proxy_delegate->on_tunnel_headers_received_called());
   EXPECT_TRUE(proxy_delegate->on_tunnel_request_completed_called());
@@ -446,9 +444,7 @@ TEST_P(HttpProxyClientSocketPoolTest, HaveAuth) {
   EXPECT_EQ(OK, rv);
   EXPECT_TRUE(handle_.is_initialized());
   ASSERT_TRUE(handle_.socket());
-  HttpProxyClientSocket* tunnel_socket =
-          static_cast<HttpProxyClientSocket*>(handle_.socket());
-  EXPECT_TRUE(tunnel_socket->IsConnected());
+  EXPECT_TRUE(handle_.socket()->IsConnected());
   proxy_delegate->VerifyOnTunnelHeadersReceived(
       "www.google.com:443",
       proxy_host_port.c_str(),

@@ -16,7 +16,7 @@
 // compile any code that calls member functions of AttachmentBroker. This
 // prevents symbols only used by AttachmentBroker and its subclasses from
 // making it into the binary.
-#if defined(OS_WIN)
+#if defined(OS_WIN) || (defined(OS_MACOSX) && !defined(OS_IOS))
 #define USE_ATTACHMENT_BROKER 1
 #else
 #define USE_ATTACHMENT_BROKER 0
@@ -63,7 +63,7 @@ class IPC_EXPORT AttachmentBroker : public Listener {
   // IPC::Channel to communicate with the broker process. This may be the same
   // IPC::Channel that is requesting the brokering of an attachment.
   // Returns true on success and false otherwise.
-  virtual bool SendAttachmentToProcess(const BrokerableAttachment* attachment,
+  virtual bool SendAttachmentToProcess(BrokerableAttachment* attachment,
                                        base::ProcessId destination_process) = 0;
 
   // Returns whether the attachment was available. If the attachment was

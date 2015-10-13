@@ -100,8 +100,7 @@ private:
     bool inShorthand() const { return m_inParseShorthand; }
     bool inQuirksMode() const { return isQuirksModeBehavior(m_context.mode()); }
 
-    bool parseViewportProperty(CSSPropertyID propId, bool important);
-    bool parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important);
+    bool parseViewportDescriptor(CSSPropertyID propId, bool important);
     bool parseFontFaceDescriptor(CSSPropertyID);
 
     KURL completeURL(const String& url) const;
@@ -201,7 +200,6 @@ private:
 
     bool consumeBorderSpacing(bool important);
 
-    PassRefPtrWillBeRawPtr<CSSValue> parseCounter(int defaultValue);
     PassRefPtrWillBeRawPtr<CSSValue> parseCounterContent(CSSParserValueList* args, bool counters);
 
     bool parseColorParameters(const CSSParserValue*, int* colorValues, bool parseAlpha);
@@ -266,8 +264,6 @@ private:
 
     PassRefPtrWillBeRawPtr<CSSValue> parseTextDecoration();
 
-    PassRefPtrWillBeRawPtr<CSSValue> parseTextIndent();
-
     bool parseCalculation(CSSParserValue*, ValueRange);
 
     bool parseGeneratedImage(CSSParserValueList*, RefPtrWillBeRawPtr<CSSValue>&);
@@ -279,17 +275,6 @@ private:
     PassRefPtrWillBeRawPtr<CSSValue> createCSSImageValueWithReferrer(const AtomicString& rawValue, const KURL&);
 
     PassRefPtrWillBeRawPtr<CSSBasicShapeInsetValue> parseInsetRoundedCorners(PassRefPtrWillBeRawPtr<CSSBasicShapeInsetValue>, CSSParserValueList*);
-
-    enum SizeParameterType {
-        None,
-        Auto,
-        Length,
-        PageSize,
-        Orientation,
-    };
-
-    PassRefPtrWillBeRawPtr<CSSValueList> parseSize();
-    SizeParameterType parseSizeParameter(CSSValueList* parsedValues, CSSParserValue*, SizeParameterType prevParamType);
 
     PassRefPtrWillBeRawPtr<CSSValue> consumeFontFaceSrcURI();
     PassRefPtrWillBeRawPtr<CSSValue> consumeFontFaceSrcLocal();

@@ -388,8 +388,8 @@ public:
 
     // IE extensions. Used to calculate offsetWidth/Height.  Overridden by inlines (LayoutFlow)
     // to return the remaining width on a given line (and the height of a single line).
-    LayoutUnit offsetWidth() const override { return m_frameRect.width(); }
-    LayoutUnit offsetHeight() const override { return m_frameRect.height(); }
+    LayoutUnit offsetWidth() const final { return m_frameRect.width(); }
+    LayoutUnit offsetHeight() const final { return m_frameRect.height(); }
 
     int pixelSnappedOffsetWidth() const final;
     int pixelSnappedOffsetHeight() const final;
@@ -590,6 +590,9 @@ public:
             m_rareData->m_paginationStrut = LayoutUnit();
     }
 
+    bool hasForcedBreakBefore() const;
+    bool hasForcedBreakAfter() const;
+
     LayoutRect clippedOverflowRectForPaintInvalidation(const LayoutBoxModelObject* paintInvalidationContainer, const PaintInvalidationState* = nullptr) const override;
     void mapRectToPaintInvalidationBacking(const LayoutBoxModelObject* paintInvalidationContainer, LayoutRect&, const PaintInvalidationState*) const override;
     virtual void invalidatePaintForOverhangingFloats(bool paintAllDescendants);
@@ -697,6 +700,7 @@ public:
     virtual void paintBoxDecorationBackground(const PaintInfo&, const LayoutPoint&) const;
     virtual void paintMask(const PaintInfo&, const LayoutPoint&) const;
     void imageChanged(WrappedImagePtr, const IntRect* = nullptr) override;
+    ResourcePriority computeResourcePriority() const final;
 
     void logicalExtentAfterUpdatingLogicalWidth(const LayoutUnit& logicalTop, LogicalExtentComputedValues&);
 
@@ -724,8 +728,8 @@ public:
     LayoutUnit lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const override;
     int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const override;
 
-    LayoutUnit offsetLeft() const override;
-    LayoutUnit offsetTop() const override;
+    LayoutUnit offsetLeft() const final;
+    LayoutUnit offsetTop() const final;
 
     LayoutPoint flipForWritingModeForChild(const LayoutBox* child, const LayoutPoint&) const;
     LayoutUnit flipForWritingMode(LayoutUnit position) const WARN_UNUSED_RETURN {
@@ -911,9 +915,14 @@ private:
 
     virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const;
 
-    // This function calculates the minimum and maximum preferred widths for an object.
-    // These values are used in shrink-to-fit layout systems.
-    // These include tables, positioned objects, floats and flexible boxes.
+    // This function calculates the preferred widths for an object.
+    //
+    // This function is only expected to be called if
+    // the boolean preferredLogicalWidthsDirty is true. It also MUST clear the
+    // boolean before returning.
+    //
+    // See INTRINSIC SIZES / PREFERRED LOGICAL WIDTHS in LayoutObject.h for more
+    // details about those widths.
     virtual void computePreferredLogicalWidths() { clearPreferredLogicalWidthsDirty(); }
 
     LayoutBoxRareData& ensureRareData()
@@ -957,15 +966,15 @@ private:
     LayoutRectOutsets m_marginBoxOutsets;
 
 protected:
-    // The preferred logical width of the element if it were to break its lines at every
-    // possible opportunity. CSS 2.1 calls this width the "preferred minimum width" and
-    // "minimum content width".
-    // See https://drafts.csswg.org/css-sizing-3/#intrinsic for more information.
+    // The logical width of the element if it were to break its lines at every
+    // possible opportunity.
+    //
+    // See LayoutObject::minPreferredLogicalWidth() for more details.
     LayoutUnit m_minPreferredLogicalWidth;
 
-    // The preferred logical width of the element if it never breaks any lines at all.
-    // CSS 2.1 calls this width the "preferred width" and "maximum cell width".
-    // See https://drafts.csswg.org/css-sizing-3/#intrinsic for more information.
+    // The logical width of the element if it never breaks any lines at all.
+    //
+    // See LayoutObject::maxPreferredLogicalWidth() for more details.
     LayoutUnit m_maxPreferredLogicalWidth;
 
     // Our overflow information.

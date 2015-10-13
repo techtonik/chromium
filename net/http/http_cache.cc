@@ -294,39 +294,20 @@ class HttpCache::QuicServerInfoFactoryAdaptor : public QuicServerInfoFactory {
 };
 
 //-----------------------------------------------------------------------------
-HttpCache::HttpCache(const HttpNetworkSession::Params& params,
-                     BackendFactory* backend_factory)
-    : net_log_(params.net_log),
-      backend_factory_(backend_factory),
-      building_backend_(false),
-      bypass_lock_for_test_(false),
-      fail_conditionalization_for_test_(false),
-      mode_(NORMAL),
-      network_layer_(new HttpNetworkLayer(new HttpNetworkSession(params))),
-      clock_(new base::DefaultClock()),
-      weak_factory_(this) {
-  SetupQuicServerInfoFactory(network_layer_->GetSession());
-}
-
-
 // This call doesn't change the shared |session|'s QuicServerInfoFactory because
 // |session| is shared.
 HttpCache::HttpCache(HttpNetworkSession* session,
-                     BackendFactory* backend_factory)
-    : net_log_(session->net_log()),
-      backend_factory_(backend_factory),
-      building_backend_(false),
-      bypass_lock_for_test_(false),
-      fail_conditionalization_for_test_(false),
-      mode_(NORMAL),
-      network_layer_(new HttpNetworkLayer(session)),
-      clock_(new base::DefaultClock()),
-      weak_factory_(this) {
-}
+                     BackendFactory* backend_factory,
+                     bool set_up_quic_server_info)
+    : HttpCache(new HttpNetworkLayer(session),
+                session->net_log(),
+                backend_factory,
+                set_up_quic_server_info) {}
 
 HttpCache::HttpCache(HttpTransactionFactory* network_layer,
                      NetLog* net_log,
-                     BackendFactory* backend_factory)
+                     BackendFactory* backend_factory,
+                     bool set_up_quic_server_info)
     : net_log_(net_log),
       backend_factory_(backend_factory),
       building_backend_(false),
@@ -336,7 +317,8 @@ HttpCache::HttpCache(HttpTransactionFactory* network_layer,
       network_layer_(network_layer),
       clock_(new base::DefaultClock()),
       weak_factory_(this) {
-  SetupQuicServerInfoFactory(network_layer_->GetSession());
+  if (set_up_quic_server_info)
+    SetupQuicServerInfoFactory(network_layer_->GetSession());
 }
 
 HttpCache::~HttpCache() {
@@ -999,10 +981,9 @@ bool HttpCache::RemovePendingTransactionFromPendingOp(PendingOp* pending_op,
 void HttpCache::SetupQuicServerInfoFactory(HttpNetworkSession* session) {
   if (session &&
       !session->quic_stream_factory()->has_quic_server_info_factory()) {
-    DCHECK(!quic_server_info_factory_);
-    quic_server_info_factory_.reset(new QuicServerInfoFactoryAdaptor(this));
+    // QuicStreamFactory takes ownership of QuicServerInfoFactoryAdaptor.
     session->quic_stream_factory()->set_quic_server_info_factory(
-        quic_server_info_factory_.get());
+        new QuicServerInfoFactoryAdaptor(this));
   }
 }
 

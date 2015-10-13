@@ -196,12 +196,11 @@ void CSSToStyleMap::mapFillSize(StyleResolverState& state, FillLayer* layer, con
 
     if (value.isValuePair()) {
         const CSSValuePair& pair = toCSSValuePair(value);
-        // TODO(sashab): Make StyleBuilderConverter take const&s and remove these const_casts.
-        firstLength = StyleBuilderConverter::convertLengthOrAuto(state, const_cast<CSSValue*>(&pair.first()));
-        secondLength = StyleBuilderConverter::convertLengthOrAuto(state, const_cast<CSSValue*>(&pair.second()));
+        firstLength = StyleBuilderConverter::convertLengthOrAuto(state, pair.first());
+        secondLength = StyleBuilderConverter::convertLengthOrAuto(state, pair.second());
     } else {
         ASSERT(value.isPrimitiveValue());
-        firstLength = StyleBuilderConverter::convertLengthOrAuto(state, const_cast<CSSValue*>(&value));
+        firstLength = StyleBuilderConverter::convertLengthOrAuto(state, value);
         secondLength = Length();
     }
 
@@ -367,12 +366,14 @@ CSSTransitionData::TransitionProperty CSSToStyleMap::mapAnimationProperty(const 
 {
     if (value.isInitialValue())
         return CSSTransitionData::initialProperty();
-    if (value.isCustomIdentValue())
-        return CSSTransitionData::TransitionProperty(toCSSCustomIdentValue(value).value());
-    const CSSPrimitiveValue& primitiveValue = toCSSPrimitiveValue(value);
-    if (primitiveValue.getValueID() == CSSValueNone)
-        return CSSTransitionData::TransitionProperty(CSSTransitionData::TransitionNone);
-    return CSSTransitionData::TransitionProperty(primitiveValue.getPropertyID());
+    if (value.isCustomIdentValue()) {
+        const CSSCustomIdentValue& customIdentValue = toCSSCustomIdentValue(value);
+        if (customIdentValue.isKnownPropertyID())
+            return CSSTransitionData::TransitionProperty(customIdentValue.valueAsPropertyID());
+        return CSSTransitionData::TransitionProperty(customIdentValue.value());
+    }
+    ASSERT(toCSSPrimitiveValue(value).getValueID() == CSSValueNone);
+    return CSSTransitionData::TransitionProperty(CSSTransitionData::TransitionNone);
 }
 
 PassRefPtr<TimingFunction> CSSToStyleMap::mapAnimationTimingFunction(const CSSValue& value, bool allowStepMiddle)

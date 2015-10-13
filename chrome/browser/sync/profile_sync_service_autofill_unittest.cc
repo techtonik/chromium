@@ -50,6 +50,7 @@
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/sync_driver/data_type_controller.h"
 #include "components/sync_driver/fake_sync_client.h"
+#include "components/sync_driver/sync_api_component_factory_mock.h"
 #include "components/syncable_prefs/pref_service_syncable.h"
 #include "components/webdata/common/web_database.h"
 #include "components/webdata_services/web_data_service_test_util.h"
@@ -390,7 +391,6 @@ ACTION_P(MakeAutocompleteSyncComponents, wds) {
 
 ACTION_P(ReturnNewDataTypeManagerWithDebugListener, debug_listener) {
   return new sync_driver::DataTypeManagerImpl(
-      base::Closure(),
       debug_listener,
       arg1,
       arg2,
@@ -511,7 +511,7 @@ class ProfileSyncServiceAutofillTest
                                                                     callback);
     sync_client_->SetSyncService(sync_service_);
 
-    ProfileSyncComponentsFactoryMock* components =
+    SyncApiComponentFactoryMock* components =
         sync_service_->GetSyncApiComponentFactoryMock();
 
     EXPECT_CALL(*components, CreateDataTypeManager(_, _, _, _, _)).
@@ -674,9 +674,11 @@ class ProfileSyncServiceAutofillTest
   DataTypeController* CreateDataTypeController(syncer::ModelType type) {
     DCHECK(type == AUTOFILL || type == AUTOFILL_PROFILE);
     if (type == AUTOFILL)
-      return new AutofillDataTypeController(sync_client_.get());
+      return new AutofillDataTypeController(base::Bind(&base::DoNothing),
+                                            sync_client_.get());
     else
-      return new AutofillProfileDataTypeController(sync_client_.get());
+      return new AutofillProfileDataTypeController(base::Bind(&base::DoNothing),
+                                                   sync_client_.get());
   }
 
   friend class AddAutofillHelper<AutofillEntry>;

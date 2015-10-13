@@ -38,7 +38,6 @@
 #include "chrome/browser/signin/chrome_signin_client_factory.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
-#include "chrome/browser/sync/glue/chrome_report_unrecoverable_error.h"
 #include "chrome/browser/sync/glue/sync_backend_host.h"
 #include "chrome/browser/sync/glue/sync_backend_host_impl.h"
 #include "chrome/browser/sync/glue/sync_start_util.h"
@@ -71,6 +70,7 @@
 #include "components/sync_driver/data_type_controller.h"
 #include "components/sync_driver/device_info.h"
 #include "components/sync_driver/favicon_cache.h"
+#include "components/sync_driver/glue/chrome_report_unrecoverable_error.h"
 #include "components/sync_driver/pref_names.h"
 #include "components/sync_driver/sync_api_component_factory.h"
 #include "components/sync_driver/sync_client.h"
@@ -204,7 +204,10 @@ bool ShouldShowActionOnUI(
     const syncer::SyncProtocolError& error) {
   return (error.action != syncer::UNKNOWN_ACTION &&
           error.action != syncer::DISABLE_SYNC_ON_CLIENT &&
-          error.action != syncer::STOP_SYNC_FOR_DISABLED_ACCOUNT);
+          error.action != syncer::STOP_SYNC_FOR_DISABLED_ACCOUNT &&
+          error.action != syncer::DISABLE_SYNC_AND_ROLLBACK &&
+          error.action != syncer::ROLLBACK_DONE &&
+          error.action != syncer::RESET_LOCAL_SYNC_DATA);
 }
 
 ProfileSyncService::ProfileSyncService(
@@ -552,7 +555,8 @@ void ProfileSyncService::InitializeBackend(bool delete_stale_data) {
                            new syncer::SyncManagerFactory(GetManagerType()))
                            .Pass(),
                        MakeWeakHandle(weak_factory_.GetWeakPtr()),
-                       base::Bind(browser_sync::ChromeReportUnrecoverableError),
+                       base::Bind(browser_sync::ChromeReportUnrecoverableError,
+                                  chrome::GetChannel()),
                        network_resources_.get(), saved_nigori_state_.Pass());
 }
 
@@ -1396,6 +1400,10 @@ void ProfileSyncService::OnActionableError(const SyncProtocolError& error) {
       sync_disabled_by_admin_ = true;
       ShutdownImpl(syncer::DISABLE_SYNC);
       break;
+    case syncer::RESET_LOCAL_SYNC_DATA:
+      ShutdownImpl(syncer::DISABLE_SYNC);
+      startup_controller_->TryStart();
+      break;
     default:
       NOTREACHED();
   }
@@ -1845,6 +1853,10 @@ syncer::ModelTypeSet ProfileSyncService::GetActiveDataTypes() const {
   const syncer::ModelTypeSet failed_types =
       data_type_status_table_.GetFailedTypes();
   return Difference(preferred_types, failed_types);
+}
+
+sync_driver::SyncClient* ProfileSyncService::GetSyncClient() const {
+  return sync_client_.get();
 }
 
 syncer::ModelTypeSet ProfileSyncService::GetPreferredDataTypes() const {
@@ -2658,10 +2670,6 @@ void ProfileSyncService::FlushDirectory() const {
   // If sync is not initialized yet, we fail silently.
   if (backend_initialized_)
     backend_->FlushDirectory();
-}
-
-sync_driver::SyncClient* ProfileSyncService::GetSyncClient() const {
-  return sync_client_.get();
 }
 
 base::FilePath ProfileSyncService::GetDirectoryPathForTest() const {

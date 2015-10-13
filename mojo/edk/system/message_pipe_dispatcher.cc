@@ -266,7 +266,7 @@ scoped_refptr<MessagePipeDispatcher> MessagePipeDispatcher::Deserialize(
 
     // TODO(jam): Copied below from RawChannelWin. See commment above
     // GetReadPlatformHandles.
-    ScopedPlatformHandleVectorPtr platform_handles;
+    ScopedPlatformHandleVectorPtr temp_platform_handles;
     if (message_view.transport_data_buffer()) {
       size_t num_platform_handles;
       const void* platform_handle_table;
@@ -275,10 +275,10 @@ scoped_refptr<MessagePipeDispatcher> MessagePipeDispatcher::Deserialize(
           &platform_handle_table);
 
       if (num_platform_handles > 0) {
-        platform_handles =
+        temp_platform_handles =
             GetReadPlatformHandles(num_platform_handles,
                                     platform_handle_table).Pass();
-        if (!platform_handles) {
+        if (!temp_platform_handles) {
           LOG(ERROR) << "Invalid number of platform handles received";
           return nullptr;
         }
@@ -292,7 +292,8 @@ scoped_refptr<MessagePipeDispatcher> MessagePipeDispatcher::Deserialize(
       DCHECK(message_view.transport_data_buffer());
       message->SetDispatchers(TransportData::DeserializeDispatchers(
           message_view.transport_data_buffer(),
-          message_view.transport_data_buffer_size(), platform_handles.Pass()));
+          message_view.transport_data_buffer_size(),
+          temp_platform_handles.Pass()));
     }
 
     rv->message_queue_.AddMessage(message.Pass());
@@ -347,12 +348,8 @@ void MessagePipeDispatcher::SerializeInternal() {
   }
 
   DCHECK(serialized_message_queue_.empty());
-  // see comment in method below, this is only temporary till we implement a
-  // solution with shared buffer
   while (!message_queue_.IsEmpty()) {
     scoped_ptr<MessageInTransit> message = message_queue_.GetMessage();
-    size_t cur_size = serialized_message_queue_.size();
-
 
     // When MojoWriteMessage is called, the MessageInTransit doesn't have
     // dispatchers set and CreateEquivaent... is called since the dispatchers
@@ -370,15 +367,14 @@ void MessagePipeDispatcher::SerializeInternal() {
     message->SerializeAndCloseDispatchers();
     // cont'd below
 
-
     size_t main_buffer_size = message->main_buffer_size();
     size_t transport_data_buffer_size = message->transport_data() ?
         message->transport_data()->buffer_size() : 0;
-    size_t total_size = message->total_size();
 
-    serialized_message_queue_.resize(cur_size + total_size);
-    memcpy(&serialized_message_queue_[cur_size], message->main_buffer(),
-           main_buffer_size);
+    serialized_message_queue_.insert(
+        serialized_message_queue_.end(),
+        static_cast<const char*>(message->main_buffer()),
+        static_cast<const char*>(message->main_buffer()) + main_buffer_size);
 
     // cont'd
     if (transport_data_buffer_size != 0) {
@@ -403,9 +399,11 @@ void MessagePipeDispatcher::SerializeInternal() {
         }
       }
 
-      memcpy(&serialized_message_queue_[
-                 cur_size + total_size - transport_data_buffer_size],
-             message->transport_data()->buffer(), transport_data_buffer_size);
+      serialized_message_queue_.insert(
+          serialized_message_queue_.end(),
+          static_cast<const char*>(message->transport_data()->buffer()),
+          static_cast<const char*>(message->transport_data()->buffer()) +
+              transport_data_buffer_size);
 #else
       NOTREACHED() << "TODO(jam) implement";
 #endif

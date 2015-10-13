@@ -14,6 +14,7 @@
 #include "core/css/CSSStringValue.h"
 #include "core/css/CSSURIValue.h"
 #include "core/css/CSSUnicodeRangeValue.h"
+#include "core/css/CSSValuePair.h"
 #include "core/css/CSSValuePool.h"
 #include "core/css/FontFace.h"
 #include "core/css/parser/CSSParserFastPaths.h"
@@ -52,7 +53,7 @@ bool CSSPropertyParser::parseValue(CSSPropertyID unresolvedProperty, bool import
 
     if (ruleType == StyleRule::Viewport) {
         parseSuccess = (RuntimeEnabledFeatures::cssViewportEnabled() || isUASheetBehavior(context.mode()))
-            && parser.parseViewportProperty(resolvedProperty, important);
+            && parser.parseViewportDescriptor(resolvedProperty, important);
     } else if (ruleType == StyleRule::FontFace) {
         parseSuccess = parser.parseFontFaceDescriptor(resolvedProperty);
     } else {
@@ -168,7 +169,7 @@ private:
     RefPtrWillBeMember<CSSCalcValue> m_calcValue;
 };
 
-static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumeInteger(CSSParserTokenRange& range, CSSParserMode cssParserMode, double minimumValue = std::numeric_limits<int>::min())
+static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumeInteger(CSSParserTokenRange& range, CSSParserMode cssParserMode, double minimumValue = -std::numeric_limits<double>::max())
 {
     const CSSParserToken& token = range.peek();
     if (token.type() == NumberToken) {
@@ -258,16 +259,29 @@ static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumeLength(CSSParserTokenRan
     return nullptr;
 }
 
-static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumeLengthOrPercent(CSSParserTokenRange& range, CSSParserMode cssParserMode, ValueRange valueRange, UnitlessQuirk unitless = UnitlessQuirk::Forbid)
+static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumePercent(CSSParserTokenRange& range, ValueRange valueRange)
 {
     const CSSParserToken& token = range.peek();
-    if (token.type() == DimensionToken || token.type() == NumberToken)
-        return consumeLength(range, cssParserMode, valueRange, unitless);
     if (token.type() == PercentageToken) {
         if (valueRange == ValueRangeNonNegative && token.numericValue() < 0)
             return nullptr;
         return cssValuePool().createValue(range.consumeIncludingWhitespace().numericValue(), CSSPrimitiveValue::UnitType::Percentage);
     }
+    CalcParser calcParser(range, valueRange);
+    if (const CSSCalcValue* calculation = calcParser.value()) {
+        if (calculation->category() == CalcPercent)
+            return calcParser.consumeValue();
+    }
+    return nullptr;
+}
+
+static PassRefPtrWillBeRawPtr<CSSPrimitiveValue> consumeLengthOrPercent(CSSParserTokenRange& range, CSSParserMode cssParserMode, ValueRange valueRange, UnitlessQuirk unitless = UnitlessQuirk::Forbid)
+{
+    const CSSParserToken& token = range.peek();
+    if (token.type() == DimensionToken || token.type() == NumberToken)
+        return consumeLength(range, cssParserMode, valueRange, unitless);
+    if (token.type() == PercentageToken)
+        return consumePercent(range, valueRange);
     CalcParser calcParser(range, valueRange);
     if (const CSSCalcValue* calculation = calcParser.value()) {
         if (calculation->category() == CalcLength || calculation->category() == CalcPercent || calculation->category() == CalcPercentLength)
@@ -628,6 +642,118 @@ static PassRefPtrWillBeRawPtr<CSSValueList> consumeRotation(CSSParserTokenRange&
     return list.release();
 }
 
+static PassRefPtrWillBeRawPtr<CSSValue> consumeCounter(CSSParserTokenRange& range, CSSParserMode cssParserMode, int defaultValue)
+{
+    if (range.peek().id() == CSSValueNone)
+        return consumeIdent(range);
+
+    // TODO(rwlbuis): should be space separated list.
+    RefPtrWillBeRawPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
+    do {
+        RefPtrWillBeRawPtr<CSSCustomIdentValue> counterName = consumeCustomIdent(range);
+        if (!counterName)
+            return nullptr;
+        int i = defaultValue;
+        if (RefPtrWillBeRawPtr<CSSPrimitiveValue> counterValue = consumeInteger(range, cssParserMode))
+            i = clampTo<int>(counterValue->getDoubleValue());
+        list->append(CSSValuePair::create(counterName.release(),
+            cssValuePool().createValue(i, CSSPrimitiveValue::UnitType::Number),
+            CSSValuePair::DropIdenticalValues));
+    } while (!range.atEnd());
+    return list.release();
+}
+
+static PassRefPtrWillBeRawPtr<CSSValue> consumePageSize(CSSParserTokenRange& range)
+{
+    switch (range.peek().id()) {
+    case CSSValueA3:
+    case CSSValueA4:
+    case CSSValueA5:
+    case CSSValueB4:
+    case CSSValueB5:
+    case CSSValueLedger:
+    case CSSValueLegal:
+    case CSSValueLetter:
+        return consumeIdent(range);
+    default:
+        return nullptr;
+    }
+}
+
+static PassRefPtrWillBeRawPtr<CSSValueList> consumeSize(CSSParserTokenRange& range, CSSParserMode cssParserMode)
+{
+    RefPtrWillBeRawPtr<CSSValueList> result = CSSValueList::createSpaceSeparated();
+
+    if (range.peek().id() == CSSValueAuto) {
+        result->append(consumeIdent(range));
+        return result.release();
+    }
+
+    if (RefPtrWillBeRawPtr<CSSValue> width = consumeLength(range, cssParserMode, ValueRangeNonNegative)) {
+        RefPtrWillBeRawPtr<CSSValue> height = consumeLength(range, cssParserMode, ValueRangeNonNegative);
+        result->append(width.release());
+        if (height)
+            result->append(height.release());
+        return result.release();
+    }
+
+    RefPtrWillBeRawPtr<CSSValue> pageSize = consumePageSize(range);
+    RefPtrWillBeRawPtr<CSSValue> orientation = nullptr;
+    if (range.peek().id() == CSSValuePortrait || range.peek().id() == CSSValueLandscape)
+        orientation = consumeIdent(range);
+    if (!pageSize)
+        pageSize = consumePageSize(range);
+
+    if (!orientation && !pageSize)
+        return nullptr;
+    if (pageSize)
+        result->append(pageSize.release());
+    if (orientation)
+        result->append(orientation.release());
+    return result.release();
+}
+
+static PassRefPtrWillBeRawPtr<CSSValue> consumeTextIndent(CSSParserTokenRange& range, CSSParserMode cssParserMode)
+{
+    // [ <length> | <percentage> ] && hanging? && each-line?
+    // Keywords only allowed when css3Text is enabled.
+    RefPtrWillBeRawPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+
+    bool hasLengthOrPercentage = false;
+    bool hasEachLine = false;
+    bool hasHanging = false;
+
+    do {
+        if (!hasLengthOrPercentage) {
+            if (RefPtrWillBeRawPtr<CSSValue> textIndent = consumeLengthOrPercent(range, cssParserMode, ValueRangeAll, UnitlessQuirk::Allow)) {
+                list->append(textIndent.release());
+                hasLengthOrPercentage = true;
+                continue;
+            }
+        }
+
+        if (RuntimeEnabledFeatures::css3TextEnabled()) {
+            CSSValueID id = range.peek().id();
+            if (!hasEachLine && id == CSSValueEachLine) {
+                list->append(consumeIdent(range));
+                hasEachLine = true;
+                continue;
+            }
+            if (!hasHanging && id == CSSValueHanging) {
+                list->append(consumeIdent(range));
+                hasHanging = true;
+                continue;
+            }
+        }
+        return nullptr;
+    } while (!range.atEnd());
+
+    if (!hasLengthOrPercentage)
+        return nullptr;
+
+    return list.release();
+}
+
 PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSPropertyID propId)
 {
     m_range.consumeWhitespace();
@@ -664,6 +790,13 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseSingleValue(CSSProperty
     case CSSPropertyWebkitBorderHorizontalSpacing:
     case CSSPropertyWebkitBorderVerticalSpacing:
         return consumeLength(m_range, m_context.mode(), ValueRangeNonNegative);
+    case CSSPropertyCounterIncrement:
+    case CSSPropertyCounterReset:
+        return consumeCounter(m_range, m_context.mode(), propId == CSSPropertyCounterIncrement ? 1 : 0);
+    case CSSPropertySize:
+        return consumeSize(m_range, m_context.mode());
+    case CSSPropertyTextIndent:
+        return consumeTextIndent(m_range, m_context.mode());
     default:
         return nullptr;
     }
@@ -906,6 +1039,96 @@ bool CSSPropertyParser::consumeBorderSpacing(bool important)
     addProperty(CSSPropertyWebkitBorderHorizontalSpacing, horizontalSpacing.release(), important);
     addProperty(CSSPropertyWebkitBorderVerticalSpacing, verticalSpacing.release(), important);
     return true;
+}
+
+static PassRefPtrWillBeRawPtr<CSSValue> consumeSingleViewportDescriptor(CSSParserTokenRange& range, CSSPropertyID propId, CSSParserMode cssParserMode)
+{
+    CSSValueID id = range.peek().id();
+    switch (propId) {
+    case CSSPropertyMinWidth:
+    case CSSPropertyMaxWidth:
+    case CSSPropertyMinHeight:
+    case CSSPropertyMaxHeight:
+        if (id == CSSValueAuto || id == CSSValueInternalExtendToZoom)
+            return consumeIdent(range);
+        return consumeLengthOrPercent(range, cssParserMode, ValueRangeNonNegative);
+    case CSSPropertyMinZoom:
+    case CSSPropertyMaxZoom:
+    case CSSPropertyZoom: {
+        if (id == CSSValueAuto)
+            return consumeIdent(range);
+        RefPtrWillBeRawPtr<CSSValue> parsedValue = consumeNumber(range, ValueRangeNonNegative);
+        if (parsedValue)
+            return parsedValue.release();
+        return consumePercent(range, ValueRangeNonNegative);
+    }
+    case CSSPropertyUserZoom:
+        if (id == CSSValueZoom || id == CSSValueFixed)
+            return consumeIdent(range);
+        break;
+    case CSSPropertyOrientation:
+        if (id == CSSValueAuto || id == CSSValuePortrait || id == CSSValueLandscape)
+            return consumeIdent(range);
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+
+    return nullptr;
+}
+
+bool CSSPropertyParser::parseViewportDescriptor(CSSPropertyID propId, bool important)
+{
+    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled() || isUASheetBehavior(m_context.mode()));
+
+    m_range.consumeWhitespace();
+
+    switch (propId) {
+    case CSSPropertyWidth: {
+        RefPtrWillBeRawPtr<CSSValue> minWidth = consumeSingleViewportDescriptor(m_range, CSSPropertyMinWidth, m_context.mode());
+        if (!minWidth)
+            return false;
+        RefPtrWillBeRawPtr<CSSValue> maxWidth = minWidth;
+        if (!m_range.atEnd())
+            maxWidth = consumeSingleViewportDescriptor(m_range, CSSPropertyMaxWidth, m_context.mode());
+        if (!maxWidth || !m_range.atEnd())
+            return false;
+        addProperty(CSSPropertyMinWidth, minWidth.release(), important);
+        addProperty(CSSPropertyMaxWidth, maxWidth.release(), important);
+        return true;
+    }
+    case CSSPropertyHeight: {
+        RefPtrWillBeRawPtr<CSSValue> minHeight = consumeSingleViewportDescriptor(m_range, CSSPropertyMinHeight, m_context.mode());
+        if (!minHeight)
+            return false;
+        RefPtrWillBeRawPtr<CSSValue> maxHeight = minHeight;
+        if (!m_range.atEnd())
+            maxHeight = consumeSingleViewportDescriptor(m_range, CSSPropertyMaxHeight, m_context.mode());
+        if (!maxHeight || !m_range.atEnd())
+            return false;
+        addProperty(CSSPropertyMinHeight, minHeight.release(), important);
+        addProperty(CSSPropertyMaxHeight, maxHeight.release(), important);
+        return true;
+    }
+    case CSSPropertyMinWidth:
+    case CSSPropertyMaxWidth:
+    case CSSPropertyMinHeight:
+    case CSSPropertyMaxHeight:
+    case CSSPropertyMinZoom:
+    case CSSPropertyMaxZoom:
+    case CSSPropertyZoom:
+    case CSSPropertyUserZoom:
+    case CSSPropertyOrientation: {
+        RefPtrWillBeRawPtr<CSSValue> parsedValue = consumeSingleViewportDescriptor(m_range, propId, m_context.mode());
+        if (!parsedValue || !m_range.atEnd())
+            return false;
+        addProperty(propId, parsedValue.release(), important);
+        return true;
+    }
+    default:
+        return false;
+    }
 }
 
 bool CSSPropertyParser::parseShorthand(CSSPropertyID propId, bool important)

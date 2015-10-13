@@ -7,11 +7,13 @@
 #include <string>
 
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/webui/options/sync_setup_handler.h"
 #include "chrome/browser/ui/webui/settings/appearance_handler.h"
 #include "chrome/browser/ui/webui/settings/downloads_handler.h"
 #include "chrome/browser/ui/webui/settings/languages_handler.h"
 #include "chrome/browser/ui/webui/settings/md_settings_localized_strings_provider.h"
 #include "chrome/browser/ui/webui/settings/settings_clear_browsing_data_handler.h"
+#include "chrome/browser/ui/webui/settings/settings_default_browser_handler.h"
 #include "chrome/browser/ui/webui/settings/settings_startup_pages_handler.h"
 #include "chrome/common/url_constants.h"
 #include "content/public/browser/web_contents.h"
@@ -32,9 +34,11 @@ MdSettingsUI::MdSettingsUI(content::WebUI* web_ui)
     : content::WebUIController(web_ui) {
   AddSettingsPageUIHandler(new AppearanceHandler(web_ui));
   AddSettingsPageUIHandler(new ClearBrowsingDataHandler(web_ui));
+  AddSettingsPageUIHandler(new DefaultBrowserHandler(web_ui));
   AddSettingsPageUIHandler(new DownloadsHandler());
   AddSettingsPageUIHandler(new LanguagesHandler(web_ui));
   AddSettingsPageUIHandler(new StartupPagesHandler(web_ui));
+  AddSettingsPageUIHandler(new SyncSetupHandler());
 
   content::WebUIDataSource* html_source =
       content::WebUIDataSource::Create(chrome::kChromeUIMdSettingsHost);
@@ -56,8 +60,8 @@ MdSettingsUI::~MdSettingsUI() {
 }
 
 void MdSettingsUI::AddSettingsPageUIHandler(
-    settings::SettingsPageUIHandler* handler_raw) {
-  scoped_ptr<settings::SettingsPageUIHandler> handler(handler_raw);
+    content::WebUIMessageHandler* handler_raw) {
+  scoped_ptr<content::WebUIMessageHandler> handler(handler_raw);
   DCHECK(handler.get());
 
   web_ui()->AddMessageHandler(handler.release());

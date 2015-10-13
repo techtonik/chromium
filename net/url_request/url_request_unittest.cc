@@ -582,7 +582,7 @@ NetworkDelegate::AuthRequiredResponse BlockingNetworkDelegate::OnAuthRequired(
       auth_callback_ = callback;
       stage_blocked_for_callback_ = ON_AUTH_REQUIRED;
       base::ThreadTaskRunnerHandle::Get()->PostTask(
-          FROM_HERE, base::MessageLoop::QuitClosure());
+          FROM_HERE, base::MessageLoop::QuitWhenIdleClosure());
       return AUTH_REQUIRED_RESPONSE_IO_PENDING;
   }
   NOTREACHED();
@@ -621,7 +621,7 @@ int BlockingNetworkDelegate::MaybeBlockStage(
       callback_ = callback;
       stage_blocked_for_callback_ = stage;
       base::ThreadTaskRunnerHandle::Get()->PostTask(
-          FROM_HERE, base::MessageLoop::QuitClosure());
+          FROM_HERE, base::MessageLoop::QuitWhenIdleClosure());
       return ERR_IO_PENDING;
   }
   NOTREACHED();
@@ -2610,7 +2610,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesEnabled) {
   // LocalHttpTestServer points).
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(true);
+    network_delegate.set_experimental_cookie_features_enabled(true);
     default_context_.set_network_delegate(&network_delegate);
 
     TestDelegate d;
@@ -2628,7 +2628,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesEnabled) {
   // Verify that the cookie is sent for first-party requests.
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(true);
+    network_delegate.set_experimental_cookie_features_enabled(true);
     default_context_.set_network_delegate(&network_delegate);
     TestDelegate d;
     scoped_ptr<URLRequest> req(default_context_.CreateRequest(
@@ -2646,7 +2646,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesEnabled) {
   // Verify that the cookie is not-sent for non-first-party requests.
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(true);
+    network_delegate.set_experimental_cookie_features_enabled(true);
     default_context_.set_network_delegate(&network_delegate);
     TestDelegate d;
     scoped_ptr<URLRequest> req(default_context_.CreateRequest(
@@ -2670,7 +2670,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesDisabled) {
   // LocalHttpTestServer points).
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(false);
+    network_delegate.set_experimental_cookie_features_enabled(false);
     default_context_.set_network_delegate(&network_delegate);
 
     TestDelegate d;
@@ -2688,7 +2688,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesDisabled) {
   // Verify that the cookie is sent for first-party requests.
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(false);
+    network_delegate.set_experimental_cookie_features_enabled(false);
     default_context_.set_network_delegate(&network_delegate);
     TestDelegate d;
     scoped_ptr<URLRequest> req(default_context_.CreateRequest(
@@ -2706,7 +2706,7 @@ TEST_F(URLRequestTest, FirstPartyOnlyCookiesDisabled) {
   // Verify that the cookie is also sent for non-first-party requests.
   {
     TestNetworkDelegate network_delegate;
-    network_delegate.set_first_party_only_cookies_enabled(false);
+    network_delegate.set_experimental_cookie_features_enabled(false);
     default_context_.set_network_delegate(&network_delegate);
     TestDelegate d;
     scoped_ptr<URLRequest> req(default_context_.CreateRequest(
@@ -2920,6 +2920,7 @@ class URLRequestTestHTTP : public URLRequestTest {
       HttpRequestHeaders headers;
       headers.SetHeader(HttpRequestHeaders::kContentLength,
                         base::SizeTToString(arraysize(kData) - 1));
+      headers.SetHeader(HttpRequestHeaders::kContentType, "text/plain");
       req->SetExtraRequestHeaders(headers);
     }
     req->Start();
@@ -2929,8 +2930,16 @@ class URLRequestTestHTTP : public URLRequestTest {
     EXPECT_EQ(OK, req->status().error());
     if (include_data) {
       if (request_method == redirect_method) {
+        EXPECT_TRUE(req->extra_request_headers().HasHeader(
+            HttpRequestHeaders::kContentLength));
+        EXPECT_TRUE(req->extra_request_headers().HasHeader(
+            HttpRequestHeaders::kContentType));
         EXPECT_EQ(kData, d.data_received());
       } else {
+        EXPECT_FALSE(req->extra_request_headers().HasHeader(
+            HttpRequestHeaders::kContentLength));
+        EXPECT_FALSE(req->extra_request_headers().HasHeader(
+            HttpRequestHeaders::kContentType));
         EXPECT_NE(kData, d.data_received());
       }
     }
@@ -7081,12 +7090,13 @@ TEST_F(URLRequestTestHTTP, NetworkSuspendTest) {
       default_context_.http_auth_handler_factory();
   params.network_delegate = &default_network_delegate_;
   params.http_server_properties = default_context_.http_server_properties();
+  HttpNetworkSession network_session(params);
   scoped_ptr<HttpNetworkLayer> network_layer(
-      new HttpNetworkLayer(new HttpNetworkSession(params)));
+      new HttpNetworkLayer(&network_session));
   network_layer->OnSuspend();
 
   HttpCache http_cache(network_layer.release(), default_context_.net_log(),
-                       HttpCache::DefaultBackend::InMemory(0));
+                       HttpCache::DefaultBackend::InMemory(0), true);
 
   TestURLRequestContext context(true);
   context.set_http_transaction_factory(&http_cache);
@@ -7118,7 +7128,8 @@ TEST_F(URLRequestTestHTTP, NetworkSuspendTestNoCache) {
       default_context_.http_auth_handler_factory();
   params.network_delegate = &default_network_delegate_;
   params.http_server_properties = default_context_.http_server_properties();
-  HttpNetworkLayer network_layer(new HttpNetworkSession(params));
+  HttpNetworkSession network_session(params);
+  HttpNetworkLayer network_layer(&network_session);
   network_layer.OnSuspend();
 
   TestURLRequestContext context(true);
@@ -7967,7 +7978,7 @@ class SSLClientAuthTestDelegate : public TestDelegate {
   void OnCertificateRequested(URLRequest* request,
                               SSLCertRequestInfo* cert_request_info) override {
     on_certificate_requested_count_++;
-    base::MessageLoop::current()->Quit();
+    base::MessageLoop::current()->QuitWhenIdle();
   }
   int on_certificate_requested_count() {
     return on_certificate_requested_count_;
@@ -8149,9 +8160,9 @@ TEST_F(HTTPSRequestTest, SSLSessionCacheShardTest) {
   params.http_server_properties = default_context_.http_server_properties();
   params.ssl_session_cache_shard = "alternate";
 
+  HttpNetworkSession network_session(params);
   scoped_ptr<HttpCache> cache(new HttpCache(
-      new HttpNetworkSession(params),
-      HttpCache::DefaultBackend::InMemory(0)));
+      &network_session, HttpCache::DefaultBackend::InMemory(0), false));
 
   default_context_.set_http_transaction_factory(cache.get());
 

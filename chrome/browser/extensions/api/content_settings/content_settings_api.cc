@@ -25,6 +25,9 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/api/content_settings.h"
+#include "components/content_settings/core/browser/content_settings_info.h"
+#include "components/content_settings/core/browser/content_settings_registry.h"
+#include "components/content_settings/core/browser/content_settings_utils.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "content/public/browser/plugin_service.h"
@@ -163,8 +166,10 @@ bool ContentSettingsContentSettingGetFunction::RunSync() {
   }
 
   base::DictionaryValue* result = new base::DictionaryValue();
-  result->SetString(keys::kContentSettingKey,
-                    helpers::ContentSettingToString(setting));
+  std::string setting_string =
+      content_settings::ContentSettingToString(setting);
+  DCHECK(!setting_string.empty());
+  result->SetString(keys::kContentSettingKey, setting_string);
 
   SetResult(result);
 
@@ -208,9 +213,11 @@ bool ContentSettingsContentSettingSetFunction::RunSync() {
       params->details.setting->GetAsString(&setting_str));
   ContentSetting setting;
   EXTENSION_FUNCTION_VALIDATE(
-      helpers::StringToContentSetting(setting_str, &setting));
-  EXTENSION_FUNCTION_VALIDATE(HostContentSettingsMap::IsSettingAllowedForType(
-      GetProfile()->GetPrefs(), setting, content_type));
+      content_settings::ContentSettingFromString(setting_str, &setting));
+  EXTENSION_FUNCTION_VALIDATE(
+      content_settings::ContentSettingsRegistry::GetInstance()
+          ->Get(content_type)
+          ->IsSettingValid(setting));
 
   // Some content setting types support the full set of values listed in
   // content_settings.json only for exceptions. For the default setting,
@@ -219,8 +226,8 @@ bool ContentSettingsContentSettingSetFunction::RunSync() {
   // [ask, block] for the default setting.
   if (primary_pattern == ContentSettingsPattern::Wildcard() &&
       secondary_pattern == ContentSettingsPattern::Wildcard() &&
-      !HostContentSettingsMap::IsDefaultSettingAllowedForType(
-          GetProfile()->GetPrefs(), setting, content_type)) {
+      !HostContentSettingsMap::IsDefaultSettingAllowedForType(setting,
+                                                              content_type)) {
     static const char kUnsupportedDefaultSettingError[] =
         "'%s' is not supported as the default setting of %s.";
 
@@ -240,7 +247,7 @@ bool ContentSettingsContentSettingSetFunction::RunSync() {
 
     error_ = base::StringPrintf(
         kUnsupportedDefaultSettingError,
-        content_settings_helpers::ContentSettingToString(setting),
+        setting_str.c_str(),
         readable_type_name.c_str());
     return false;
   }

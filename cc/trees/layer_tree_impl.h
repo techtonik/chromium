@@ -5,6 +5,7 @@
 #ifndef CC_TREES_LAYER_TREE_IMPL_H_
 #define CC_TREES_LAYER_TREE_IMPL_H_
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -99,7 +100,7 @@ class CC_EXPORT LayerTreeImpl {
   gfx::Size DrawViewportSize() const;
   const gfx::Rect ViewportRectForTilePriority() const;
   scoped_ptr<ScrollbarAnimationController> CreateScrollbarAnimationController(
-      LayerImpl* scrolling_layer);
+      int scroll_layer_id);
   void DidAnimateScrollOffset();
   void InputScrollAnimationFinished();
   bool use_gpu_rasterization() const;
@@ -197,10 +198,6 @@ class CC_EXPORT LayerTreeImpl {
 
   void SetDeviceScaleFactor(float device_scale_factor);
   float device_scale_factor() const { return device_scale_factor_; }
-
-  void set_hide_pinch_scrollbars_near_min_scale(bool hide) {
-    hide_pinch_scrollbars_near_min_scale_ = hide;
-  }
 
   SyncedElasticOverscroll* elastic_overscroll() {
     return elastic_overscroll_.get();
@@ -320,6 +317,13 @@ class CC_EXPORT LayerTreeImpl {
     return picture_layers_;
   }
 
+  void RegisterScrollbar(ScrollbarLayerImplBase* scrollbar_layer);
+  void UnregisterScrollbar(ScrollbarLayerImplBase* scrollbar_layer);
+  ScrollbarSet ScrollbarsFor(int scroll_layer_id) const;
+
+  void RegisterScrollLayer(LayerImpl* layer);
+  void UnregisterScrollLayer(LayerImpl* layer);
+
   void AddLayerWithCopyOutputRequest(LayerImpl* layer);
   void RemoveLayerWithCopyOutputRequest(LayerImpl* layer);
   const std::vector<LayerImpl*>& LayersWithCopyOutputRequest() const;
@@ -362,6 +366,8 @@ class CC_EXPORT LayerTreeImpl {
   scoped_ptr<PendingPageScaleAnimation> TakePendingPageScaleAnimation();
 
   void GatherFrameTimingRequestIds(std::vector<int64_t>* request_ids);
+
+  void DidUpdateScrollState(int layer_id);
 
   bool IsAnimatingFilterProperty(const LayerImpl* layer) const;
   bool IsAnimatingOpacityProperty(const LayerImpl* layer) const;
@@ -407,8 +413,9 @@ class CC_EXPORT LayerTreeImpl {
                                     float max_page_scale_factor);
   bool SetPageScaleFactorLimits(float min_page_scale_factor,
                                 float max_page_scale_factor);
+  bool IsViewportLayerId(int id) const;
+  void UpdateScrollbars(int scroll_layer_id, int clip_layer_id);
   void DidUpdatePageScale();
-  void HideInnerViewportScrollbarsIfNeeded();
   void PushTopControls(const float* top_controls_shown_ratio);
   LayerTreeHostImpl* layer_tree_host_impl_;
   int source_frame_number_;
@@ -429,7 +436,6 @@ class CC_EXPORT LayerTreeImpl {
   scoped_refptr<SyncedProperty<ScaleGroup>> page_scale_factor_;
   float min_page_scale_factor_;
   float max_page_scale_factor_;
-  bool hide_pinch_scrollbars_near_min_scale_;
 
   float device_scale_factor_;
 
@@ -437,6 +443,17 @@ class CC_EXPORT LayerTreeImpl {
 
   typedef base::hash_map<int, LayerImpl*> LayerIdMap;
   LayerIdMap layer_id_map_;
+
+  // Maps from clip layer ids to scroll layer ids.  Note that this only includes
+  // the subset of clip layers that act as scrolling containers.  (This is
+  // derived from LayerImpl::scroll_clip_layer_ and exists to avoid O(n) walks.)
+  base::hash_map<int, int> clip_scroll_map_;
+
+  // Maps scroll layer ids to scrollbar layer ids.  For each scroll layer, there
+  // may be 1 or 2 scrollbar layers (for vertical and horizontal).  (This is
+  // derived from ScrollbarLayerImplBase::scroll_layer_id_ and exists to avoid
+  // O(n) walks.)
+  std::multimap<int, int> scrollbar_map_;
 
   std::vector<PictureLayerImpl*> picture_layers_;
   std::vector<LayerImpl*> layers_with_copy_output_request_;

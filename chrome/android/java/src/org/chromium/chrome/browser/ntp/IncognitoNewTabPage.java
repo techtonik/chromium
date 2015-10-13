@@ -27,9 +27,14 @@ public class IncognitoNewTabPage implements NativePage, InvalidationAwareThumbna
 
     private final String mTitle;
     private final int mBackgroundColor;
+    private final int mThemeColor;
     private final IncognitoNewTabPageView mIncognitoNewTabPageView;
 
     private boolean mIsLoaded;
+
+    // For temporary debugging purposes.
+    // TODO(newt): delete this once http://crbug.com/540537 is fixed.
+    private Exception mDestroyStackTrace;
 
     private final IncognitoNewTabPageManager mIncognitoNewTabPageManager =
             new IncognitoNewTabPageManager() {
@@ -56,6 +61,8 @@ public class IncognitoNewTabPage implements NativePage, InvalidationAwareThumbna
         mTitle = activity.getResources().getString(R.string.button_new_tab);
         mBackgroundColor =
                 ApiCompatibilityUtils.getColor(activity.getResources(), R.color.ntp_bg_incognito);
+        mThemeColor = ApiCompatibilityUtils.getColor(activity.getResources(),
+                R.color.incognito_primary_color);
 
         LayoutInflater inflater = LayoutInflater.from(activity);
         mIncognitoNewTabPageView =
@@ -75,6 +82,14 @@ public class IncognitoNewTabPage implements NativePage, InvalidationAwareThumbna
 
     @Override
     public void destroy() {
+        if (mDestroyStackTrace != null) {
+            throw new RuntimeException("IncognitoNewTabPage was destroyed twice",
+                    mDestroyStackTrace);
+        } else {
+            mDestroyStackTrace = new RuntimeException(
+                    "Stack trace for first call to IncognitoNewTabPage.destroy()");
+        }
+
         assert getView().getParent() == null : "Destroy called before removed from window";
     }
 
@@ -91,6 +106,11 @@ public class IncognitoNewTabPage implements NativePage, InvalidationAwareThumbna
     @Override
     public int getBackgroundColor() {
         return mBackgroundColor;
+    }
+
+    @Override
+    public int getThemeColor() {
+        return mThemeColor;
     }
 
     @Override

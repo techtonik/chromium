@@ -60,6 +60,7 @@
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/common/security_style.h"
 #include "content/public/common/ssl_status.h"
 #include "content/public/test/browser_test_utils.h"
@@ -125,7 +126,7 @@ class ProvisionalLoadWaiter : public content::WebContentsObserver {
       bool was_ignored_by_handler) override {
     seen_ = true;
     if (waiting_)
-      base::MessageLoopForUI::current()->Quit();
+      base::MessageLoopForUI::current()->QuitWhenIdle();
   }
 
  private:
@@ -336,7 +337,7 @@ class SSLUITest
 
       // Wait a bit.
       base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
-          FROM_HERE, base::MessageLoop::QuitClosure(),
+          FROM_HERE, base::MessageLoop::QuitWhenIdleClosure(),
           base::TimeDelta::FromMilliseconds(kTimeoutMS));
       content::RunMessageLoop();
     }
@@ -1760,7 +1761,7 @@ IN_PROC_BROWSER_TEST_F(SSLUITest, DISABLED_TestCloseTabWithUnsafePopup) {
     if (IsShowingWebContentsModalDialog())
       break;
     base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
-        FROM_HERE, base::MessageLoop::QuitClosure(),
+        FROM_HERE, base::MessageLoop::QuitWhenIdleClosure(),
         base::TimeDelta::FromSeconds(1));
     content::RunMessageLoop();
   }

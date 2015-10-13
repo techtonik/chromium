@@ -2509,9 +2509,17 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="Autofill.SuggestionAcceptedIndex">
+<histogram name="Autofill.SuggestionAcceptedIndex" units="position">
   <owner>mathp@chromium.org</owner>
-  <summary>The index of the accepted suggestion in the Autofill popup.</summary>
+  <summary>The index of the accepted Autofill suggestion in the popup.</summary>
+</histogram>
+
+<histogram name="Autofill.SuggestionAcceptedIndex.Autocomplete"
+    units="position">
+  <owner>mathp@chromium.org</owner>
+  <summary>
+    The index of the accepted Autocomplete suggestion in the popup.
+  </summary>
 </histogram>
 
 <histogram name="Autofill.UnmaskPrompt.Duration" units="ms">
@@ -3463,6 +3471,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     Records the type of the remote playback device selected by the user. This
     will be recorded when the user has chosen the device from the media route
     chooser dialog.
+  </summary>
+</histogram>
+
+<histogram name="Cast.Sender.Overlay" enum="CastOverlayEvents">
+  <owner>avayvod@chromium.org</owner>
+  <owner>mlamouri@chromium.org</owner>
+  <summary>
+    Records events and user interactions related to the Cast overlay shown on
+    video elements.
   </summary>
 </histogram>
 
@@ -16482,6 +16499,11 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="LevelDB.Open" enum="LevelDBStatus">
+  <owner>cmumford@chromium.org</owner>
+  <summary>The result of an open attempt of a leveldb.</summary>
+</histogram>
+
 <histogram name="LevelDBEnv.All.SafeThreadAccess" units="accesses">
   <obsolete>
     Deprecated 2013-10. No thread-unsafety was found.
@@ -17204,6 +17226,23 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Android: Records whether a regular media url is HLS (http live streaming)
     media or not.
+  </summary>
+</histogram>
+
+<histogram name="Media.Android.NumMediaServerCrashes">
+  <owner>qinmin@chromium.org</owner>
+  <summary>
+    Android: Number of consecutive media server crashes monitored before it is
+    reset to 0. Reset happens if there are no crashes in a minute, or if user
+    hits the &quot;try again&quot; button on the media throttle info bar.
+  </summary>
+</histogram>
+
+<histogram name="Media.Android.ThrottleInfobarResponse"
+    enum="ThrottleInfobarResponse">
+  <owner>qinmin@chromium.org</owner>
+  <summary>
+    Android: The distribution of responses to the media throttle infobar prompt.
   </summary>
 </histogram>
 
@@ -18087,6 +18126,18 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Video codec profile used in RTC video encoder.</summary>
 </histogram>
 
+<histogram name="Media.Session.ActiveTime" units="ms">
+  <owner>avayvod@chromium.org</owner>
+  <owner>mlamouri@chromium.org</owner>
+  <summary>
+    Time during which a media session has been active, in other words, the time
+    between an activation and deactivation, without counting time while it was
+    suspended. If a session is activated after being deactivated, there will be
+    two entries. For example, if a user plays a song but is interrupted by a
+    phone call, it will only account for the song playing time.
+  </summary>
+</histogram>
+
 <histogram name="Media.Session.Pause" enum="MediaSessionActionSource">
   <owner>avayvod@chromium.org</owner>
   <owner>mlamouri@chromium.org</owner>
@@ -18111,6 +18162,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     The number of times the user stopped a media session using other means than
     the pause button on the page.
+  </summary>
+</histogram>
+
+<histogram name="Media.Session.Suspended" enum="MediaSessionSuspendedSource">
+  <owner>avayvod@chromium.org</owner>
+  <owner>mlamouri@chromium.org</owner>
+  <summary>
+    The number of times a media session is suspended and why it has been
+    suspended.
   </summary>
 </histogram>
 
@@ -40968,6 +41028,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="ServiceWorker.StopWorker.Status"
     enum="ServiceWorkerStopStatus">
+  <obsolete>
+    Removed from code in Oct 2015, replaced with ServiceWorker.WorkerStopped.
+  </obsolete>
   <owner>falken@chromium.org</owner>
   <summary>
     The result of trying to stop a Service Worker. Recorded only for installed
@@ -41082,6 +41145,23 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     code zero to a subresource request forwarded to a Service Worker (i.e.,
     ServiceWorker.URLRequestJob.Subresource.Result was
     REQUEST_JOB_ERROR_RESPONSE_STATUS_ZERO).
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.WorkerForMessageFound" enum="Boolean">
+  <owner>falken@chromium.org</owner>
+  <summary>
+    True if a message from the renderer intended for a browser-side embedded
+    worker instance found its recipient. False if the instance did not exist
+    when the message was received (e.g., it was a detached worker). Recorded in
+    EmbeddedWorkerRegistry::GetWorkerForMessage.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.WorkerStopped" enum="ServiceWorkerStoppedStatus">
+  <owner>falken@chromium.org</owner>
+  <summary>
+    The mechanism by which a service worker entered running status STOPPED.
   </summary>
 </histogram>
 
@@ -43262,6 +43342,32 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Usage of the Software Removal Tool (SRT) Prompt.</summary>
 </histogram>
 
+<histogram name="SoftwareReporter.RunningTime" units="ms">
+  <owner>alito@chromium.org</owner>
+  <summary>
+    The amount of time it took to run the software reporter tool as reported by
+    the tool itself via the registry. Logged just after the software reporter
+    tool has finished.
+  </summary>
+</histogram>
+
+<histogram name="SoftwareReporter.RunningTimeAccordingToChrome" units="ms">
+  <owner>alito@chromium.org</owner>
+  <summary>
+    The amount of time it took for the software reporter to run as measured by
+    chrome. Logged just after the software reporter tool has finished.
+  </summary>
+</histogram>
+
+<histogram name="SoftwareReporter.RunningTimeRegistryError"
+    enum="SwReporterRunningTimeRegistryError">
+  <owner>alito@chromium.org</owner>
+  <summary>
+    Error encountered when reading the software reporter tool's start and end
+    times from the registry.
+  </summary>
+</histogram>
+
 <histogram name="SoftwareReporter.Step" enum="SwReporterStep">
   <owner>mad@chromium.org</owner>
   <summary>
@@ -43535,6 +43641,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Error codes returned by sqlite the web db.</summary>
+</histogram>
+
+<histogram name="sri.resource_integrity_mismatch_event"
+    enum="SRIResourceIntegrityMismatchEvent">
+  <owner>jww@chromium.org</owner>
+  <summary>
+    When resources are checked for mismatching integrity and whether the
+    mismatch forces a refetch.
+  </summary>
 </histogram>
 
 <histogram name="SSL.InsecureContent" enum="InsecureContentType">
@@ -47161,7 +47276,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
   <details>
     NOTE: This metric was incorrectly recorded on ChromeOS for versions 42
-    through 44, see http://crbug.com/499476 for more details.
+    through 45, see http://crbug.com/499476 for more details.
   </details>
 </histogram>
 
@@ -51402,6 +51517,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.OnewayDelayInMs" units="ms">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    Average delay (network delay (rtt/2) + jitter delay + decode time + render
+    delay) for a received video stream. Recorded when a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.PaddingBitrateReceivedInKbps" units="kbps">
   <owner>asapersson@chromium.org</owner>
   <summary>
@@ -51485,6 +51608,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     The number of sent frames to the renderer per second for a received video
     stream. Recorded when a stream is removed. The total number of frames is
     divided by the time the video stream exists.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.Video.RenderSqrtPixelsPerSecond" units="pps">
+  <owner>asapersson@chromium.org</owner>
+  <summary>
+    The number of pixels (sqrt(width*height)) of sent frames to the renderer per
+    second for a received video stream. Recorded when a stream is removed. The
+    total number of pixels is divided by the time the video stream exists.
   </summary>
 </histogram>
 
@@ -53679,6 +53811,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1" label="OK"/>
   <int value="2" label="Failed to create stream"/>
   <int value="3" label="Failed to open stream"/>
+</enum>
+
+<enum name="CastOverlayEvents" type="int">
+  <int value="0" label="Created"/>
+  <int value="1" label="Shown"/>
+  <int value="2" label="Clicked"/>
 </enum>
 
 <enum name="CastPlayBackState" type="int">
@@ -60101,6 +60239,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="957" label="BackspaceNavigatedBack"/>
   <int value="958" label="BackspaceNavigatedBackAfterFormInteraction"/>
   <int value="959" label="CSPSourceWildcardWouldMatchExactHost"/>
+  <int value="960" label="CredentialManagerGet"/>
+  <int value="961" label="CredentialManagerGetWithUI"/>
+  <int value="962" label="CredentialManagerGetWithoutUI"/>
+  <int value="963" label="CredentialManagerStore"/>
+  <int value="964" label="CredentialManagerRequireUserMediation"/>
+  <int value="965" label="RequestAutocomplete"/>
 </enum>
 
 <enum name="FetchRequestMode" type="int">
@@ -64069,6 +64213,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-711890895" label="enable-website-settings-manager"/>
   <int value="-699767107" label="enable-sync-app-list"/>
   <int value="-697751423" label="disable-quickoffice-component-app"/>
+  <int value="-684900739" label="disable-merge-key-char-events"/>
   <int value="-667517406" label="overscroll-history-navigation"/>
   <int value="-661978438" label="enable-data-reduction-proxy-lo-fi"/>
   <int value="-660160292" label="enable-apps-show-on-first-paint"/>
@@ -64344,6 +64489,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1658644418" label="disable-app-list-voice-search"/>
   <int value="1661925474" label="silent-debugger-extension-api"/>
   <int value="1668611601" label="enable-encrypted-media"/>
+  <int value="1689183477" label="enable-merge-key-char-events"/>
   <int value="1694854500" label="disable-save-password-bubble"/>
   <int value="1696139514" label="enable-ble-advertising-in-apps"/>
   <int value="1705724232" label="use-android-midi-api"/>
@@ -64374,6 +64520,7 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="enable-message-center-always-scroll-up-upon-notification-removal"/>
   <int value="1862207743" label="enable-android-spellchecker"/>
   <int value="1865799183" label="javascript-harmony"/>
+  <int value="1881036528" label="disable-multilingual-spellchecker"/>
   <int value="1891210939" label="enable-blink-features"/>
   <int value="1892201400" label="enable-password-separated-signin-flow"/>
   <int value="1896456311" label="enable-password-save-in-page-navigation"/>
@@ -65389,6 +65536,12 @@ To add a new entry, add it with any value and run test to compute valid value.
 <enum name="MediaSessionActionSource" type="int">
   <int value="0" label="Media Notification"/>
   <int value="1" label="MediaSession (Android)"/>
+</enum>
+
+<enum name="MediaSessionSuspendedSource" type="int">
+  <int value="0" label="System Transient"/>
+  <int value="1" label="System Permanent"/>
+  <int value="2" label="UI"/>
 </enum>
 
 <enum name="MediaStreamRequestResult" type="int">
@@ -70973,7 +71126,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="18" label="SERVICE_WORKER_ERROR_DISALLOWED"/>
 </enum>
 
+<enum name="ServiceWorkerStoppedStatus" type="int">
+  <int value="0" label="NORMAL"/>
+  <int value="1" label="DETACH_BY_REGISTRY"/>
+  <int value="2" label="TIMEOUT"/>
+</enum>
+
 <enum name="ServiceWorkerStopStatus" type="int">
+  <obsolete>
+    Deprecated Oct 2015. No longer generated in the code.
+  </obsolete>
   <int value="0" label="STOP_STATUS_STOPPING"/>
   <int value="1" label="STOP_STATUS_STOPPED"/>
   <int value="2" label="STOP_STATUS_STALLED"/>
@@ -71915,6 +72077,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="DEPRECATION_RAZE_FAILED">Raze failed.</int>
 </enum>
 
+<enum name="SRIResourceIntegrityMismatchEvent" type="int">
+  <int value="0" label="CHECKING_FOR_INTEGRITY_MISMATCH"/>
+  <int value="1" label="REFETCH_DUE_TO_INTEGRITY_MISMATCH"/>
+</enum>
+
 <enum name="SRTCompleted" type="int">
   <int value="0" label="Not Completed"/>
   <int value="1" label="Completed"/>
@@ -72788,6 +72955,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Attempted"/>
 </enum>
 
+<enum name="SwReporterRunningTimeRegistryError" type="int">
+  <int value="0" label="No error"/>
+  <int value="1" label="Registry key invalid"/>
+  <int value="2" label="Missing start time"/>
+  <int value="3" label="Missing end time"/>
+  <int value="4" label="Missing start and end times"/>
+</enum>
+
 <enum name="SwReporterStep" type="int">
   <int value="0" label="Explicit request"/>
   <int value="1" label="Startup retry"/>
@@ -73166,6 +73341,13 @@ To add a new entry, add it with any value and run test to compute valid value.
 <enum name="ThreadType" type="int">
   <int value="0" label="UI"/>
   <int value="1" label="Blocking"/>
+</enum>
+
+<enum name="ThrottleInfobarResponse" type="int">
+  <int value="0" label="No response"/>
+  <int value="1" label="Try again"/>
+  <int value="2" label="Wait"/>
+  <int value="3" label="Infobar dismissed"/>
 </enum>
 
 <enum name="TileMemoryBudget" type="int">
@@ -75208,7 +75390,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="ImageLink"
       label="The context menu was shown for an image which is also a link"/>
   <suffix name="Video" label="The context menu was shown for a video"/>
-  <suffix name="TextSelection"
+  <suffix name="SelectedText"
       label="The context menu was shown for a text selection"/>
   <affected-histogram name="ContextMenu.SelectedOption"/>
 </histogram_suffixes>
@@ -76456,6 +76638,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="LockFile" label="LockFile"/>
   <affected-histogram name="LevelDBEnv.IDB.TimeTo"/>
   <affected-histogram name="LevelDBEnv.TimeTo"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="LevelDBOpenResults">
+  <suffix name="DomDistillerStore" label="Databases for DomDistillerStore"/>
+  <suffix name="GCMKeyStore" label="Databases for GCMKeyStore"/>
+  <suffix name="ImageManager" label="Databases for ImageManager"/>
+  <suffix name="OfflinePageMetadataStore"
+      label="Databases for OfflinePageMetadataStore"/>
+  <affected-histogram name="LevelDB.Open"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="LocalStorageSizes" separator="">

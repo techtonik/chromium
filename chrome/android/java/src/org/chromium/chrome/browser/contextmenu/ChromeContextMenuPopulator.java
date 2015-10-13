@@ -15,13 +15,12 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
 import org.chromium.chrome.browser.preferences.datareduction.DataReductionProxyUma;
-import org.chromium.chrome.browser.search_engines.TemplateUrlService;
 
 /**
  * A {@link ContextMenuPopulator} used for showing the default Chrome context menu.
  */
 public class ChromeContextMenuPopulator implements ContextMenuPopulator {
-    private final ChromeContextMenuItemDelegate mDelegate;
+    private final ContextMenuItemDelegate mDelegate;
     private MenuInflater mMenuInflater;
     private static final String BLANK_URL = "about:blank";
 
@@ -38,7 +37,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         static final int ACTION_OPEN_IMAGE_IN_NEW_TAB = 8;
         static final int ACTION_COPY_IMAGE = 9;
         static final int ACTION_COPY_IMAGE_URL = 10;
-        static final int ACTION_SEARCH_BY_IMAGE = 11;
         static final int ACTION_LOAD_IMAGES = 12;
         static final int ACTION_LOAD_ORIGINAL_IMAGE = 13;
         static final int ACTION_SAVE_VIDEO = 14;
@@ -69,10 +67,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
 
     /**
      * Builds a {@link ChromeContextMenuPopulator}.
-     * @param delegate The {@link ChromeContextMenuItemDelegate} that will be notified with actions
+     * @param delegate The {@link ContextMenuItemDelegate} that will be notified with actions
      *                 to perform when menu items are selected.
      */
-    public ChromeContextMenuPopulator(ChromeContextMenuItemDelegate delegate) {
+    public ChromeContextMenuPopulator(ContextMenuItemDelegate delegate) {
         mDelegate = delegate;
     }
 
@@ -139,7 +137,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             menu.findItem(R.id.contextmenu_save_image).setVisible(false);
             menu.findItem(R.id.contextmenu_open_image).setVisible(false);
             menu.findItem(R.id.contextmenu_open_image_in_new_tab).setVisible(false);
-            menu.findItem(R.id.contextmenu_search_by_image).setVisible(false);
             menu.findItem(R.id.contextmenu_copy_image).setVisible(false);
         } else if (params.isImage() && !params.imageWasFetchedLoFi()) {
             menu.findItem(R.id.contextmenu_load_original_image).setVisible(false);
@@ -156,21 +153,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             // Avoid showing open image option for same image which is already opened.
             if (mDelegate.getPageUrl().equals(params.getSrcUrl())) {
                 menu.findItem(R.id.contextmenu_open_image).setVisible(false);
-            }
-            final TemplateUrlService templateUrlServiceInstance = TemplateUrlService.getInstance();
-            final boolean isSearchByImageAvailable =
-                    UrlUtilities.isDownloadableScheme(params.getSrcUrl())
-                            && templateUrlServiceInstance.isLoaded()
-                            && templateUrlServiceInstance.isSearchByImageAvailable()
-                            && templateUrlServiceInstance.getDefaultSearchEngineTemplateUrl()
-                                    != null;
-
-            menu.findItem(R.id.contextmenu_search_by_image).setVisible(isSearchByImageAvailable);
-            if (isSearchByImageAvailable) {
-                menu.findItem(R.id.contextmenu_search_by_image).setTitle(
-                        context.getString(R.string.contextmenu_search_web_for_image,
-                                TemplateUrlService.getInstance()
-                                        .getDefaultSearchEngineTemplateUrl().getShortName()));
             }
         }
     }
@@ -208,15 +190,15 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         } else if (itemId == R.id.contextmenu_copy_link_address) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_COPY_LINK_ADDRESS);
             mDelegate.onSaveToClipboard(params.getUnfilteredLinkUrl(),
-                    ChromeContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_URL);
+                    ContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_URL);
         } else if (itemId == R.id.contextmenu_copy_email_address) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_COPY_EMAIL_ADDRESS);
             mDelegate.onSaveToClipboard(MailTo.parse(params.getLinkUrl()).getTo(),
-                    ChromeContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_URL);
+                    ContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_URL);
         } else if (itemId == R.id.contextmenu_copy_link_text) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_COPY_LINK_TEXT);
             mDelegate.onSaveToClipboard(
-                    params.getLinkText(), ChromeContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_TEXT);
+                    params.getLinkText(), ContextMenuItemDelegate.CLIPBOARD_TYPE_LINK_TEXT);
         } else if (itemId == R.id.contextmenu_save_image) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_SAVE_IMAGE);
             if (mDelegate.startDownload(params.getSrcUrl(), false)) {
@@ -233,16 +215,13 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
             if (mDelegate.startDownload(params.getUnfilteredLinkUrl(), true)) {
                 helper.startContextMenuDownload(true, false);
             }
-        } else if (itemId == R.id.contextmenu_search_by_image) {
-            ContextMenuUma.record(params, ContextMenuUma.ACTION_SEARCH_BY_IMAGE);
-            mDelegate.onSearchByImageInNewTab();
         } else if (itemId == R.id.contextmenu_copy_image) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_COPY_IMAGE);
             mDelegate.onSaveImageToClipboard(params.getSrcUrl());
         } else if (itemId == R.id.contextmenu_copy_image_url) {
             ContextMenuUma.record(params, ContextMenuUma.ACTION_COPY_IMAGE_URL);
             mDelegate.onSaveToClipboard(
-                    params.getSrcUrl(), ChromeContextMenuItemDelegate.CLIPBOARD_TYPE_IMAGE_URL);
+                    params.getSrcUrl(), ContextMenuItemDelegate.CLIPBOARD_TYPE_IMAGE_URL);
         } else {
             assert false;
         }

@@ -112,12 +112,10 @@ TEST_F(SurfaceLibQuadTest, TextureQuad) {
   float vertex_opacity[4] = {0.1f, 0.5f, 0.4f, 0.8f};
   bool y_flipped = false;
   bool nearest_neighbor = false;
-  bool allow_overlay = false;
   texture_quad->SetAll(sqs, rect, opaque_rect, visible_rect, needs_blending,
-                       resource_id, gfx::Size(), allow_overlay,
-                       premultiplied_alpha, uv_top_left, uv_bottom_right,
-                       background_color, vertex_opacity, y_flipped,
-                       nearest_neighbor);
+                       resource_id, gfx::Size(), premultiplied_alpha,
+                       uv_top_left, uv_bottom_right, background_color,
+                       vertex_opacity, y_flipped, nearest_neighbor);
 
   QuadPtr mojo_quad = Quad::From<cc::DrawQuad>(*texture_quad);
   ASSERT_FALSE(mojo_quad.is_null());
@@ -266,12 +264,10 @@ TEST(SurfaceLibTest, RenderPass) {
   float vertex_opacity[4] = {0.1f, 0.5f, 0.4f, 0.8f};
   bool y_flipped = false;
   bool nearest_neighbor = false;
-  bool allow_overlay = false;
   texture_quad->SetAll(sqs, rect, opaque_rect, visible_rect, needs_blending,
-                       resource_id, gfx::Size(), allow_overlay,
-                       premultiplied_alpha, uv_top_left, uv_bottom_right,
-                       background_color, vertex_opacity, y_flipped,
-                       nearest_neighbor);
+                       resource_id, gfx::Size(), premultiplied_alpha,
+                       uv_top_left, uv_bottom_right, background_color,
+                       vertex_opacity, y_flipped, nearest_neighbor);
 
   PassPtr mojo_pass = Pass::From(*pass);
   ASSERT_FALSE(mojo_pass.is_null());
@@ -387,8 +383,6 @@ TEST(SurfaceLibTest, TransferableResource) {
   uint32_t filter = 123u;
   gfx::Size size(17, 18);
   gpu::MailboxHolder mailbox_holder;
-  bool is_repeated = false;
-  ;
   bool is_software = false;
   cc::TransferableResource resource;
   resource.id = id;
@@ -396,7 +390,6 @@ TEST(SurfaceLibTest, TransferableResource) {
   resource.filter = filter;
   resource.size = size;
   resource.mailbox_holder = mailbox_holder;
-  resource.is_repeated = is_repeated;
   resource.is_software = is_software;
 
   TransferableResourcePtr mojo_resource = TransferableResource::From(resource);
@@ -405,7 +398,6 @@ TEST(SurfaceLibTest, TransferableResource) {
             mojo_resource->format);
   EXPECT_EQ(filter, mojo_resource->filter);
   EXPECT_TRUE(Size::From(size).Equals(mojo_resource->size));
-  EXPECT_EQ(is_repeated, mojo_resource->is_repeated);
   EXPECT_EQ(is_software, mojo_resource->is_software);
 
   cc::TransferableResource round_trip_resource =
@@ -419,7 +411,6 @@ TEST(SurfaceLibTest, TransferableResource) {
             round_trip_resource.mailbox_holder.texture_target);
   EXPECT_EQ(mailbox_holder.sync_point,
             round_trip_resource.mailbox_holder.sync_point);
-  EXPECT_EQ(is_repeated, round_trip_resource.is_repeated);
   EXPECT_EQ(is_software, round_trip_resource.is_software);
 }
 

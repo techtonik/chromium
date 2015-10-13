@@ -9,6 +9,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Rect;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
@@ -30,8 +31,8 @@ import org.chromium.chrome.browser.compositor.layouts.content.InvalidationAwareT
 import org.chromium.chrome.browser.document.DocumentMetricIds;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkUtils;
 import org.chromium.chrome.browser.favicon.FaviconHelper;
-import org.chromium.chrome.browser.favicon.FaviconHelper.FaviconAvailabilityCallback;
 import org.chromium.chrome.browser.favicon.FaviconHelper.FaviconImageCallback;
+import org.chromium.chrome.browser.favicon.FaviconHelper.IconAvailabilityCallback;
 import org.chromium.chrome.browser.favicon.LargeIconBridge;
 import org.chromium.chrome.browser.favicon.LargeIconBridge.LargeIconCallback;
 import org.chromium.chrome.browser.metrics.StartupMetrics;
@@ -87,6 +88,7 @@ public class NewTabPage
     private final Profile mProfile;
     private final String mTitle;
     private final int mBackgroundColor;
+    private final int mThemeColor;
     private final NewTabPageView mNewTabPageView;
 
     private MostVisitedSites mMostVisitedSites;
@@ -107,6 +109,10 @@ public class NewTabPage
 
     // Whether destroy() has been called.
     private boolean mIsDestroyed;
+
+    // For temporary debugging purposes.
+    // TODO(newt): delete this once http://crbug.com/540537 is fixed.
+    private Exception mDestroyStackTrace;
 
     /**
      * Allows clients to listen for updates to the scroll changes of the search box on the
@@ -350,12 +356,12 @@ public class NewTabPage
         }
 
         @Override
-        public void ensureFaviconIsAvailable(String pageUrl, String faviconUrl,
-                FaviconAvailabilityCallback callback) {
+        public void ensureIconIsAvailable(String pageUrl, String iconUrl, boolean isLargeIcon,
+                IconAvailabilityCallback callback) {
             if (mIsDestroyed) return;
             if (mFaviconHelper == null) mFaviconHelper = new FaviconHelper();
-            mFaviconHelper.ensureFaviconIsAvailable(mProfile, mTab.getWebContents(), pageUrl,
-                    faviconUrl, callback);
+            mFaviconHelper.ensureIconIsAvailable(
+                    mProfile, mTab.getWebContents(), pageUrl, iconUrl, isLargeIcon, callback);
         }
 
         @Override
@@ -424,6 +430,8 @@ public class NewTabPage
 
         mTitle = activity.getResources().getString(R.string.button_new_tab);
         mBackgroundColor = ApiCompatibilityUtils.getColor(activity.getResources(), R.color.ntp_bg);
+        mThemeColor = ApiCompatibilityUtils.getColor(
+                activity.getResources(), R.color.default_primary_color);
         TemplateUrlService.getInstance().addObserver(this);
 
         // Whether to show the promo can change within the lifetime of a single NTP instance
@@ -561,6 +569,14 @@ public class NewTabPage
 
     @Override
     public void destroy() {
+        if (mDestroyStackTrace != null) {
+            throw new RuntimeException("NewTabPage was destroyed twice",
+                    mDestroyStackTrace);
+        } else {
+            mDestroyStackTrace = new RuntimeException(
+                    "Stack trace for first call to NewTabPage.destroy()");
+        }
+
         assert !mIsDestroyed;
         assert getView().getParent() == null : "Destroy called before removed from window";
         if (mFaviconHelper != null) {
@@ -596,6 +612,11 @@ public class NewTabPage
     @Override
     public int getBackgroundColor() {
         return mBackgroundColor;
+    }
+
+    @Override
+    public int getThemeColor() {
+        return isLocationBarShownInNTP() ? Color.WHITE : mThemeColor;
     }
 
     @Override

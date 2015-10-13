@@ -55,14 +55,17 @@ base::string16 GenerateKeywordFromNavigationEntry(
       return base::string16();
   }
 
-  // Don't autogenerate keywords for referrers that are anything other than HTTP
-  // or have a path.
+  // Don't autogenerate keywords for referrers that
+  // a) are anything other than HTTP/HTTPS or
+  // b) have a path.
   //
   // If we relax the path constraint, we need to be sure to sanitize the path
   // elements and update AutocompletePopup to look for keywords using the path.
   // See http://b/issue?id=863583.
-  if (!url.SchemeIs(url::kHttpScheme) || (url.path().length() > 1))
+  if (!(url.SchemeIs(url::kHttpScheme) || url.SchemeIs(url::kHttpsScheme)) ||
+      (url.path().length() > 1)) {
     return base::string16();
+  }
 
   return TemplateURL::GenerateKeyword(url, accept_languages);
 }
@@ -95,6 +98,12 @@ bool SearchEngineTabHelper::OnMessageReceived(const IPC::Message& message) {
   IPC_END_MESSAGE_MAP()
 
   return handled;
+}
+
+bool SearchEngineTabHelper::OnMessageReceived(
+    const IPC::Message& message,
+    content::RenderFrameHost* render_frame_host) {
+  return OnMessageReceived(message);
 }
 
 SearchEngineTabHelper::SearchEngineTabHelper(WebContents* web_contents)
