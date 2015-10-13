@@ -30,8 +30,8 @@ final class BluetoothRemoteGattServiceAndroid {
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
     private final BluetoothGattCallbackImpl mBluetoothGattCallbackImpl;
 
-    private BluetoothRemoteGattServiceAndroid(
-            long nativeBluetoothRemoteGattServiceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
+    private BluetoothRemoteGattServiceAndroid(long nativeBluetoothRemoteGattServiceAndroid,
+            Wrappers.BluetoothDeviceWrapper deviceWrapper) {
         mNativeBluetoothRemoteGattServiceAndroid = nativeBluetoothRemoteGattServiceAndroid;
         mDevice = deviceWrapper;
         mBluetoothGattCallbackImpl = new BluetoothGattCallbackImpl();
@@ -55,8 +55,8 @@ final class BluetoothRemoteGattServiceAndroid {
     @CalledByNative
     private static BluetoothRemoteGattServiceAndroid create(
             long nativeBluetoothRemoteGattServiceAndroid, Object deviceWrapper) {
-        return new BluetoothRemoteGattServiceAndroid(
-                nativeBluetoothRemoteGattServiceAndroid, (Wrappers.BluetoothDeviceWrapper) deviceWrapper);
+        return new BluetoothRemoteGattServiceAndroid(nativeBluetoothRemoteGattServiceAndroid,
+                (Wrappers.BluetoothDeviceWrapper) deviceWrapper);
     }
 
     // Implements BluetoothRemoteGattServiceAndroid::UpdateAdvertisedUUIDs.
@@ -76,7 +76,6 @@ final class BluetoothRemoteGattServiceAndroid {
         return mDevice.getBluetoothClass_getDeviceClass();
     }
 
-
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterDevice C++ methods declared for access from java:
 
@@ -88,6 +87,6 @@ final class BluetoothRemoteGattServiceAndroid {
     // 'Object' type must be used for |bluetoothGattServiceWrapper| because inner class
     // Wrappers.BluetoothGattServiceWrapper reference is not handled by jni_generator.py JavaToJni.
     // http://crbug.com/505554
-    private native void nativeCreateGattRemoteService(
-            long nativeBluetoothRemoteGattServiceAndroid, int instanceId, Object bluetoothGattServiceWrapper);
+    private native void nativeCreateGattRemoteService(long nativeBluetoothRemoteGattServiceAndroid,
+            int instanceId, Object bluetoothGattServiceWrapper);
 }
