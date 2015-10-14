@@ -221,7 +221,7 @@ class Fakes {
             if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
                 fakeDevice.mGatt.mServices.clear();
                 fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(1));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
             }
 
             fakeDevice.mGattCallback.onServicesDiscovered(status);
