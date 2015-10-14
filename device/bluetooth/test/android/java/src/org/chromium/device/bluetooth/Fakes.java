@@ -220,8 +220,10 @@ class Fakes {
             // their properties. http://crbug.com/541400
             if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
                 fakeDevice.mGatt.mServices.clear();
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(0));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001800-0000-1000-8000-00805f9b34fb"), 0));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001800-0000-1000-8000-00805f9b34fb"), 0));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001801-0000-1000-8000-00805f9b34fb"), 0));
+                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001801-0000-1000-8000-00805f9b34fb"), 1));
             }
 
             fakeDevice.mGattCallback.onServicesDiscovered(status);
@@ -297,10 +299,12 @@ class Fakes {
      * Fakes android.bluetooth.BluetoothGattService.
      */
     static class FakeBluetoothGattService extends Wrappers.BluetoothGattServiceWrapper {
+        final UUID mUuid;
         final int mInstanceId;
 
-        public FakeBluetoothGattService(int instanceId) {
+        public FakeBluetoothGattService(UUID uuid, int instanceId) {
             super(null);
+            mUuid = uuid;
             mInstanceId = instanceId;
         }
 
@@ -309,8 +313,9 @@ class Fakes {
             return mInstanceId;
         }
 
+        @Override
         public UUID getUuid() {
-            return UUID.fromString("00001800-0000-1000-8000-00805f9b34fb");
+            return mUuid;
         }
     }
 

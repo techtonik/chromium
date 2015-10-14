@@ -15,9 +15,6 @@
 #include "device/bluetooth/test/bluetooth_test_mac.h"
 #endif
 
-// MOVE
-#include "device/bluetooth/bluetooth_gatt_service.h"
-
 namespace device {
 
 TEST(BluetoothDeviceTest, CanonicalizeAddressFormat_AcceptsAllValidFormats) {
@@ -442,7 +439,7 @@ TEST_F(BluetoothTest, SimulateGattServicesDiscovered) {
   // TODO(scheib): Add more control over how many services are created and
   // their properties. http://crbug.com/541400
   SimulateGattServicesDiscovered(device);
-  EXPECT_EQ(2u, device->GetGattServices().size());
+  EXPECT_EQ(3u, device->GetGattServices().size());
 }
 #endif  // defined(OS_ANDROID)
 
@@ -459,25 +456,6 @@ TEST_F(BluetoothTest, SimulateGattServicesDiscoveryError) {
 
   SimulateGattServicesDiscoveryError(device);
   EXPECT_EQ(0u, device->GetGattServices().size());
-}
-#endif  // defined(OS_ANDROID)
-
-// TODO BEFORE LANDING: Move to its own file.
-#if defined(OS_ANDROID)
-TEST_F(BluetoothTest, GetUUID) {
-  InitWithFakeAdapter();
-  StartDiscoverySession();
-  BluetoothDevice* device = DiscoverLowEnergyDevice(3);
-  device->CreateGattConnection(GetGattConnectionCallback(),
-                               GetConnectErrorCallback());
-  ResetEventCounts();
-  SimulateGattConnection(device);
-  EXPECT_EQ(1, gatt_discovery_attempts_);
-
-  // TODO Clean this up some
-  SimulateGattServicesDiscovered(device);
-  EXPECT_EQ("00001800-0000-1000-8000-00805f9b34fb",
-            device->GetGattServices()[0]->GetUUID().value());
 }
 #endif  // defined(OS_ANDROID)
 
