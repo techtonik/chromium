@@ -25,15 +25,15 @@ TEST_F(BluetoothTest, GetUUID) {
   SimulateGattConnection(device);
   EXPECT_EQ(1, gatt_discovery_attempts_);
 
+  // Create multiple instances, verifying each can have the same UUID.
   std::vector<std::string> services;
   services.push_back("00000000-0000-1000-8000-00805f9b34fb");
+  services.push_back("00000000-0000-1000-8000-00805f9b34fb");
   SimulateGattServicesDiscovered(device, services);
-  bool foundUUID = false;
-  BluetoothUUID searchUUID("00000000-0000-1000-8000-00805f9b34fb");
-  for (const auto& service : device->GetGattServices())
-    if (service->GetUUID() == searchUUID)
-      foundUUID = true;
-  EXPECT_TRUE(foundUUID);
+  EXPECT_EQ(BluetoothUUID("00000000-0000-1000-8000-00805f9b34fb"),
+            device->GetGattServices()[0]->GetUUID());
+  EXPECT_EQ(BluetoothUUID("00000000-0000-1000-8000-00805f9b34fb"),
+            device->GetGattServices()[1]->GetUUID());
 }
 #endif  // defined(OS_ANDROID)
 
