@@ -476,8 +476,8 @@ TEST_F(BluetoothTest, GetUUID) {
 
   // TODO Clean this up some
   SimulateGattServicesDiscovered(device);
-  ASSERT_EQ(1u, device->GetGattServices().size());
-  EXPECT_EQ("", device->GetGattServices()[0]->GetUUID().value());
+  EXPECT_EQ("00001800-0000-1000-8000-00805f9b34fb",
+            device->GetGattServices()[0]->GetUUID().value());
 }
 #endif  // defined(OS_ANDROID)
 

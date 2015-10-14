@@ -310,7 +310,7 @@ class Fakes {
         }
 
         public UUID getUuid() {
-            return UUID.fromString("HEY GET A REAL UUID");
+            return UUID.fromString("00001800-0000-1000-8000-00805f9b34fb");
         }
     }
 

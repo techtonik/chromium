@@ -31,7 +31,7 @@ BluetoothRemoteGattServiceAndroid* BluetoothRemoteGattServiceAndroid::Create(
 }
 
 // static
-bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
+bool BluetoothRemoteGattServiceAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(
       env);  // Generated in ChromeBluetoothRemoteGattService_jni.h
 }
@@ -41,8 +41,9 @@ std::string BluetoothRemoteGattServiceAndroid::GetIdentifier() const {
 }
 
 device::BluetoothUUID BluetoothRemoteGattServiceAndroid::GetUUID() const {
-  return device::BluetoothUUID(ConvertJavaStringToUTF8(Java_ChromeBluetoothRemoteGattService_getUUID(
-      AttachCurrentThread(), j_service_.obj())));
+  return device::BluetoothUUID(
+      ConvertJavaStringToUTF8(Java_ChromeBluetoothRemoteGattService_getUUID(
+          AttachCurrentThread(), j_service_.obj())));
 }
 
 bool BluetoothRemoteGattServiceAndroid::IsLocal() const {
