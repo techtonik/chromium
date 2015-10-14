@@ -18,6 +18,7 @@ import org.chromium.base.annotations.JNINamespace;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Fake implementations of android.bluetooth.* classes for testing.
@@ -306,6 +307,10 @@ class Fakes {
         @Override
         public int getInstanceId() {
             return mInstanceId;
+        }
+
+        public UUID getUuid() {
+            return UUID.fromString("HEY GET A REAL UUID");
         }
     }
 

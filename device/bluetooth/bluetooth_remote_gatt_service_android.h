@@ -72,8 +72,8 @@ class BluetoothRemoteGattServiceAndroid : public device::BluetoothGattService {
                                     std::string instanceId);
   ~BluetoothRemoteGattServiceAndroid() override;
 
-  // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
-  base::android::ScopedJavaGlobalRef<jobject> j_device_;
+  // Java object org.chromium.device.bluetooth.ChromeBluetoothRemoteGattService.
+  base::android::ScopedJavaGlobalRef<jobject> j_service_;
 
   // The adapter associated with this service. It's ok to store a raw pointer
   // here since |adapter_| indirectly owns this instance.

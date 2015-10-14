@@ -4,9 +4,13 @@
 
 #include "device/bluetooth/bluetooth_remote_gatt_service_android.h"
 
+#include "base/android/jni_android.h"
+#include "base/android/jni_string.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "device/bluetooth/bluetooth_device_android.h"
 #include "jni/ChromeBluetoothRemoteGattService_jni.h"
+
+using base::android::AttachCurrentThread;
 
 namespace device {
 
@@ -19,7 +23,7 @@ BluetoothRemoteGattServiceAndroid* BluetoothRemoteGattServiceAndroid::Create(
   BluetoothRemoteGattServiceAndroid* service =
       new BluetoothRemoteGattServiceAndroid(adapter, device, instanceId);
 
-  service->j_device_.Reset(Java_ChromeBluetoothRemoteGattService_create(
+  service->j_service_.Reset(Java_ChromeBluetoothRemoteGattService_create(
       AttachCurrentThread(), reinterpret_cast<intptr_t>(service),
       bluetooth_remote_gatt_service_wrapper));
 
@@ -37,8 +41,8 @@ std::string BluetoothRemoteGattServiceAndroid::GetIdentifier() const {
 }
 
 device::BluetoothUUID BluetoothRemoteGattServiceAndroid::GetUUID() const {
-  NOTIMPLEMENTED();
-  return device::BluetoothUUID();
+  return device::BluetoothUUID(ConvertJavaStringToUTF8(Java_ChromeBluetoothRemoteGattService_getUUID(
+      AttachCurrentThread(), j_service_.obj())));
 }
 
 bool BluetoothRemoteGattServiceAndroid::IsLocal() const {
