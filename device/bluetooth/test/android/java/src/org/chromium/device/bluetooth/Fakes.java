@@ -17,6 +17,7 @@ import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.JNINamespace;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -213,17 +214,21 @@ class Fakes {
         // Create a call to onServicesDiscovered on the |chrome_device| using parameter
         // |status|.
         @CalledByNative("FakeBluetoothDevice")
-        private static void servicesDiscovered(ChromeBluetoothDevice chromeDevice, int status) {
+        private static void servicesDiscovered(
+                ChromeBluetoothDevice chromeDevice, int status, String uuidsSpaceDelimited) {
             FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
 
-            // TODO(scheib): Add more control over how many services are created and
-            // their properties. http://crbug.com/541400
             if (status == android.bluetooth.BluetoothGatt.GATT_SUCCESS) {
                 fakeDevice.mGatt.mServices.clear();
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001800-0000-1000-8000-00805f9b34fb"), 0));
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001800-0000-1000-8000-00805f9b34fb"), 0));
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001801-0000-1000-8000-00805f9b34fb"), 0));
-                fakeDevice.mGatt.mServices.add(new FakeBluetoothGattService(UUID.fromString("00001801-0000-1000-8000-00805f9b34fb"), 1));
+                HashMap<String, Integer> uuidsToInstanceIdMap = new HashMap<String, Integer>();
+                for (String uuid : uuidsSpaceDelimited.split(" ")) {
+                    Log.v(TAG, uuid);
+                    Integer previousId = uuidsToInstanceIdMap.get(uuid);
+                    int instanceId = (previousId == null) ? 0 : previousId + 1;
+                    uuidsToInstanceIdMap.put(uuid, instanceId);
+                    fakeDevice.mGatt.mServices.add(
+                            new FakeBluetoothGattService(UUID.fromString(uuid), instanceId));
+                }
             }
 
             fakeDevice.mGattCallback.onServicesDiscovered(status);

@@ -4,12 +4,16 @@
 
 #include "device/bluetooth/test/bluetooth_test_android.h"
 
+#include "base/android/jni_string.h"
 #include "base/logging.h"
 #include "device/bluetooth/android/wrappers.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "device/bluetooth/bluetooth_device_android.h"
 #include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "jni/Fakes_jni.h"
+
+#include <iterator>
+#include <sstream>
 
 using base::android::AttachCurrentThread;
 using base::android::ScopedJavaLocalRef;
@@ -107,13 +111,21 @@ void BluetoothTestAndroid::SimulateGattDisconnection(BluetoothDevice* device) {
 }
 
 void BluetoothTestAndroid::SimulateGattServicesDiscovered(
-    BluetoothDevice* device) {
+    BluetoothDevice* device,
+    std::vector<std::string> uuids) {
   BluetoothDeviceAndroid* device_android =
       static_cast<BluetoothDeviceAndroid*>(device);
+  JNIEnv* env = base::android::AttachCurrentThread();
+
+  std::ostringstream uuids_space_delimited;
+  std::copy(uuids.begin(), uuids.end(),
+            std::ostream_iterator<std::string>(uuids_space_delimited, " "));
 
   Java_FakeBluetoothDevice_servicesDiscovered(
-      AttachCurrentThread(), device_android->GetJavaObject().obj(),
-      0);  // android.bluetooth.BluetoothGatt.GATT_SUCCESS
+      env, device_android->GetJavaObject().obj(),
+      0,  // android.bluetooth.BluetoothGatt.GATT_SUCCESS
+      base::android::ConvertUTF8ToJavaString(env, uuids_space_delimited.str())
+          .obj());
 }
 
 void BluetoothTestAndroid::SimulateGattServicesDiscoveryError(
@@ -123,7 +135,8 @@ void BluetoothTestAndroid::SimulateGattServicesDiscoveryError(
 
   Java_FakeBluetoothDevice_servicesDiscovered(
       AttachCurrentThread(), device_android->GetJavaObject().obj(),
-      0x00000101);  // android.bluetooth.BluetoothGatt.GATT_FAILURE
+      0x00000101,  // android.bluetooth.BluetoothGatt.GATT_FAILURE
+      nullptr);
 }
 
 void BluetoothTestAndroid::OnFakeBluetoothDeviceConnectGattCalled(

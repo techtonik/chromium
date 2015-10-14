@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device/bluetooth/bluetooth_device.h"
+#include "device/bluetooth/bluetooth_gatt_service.h"
 
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -11,9 +11,6 @@
 #elif defined(OS_MACOSX)
 #include "device/bluetooth/test/bluetooth_test_mac.h"
 #endif
-
-// MOVE
-#include "device/bluetooth/bluetooth_gatt_service.h"
 
 namespace device {
 
@@ -28,10 +25,11 @@ TEST_F(BluetoothTest, GetUUID) {
   SimulateGattConnection(device);
   EXPECT_EQ(1, gatt_discovery_attempts_);
 
-  // TODO Clean this up some
-  SimulateGattServicesDiscovered(device);
+  std::vector<std::string> services;
+  services.push_back("00000000-0000-1000-8000-00805f9b34fb");
+  SimulateGattServicesDiscovered(device, services);
   bool foundUUID = false;
-  BluetoothUUID searchUUID("00001800-0000-1000-8000-00805f9b34fb");
+  BluetoothUUID searchUUID("00000000-0000-1000-8000-00805f9b34fb");
   for (const auto& service : device->GetGattServices())
     if (service->GetUUID() == searchUUID)
       foundUUID = true;
